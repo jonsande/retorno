@@ -9,6 +9,8 @@ class JobType(str, Enum):
     REPAIR_SYSTEM = "repair_system"
     BOOT_SERVICE = "boot_service"
     DEPLOY_DRONE = "deploy_drone"
+    DOCK = "dock"
+    SALVAGE = "salvage"
 
 
 class JobStatus(str, Enum):

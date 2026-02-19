@@ -26,6 +26,7 @@ class PowerShed(Action):
 class DroneDeploy(Action):
     drone_id: str
     sector_id: str
+    emergency: bool = False
 
 
 @dataclass(slots=True)
@@ -37,3 +38,15 @@ class Repair(Action):
 @dataclass(slots=True)
 class Boot(Action):
     service_name: str
+
+
+@dataclass(slots=True)
+class Dock(Action):
+    node_id: str
+
+
+@dataclass(slots=True)
+class Salvage(Action):
+    node_id: str
+    kind: str
+    amount: int = 1

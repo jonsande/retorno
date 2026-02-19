@@ -21,4 +21,5 @@ class SpaceGraph:
 class WorldState:
     space: SpaceGraph = field(default_factory=SpaceGraph)
     known_contacts: set[str] = field(default_factory=set)
+    current_node_id: str = "SHIP_1"
     rng_seed: int = 0

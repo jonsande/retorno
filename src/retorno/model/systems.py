@@ -56,6 +56,9 @@ class ShipSystem:
     k_power: float
     k_rad: float
 
+    state_locked: bool = False
+    forced_offline: bool = False
+
     dependencies: list[Dependency] = field(default_factory=list)
     service: ServiceState | None = None
     tags: set[str] = field(default_factory=set)

@@ -20,6 +20,9 @@ class EventType(str, Enum):
     JOB_COMPLETED = "job_completed"
     JOB_FAILED = "job_failed"
     BOOT_BLOCKED = "boot_blocked"
+    SIGNAL_DETECTED = "signal_detected"
+    JOB_QUEUED = "job_queued"
+    DOCKED = "docked"
 
 
 @dataclass(slots=True)
@@ -48,6 +51,7 @@ class AlertState:
     first_seen_t: int
     last_seen_t: int
     unacked_s: int = 0
+    acknowledged: bool = False
     data: dict[str, Any] = field(default_factory=dict)
     is_active: bool = True
 

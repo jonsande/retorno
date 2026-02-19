@@ -1,21 +1,23 @@
 from __future__ import annotations
 
-from dataclasses import replace
+import random
 from typing import Iterable
 
 from retorno.core.actions import (
     Action,
     Boot,
     Diag,
+    Dock,
     DroneDeploy,
     PowerShed,
     Repair,
+    Salvage,
     Status,
 )
 from retorno.core.gamestate import GameState
 from retorno.model.drones import DroneLocation, DroneStatus
 from retorno.model.events import AlertState, Event, EventManagerState, EventType, Severity, SourceRef
-from retorno.model.jobs import Job, JobManagerState, JobStatus, JobType, TargetRef
+from retorno.model.jobs import Job, JobManagerState, JobStatus, JobType, RiskProfile, TargetRef
 from retorno.model.systems import Dependency, ShipSystem, SystemState
 
 
@@ -27,67 +29,35 @@ class Engine:
 
     _REPAIR_TIME_S = 25.0
     _DEPLOY_TIME_S = 6.0
+    _DOCK_TIME_S = 12.0
+    _SALVAGE_BASE_TIME_S = 8.0
 
     def tick(self, state: GameState, dt: float) -> list[Event]:
         if dt <= 0:
             return []
 
         state.clock.last_dt = dt
-        state.clock.t += int(dt)
+        state.clock.t += dt
 
         events: list[Event] = []
 
         events.extend(self._process_jobs(state, dt))
 
         p_load = self._compute_load_kw(state.ship.systems.values())
-        state.ship.power.p_load_kw = p_load
-
         p_gen = state.ship.power.p_gen_kw
         p_discharge_max = state.ship.power.p_discharge_max_kw
-        p_charge_max = state.ship.power.p_charge_max_kw
-
-        deficit_ratio = 0.0
-        net = p_gen - p_load
-        if net >= 0:
-            charge_kw = min(net, p_charge_max)
-            delta_e = (charge_kw * dt / 3600.0) * state.ship.power.eta_charge
-            state.ship.power.e_batt_kwh = min(
-                state.ship.power.e_batt_max_kwh,
-                state.ship.power.e_batt_kwh + delta_e,
-            )
-        else:
-            discharge_kw = min(-net, p_discharge_max)
-            delta_e = (discharge_kw * dt / 3600.0) / max(state.ship.power.eta_discharge, 1e-6)
-            state.ship.power.e_batt_kwh = max(
-                0.0,
-                state.ship.power.e_batt_kwh - delta_e,
-            )
-            if -net > p_discharge_max and p_load > 0:
-                deficit_ratio = min(1.0, (-net - p_discharge_max) / p_load)
-
-        state.ship.power.deficit_ratio = deficit_ratio
-        soc = (
-            state.ship.power.e_batt_kwh / state.ship.power.e_batt_max_kwh
-            if state.ship.power.e_batt_max_kwh > 0
-            else 0.0
-        )
-        q_soc = self._clamp(soc)
-        q_def = self._clamp(1.0 - deficit_ratio)
-        power_quality = 0.6 * q_soc + 0.4 * q_def
-
-        distribution = state.ship.systems.get("energy_distribution")
-        if distribution and distribution.state in (SystemState.DAMAGED, SystemState.CRITICAL):
-            power_quality -= 0.10
-
-        power_quality = self._clamp(power_quality)
-        state.ship.power.power_quality = power_quality
 
         if p_load > p_gen + p_discharge_max:
             events.extend(self._auto_load_shed(state, p_gen + p_discharge_max, p_load))
             p_load = self._compute_load_kw(state.ship.systems.values())
-            state.ship.power.p_load_kw = p_load
 
-        self._apply_degradation(state, dt, power_quality)
+        state.ship.power.p_load_kw = p_load
+
+        self._update_battery(state, dt, p_gen, p_load)
+        power_quality = self._compute_power_quality(state, p_gen, p_load)
+        state.ship.power.power_quality = power_quality
+
+        events.extend(self._apply_degradation(state, dt, power_quality))
         self._apply_radiation(state, dt)
 
         events.extend(self._update_alerts(state, p_load, p_gen, power_quality))
@@ -106,6 +76,86 @@ class Engine:
         if isinstance(action, Diag):
             return []
 
+        if isinstance(action, Dock):
+            node = state.world.space.nodes.get(action.node_id)
+            if not node:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    f"Dock blocked: node {action.node_id} not found",
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if action.node_id != state.world.current_node_id and action.node_id not in state.world.known_contacts:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    f"Dock blocked: unknown contact {action.node_id}",
+                )
+                self._record_event(state.events, event)
+                return [event]
+            events = self._enqueue_job(
+                state,
+                JobType.DOCK,
+                TargetRef(kind="world_node", id=action.node_id),
+                owner_id=None,
+                eta_s=self._DOCK_TIME_S,
+                params={"node_id": action.node_id},
+            )
+            event = self._make_event(
+                state,
+                EventType.JOB_QUEUED,
+                Severity.INFO,
+                SourceRef(kind="world", id=action.node_id),
+                f"Job queued: dock {action.node_id} (ETA {int(self._DOCK_TIME_S)}s)",
+            )
+            self._record_event(state.events, event)
+            return [event, *events]
+
+        if isinstance(action, Salvage):
+            if action.amount <= 0:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    "Salvage blocked: amount must be > 0",
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if state.world.current_node_id != action.node_id:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    f"Salvage blocked: not docked at {action.node_id}",
+                )
+                self._record_event(state.events, event)
+                return [event]
+            eta = self._SALVAGE_BASE_TIME_S + float(action.amount)
+            events = self._enqueue_job(
+                state,
+                JobType.SALVAGE,
+                TargetRef(kind="world_node", id=action.node_id),
+                owner_id=None,
+                eta_s=eta,
+                params={"node_id": action.node_id, "kind": action.kind, "amount": action.amount},
+            )
+            event = self._make_event(
+                state,
+                EventType.JOB_QUEUED,
+                Severity.INFO,
+                SourceRef(kind="world", id=action.node_id),
+                f"Job queued: salvage {action.node_id} (ETA {int(eta)}s)",
+            )
+            self._record_event(state.events, event)
+            return [event, *events]
+
         if isinstance(action, PowerShed):
             system = state.ship.systems.get(action.system_id)
             if not system:
@@ -113,19 +163,83 @@ class Engine:
             if system.state != SystemState.OFFLINE:
                 old_state = system.state
                 system.state = SystemState.OFFLINE
+                system.forced_offline = True
                 event = self._make_event(
                     state,
                     EventType.SYSTEM_STATE_CHANGED,
                     Severity.WARN,
                     SourceRef(kind="ship_system", id=system.system_id),
                     f"Manual power shed: {system.system_id} -> OFFLINE",
-                    data={"from": old_state.value, "to": system.state.value},
+                    data={"from": old_state.value, "to": system.state.value, "cause": "manual_shed"},
                 )
                 self._record_event(state.events, event)
                 return [event]
+            system.forced_offline = True
             return []
 
         if isinstance(action, DroneDeploy):
+            drone = state.ship.drones.get(action.drone_id)
+            if not drone:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=action.drone_id),
+                    f"Drone deploy blocked: drone {action.drone_id} not found",
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if drone.status != DroneStatus.DOCKED:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Drone deploy blocked: {drone.drone_id} not docked",
+                )
+                self._record_event(state.events, event)
+                return [event]
+            drone_bay = state.ship.systems.get("drone_bay")
+            if not drone_bay or drone_bay.state == SystemState.OFFLINE or drone_bay.forced_offline:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id="drone_bay"),
+                    "Drone deploy blocked: drone bay offline",
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if self._dependencies_blocked(state.ship.systems, drone_bay.dependencies):
+                if not action.emergency:
+                    event = self._make_event(
+                        state,
+                        EventType.BOOT_BLOCKED,
+                        Severity.WARN,
+                        SourceRef(kind="ship_system", id="drone_bay"),
+                        "Drone deploy blocked: drone bay dependencies unmet",
+                    )
+                    self._record_event(state.events, event)
+                    return [event]
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id="drone_bay"),
+                    "Emergency override: deploying despite unmet dependencies",
+                    data={"emergency": True},
+                )
+                self._record_event(state.events, event)
+                return self._enqueue_job(
+                    state,
+                    JobType.DEPLOY_DRONE,
+                    TargetRef(kind="ship_sector", id=action.sector_id),
+                    owner_id=action.drone_id,
+                    eta_s=self._DEPLOY_TIME_S,
+                    params={"drone_id": action.drone_id, "emergency": True},
+                    risk=RiskProfile(p_glitch_per_s=0.05, p_fail_per_s=0.03),
+                )
+
             return self._enqueue_job(
                 state,
                 JobType.DEPLOY_DRONE,
@@ -136,13 +250,49 @@ class Engine:
             )
 
         if isinstance(action, Repair):
+            drone = state.ship.drones.get(action.drone_id)
+            if not drone:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=action.drone_id),
+                    f"Repair blocked: drone {action.drone_id} not found",
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if drone.status != DroneStatus.DEPLOYED:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Repair blocked: {drone.drone_id} not deployed",
+                )
+                self._record_event(state.events, event)
+                return [event]
+            target_system = state.ship.systems.get(action.system_id)
+            if not target_system:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=action.system_id),
+                    f"Repair blocked: system {action.system_id} not found",
+                )
+                self._record_event(state.events, event)
+                return [event]
+
+            params = {"drone_id": action.drone_id}
+            if action.system_id == "energy_distribution":
+                params["repair_amount"] = 0.25
             return self._enqueue_job(
                 state,
                 JobType.REPAIR_SYSTEM,
                 TargetRef(kind="ship_system", id=action.system_id),
                 owner_id=action.drone_id,
                 eta_s=self._REPAIR_TIME_S,
-                params={"drone_id": action.drone_id},
+                params=params,
             )
 
         if isinstance(action, Boot):
@@ -193,6 +343,12 @@ class Engine:
                 continue
             if job.status == JobStatus.QUEUED:
                 job.status = JobStatus.RUNNING
+            if job.params.get("emergency"):
+                failed_event = self._maybe_fail_emergency_job(state, job, dt)
+                if failed_event:
+                    events.append(failed_event)
+                    completed.append(job_id)
+                    continue
 
             job.eta_s -= dt
             if job.eta_s <= 0:
@@ -211,9 +367,12 @@ class Engine:
         if job.job_type == JobType.REPAIR_SYSTEM and job.target:
             system = state.ship.systems.get(job.target.id)
             if system:
-                system.health = 1.0
-                if system.state in (SystemState.DAMAGED, SystemState.CRITICAL):
-                    system.state = SystemState.NOMINAL
+                default_repair = 0.25 if system.system_id == "energy_distribution" else 0.15
+                repair_amount = float(job.params.get("repair_amount", default_repair))
+                system.health = min(1.0, system.health + repair_amount)
+                if system.system_id == "energy_distribution":
+                    system.state_locked = False
+                self._apply_health_state(system, state, events, cause="repair")
                 events.append(
                     self._make_event(
                         state,
@@ -231,6 +390,10 @@ class Engine:
             system = state.ship.systems.get(system_id) if system_id else None
             if system and system.service:
                 system.service.is_running = True
+                if system.state_locked:
+                    system.state_locked = False
+                if not system.forced_offline:
+                    self._apply_health_state(system, state, events, cause="boot")
                 events.append(
                     self._make_event(
                         state,
@@ -241,6 +404,19 @@ class Engine:
                         data={"job_id": job.job_id},
                     )
                 )
+                if system.service.service_name == "sensord":
+                    if "ECHO_7" not in state.world.known_contacts:
+                        state.world.known_contacts.add("ECHO_7")
+                        events.append(
+                            self._make_event(
+                                state,
+                                EventType.SIGNAL_DETECTED,
+                                Severity.INFO,
+                                SourceRef(kind="ship_system", id=system.system_id),
+                                "Signal detected: ECHO-7",
+                                data={"contact_id": "ECHO_7"},
+                            )
+                        )
             return events
 
         if job.job_type == JobType.DEPLOY_DRONE and job.target:
@@ -261,6 +437,38 @@ class Engine:
                 )
             return events
 
+        if job.job_type == JobType.DOCK and job.target:
+            state.world.current_node_id = job.target.id
+            events.append(
+                self._make_event(
+                    state,
+                    EventType.DOCKED,
+                    Severity.INFO,
+                    SourceRef(kind="world", id=job.target.id),
+                    f"Docked at {job.target.id}",
+                    data={"job_id": job.job_id},
+                )
+            )
+            return events
+
+        if job.job_type == JobType.SALVAGE and job.target:
+            node_id = job.params.get("node_id", job.target.id)
+            kind = job.params.get("kind", "scrap")
+            amount = int(job.params.get("amount", 1))
+            if kind == "scrap":
+                state.ship.inventory.scrap += amount
+            events.append(
+                self._make_event(
+                    state,
+                    EventType.JOB_COMPLETED,
+                    Severity.INFO,
+                    SourceRef(kind="world", id=node_id),
+                    f"Salvage complete: +{amount} {kind} from {node_id}",
+                    data={"job_id": job.job_id, "kind": kind, "amount": amount},
+                )
+            )
+            return events
+
         return events
 
     def _compute_load_kw(self, systems: Iterable[ShipSystem]) -> float:
@@ -276,11 +484,12 @@ class Engine:
         for system in systems_sorted:
             if p_load <= p_capacity:
                 break
-            if system.state == SystemState.OFFLINE:
+            if system.state == SystemState.OFFLINE or system.priority == 1:
                 continue
             prev_load = system.p_effective_kw()
             old_state = system.state
             system.state = SystemState.OFFLINE
+            # Auto-shed is reversible; do not mark forced_offline.
             p_load -= prev_load
             events.append(
                 self._make_event(
@@ -292,14 +501,29 @@ class Engine:
                     data={"from": old_state.value, "to": system.state.value},
                 )
             )
+        if p_load > p_capacity:
+            state.ship.power.brownout = True
+            events.append(
+                self._make_event(
+                    state,
+                    EventType.POWER_NET_DEFICIT,
+                    Severity.CRITICAL,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    "Capacity exceeded, vital systems at risk",
+                    data={"p_load_kw": p_load, "p_capacity_kw": p_capacity},
+                )
+            )
         return events
 
-    def _apply_degradation(self, state: GameState, dt: float, power_quality: float) -> None:
+    def _apply_degradation(self, state: GameState, dt: float, power_quality: float) -> list[Event]:
         r_env = state.ship.radiation_env_rad_per_s
         r_env_norm = self._clamp(r_env / self._R_REF)
+        events: list[Event] = []
         for system in state.ship.systems.values():
             s_factor = 1.0 + system.k_power * (1.0 - power_quality) + system.k_rad * r_env_norm
             system.health = max(0.0, system.health - system.base_decay_per_s * s_factor * dt)
+            self._apply_health_state(system, state, events, cause="degradation")
+        return events
 
     def _apply_radiation(self, state: GameState, dt: float) -> None:
         r_env = state.ship.radiation_env_rad_per_s
@@ -384,7 +608,7 @@ class Engine:
         key = event_type.value
         alert = state.events.alerts.get(key)
         if alert and alert.is_active:
-            alert.last_seen_t = state.clock.t
+            alert.last_seen_t = int(state.clock.t)
             if severity == Severity.CRITICAL:
                 alert.severity = Severity.CRITICAL
             if data:
@@ -397,8 +621,8 @@ class Engine:
         state.events.alerts[key] = AlertState(
             alert_key=key,
             severity=severity,
-            first_seen_t=state.clock.t,
-            last_seen_t=state.clock.t,
+            first_seen_t=int(state.clock.t),
+            last_seen_t=int(state.clock.t),
             data=data or {},
             is_active=True,
         )
@@ -409,7 +633,7 @@ class Engine:
         if inc <= 0:
             return
         for alert in events.alerts.values():
-            if alert.is_active and not alert.data.get("acknowledged", False):
+            if alert.is_active and not alert.acknowledged:
                 alert.unacked_s += inc
 
     def _record_event(self, events: EventManagerState, event: Event) -> None:
@@ -430,7 +654,7 @@ class Engine:
         state.events.next_event_seq += 1
         return Event(
             event_id=f"E{seq:05d}",
-            t=state.clock.t,
+            t=int(state.clock.t),
             type=event_type,
             severity=severity,
             source=source,
@@ -446,6 +670,7 @@ class Engine:
         owner_id: str | None,
         eta_s: float,
         params: dict,
+        risk: RiskProfile | None = None,
     ) -> list[Event]:
         job_id = f"J{state.jobs.next_job_seq:05d}"
         state.jobs.next_job_seq += 1
@@ -458,6 +683,8 @@ class Engine:
             target=target,
             params=params,
         )
+        if risk is not None:
+            job.risk = risk
         state.jobs.jobs[job_id] = job
         state.jobs.active_job_ids.append(job_id)
         return []
@@ -501,3 +728,117 @@ class Engine:
         if value > hi:
             return hi
         return value
+
+    def _update_battery(self, state: GameState, dt: float, p_gen: float, p_load: float) -> None:
+        p_charge_max = state.ship.power.p_charge_max_kw
+        p_discharge_max = state.ship.power.p_discharge_max_kw
+        net = p_gen - p_load
+        if net >= 0:
+            charge_kw = min(net, p_charge_max)
+            delta_e = (charge_kw * dt / 3600.0) * state.ship.power.eta_charge
+            state.ship.power.e_batt_kwh = min(
+                state.ship.power.e_batt_max_kwh,
+                state.ship.power.e_batt_kwh + delta_e,
+            )
+        else:
+            discharge_kw = min(-net, p_discharge_max)
+            delta_e = (discharge_kw * dt / 3600.0) / max(state.ship.power.eta_discharge, 1e-6)
+            state.ship.power.e_batt_kwh = max(
+                0.0,
+                state.ship.power.e_batt_kwh - delta_e,
+            )
+
+    def _compute_power_quality(self, state: GameState, p_gen: float, p_load: float) -> float:
+        if state.ship.power.e_batt_max_kwh > 0:
+            soc = state.ship.power.e_batt_kwh / state.ship.power.e_batt_max_kwh
+        else:
+            soc = 0.0
+        q_soc = self._clamp((soc - 0.10) / (0.50 - 0.10))
+        p_deficit = max(0.0, p_load - p_gen)
+        p_deficit_ratio = (
+            self._clamp(p_deficit / state.ship.power.p_discharge_max_kw)
+            if state.ship.power.p_discharge_max_kw > 0
+            else 1.0
+        )
+        state.ship.power.deficit_ratio = p_deficit_ratio
+        q_def = 1.0 - 0.7 * p_deficit_ratio
+        power_quality = 0.6 * q_soc + 0.4 * q_def
+
+        distribution = state.ship.systems.get("energy_distribution")
+        if distribution and distribution.state in (SystemState.DAMAGED, SystemState.CRITICAL):
+            power_quality -= 0.10
+
+        return self._clamp(power_quality)
+
+    def _apply_health_state(
+        self,
+        system: ShipSystem,
+        state: GameState,
+        events: list[Event],
+        cause: str,
+    ) -> None:
+        if system.forced_offline:
+            system.state = SystemState.OFFLINE
+            return
+        if system.state_locked:
+            return
+        old_state = system.state
+        h = system.health
+        if h <= 0.0:
+            new_state = SystemState.OFFLINE
+        elif h < 0.35:
+            new_state = SystemState.CRITICAL
+        elif h < 0.60:
+            new_state = SystemState.DAMAGED
+        elif h < 0.85:
+            new_state = SystemState.LIMITED
+        else:
+            new_state = SystemState.NOMINAL
+
+        if new_state != old_state:
+            system.state = new_state
+            events.append(
+                self._make_event(
+                    state,
+                    EventType.SYSTEM_STATE_CHANGED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=system.system_id),
+                    f"System state changed: {system.system_id}",
+                    data={
+                        "from": old_state.value,
+                        "to": new_state.value,
+                        "cause": cause,
+                        "health": system.health,
+                    },
+                )
+            )
+
+    def _maybe_fail_emergency_job(self, state: GameState, job: Job, dt: float) -> Event | None:
+        p_fail = self._clamp(job.risk.p_fail_per_s * dt)
+        if p_fail <= 0:
+            return None
+        rng = self._job_rng(state, job)
+        if rng.random() >= p_fail:
+            return None
+
+        job.status = JobStatus.FAILED
+        source = SourceRef(kind="ship", id=state.ship.ship_id)
+        if job.owner_id:
+            drone = state.ship.drones.get(job.owner_id)
+            if drone:
+                drone.status = DroneStatus.DISABLED
+                drone.integrity = max(0.0, drone.integrity - 0.25)
+                source = SourceRef(kind="drone", id=drone.drone_id)
+        return self._make_event(
+            state,
+            EventType.JOB_FAILED,
+            Severity.WARN,
+            source,
+            f"Emergency job failed: {job.job_type.value}",
+            data={"job_id": job.job_id, "emergency": True},
+        )
+
+    def _job_rng(self, state: GameState, job: Job) -> random.Random:
+        job_num = int(job.job_id[1:]) if job.job_id.startswith("J") else 0
+        seed = state.meta.rng_seed + int(state.clock.t * 1000.0) + job_num
+        return random.Random(seed)
