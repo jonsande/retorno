@@ -1,0 +1,56 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+from retorno.model.drones import DroneState, Inventory
+from retorno.model.systems import ShipSystem
+
+
+@dataclass(slots=True)
+class ShedPolicyState:
+    low_soc_threshold: float = 0.15
+
+
+@dataclass(slots=True)
+class PowerNetworkState:
+    p_gen_kw: float
+    e_batt_kwh: float
+    e_batt_max_kwh: float
+    p_charge_max_kw: float
+    p_discharge_max_kw: float
+    eta_charge: float = 1.0
+    eta_discharge: float = 1.0
+
+    p_load_kw: float = 0.0
+    deficit_ratio: float = 0.0
+    power_quality: float = 1.0
+
+    brownout: bool = False
+    shed_policy: ShedPolicyState = field(default_factory=ShedPolicyState)
+
+
+@dataclass(slots=True)
+class ShipLocation:
+    # simplificado para v0
+    sector_id: str = "UNKNOWN"
+
+
+@dataclass(slots=True)
+class ShipState:
+    ship_id: str
+    name: str
+
+    location: ShipLocation = field(default_factory=ShipLocation)
+    hull_integrity: float = 1.0
+
+    # radiación interior base (luego por sectores/nodos)
+    radiation_env_rad_per_s: float = 0.001
+
+    power: PowerNetworkState = field(default_factory=lambda: PowerNetworkState(
+        p_gen_kw=0.0, e_batt_kwh=0.0, e_batt_max_kwh=1.0, p_charge_max_kw=1.0, p_discharge_max_kw=1.0
+    ))
+
+    systems: dict[str, ShipSystem] = field(default_factory=dict)
+    drones: dict[str, DroneState] = field(default_factory=dict)
+
+    inventory: Inventory = field(default_factory=Inventory)
