@@ -50,3 +50,13 @@ class Salvage(Action):
     node_id: str
     kind: str
     amount: int = 1
+
+
+@dataclass(slots=True)
+class Install(Action):
+    module_id: str
+
+
+@dataclass(slots=True)
+class DroneReboot(Action):
+    drone_id: str

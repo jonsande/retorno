@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import difflib
 
-from retorno.core.actions import Boot, Diag, Dock, DroneDeploy, PowerShed, Repair, Salvage, Status
+from retorno.core.actions import Boot, Diag, Dock, DroneDeploy, DroneReboot, Install, PowerShed, Repair, Salvage, Status
 
 
 @dataclass(slots=True)
@@ -35,7 +36,11 @@ def parse_command(line: str):
         return Status()
 
     if cmd == "alerts":
-        return "ALERTS"
+        if len(args) == 0:
+            return "ALERTS"
+        if len(args) == 2 and args[0] == "explain":
+            return ("ALERTS_EXPLAIN", args[1])
+        raise ParseError("Uso: alerts | alerts explain <alert_key>")
 
     if cmd == "logs":
         return "LOGS"
@@ -51,6 +56,11 @@ def parse_command(line: str):
             raise ParseError("wait: <segundos> debe ser > 0")
         return ("WAIT", seconds)
 
+    if cmd == "debug":
+        if len(args) != 1 or args[0] not in {"on", "off", "status"}:
+            raise ParseError("Uso: debug on|off|status")
+        return ("DEBUG", args[0])
+
     if cmd == "dock":
         if len(args) != 1:
             raise ParseError("Uso: dock <node_id>")
@@ -62,19 +72,66 @@ def parse_command(line: str):
         node_id = args[0]
         kind = "scrap"
         amount = 1
-        if len(args) >= 2:
-            kind = args[1]
+        if len(args) == 2:
+            try:
+                amount = int(args[1])
+                kind = "scrap"
+            except ValueError:
+                kind = args[1]
         if len(args) == 3:
+            kind = args[1]
             try:
                 amount = int(args[2])
             except ValueError as e:
                 raise ParseError("salvage: amount debe ser entero") from e
+        if amount <= 0:
+            raise ParseError("salvage: amount debe ser > 0")
         return Salvage(node_id=node_id, kind=kind, amount=amount)
+
+    if cmd == "inventory":
+        return "INVENTORY"
+
+    if cmd == "modules":
+        return "MODULES"
+
+    if cmd == "config":
+        if len(args) == 0 or (len(args) == 1 and args[0] == "show"):
+            return "CONFIG_SHOW"
+        if len(args) == 3 and args[0] == "set" and args[1] == "lang":
+            lang = args[2].lower()
+            if lang not in {"en", "es"}:
+                raise ParseError("config set lang <en|es>")
+            return ("CONFIG_SET_LANG", lang)
+        raise ParseError("Uso: config set lang <en|es> | config show")
+
+    if cmd == "mail":
+        if len(args) > 2:
+            raise ParseError("Uso: mail [inbox] | mail read <id|latest>")
+        if len(args) == 0:
+            return ("MAIL_LIST", "inbox")
+        if len(args) == 1:
+            return ("MAIL_LIST", args[0])
+        if len(args) == 2 and args[0] == "read":
+            return ("MAIL_READ", args[1])
+        raise ParseError("Uso: mail [inbox] | mail read <id|latest>")
+
+    if cmd == "sectors" or cmd == "map":
+        return "SECTORS"
+
+    if cmd == "locate":
+        if len(args) != 1:
+            raise ParseError("Uso: locate <system_id>")
+        return ("LOCATE", args[0])
 
     if cmd == "diag":
         if len(args) != 1:
             raise ParseError("Uso: diag <system_id>")
         return Diag(system_id=args[0])
+
+    if cmd == "install":
+        if len(args) != 1:
+            raise ParseError("Uso: install <module_id>")
+        return Install(module_id=args[0])
 
     if cmd == "ls":
         if len(args) > 1:
@@ -120,6 +177,10 @@ def parse_command(line: str):
         sub = args[0].lower()
         if sub == "status":
             return "DRONE_STATUS"
+        if sub == "reboot":
+            if len(args) != 2:
+                raise ParseError("Uso: drone reboot <drone_id>")
+            return DroneReboot(drone_id=args[1])
         emergency = False
         if sub in {"deploy", "deploy!"}:
             emergency = sub.endswith("!")
@@ -137,4 +198,40 @@ def parse_command(line: str):
             raise ParseError("Uso: repair <drone_id> <system_id>")
         return Repair(drone_id=args[0], system_id=args[1])
 
+    suggestion = _suggest_command(cmd)
+    if suggestion:
+        raise ParseError(f"Comando desconocido: {cmd}. ¿Quizá quisiste decir: {suggestion} ?")
     raise ParseError(f"Comando desconocido: {cmd}")
+
+
+def _suggest_command(cmd: str) -> str | None:
+    commands = [
+        "help",
+        "status",
+        "alerts",
+        "diag",
+        "about",
+        "man",
+        "config",
+        "mail",
+        "ls",
+        "cat",
+        "contacts",
+        "scan",
+        "sectors",
+        "map",
+        "locate",
+        "dock",
+        "salvage",
+        "drone",
+        "repair",
+        "boot",
+        "wait",
+        "debug",
+        "power",
+        "logs",
+        "exit",
+        "quit",
+    ]
+    matches = difflib.get_close_matches(cmd, commands, n=1, cutoff=0.6)
+    return matches[0] if matches else None

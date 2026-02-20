@@ -23,6 +23,10 @@ class EventType(str, Enum):
     SIGNAL_DETECTED = "signal_detected"
     JOB_QUEUED = "job_queued"
     DOCKED = "docked"
+    SALVAGE_SCRAP_GAINED = "salvage_scrap_gained"
+    SALVAGE_MODULE_FOUND = "salvage_module_found"
+    MODULE_INSTALLED = "module_installed"
+    DRONE_DISABLED = "drone_disabled"
 
 
 @dataclass(slots=True)

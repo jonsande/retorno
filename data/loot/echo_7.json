@@ -1,0 +1,12 @@
+{
+  "scrap": {
+    "min": 2,
+    "max": 6
+  },
+  "module_drop_chance": 0.35,
+  "modules": [
+    { "id": "bus_stabilizer", "weight": 3 },
+    { "id": "aux_battery_cell", "weight": 2 },
+    { "id": "micro_reactor_patch", "weight": 1 }
+  ]
+}

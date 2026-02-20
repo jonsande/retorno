@@ -11,6 +11,8 @@ class JobType(str, Enum):
     DEPLOY_DRONE = "deploy_drone"
     DOCK = "dock"
     SALVAGE = "salvage"
+    INSTALL_MODULE = "install_module"
+    REBOOT_DRONE = "reboot_drone"
 
 
 class JobStatus(str, Enum):

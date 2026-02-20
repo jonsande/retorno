@@ -1,0 +1,22 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+_DATA_ROOT = Path(__file__).resolve().parents[3] / "data"
+
+
+def _node_to_filename(node_id: str) -> str:
+    return node_id.lower().replace("-", "_") + ".json"
+
+
+def load_loot(node_id: str) -> dict:
+    path = _DATA_ROOT / "loot" / _node_to_filename(node_id)
+    with path.open("r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+def load_modules() -> dict:
+    path = _DATA_ROOT / "modules.json"
+    with path.open("r", encoding="utf-8") as fh:
+        return json.load(fh)

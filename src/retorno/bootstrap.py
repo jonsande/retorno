@@ -3,8 +3,8 @@ from __future__ import annotations
 from retorno.core.gamestate import GameState
 from retorno.model.drones import DroneLocation, DroneState, DroneStatus
 from retorno.model.events import AlertState, Event, EventType, Severity, SourceRef
-from retorno.model.ship import PowerNetworkState
-from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path
+from retorno.model.ship import PowerNetworkState, ShipSector
+from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, normalize_path
 from retorno.model.systems import Dependency, ServiceState, ShipSystem, SystemState
 from retorno.model.world import SpaceNode
 
@@ -26,6 +26,7 @@ def create_initial_state_prologue() -> GameState:
             name="Core OS",
             state=SystemState.NOMINAL,
             health=1.0,
+            sector_id="BRG-01",
             p_nom_kw=0.4,
             priority=1,
             base_decay_per_s=1.0e-5,
@@ -39,6 +40,7 @@ def create_initial_state_prologue() -> GameState:
             name="Life Support",
             state=SystemState.NOMINAL,
             health=1.0,
+            sector_id="BRG-01",
             p_nom_kw=1.2,
             priority=1,
             base_decay_per_s=1.2e-5,
@@ -51,6 +53,7 @@ def create_initial_state_prologue() -> GameState:
             name="Power Core",
             state=SystemState.DAMAGED,
             health=0.6,
+            sector_id="PWR-A2",
             p_nom_kw=0.2,
             priority=2,
             base_decay_per_s=1.5e-5,
@@ -64,6 +67,7 @@ def create_initial_state_prologue() -> GameState:
             state=SystemState.DAMAGED,
             health=0.7,
             state_locked=True,
+            sector_id="PWR-A2",
             p_nom_kw=0.3,
             priority=1,
             base_decay_per_s=1.1e-5,
@@ -76,6 +80,7 @@ def create_initial_state_prologue() -> GameState:
             name="Drone Bay",
             state=SystemState.NOMINAL,
             health=0.9,
+            sector_id="DRN-BAY",
             p_nom_kw=0.6,
             priority=4,
             base_decay_per_s=1.0e-5,
@@ -96,6 +101,7 @@ def create_initial_state_prologue() -> GameState:
             name="Security",
             state=SystemState.NOMINAL,
             health=0.9,
+            sector_id="BRG-01",
             p_nom_kw=0.5,
             priority=3,
             base_decay_per_s=1.1e-5,
@@ -115,6 +121,7 @@ def create_initial_state_prologue() -> GameState:
             name="Data Core",
             state=SystemState.NOMINAL,
             health=0.9,
+            sector_id="BRG-01",
             p_nom_kw=0.4,
             priority=3,
             base_decay_per_s=1.1e-5,
@@ -135,6 +142,7 @@ def create_initial_state_prologue() -> GameState:
             state=SystemState.OFFLINE,
             health=0.85,
             state_locked=True,
+            sector_id="BRG-01",
             p_nom_kw=0.7,
             priority=4,
             base_decay_per_s=1.2e-5,
@@ -160,6 +168,12 @@ def create_initial_state_prologue() -> GameState:
             location=DroneLocation(kind="ship_sector", id="drone_bay"),
             shield_factor=0.9,
         )
+    }
+
+    state.ship.sectors = {
+        "DRN-BAY": ShipSector(sector_id="DRN-BAY", name="Drone Bay", tags={"bay"}),
+        "PWR-A2": ShipSector(sector_id="PWR-A2", name="Power Trunk A2", tags={"power"}),
+        "BRG-01": ShipSector(sector_id="BRG-01", name="Bridge Access", tags={"restricted"}),
     }
 
     state.world.space.nodes[state.ship.ship_id] = SpaceNode(
@@ -219,6 +233,7 @@ def _bootstrap_alerts(state: GameState) -> None:
 def _bootstrap_os(state: GameState) -> None:
     fs = state.os.fs
     state.os.access_level = AccessLevel.GUEST
+    state.os.locale = Locale.EN
 
     def add_dir(path: str, access: AccessLevel = AccessLevel.GUEST) -> None:
         norm = normalize_path(path)
@@ -232,6 +247,7 @@ def _bootstrap_os(state: GameState) -> None:
     add_dir("/manuals")
     add_dir("/manuals/commands")
     add_dir("/manuals/systems")
+    add_dir("/manuals/alerts")
     add_dir("/mail")
     add_dir("/mail/inbox")
     add_dir("/logs", access=AccessLevel.ENG)
@@ -249,17 +265,28 @@ def _bootstrap_os(state: GameState) -> None:
         "- Verifica dependencias y servicio.\n",
     )
     add_file(
-        "/manuals/commands/boot.txt",
+        "/manuals/commands/boot.en.txt",
+        "boot <service_name>\n"
+        "- Starts an installed service.\n"
+        "- Requires dependencies satisfied.\n",
+    )
+    add_file(
+        "/manuals/commands/boot.es.txt",
         "boot <service_name>\n"
         "- Inicia un servicio instalado.\n"
         "- Requiere dependencias satisfechas.\n",
     )
     add_file(
-        "/manuals/commands/repair.txt",
+        "/manuals/commands/repair.en.txt",
+        "repair <drone_id> <system_id>\n"
+        "- Repairs a system using a drone.\n"
+        "- Repair operations require deployed drone units.\n",
+    )
+    add_file(
+        "/manuals/commands/repair.es.txt",
         "repair <drone_id> <system_id>\n"
         "- Repara un sistema con un dron.\n"
-        "- El dron debe estar desplegado.\n"
-        "- Repair operations require deployed drone units.\n",
+        "- Las reparaciones requieren drones desplegados.\n",
     )
     add_file(
         "/manuals/commands/wait.txt",
@@ -268,57 +295,219 @@ def _bootstrap_os(state: GameState) -> None:
         "- Útil para completar jobs.\n",
     )
     add_file(
-        "/manuals/commands/alerts.txt",
+        "/manuals/commands/alerts.en.txt",
         "alerts\n"
-        "- Lista alertas activas.\n"
-        "- Las críticas requieren atención.\n",
+        "- Lists active alerts.\n"
+        "- Critical alerts require attention.\n"
+        "alerts explain <alert_key>\n"
+        "- Shows explanation and current values.\n",
     )
     add_file(
-        "/manuals/commands/contacts.txt",
+        "/manuals/commands/alerts.es.txt",
+        "alerts\n"
+        "- Lista alertas activas.\n"
+        "- Las críticas requieren atención.\n"
+        "alerts explain <alert_key>\n"
+        "- Muestra explicación y valores actuales.\n",
+    )
+    add_file(
+        "/manuals/commands/inventory.en.txt",
+        "inventory\n"
+        "- Shows scrap and installed modules.\n"
+        "- Use after salvage or install.\n",
+    )
+    add_file(
+        "/manuals/commands/inventory.es.txt",
+        "inventory\n"
+        "- Muestra chatarra y módulos instalados.\n"
+        "- Úsalo después de salvage o install.\n",
+    )
+    add_file(
+        "/manuals/commands/install.en.txt",
+        "install <module_id>\n"
+        "- Installs a module from inventory.\n"
+        "- Consumes the module item.\n",
+    )
+    add_file(
+        "/manuals/commands/install.es.txt",
+        "install <module_id>\n"
+        "- Instala un módulo del inventario.\n"
+        "- Consume el módulo.\n",
+    )
+    add_file(
+        "/manuals/commands/modules.en.txt",
+        "modules\n"
+        "- Lists available module definitions.\n"
+        "- Use to inspect install options.\n",
+    )
+    add_file(
+        "/manuals/commands/modules.es.txt",
+        "modules\n"
+        "- Lista módulos disponibles.\n"
+        "- Úsalo para ver opciones de instalación.\n",
+    )
+    add_file(
+        "/manuals/commands/contacts.en.txt",
+        "contacts | scan\n"
+        "- Lists detected signals.\n"
+        "- Requires sensord active.\n",
+    )
+    add_file(
+        "/manuals/commands/contacts.es.txt",
         "contacts | scan\n"
         "- Lista señales detectadas.\n"
         "- Requiere sensord activo.\n",
     )
     add_file(
-        "/manuals/commands/dock.txt",
+        "/manuals/commands/dock.en.txt",
+        "dock <node_id>\n"
+        "- Dock the ship at a node.\n"
+        "- Must be a known contact.\n",
+    )
+    add_file(
+        "/manuals/commands/dock.es.txt",
         "dock <node_id>\n"
         "- Acopla la nave al nodo.\n"
         "- Debe ser contacto conocido.\n",
     )
     add_file(
-        "/manuals/commands/salvage.txt",
+        "/manuals/commands/salvage.en.txt",
+        "salvage <node_id> [scrap] [amount]\n"
+        "- Recover resources from a node.\n"
+        "- You must be docked there.\n",
+    )
+    add_file(
+        "/manuals/commands/salvage.es.txt",
         "salvage <node_id> [scrap] [amount]\n"
         "- Recupera recursos del nodo.\n"
         "- Debes estar acoplado allí.\n",
     )
     add_file(
-        "/manuals/systems/energy_distribution.txt",
+        "/manuals/commands/drone.en.txt",
+        "drone deploy <drone_id> <sector_id>\n"
+        "drone deploy! <drone_id> <sector_id>\n"
+        "drone reboot <drone_id>\n"
+        "- Deploys a drone to a ship sector.\n"
+        "- Use 'sectors' to list available ship sectors.\n"
+        "- Emergency deploy may risk failure.\n"
+        "- Reboot attempts recovery of a disabled drone.\n",
+    )
+    add_file(
+        "/manuals/commands/drone.es.txt",
+        "drone deploy <drone_id> <sector_id>\n"
+        "drone deploy! <drone_id> <sector_id>\n"
+        "drone reboot <drone_id>\n"
+        "- Despliega un dron a un sector de la nave.\n"
+        "- Usa 'sectors' para listar sectores disponibles.\n"
+        "- El despliegue de emergencia puede fallar.\n"
+        "- Reboot intenta recuperar un dron deshabilitado.\n",
+    )
+    add_file(
+        "/manuals/systems/energy_distribution.en.txt",
+        "energy_distribution\n"
+        "- Power routing subsystem.\n"
+        "- When integrity drops below nominal, downstream systems may refuse to initialize.\n",
+    )
+    add_file(
+        "/manuals/systems/energy_distribution.es.txt",
         "energy_distribution\n"
         "- Enrutamiento de energía.\n"
         "- Cuando la integridad cae bajo nominal, algunos sistemas pueden negarse a iniciar.\n",
     )
     add_file(
-        "/manuals/systems/power_core.txt",
+        "/manuals/systems/power_core.en.txt",
+        "power_core\n"
+        "- Primary generation core.\n"
+        "- Degraded state reduces stability.\n",
+        access=AccessLevel.ENG,
+    )
+    add_file(
+        "/manuals/systems/power_core.es.txt",
         "power_core\n"
         "- Núcleo de generación primaria.\n"
         "- Estado degradado reduce estabilidad.\n",
         access=AccessLevel.ENG,
     )
     add_file(
-        "/manuals/systems/sensors.txt",
+        "/manuals/systems/sensors.en.txt",
+        "sensors\n"
+        "- External signal detection.\n"
+        "- Boot sensord to activate.\n",
+    )
+    add_file(
+        "/manuals/systems/sensors.es.txt",
         "sensors\n"
         "- Detección de señales externas.\n"
         "- Boot sensord para activar.\n",
     )
     add_file(
-        "/manuals/systems/drone_bay.txt",
+        "/manuals/systems/drone_bay.en.txt",
+        "drone_bay\n"
+        "- Drone launch subsystem.\n"
+        "- In emergencies use deploy!.\n",
+    )
+    add_file(
+        "/manuals/systems/drone_bay.es.txt",
         "drone_bay\n"
         "- Salida de drones al casco.\n"
         "- En emergencia usa deploy!.\n",
     )
+    add_file(
+        "/manuals/alerts/power_net_deficit.en.txt",
+        "power_net_deficit\n"
+        "- Load exceeds generation (plus battery discharge limit).\n"
+        "- Typical causes: high load, low generation, damaged core.\n"
+        "- If persistent: brownouts, forced shutdowns.\n"
+        "Recommended: reduce load, repair power_core, charge batteries.\n",
+    )
+    add_file(
+        "/manuals/alerts/power_net_deficit.es.txt",
+        "power_net_deficit\n"
+        "- La carga supera la generación (más el límite de descarga).\n"
+        "- Causas típicas: carga alta, baja generación, core dañado.\n"
+        "- Si persiste: apagones, apagados forzados.\n"
+        "Recomendado: reduce consumo, aumenta generación, recarga baterías.\n",
+    )
+    add_file(
+        "/manuals/alerts/low_power_quality.en.txt",
+        "low_power_quality\n"
+        "- Power quality below nominal range.\n"
+        "- Causes: low SoC, sustained deficit, distribution damage.\n"
+        "- If persistent: system degradation accelerates.\n"
+        "Recommended: stabilize distribution, reduce load, restore SoC.\n",
+    )
+    add_file(
+        "/manuals/alerts/low_power_quality.es.txt",
+        "low_power_quality\n"
+        "- Calidad de energía por debajo del rango nominal.\n"
+        "- Causas: SoC bajo, déficit sostenido, distribución dañada.\n"
+        "- Si persiste: degradación acelerada de sistemas.\n"
+        "Recomendado: recarga baterías, reduce carga, repara `energy_distribution`.\n",
+    )
+    add_file(
+        "/manuals/alerts/power_bus_instability.en.txt",
+        "power_bus_instability\n"
+        "- Distribution bus instability detected.\n"
+        "- Often tied to damaged energy_distribution.\n"
+        "- If persistent: intermittent shutdowns, sensor dropouts.\n"
+        "Recommended: repair energy_distribution, reduce load.\n",
+    )
+    add_file(
+        "/manuals/alerts/power_bus_instability.es.txt",
+        "power_bus_instability\n"
+        "- Inestabilidad detectada en el bus de distribución.\n"
+        "- Suele asociarse a energy_distribution dañado.\n"
+        "- Si persiste: apagados intermitentes, pérdida de sensores.\n"
+        "Recomendado: repara `energy_distribution`, reduce carga.\n",
+    )
 
     add_file(
-        "/mail/inbox/0001.txt",
+        "/mail/inbox/0000.notice.txt",
+        "EN: Language can be changed with: config set lang en|es\n"
+        "ES: El idioma se puede cambiar con: config set lang en|es\n",
+    )
+    add_file(
+        "/mail/inbox/0001.en.txt",
         "FROM: Autonomous Systems\n"
         "SUBJ: Emergency Wake Event\n"
         "\n"
@@ -335,6 +524,27 @@ def _bootstrap_os(state: GameState) -> None:
         " - stabilize signal infrastructure\n"
         "\n"
         "Warning: cascading failures possible if instability persists.\n"
+        "\n"
+        "— Ship OS\n",
+    )
+    add_file(
+        "/mail/inbox/0001.es.txt",
+        "FROM: Autonomous Systems\n"
+        "SUBJ: Emergency Wake Event\n"
+        "\n"
+        "Condición de despertar activada por inestabilidad de energía.\n"
+        "\n"
+        "Integridad de la red de distribución primaria bajo umbrales nominales.\n"
+        "La salida del núcleo fluctúa.\n"
+        "\n"
+        "Protocolos de mantenimiento de emergencia disponibles para el operador consciente.\n"
+        "\n"
+        "Acciones recomendadas:\n"
+        " - revisar diagnósticos del sistema\n"
+        " - evaluar disponibilidad de drones de mantenimiento\n"
+        " - estabilizar la infraestructura de señal\n"
+        "\n"
+        "Advertencia: fallas en cascada posibles si la inestabilidad persiste.\n"
         "\n"
         "— Ship OS\n",
     )

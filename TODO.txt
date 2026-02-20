@@ -1,0 +1,49 @@
+- [ ] La cantidad de scrap que se ordena recuperar con 'salvage' tiene que afectar al tiempo
+que se tarda en llevar a cabo la tarea.
+- [ ] Establecer límite de scrap que se puede obtener de un derelict u objeto dockable.
+- [ ] Obtener scrap debería de hacerse con un dron (específico para las tareas de salvage),
+sin tener el cual (o sin estar operativo y desplegado en el nodo adecuado) no debe ser posible
+obtener scrap. 
+
+- [ ] La cuestión de implementar Textual.
+
+- [ ] Un comando que liste los trabajos (jobs) en proceso o en cola.
+
+- [ ] Ahora mismo tu status muestra P_load=4.20kW estando docked; eso sugiere que el docking 
+añade consumo o activa algo. Está bien, pero ojo con el prólogo: podrías querer que dock 
+reduzca carga (porque apagas motores) o que cambie perfil. No lo toques ahora; solo para 
+tenerlo en mente.
+
+- [ ] repair debería consumir algo. Como mínimo scrap.
+
+- [ ] boot sensord no está devolviendo ningún mensaje.
+
+- [ ] debería haber un límite de scrap y un máximo de módules encontrables (y que todo esto sea configurable en el json).
+- [ ] Si quieres, también podemos añadir un mail automático al primer módulo encontrado (lore + “esto se instala con install <id>”), pero lo dejo para después de que el loop funcione.
+
+Después de esto
+
+Ya tendrás:
+
+prólogo puzzle
+
+transición sandbox
+
+progresión sistémica
+
+mejora de nave
+
+determinismo reproducible
+
+Y entonces podremos empezar a hablar de:
+
+economía
+
+viajes
+
+amenazas
+
+eventos dinámicos
+
+Cuando Codex termine, pega el resultado de salvage + inventory y lo analizamos.
+

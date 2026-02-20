@@ -1,0 +1,23 @@
+{
+  "bus_stabilizer": {
+    "name": "Bus Stabilizer",
+    "desc_en": "Stabilizes power bus phase alignment.",
+    "desc_es": "Estabiliza la alineación de fase del bus de energía.",
+    "scrap_cost": 12,
+    "effects": { "power_quality_offset": 0.05 }
+  },
+  "aux_battery_cell": {
+    "name": "Aux Battery Cell",
+    "desc_en": "Adds auxiliary battery capacity.",
+    "desc_es": "Añade capacidad auxiliar de baterías.",
+    "scrap_cost": 20,
+    "effects": { "e_batt_bonus_kwh": 2.0 }
+  },
+  "micro_reactor_patch": {
+    "name": "Micro Reactor Patch",
+    "desc_en": "Boosts generation output slightly.",
+    "desc_es": "Aumenta ligeramente la generación.",
+    "scrap_cost": 30,
+    "effects": { "p_gen_bonus_kw": 0.5 }
+  }
+}

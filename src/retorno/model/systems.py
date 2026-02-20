@@ -56,6 +56,7 @@ class ShipSystem:
     k_power: float
     k_rad: float
 
+    sector_id: str = "UNKNOWN"
     state_locked: bool = False
     forced_offline: bool = False
 

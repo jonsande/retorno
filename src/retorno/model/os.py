@@ -10,6 +10,11 @@ class AccessLevel(str, Enum):
     ROOT = "root"
 
 
+class Locale(str, Enum):
+    EN = "en"
+    ES = "es"
+
+
 class FSNodeType(str, Enum):
     FILE = "file"
     DIR = "dir"
@@ -27,6 +32,8 @@ class FSNode:
 @dataclass(slots=True)
 class OSState:
     access_level: AccessLevel = AccessLevel.GUEST
+    locale: Locale = Locale.EN
+    debug_enabled: bool = False
     fs: dict[str, FSNode] = field(default_factory=dict)
 
 

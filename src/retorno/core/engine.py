@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 from typing import Iterable
+import difflib
 
 from retorno.core.actions import (
     Action,
@@ -9,6 +10,8 @@ from retorno.core.actions import (
     Diag,
     Dock,
     DroneDeploy,
+    DroneReboot,
+    Install,
     PowerShed,
     Repair,
     Salvage,
@@ -18,6 +21,7 @@ from retorno.core.gamestate import GameState
 from retorno.model.drones import DroneLocation, DroneStatus
 from retorno.model.events import AlertState, Event, EventManagerState, EventType, Severity, SourceRef
 from retorno.model.jobs import Job, JobManagerState, JobStatus, JobType, RiskProfile, TargetRef
+from retorno.runtime.data_loader import load_modules
 from retorno.model.systems import Dependency, ShipSystem, SystemState
 
 
@@ -29,6 +33,7 @@ class Engine:
 
     _REPAIR_TIME_S = 25.0
     _DEPLOY_TIME_S = 6.0
+    _REBOOT_TIME_S = 15.0
     _DOCK_TIME_S = 12.0
     _SALVAGE_BASE_TIME_S = 8.0
 
@@ -85,6 +90,7 @@ class Engine:
                     Severity.WARN,
                     SourceRef(kind="world", id=action.node_id),
                     f"Dock blocked: node {action.node_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "node_missing", "node_id": action.node_id},
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -95,6 +101,7 @@ class Engine:
                     Severity.WARN,
                     SourceRef(kind="world", id=action.node_id),
                     f"Dock blocked: unknown contact {action.node_id}",
+                    data={"message_key": "boot_blocked", "reason": "unknown_contact", "node_id": action.node_id},
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -106,15 +113,7 @@ class Engine:
                 eta_s=self._DOCK_TIME_S,
                 params={"node_id": action.node_id},
             )
-            event = self._make_event(
-                state,
-                EventType.JOB_QUEUED,
-                Severity.INFO,
-                SourceRef(kind="world", id=action.node_id),
-                f"Job queued: dock {action.node_id} (ETA {int(self._DOCK_TIME_S)}s)",
-            )
-            self._record_event(state.events, event)
-            return [event, *events]
+            return events
 
         if isinstance(action, Salvage):
             if action.amount <= 0:
@@ -124,6 +123,7 @@ class Engine:
                     Severity.WARN,
                     SourceRef(kind="world", id=action.node_id),
                     "Salvage blocked: amount must be > 0",
+                    data={"message_key": "boot_blocked", "reason": "invalid_amount", "node_id": action.node_id},
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -134,6 +134,7 @@ class Engine:
                     Severity.WARN,
                     SourceRef(kind="world", id=action.node_id),
                     f"Salvage blocked: not docked at {action.node_id}",
+                    data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": action.node_id},
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -146,15 +147,57 @@ class Engine:
                 eta_s=eta,
                 params={"node_id": action.node_id, "kind": action.kind, "amount": action.amount},
             )
-            event = self._make_event(
+            return events
+
+        if isinstance(action, Install):
+            if action.module_id not in state.ship.modules:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    f"Install blocked: module {action.module_id} not in inventory",
+                    data={"message_key": "boot_blocked", "reason": "module_missing", "module_id": action.module_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            modules = load_modules()
+            if action.module_id not in modules:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    f"Install blocked: unknown module {action.module_id}",
+                    data={"message_key": "boot_blocked", "reason": "module_unknown", "module_id": action.module_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            scrap_cost = int(modules[action.module_id].get("scrap_cost", 0))
+            if state.ship.scrap < scrap_cost:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    f"Install blocked: insufficient scrap ({state.ship.scrap}/{scrap_cost})",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "scrap_insufficient",
+                        "module_id": action.module_id,
+                        "scrap_cost": scrap_cost,
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
+            return self._enqueue_job(
                 state,
-                EventType.JOB_QUEUED,
-                Severity.INFO,
-                SourceRef(kind="world", id=action.node_id),
-                f"Job queued: salvage {action.node_id} (ETA {int(eta)}s)",
+                JobType.INSTALL_MODULE,
+                TargetRef(kind="ship", id=state.ship.ship_id),
+                owner_id=None,
+                eta_s=10.0,
+                params={"module_id": action.module_id, "scrap_cost": scrap_cost},
             )
-            self._record_event(state.events, event)
-            return [event, *events]
 
         if isinstance(action, PowerShed):
             system = state.ship.systems.get(action.system_id)
@@ -186,6 +229,7 @@ class Engine:
                     Severity.WARN,
                     SourceRef(kind="drone", id=action.drone_id),
                     f"Drone deploy blocked: drone {action.drone_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "drone_missing", "drone_id": action.drone_id},
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -196,6 +240,7 @@ class Engine:
                     Severity.WARN,
                     SourceRef(kind="drone", id=drone.drone_id),
                     f"Drone deploy blocked: {drone.drone_id} not docked",
+                    data={"message_key": "boot_blocked", "reason": "drone_not_docked", "drone_id": drone.drone_id},
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -207,6 +252,7 @@ class Engine:
                     Severity.WARN,
                     SourceRef(kind="ship_system", id="drone_bay"),
                     "Drone deploy blocked: drone bay offline",
+                    data={"message_key": "boot_blocked", "reason": "drone_bay_offline"},
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -218,6 +264,7 @@ class Engine:
                         Severity.WARN,
                         SourceRef(kind="ship_system", id="drone_bay"),
                         "Drone deploy blocked: drone bay dependencies unmet",
+                        data={"message_key": "boot_blocked", "reason": "deps_unmet", "system_id": "drone_bay"},
                     )
                     self._record_event(state.events, event)
                     return [event]
@@ -227,7 +274,7 @@ class Engine:
                     Severity.WARN,
                     SourceRef(kind="ship_system", id="drone_bay"),
                     "Emergency override: deploying despite unmet dependencies",
-                    data={"emergency": True},
+                    data={"emergency": True, "message_key": "boot_blocked", "reason": "emergency_override"},
                 )
                 self._record_event(state.events, event)
                 return self._enqueue_job(
@@ -249,6 +296,39 @@ class Engine:
                 params={"drone_id": action.drone_id},
             )
 
+        if isinstance(action, DroneReboot):
+            drone = state.ship.drones.get(action.drone_id)
+            if not drone:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=action.drone_id),
+                    f"Reboot blocked: drone {action.drone_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "drone_missing", "drone_id": action.drone_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if drone.status != DroneStatus.DISABLED:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Reboot blocked: drone {drone.drone_id} not disabled",
+                    data={"message_key": "boot_blocked", "reason": "drone_not_disabled", "drone_id": drone.drone_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            return self._enqueue_job(
+                state,
+                JobType.REBOOT_DRONE,
+                TargetRef(kind="drone", id=drone.drone_id),
+                owner_id=drone.drone_id,
+                eta_s=self._REBOOT_TIME_S,
+                params={"drone_id": drone.drone_id},
+            )
+
         if isinstance(action, Repair):
             drone = state.ship.drones.get(action.drone_id)
             if not drone:
@@ -258,6 +338,7 @@ class Engine:
                     Severity.WARN,
                     SourceRef(kind="drone", id=action.drone_id),
                     f"Repair blocked: drone {action.drone_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "drone_missing", "drone_id": action.drone_id},
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -268,6 +349,7 @@ class Engine:
                     Severity.WARN,
                     SourceRef(kind="drone", id=drone.drone_id),
                     f"Repair blocked: {drone.drone_id} not deployed",
+                    data={"message_key": "boot_blocked", "reason": "drone_not_deployed", "drone_id": drone.drone_id},
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -279,6 +361,7 @@ class Engine:
                     Severity.WARN,
                     SourceRef(kind="ship_system", id=action.system_id),
                     f"Repair blocked: system {action.system_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "system_missing", "system_id": action.system_id},
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -296,14 +379,28 @@ class Engine:
             )
 
         if isinstance(action, Boot):
-            system = self._find_system_by_service(state.ship.systems.values(), action.service_name)
+            service_name = action.service_name
+            if service_name == "sensors":
+                service_name = "sensord"
+            system = self._find_system_by_service(state.ship.systems.values(), service_name)
             if not system or not system.service or not system.service.is_installed:
+                available_list = self._available_services(state)
+                available = ", ".join(available_list)
+                suggestion = self._suggest_service(service_name, available_list)
+                suffix = f" Did you mean '{suggestion}'?" if suggestion else ""
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
                     Severity.WARN,
                     SourceRef(kind="ship", id=state.ship.ship_id),
-                    f"Boot blocked: service {action.service_name} not installed",
+                    f"Unknown service '{action.service_name}'. Available: {available}.{suffix}",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "service_missing",
+                        "service": action.service_name,
+                        "available": available,
+                        "suggestion": suggestion or "",
+                    },
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -315,7 +412,8 @@ class Engine:
                     EventType.BOOT_BLOCKED,
                     Severity.WARN,
                     SourceRef(kind="ship_system", id=system.system_id),
-                    f"Boot blocked: unmet dependencies for {action.service_name}",
+                    f"Boot blocked: unmet dependencies for {service_name}",
+                    data={"message_key": "boot_blocked", "reason": "deps_unmet", "service": service_name},
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -323,7 +421,7 @@ class Engine:
             return self._enqueue_job(
                 state,
                 JobType.BOOT_SERVICE,
-                TargetRef(kind="service", id=action.service_name),
+                TargetRef(kind="service", id=service_name),
                 owner_id=None,
                 eta_s=system.service.boot_time_s,
                 params={"system_id": system.system_id},
@@ -380,7 +478,12 @@ class Engine:
                         Severity.INFO,
                         SourceRef(kind="ship_system", id=system.system_id),
                         f"Repair completed for {system.system_id}",
-                        data={"job_id": job.job_id},
+                        data={
+                            "job_id": job.job_id,
+                            "job_type": job.job_type.value,
+                            "system_id": system.system_id,
+                            "message_key": "job_completed_repair",
+                        },
                     )
                 )
             return events
@@ -401,7 +504,12 @@ class Engine:
                         Severity.INFO,
                         SourceRef(kind="ship_system", id=system.system_id),
                         f"Service booted: {system.service.service_name}",
-                        data={"job_id": job.job_id},
+                        data={
+                            "job_id": job.job_id,
+                            "job_type": job.job_type.value,
+                            "service": system.service.service_name,
+                            "message_key": "job_completed_boot",
+                        },
                     )
                 )
                 if system.service.service_name == "sensord":
@@ -414,7 +522,7 @@ class Engine:
                                 Severity.INFO,
                                 SourceRef(kind="ship_system", id=system.system_id),
                                 "Signal detected: ECHO-7",
-                                data={"contact_id": "ECHO_7"},
+                                data={"contact_id": "ECHO_7", "message_key": "signal_detected"},
                             )
                         )
             return events
@@ -432,9 +540,59 @@ class Engine:
                         Severity.INFO,
                         SourceRef(kind="drone", id=drone.drone_id),
                         f"Drone deployed to {job.target.id}",
-                        data={"job_id": job.job_id},
+                        data={
+                            "job_id": job.job_id,
+                            "job_type": job.job_type.value,
+                            "drone_id": drone.drone_id,
+                            "sector_id": job.target.id,
+                            "message_key": "job_completed_deploy",
+                        },
                     )
                 )
+            return events
+
+        if job.job_type == JobType.REBOOT_DRONE and job.target:
+            drone_id = job.params.get("drone_id")
+            drone = state.ship.drones.get(drone_id) if drone_id else None
+            if drone:
+                rng = self._job_rng(state, job)
+                integrity = drone.integrity
+                p_success = self._clamp(integrity, 0.2, 0.9)
+                if rng.random() < p_success:
+                    drone.status = DroneStatus.DOCKED
+                    drone.location = DroneLocation(kind="ship_sector", id="drone_bay")
+                    events.append(
+                        self._make_event(
+                            state,
+                            EventType.JOB_COMPLETED,
+                            Severity.INFO,
+                            SourceRef(kind="drone", id=drone.drone_id),
+                            f"Drone rebooted: {drone.drone_id}",
+                            data={
+                                "job_id": job.job_id,
+                                "job_type": job.job_type.value,
+                                "drone_id": drone.drone_id,
+                                "message_key": "job_completed_reboot",
+                            },
+                        )
+                    )
+                else:
+                    job.status = JobStatus.FAILED
+                    events.append(
+                        self._make_event(
+                            state,
+                            EventType.JOB_FAILED,
+                            Severity.WARN,
+                            SourceRef(kind="drone", id=drone.drone_id),
+                            f"Drone reboot failed: {drone.drone_id}",
+                            data={
+                                "job_id": job.job_id,
+                                "job_type": job.job_type.value,
+                                "drone_id": drone.drone_id,
+                                "message_key": "job_failed_reboot",
+                            },
+                        )
+                    )
             return events
 
         if job.job_type == JobType.DOCK and job.target:
@@ -446,7 +604,12 @@ class Engine:
                     Severity.INFO,
                     SourceRef(kind="world", id=job.target.id),
                     f"Docked at {job.target.id}",
-                    data={"job_id": job.job_id},
+                    data={
+                        "job_id": job.job_id,
+                        "job_type": job.job_type.value,
+                        "node_id": job.target.id,
+                        "message_key": "docked",
+                    },
                 )
             )
             return events
@@ -455,8 +618,6 @@ class Engine:
             node_id = job.params.get("node_id", job.target.id)
             kind = job.params.get("kind", "scrap")
             amount = int(job.params.get("amount", 1))
-            if kind == "scrap":
-                state.ship.inventory.scrap += amount
             events.append(
                 self._make_event(
                     state,
@@ -464,7 +625,56 @@ class Engine:
                     Severity.INFO,
                     SourceRef(kind="world", id=node_id),
                     f"Salvage complete: +{amount} {kind} from {node_id}",
-                    data={"job_id": job.job_id, "kind": kind, "amount": amount},
+                    data={
+                        "job_id": job.job_id,
+                        "job_type": job.job_type.value,
+                        "kind": kind,
+                        "amount": amount,
+                        "node_id": node_id,
+                        "message_key": "job_completed_salvage",
+                    },
+                )
+            )
+            return events
+
+        if job.job_type == JobType.INSTALL_MODULE and job.target:
+            module_id = job.params.get("module_id")
+            if module_id and module_id in state.ship.modules:
+                modules = load_modules()
+                mod = modules.get(module_id, {})
+                effects = mod.get("effects", {})
+                if "power_quality_offset" in effects:
+                    state.ship.power.quality_offset += float(effects["power_quality_offset"])
+                if "e_batt_bonus_kwh" in effects:
+                    state.ship.power.e_batt_max_kwh += float(effects["e_batt_bonus_kwh"])
+                if "p_gen_bonus_kw" in effects:
+                    state.ship.power.p_gen_kw += float(effects["p_gen_bonus_kw"])
+                scrap_cost = int(job.params.get("scrap_cost", mod.get("scrap_cost", 0)))
+                state.ship.scrap = max(0, state.ship.scrap - scrap_cost)
+                state.ship.modules.remove(module_id)
+            events.append(
+                self._make_event(
+                    state,
+                    EventType.JOB_COMPLETED,
+                    Severity.INFO,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    f"Module installed: {module_id}",
+                    data={
+                        "job_id": job.job_id,
+                        "job_type": job.job_type.value,
+                        "module_id": module_id,
+                        "message_key": "job_completed_install",
+                    },
+                )
+            )
+            events.append(
+                self._make_event(
+                    state,
+                    EventType.MODULE_INSTALLED,
+                    Severity.INFO,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    f"Module installed: {module_id}",
+                    data={"module_id": module_id},
                 )
             )
             return events
@@ -542,6 +752,7 @@ class Engine:
                     Severity.WARN,
                     SourceRef(kind="ship", id=state.ship.ship_id),
                     "Power deficit detected",
+                    data={"message_key": "power_net_deficit"},
                 )
             )
             active_keys.add(EventType.POWER_NET_DEFICIT.value)
@@ -555,6 +766,7 @@ class Engine:
                     Severity.WARN,
                     SourceRef(kind="ship_system", id=power_core.system_id),
                     "Power core degraded",
+                    data={"message_key": "power_core_degraded"},
                 )
             )
             active_keys.add(EventType.POWER_CORE_DEGRADED.value)
@@ -572,21 +784,24 @@ class Engine:
                     Severity.CRITICAL,
                     SourceRef(kind="ship_system", id=distribution.system_id),
                     "Power bus instability due to damaged distribution",
+                    data={"message_key": "power_bus_instability"},
                 )
             )
             active_keys.add(EventType.POWER_BUS_INSTABILITY.value)
 
         if power_quality < self._LOW_POWER_QUALITY_THRESHOLD:
-            events.extend(
-                self._ensure_alert(
-                    state,
-                    EventType.LOW_POWER_QUALITY,
-                    Severity.WARN,
-                    SourceRef(kind="ship", id=state.ship.ship_id),
-                    "Low power quality",
-                    data={"power_quality": power_quality},
+            existing = state.events.alerts.get(EventType.LOW_POWER_QUALITY.value)
+            if not existing or not existing.is_active:
+                events.extend(
+                    self._ensure_alert(
+                        state,
+                        EventType.LOW_POWER_QUALITY,
+                        Severity.WARN,
+                        SourceRef(kind="ship", id=state.ship.ship_id),
+                        "Low power quality",
+                        data={"power_quality": power_quality, "message_key": "low_power_quality"},
+                    )
                 )
-            )
             active_keys.add(EventType.LOW_POWER_QUALITY.value)
 
         for alert in state.events.alerts.values():
@@ -687,7 +902,47 @@ class Engine:
             job.risk = risk
         state.jobs.jobs[job_id] = job
         state.jobs.active_job_ids.append(job_id)
-        return []
+        source = self._job_source(state, target, owner_id, params)
+        data = {
+            "job_id": job_id,
+            "job_type": job_type.value,
+            "eta_s": eta_s,
+            "target": {"kind": target.kind, "id": target.id},
+            "owner_id": owner_id,
+            "message_key": "job_queued",
+        }
+        if params.get("emergency"):
+            data["emergency"] = True
+        event = self._make_event(
+            state,
+            EventType.JOB_QUEUED,
+            Severity.INFO,
+            source,
+            f"Job queued: {job_type.value} -> {target.kind}:{target.id} (ETA {int(eta_s)}s)",
+            data=data,
+        )
+        self._record_event(state.events, event)
+        return [event]
+
+    def _job_source(
+        self,
+        state: GameState,
+        target: TargetRef,
+        owner_id: str | None,
+        params: dict,
+    ) -> SourceRef:
+        if owner_id and owner_id in state.ship.drones:
+            return SourceRef(kind="drone", id=owner_id)
+        if target.kind == "ship_system":
+            return SourceRef(kind="ship_system", id=target.id)
+        if target.kind == "service":
+            system_id = params.get("system_id")
+            if system_id:
+                return SourceRef(kind="ship_system", id=system_id)
+            return SourceRef(kind="ship", id=state.ship.ship_id)
+        if target.kind == "world_node":
+            return SourceRef(kind="world", id=target.id)
+        return SourceRef(kind="ship", id=state.ship.ship_id)
 
     def _find_system_by_service(
         self, systems: Iterable[ShipSystem], service_name: str
@@ -696,6 +951,20 @@ class Engine:
             if system.service and system.service.service_name == service_name:
                 return system
         return None
+
+    def _available_services(self, state: GameState) -> list[str]:
+        services = []
+        for system in state.ship.systems.values():
+            if system.service and system.service.is_installed:
+                services.append(system.service.service_name)
+        services.sort()
+        return services
+
+    def _suggest_service(self, service_name: str, candidates: list[str]) -> str | None:
+        if not candidates:
+            return None
+        matches = difflib.get_close_matches(service_name, candidates, n=1, cutoff=0.6)
+        return matches[0] if matches else None
 
     def _dependencies_blocked(
         self, systems: dict[str, ShipSystem], dependencies: list[Dependency]
@@ -768,6 +1037,7 @@ class Engine:
         if distribution and distribution.state in (SystemState.DAMAGED, SystemState.CRITICAL):
             power_quality -= 0.10
 
+        power_quality += state.ship.power.quality_offset
         return self._clamp(power_quality)
 
     def _apply_health_state(
@@ -809,6 +1079,7 @@ class Engine:
                         "to": new_state.value,
                         "cause": cause,
                         "health": system.health,
+                        "message_key": "system_state_changed",
                     },
                 )
             )
@@ -829,13 +1100,27 @@ class Engine:
                 drone.status = DroneStatus.DISABLED
                 drone.integrity = max(0.0, drone.integrity - 0.25)
                 source = SourceRef(kind="drone", id=drone.drone_id)
+                disabled_event = self._make_event(
+                    state,
+                    EventType.DRONE_DISABLED,
+                    Severity.WARN,
+                    source,
+                    f"Drone disabled: {drone.drone_id}",
+                    data={"drone_id": drone.drone_id, "message_key": "drone_disabled"},
+                )
+                self._record_event(state.events, disabled_event)
         return self._make_event(
             state,
             EventType.JOB_FAILED,
             Severity.WARN,
             source,
             f"Emergency job failed: {job.job_type.value}",
-            data={"job_id": job.job_id, "emergency": True},
+            data={
+                "job_id": job.job_id,
+                "emergency": True,
+                "job_type": job.job_type.value,
+                "message_key": "job_failed",
+            },
         )
 
     def _job_rng(self, state: GameState, job: Job) -> random.Random:

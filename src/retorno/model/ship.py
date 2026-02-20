@@ -24,6 +24,7 @@ class PowerNetworkState:
     p_load_kw: float = 0.0
     deficit_ratio: float = 0.0
     power_quality: float = 1.0
+    quality_offset: float = 0.0
 
     brownout: bool = False
     shed_policy: ShedPolicyState = field(default_factory=ShedPolicyState)
@@ -52,5 +53,17 @@ class ShipState:
 
     systems: dict[str, ShipSystem] = field(default_factory=dict)
     drones: dict[str, DroneState] = field(default_factory=dict)
+    sectors: dict[str, "ShipSector"] = field(default_factory=dict)
+
+    scrap: int = 0
+    modules: list[str] = field(default_factory=list)
 
     inventory: Inventory = field(default_factory=Inventory)
+
+
+@dataclass(slots=True)
+class ShipSector:
+    sector_id: str
+    name: str
+    tags: set[str] = field(default_factory=set)
+    notes: str = ""
