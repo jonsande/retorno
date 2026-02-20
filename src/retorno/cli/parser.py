@@ -69,12 +69,12 @@ def parse_command(line: str):
     if cmd == "salvage":
         if len(args) < 2:
             raise ParseError(
-                "Uso: salvage scrap <drone_id> <node_id> <amount> | salvage module(s) <drone_id> <node_id>"
+                "Uso: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id]"
             )
         kind = args[0].lower()
         if kind == "scrap":
             if len(args) != 4:
-                raise ParseError("Uso: salvage scrap <drone_id> <node_id> <amount>")
+                raise ParseError("Uso: drone salvage scrap <drone_id> <node_id> <amount>")
             try:
                 amount = int(args[3])
             except ValueError as e:
@@ -84,10 +84,10 @@ def parse_command(line: str):
             return SalvageScrap(drone_id=args[1], node_id=args[2], amount=amount)
         if kind in {"module", "modules"}:
             if len(args) != 3:
-                raise ParseError("Missing node_id. Example: salvage modules D1 ECHO_7")
+                raise ParseError("Missing node_id. Example: drone salvage modules D1 ECHO_7")
             return SalvageModule(drone_id=args[1], node_id=args[2])
         raise ParseError(
-            "Uso: salvage scrap <drone_id> <node_id> <amount> | salvage module(s) <drone_id> <node_id>"
+            "Uso: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id]"
         )
 
     if cmd == "inventory":
@@ -187,6 +187,44 @@ def parse_command(line: str):
             if len(args) != 2:
                 raise ParseError("Uso: drone reboot <drone_id>")
             return DroneReboot(drone_id=args[1])
+        if sub == "repair":
+            if len(args) != 3:
+                raise ParseError("Uso: drone repair <drone_id> <system_id>")
+            return Repair(drone_id=args[1], system_id=args[2])
+        if sub == "salvage":
+            if len(args) < 3:
+                raise ParseError(
+                    "Uso: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id]"
+                )
+            kind = args[1].lower()
+            rest = args[2:]
+            if kind == "scrap":
+                if len(rest) not in {2, 3}:
+                    raise ParseError("Uso: drone salvage scrap <drone_id> <node_id> <amount>")
+                if len(rest) == 2:
+                    drone_id = rest[0]
+                    node_id = None
+                    amount_str = rest[1]
+                else:
+                    drone_id = rest[0]
+                    node_id = rest[1]
+                    amount_str = rest[2]
+                try:
+                    amount = int(amount_str)
+                except ValueError as e:
+                    raise ParseError("salvage: amount debe ser entero") from e
+                if amount <= 0:
+                    raise ParseError("salvage: amount debe ser > 0")
+                return SalvageScrap(drone_id=drone_id, node_id=node_id, amount=amount)
+            if kind in {"module", "modules"}:
+                if len(rest) not in {1, 2}:
+                    raise ParseError("Missing node_id. Example: drone salvage modules D1 ECHO_7")
+                drone_id = rest[0]
+                node_id = rest[1] if len(rest) == 2 else None
+                return SalvageModule(drone_id=drone_id, node_id=node_id)
+            raise ParseError(
+                "Uso: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id]"
+            )
         emergency = False
         if sub in {"deploy", "deploy!"}:
             emergency = sub.endswith("!")
@@ -201,7 +239,7 @@ def parse_command(line: str):
 
     if cmd == "repair":
         if len(args) != 2:
-            raise ParseError("Uso: repair <drone_id> <system_id>")
+            raise ParseError("Uso: drone repair <drone_id> <system_id>")
         return Repair(drone_id=args[0], system_id=args[1])
 
     suggestion = _suggest_command(cmd)

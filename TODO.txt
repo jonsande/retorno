@@ -1,3 +1,6 @@
+- [ ] Operaciones de salvage y de repair deberían estar dentro del comando drone.
+
+
 - [ ] La cantidad de scrap que se ordena recuperar con 'salvage' tiene que afectar al tiempo
 que se tarda en llevar a cabo la tarea.
 - [ ] Establecer límite de scrap que se puede obtener de un derelict u objeto dockable.

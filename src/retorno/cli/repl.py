@@ -23,11 +23,14 @@ def print_help() -> None:
         "  alerts explain <alert_key>\n"
         "  contacts | scan\n"
         "  sectors | map | locate <system_id>\n"
-        "  dock <node_id> | salvage scrap <drone_id> <node_id> <amount>\n"
-        "  salvage module <drone_id> <node_id>\n"
-        "  diag <system_id> | boot <service_name> | repair <drone_id> <system_id>\n"
+        "  dock <node_id>\n"
+        "  diag <system_id> | boot <service_name>\n"
         "  inventory | install <module_id> | modules\n"
-        "  drone status | drone deploy | drone deploy! | drone reboot | drone recall\n"
+        "  drone status | drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>\n"
+        "  drone repair <drone_id> <system_id>\n"
+        "  drone salvage scrap <drone_id> <node_id> <amount>\n"
+        "  drone salvage module <drone_id> [node_id]\n"
+        "  drone reboot <drone_id> | drone recall <drone_id>\n"
         "  wait <segundos> (DEBUG only)\n"
         "  debug on|off|status\n"
         "  exit | quit\n"
@@ -1014,11 +1017,20 @@ def main() -> None:
                     candidates = [k for k in locked_state.events.alerts.keys() if k.startswith(text)]
             elif cmd == "drone":
                 if len(tokens) == 2:
-                    candidates = [c for c in ["status", "deploy", "deploy!", "reboot", "recall"] if c.startswith(text)]
-                elif len(tokens) == 3 and tokens[1] in {"deploy", "deploy!", "reboot", "recall"}:
+                    candidates = [
+                        c for c in ["status", "deploy", "deploy!", "reboot", "recall", "repair", "salvage"]
+                        if c.startswith(text)
+                    ]
+                elif len(tokens) == 3 and tokens[1] in {"deploy", "deploy!", "reboot", "recall", "repair"}:
                     candidates = [d for d in drones if d.startswith(text)]
                 elif len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
                     candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
+                elif len(tokens) == 3 and tokens[1] == "salvage":
+                    candidates = [c for c in ["scrap", "module", "modules"] if c.startswith(text)]
+                elif len(tokens) == 4 and tokens[1] == "salvage":
+                    candidates = [d for d in drones if d.startswith(text)]
+                elif len(tokens) == 5 and tokens[1] == "salvage":
+                    candidates = [c for c in contacts if c.startswith(text)]
             elif cmd == "salvage":
                 if len(tokens) == 2:
                     candidates = [c for c in ["scrap", "module", "modules"] if c.startswith(text)]

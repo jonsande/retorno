@@ -70,11 +70,11 @@ class DroneRecall(Action):
 @dataclass(slots=True)
 class SalvageScrap(Action):
     drone_id: str
-    node_id: str
+    node_id: str | None
     amount: int
 
 
 @dataclass(slots=True)
 class SalvageModule(Action):
     drone_id: str
-    node_id: str
+    node_id: str | None

@@ -449,37 +449,49 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            node = state.world.space.nodes.get(action.node_id)
-            if not node:
-                event = self._make_event(
-                    state,
-                    EventType.BOOT_BLOCKED,
-                    Severity.WARN,
-                    SourceRef(kind="world", id=action.node_id),
-                    f"Salvage blocked: node {action.node_id} not found",
-                    data={"message_key": "boot_blocked", "reason": "node_missing", "node_id": action.node_id},
-                )
-                self._record_event(state.events, event)
-                return [event]
-            if drone.location.kind != "world_node" or drone.location.id != action.node_id:
+            node_id = action.node_id or self._drone_world_node(drone)
+            if not node_id:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
                     Severity.WARN,
                     SourceRef(kind="drone", id=drone.drone_id),
-                    f"Salvage blocked: {drone.drone_id} not at node {action.node_id}",
-                    data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": action.node_id},
+                    f"Salvage blocked: {drone.drone_id} not at a node",
+                    data={"message_key": "boot_blocked", "reason": "not_docked", "drone_id": drone.drone_id},
                 )
                 self._record_event(state.events, event)
                 return [event]
-            if state.world.current_node_id != action.node_id:
+            node = state.world.space.nodes.get(node_id)
+            if not node:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
                     Severity.WARN,
-                    SourceRef(kind="world", id=action.node_id),
-                    f"Salvage blocked: ship not docked at {action.node_id}",
-                    data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": action.node_id},
+                    SourceRef(kind="world", id=node_id),
+                    f"Salvage blocked: node {node_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "node_missing", "node_id": node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if drone.location.kind != "world_node" or drone.location.id != node_id:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Salvage blocked: {drone.drone_id} not at node {node_id}",
+                    data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if state.world.current_node_id != node_id:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=node_id),
+                    f"Salvage blocked: ship not docked at {node_id}",
+                    data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": node_id},
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -488,9 +500,9 @@ class Engine:
                     state,
                     EventType.BOOT_BLOCKED,
                     Severity.WARN,
-                    SourceRef(kind="world", id=action.node_id),
+                    SourceRef(kind="world", id=node_id),
                     "Salvage blocked: amount must be > 0",
-                    data={"message_key": "boot_blocked", "reason": "invalid_amount", "node_id": action.node_id},
+                    data={"message_key": "boot_blocked", "reason": "invalid_amount", "node_id": node_id},
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -500,9 +512,9 @@ class Engine:
                     state,
                     EventType.BOOT_BLOCKED,
                     Severity.WARN,
-                    SourceRef(kind="world", id=action.node_id),
+                    SourceRef(kind="world", id=node_id),
                     "No scrap available",
-                    data={"message_key": "boot_blocked", "reason": "scrap_empty", "node_id": action.node_id},
+                    data={"message_key": "boot_blocked", "reason": "scrap_empty", "node_id": node_id},
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -510,11 +522,11 @@ class Engine:
             return self._enqueue_job(
                 state,
                 JobType.SALVAGE_SCRAP,
-                TargetRef(kind="world_node", id=action.node_id),
+                TargetRef(kind="world_node", id=node_id),
                 owner_id=action.drone_id,
                 eta_s=eta,
                 params={
-                    "node_id": action.node_id,
+                    "node_id": node_id,
                     "requested": action.amount,
                     "effective": effective,
                     "available": node.salvage_scrap_available,
@@ -545,37 +557,49 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            node = state.world.space.nodes.get(action.node_id)
-            if not node:
-                event = self._make_event(
-                    state,
-                    EventType.BOOT_BLOCKED,
-                    Severity.WARN,
-                    SourceRef(kind="world", id=action.node_id),
-                    f"Salvage blocked: node {action.node_id} not found",
-                    data={"message_key": "boot_blocked", "reason": "node_missing", "node_id": action.node_id},
-                )
-                self._record_event(state.events, event)
-                return [event]
-            if drone.location.kind != "world_node" or drone.location.id != action.node_id:
+            node_id = action.node_id or self._drone_world_node(drone)
+            if not node_id:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
                     Severity.WARN,
                     SourceRef(kind="drone", id=drone.drone_id),
-                    f"Salvage blocked: {drone.drone_id} not at node {action.node_id}",
-                    data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": action.node_id},
+                    f"Salvage blocked: {drone.drone_id} not at a node",
+                    data={"message_key": "boot_blocked", "reason": "not_docked", "drone_id": drone.drone_id},
                 )
                 self._record_event(state.events, event)
                 return [event]
-            if state.world.current_node_id != action.node_id:
+            node = state.world.space.nodes.get(node_id)
+            if not node:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
                     Severity.WARN,
-                    SourceRef(kind="world", id=action.node_id),
-                    f"Salvage blocked: ship not docked at {action.node_id}",
-                    data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": action.node_id},
+                    SourceRef(kind="world", id=node_id),
+                    f"Salvage blocked: node {node_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "node_missing", "node_id": node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if drone.location.kind != "world_node" or drone.location.id != node_id:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Salvage blocked: {drone.drone_id} not at node {node_id}",
+                    data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if state.world.current_node_id != node_id:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=node_id),
+                    f"Salvage blocked: ship not docked at {node_id}",
+                    data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": node_id},
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -583,10 +607,10 @@ class Engine:
             return self._enqueue_job(
                 state,
                 JobType.SALVAGE_MODULE,
-                TargetRef(kind="world_node", id=action.node_id),
+                TargetRef(kind="world_node", id=node_id),
                 owner_id=action.drone_id,
                 eta_s=eta,
-                params={"node_id": action.node_id},
+                params={"node_id": node_id},
             )
 
         if isinstance(action, Boot):
@@ -1326,6 +1350,11 @@ class Engine:
         if target.kind == "world_node":
             return SourceRef(kind="world", id=target.id)
         return SourceRef(kind="ship", id=state.ship.ship_id)
+
+    def _drone_world_node(self, drone) -> str | None:
+        if drone.location.kind == "world_node":
+            return drone.location.id
+        return None
 
     def _find_system_by_service(
         self, systems: Iterable[ShipSystem], service_name: str

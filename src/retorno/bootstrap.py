@@ -294,13 +294,13 @@ def _bootstrap_os(state: GameState) -> None:
     )
     add_file(
         "/manuals/commands/repair.en.txt",
-        "repair <drone_id> <system_id>\n"
+        "drone repair <drone_id> <system_id>\n"
         "- Repairs a system using a drone.\n"
         "- Repair operations require deployed drone units.\n",
     )
     add_file(
         "/manuals/commands/repair.es.txt",
-        "repair <drone_id> <system_id>\n"
+        "drone repair <drone_id> <system_id>\n"
         "- Repara un sistema con un dron.\n"
         "- Las reparaciones requieren drones desplegados.\n",
     )
@@ -388,22 +388,27 @@ def _bootstrap_os(state: GameState) -> None:
     )
     add_file(
         "/manuals/commands/salvage.en.txt",
-        "salvage scrap <drone_id> <node_id> <amount>\n"
-        "salvage module <drone_id> <node_id>\n"
+        "drone salvage scrap <drone_id> <node_id> <amount>\n"
+        "drone salvage module <drone_id> [node_id]\n"
         "- Salvage scrap or modules from a node.\n"
-        "- Drone must be deployed at the node.\n",
+        "- Drone must be deployed at the node.\n"
+        "- If node_id is omitted, uses the drone's current node.\n",
     )
     add_file(
         "/manuals/commands/salvage.es.txt",
-        "salvage scrap <drone_id> <node_id> <amount>\n"
-        "salvage module <drone_id> <node_id>\n"
+        "drone salvage scrap <drone_id> <node_id> <amount>\n"
+        "drone salvage module <drone_id> [node_id]\n"
         "- Recupera chatarra o módulos del nodo.\n"
-        "- El dron debe estar desplegado en el nodo.\n",
+        "- El dron debe estar desplegado en el nodo.\n"
+        "- Si no se indica node_id, se usa el nodo actual del dron.\n",
     )
     add_file(
         "/manuals/commands/drone.en.txt",
         "drone deploy <drone_id> <sector_id>\n"
         "drone deploy! <drone_id> <sector_id>\n"
+        "drone repair <drone_id> <system_id>\n"
+        "drone salvage scrap <drone_id> <node_id> <amount>\n"
+        "drone salvage module <drone_id> [node_id]\n"
         "drone reboot <drone_id>\n"
         "drone recall <drone_id>\n"
         "- Deploys a drone to a ship sector.\n"
@@ -415,6 +420,9 @@ def _bootstrap_os(state: GameState) -> None:
         "/manuals/commands/drone.es.txt",
         "drone deploy <drone_id> <sector_id>\n"
         "drone deploy! <drone_id> <sector_id>\n"
+        "drone repair <drone_id> <system_id>\n"
+        "drone salvage scrap <drone_id> <node_id> <amount>\n"
+        "drone salvage module <drone_id> [node_id]\n"
         "drone reboot <drone_id>\n"
         "drone recall <drone_id>\n"
         "- Despliega un dron a un sector de la nave.\n"
