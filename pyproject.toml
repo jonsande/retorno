@@ -3,7 +3,7 @@ name = "retorno"
 version = "0.1.0"
 description = "Retorno - Sci-fi terminal simulation game"
 authors = [
-    { name = "Tu Nombre" }
+    { name = "Jon Ander Sande Eguskiza" }
 ]
 requires-python = ">=3.12"
 readme = "README.md"
