@@ -7,6 +7,9 @@ from retorno.model.ship import PowerNetworkState, ShipSector
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, normalize_path
 from retorno.model.systems import Dependency, ServiceState, ShipSystem, SystemState
 from retorno.model.world import SpaceNode
+from retorno.runtime.data_loader import load_modules
+from retorno.config.balance import Balance
+import random
 
 
 def create_initial_state_prologue() -> GameState:
@@ -182,17 +185,29 @@ def create_initial_state_prologue() -> GameState:
         kind="ship",
         radiation_rad_per_s=state.ship.radiation_env_rad_per_s,
     )
+    rng = random.Random(state.meta.rng_seed)
+    modules = load_modules()
+    module_ids = list(modules.keys())
     state.world.space.nodes["ECHO_7"] = SpaceNode(
         node_id="ECHO_7",
         name="ECHO-7 Relay Station",
         kind="station",
         radiation_rad_per_s=0.002,
+        salvage_scrap_available=rng.randint(Balance.ECHO_7_SCRAP_MIN, Balance.ECHO_7_SCRAP_MAX),
+        salvage_modules_available=_bootstrap_modules(rng, module_ids),
     )
 
     _bootstrap_os(state)
     _bootstrap_alerts(state)
 
     return state
+
+
+def _bootstrap_modules(rng: random.Random, module_ids: list[str]) -> list[str]:
+    if not module_ids:
+        return []
+    count = rng.randint(Balance.ECHO_7_MODULES_MIN, Balance.ECHO_7_MODULES_MAX)
+    return [rng.choice(module_ids) for _ in range(count)]
 
 
 def _bootstrap_alerts(state: GameState) -> None:
@@ -248,6 +263,7 @@ def _bootstrap_os(state: GameState) -> None:
     add_dir("/manuals/commands")
     add_dir("/manuals/systems")
     add_dir("/manuals/alerts")
+    add_dir("/manuals/modules")
     add_dir("/mail")
     add_dir("/mail/inbox")
     add_dir("/logs", access=AccessLevel.ENG)
@@ -372,21 +388,24 @@ def _bootstrap_os(state: GameState) -> None:
     )
     add_file(
         "/manuals/commands/salvage.en.txt",
-        "salvage <node_id> [scrap] [amount]\n"
-        "- Recover resources from a node.\n"
-        "- You must be docked there.\n",
+        "salvage scrap <drone_id> <node_id> <amount>\n"
+        "salvage module <drone_id> <node_id>\n"
+        "- Salvage scrap or modules from a node.\n"
+        "- Drone must be deployed at the node.\n",
     )
     add_file(
         "/manuals/commands/salvage.es.txt",
-        "salvage <node_id> [scrap] [amount]\n"
-        "- Recupera recursos del nodo.\n"
-        "- Debes estar acoplado allí.\n",
+        "salvage scrap <drone_id> <node_id> <amount>\n"
+        "salvage module <drone_id> <node_id>\n"
+        "- Recupera chatarra o módulos del nodo.\n"
+        "- El dron debe estar desplegado en el nodo.\n",
     )
     add_file(
         "/manuals/commands/drone.en.txt",
         "drone deploy <drone_id> <sector_id>\n"
         "drone deploy! <drone_id> <sector_id>\n"
         "drone reboot <drone_id>\n"
+        "drone recall <drone_id>\n"
         "- Deploys a drone to a ship sector.\n"
         "- Use 'sectors' to list available ship sectors.\n"
         "- Emergency deploy may risk failure.\n"
@@ -397,6 +416,7 @@ def _bootstrap_os(state: GameState) -> None:
         "drone deploy <drone_id> <sector_id>\n"
         "drone deploy! <drone_id> <sector_id>\n"
         "drone reboot <drone_id>\n"
+        "drone recall <drone_id>\n"
         "- Despliega un dron a un sector de la nave.\n"
         "- Usa 'sectors' para listar sectores disponibles.\n"
         "- El despliegue de emergencia puede fallar.\n"
@@ -499,6 +519,70 @@ def _bootstrap_os(state: GameState) -> None:
         "- Suele asociarse a energy_distribution dañado.\n"
         "- Si persiste: apagados intermitentes, pérdida de sensores.\n"
         "Recomendado: repara `energy_distribution`, reduce carga.\n",
+    )
+    add_file(
+        "/manuals/modules/bus_stabilizer.en.txt",
+        "bus_stabilizer\n"
+        "- Phase-lock filter for aging distribution busses.\n"
+        "- Dampens transient spikes and line noise.\n"
+        "- Restores smoother load-sharing across subsystems.\n"
+        "- Common in long-haul retrofit kits.\n"
+        "- Installation requires brief bus re-sync.\n"
+        "- Side effect: slightly higher idle draw.\n"
+        "- Recommended when Q is unstable.\n"
+        "Lore: These units were nicknamed \"calmers\" by deck crews.\n",
+    )
+    add_file(
+        "/manuals/modules/bus_stabilizer.es.txt",
+        "bus_stabilizer\n"
+        "- Filtro de fase para buses de distribución envejecidos.\n"
+        "- Atenúa picos transitorios y ruido de línea.\n"
+        "- Suaviza el reparto de carga entre subsistemas.\n"
+        "- Común en kits de modernización de largo alcance.\n"
+        "- La instalación requiere una resincronización breve.\n"
+        "- Efecto secundario: mayor consumo en reposo.\n"
+        "- Recomendado cuando Q es inestable.\n"
+        "Lore: En la tripulación se le llamaba \"calmador\".\n",
+    )
+    add_file(
+        "/manuals/modules/aux_battery_cell.en.txt",
+        "aux_battery_cell\n"
+        "- Auxiliary LiFe cell pack for emergency buffer.\n"
+        "- Raises maximum capacity without altering core chemistry.\n"
+        "- Slows depth-of-discharge stress during deficits.\n"
+        "- Installation is non-invasive to power core.\n"
+        "- Best paired with stable distribution.\n"
+        "Lore: The original vendor marketed these as \"lifeboat cells\".\n",
+    )
+    add_file(
+        "/manuals/modules/aux_battery_cell.es.txt",
+        "aux_battery_cell\n"
+        "- Pack auxiliar de celdas LiFe para amortiguación.\n"
+        "- Aumenta la capacidad máxima sin tocar la química base.\n"
+        "- Reduce el estrés por descargas profundas.\n"
+        "- Instalación no invasiva al núcleo de energía.\n"
+        "- Mejor rendimiento con distribución estable.\n"
+        "Lore: El fabricante los vendía como \"celdas salvavidas\".\n",
+    )
+    add_file(
+        "/manuals/modules/micro_reactor_patch.en.txt",
+        "micro_reactor_patch\n"
+        "- Micro-injector retrofit for tired reactor cores.\n"
+        "- Improves fuel mixing and thermal balance.\n"
+        "- Grants a small but steady generation increase.\n"
+        "- Requires careful calibration after install.\n"
+        "- Not recommended if the core is critical.\n"
+        "Lore: Field engineers dubbed it \"the whisper patch\".\n",
+    )
+    add_file(
+        "/manuals/modules/micro_reactor_patch.es.txt",
+        "micro_reactor_patch\n"
+        "- Retroadaptación de microinyectores para núcleos fatigados.\n"
+        "- Mejora mezcla de combustible y balance térmico.\n"
+        "- Aporta un aumento estable de generación.\n"
+        "- Requiere calibración cuidadosa tras instalar.\n"
+        "- No recomendado si el core está en estado crítico.\n"
+        "Lore: Los ingenieros lo llamaban \"parche susurro\".\n",
     )
 
     add_file(

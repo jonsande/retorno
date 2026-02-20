@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from retorno.bootstrap import create_initial_state_prologue
+import readline
 from retorno.core.engine import Engine
 from retorno.runtime.loop import GameLoop
 from retorno.model.events import Event, EventType, Severity, SourceRef
-from retorno.runtime.data_loader import load_loot, load_modules
-import math
+from retorno.runtime.data_loader import load_modules
+from retorno.config.balance import Balance
 from retorno.model.systems import SystemState
 from retorno.model.os import FSNodeType, Locale, list_dir, normalize_path, read_file
 
@@ -22,10 +23,11 @@ def print_help() -> None:
         "  alerts explain <alert_key>\n"
         "  contacts | scan\n"
         "  sectors | map | locate <system_id>\n"
-        "  dock <node_id> | salvage <node_id> [scrap] [amount]\n"
+        "  dock <node_id> | salvage scrap <drone_id> <node_id> <amount>\n"
+        "  salvage module <drone_id> <node_id>\n"
         "  diag <system_id> | boot <service_name> | repair <drone_id> <system_id>\n"
         "  inventory | install <module_id> | modules\n"
-        "  drone status | drone deploy | drone deploy! | drone reboot\n"
+        "  drone status | drone deploy | drone deploy! | drone reboot | drone recall\n"
         "  wait <segundos> (DEBUG only)\n"
         "  debug on|off|status\n"
         "  exit | quit\n"
@@ -68,6 +70,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
     job_queued_templates = {
         "en": "[{sev}] job_queued :: {job_id} {job_type} target={kind}:{tid} ETA={eta_s}s{emergency}",
         "es": "[{sev}] job_queued :: {job_id} {job_type} objetivo={kind}:{tid} ETA={eta_s}s{emergency}",
+    }
+    salvage_job_queued_templates = {
+        "en": "[{sev}] job_queued :: {job_id} salvage_scrap requested={requested} available={available} will_recover={effective} ETA={eta_s}s",
+        "es": "[{sev}] job_queued :: {job_id} salvage_scrap pedido={requested} disponible={available} recupera={effective} ETA={eta_s}s",
     }
     system_state_templates = {
         "en": "[{sev}] system_state_changed :: {system_id}: {from_state} -> {to_state} (cause={cause}, health={health})",
@@ -138,15 +144,30 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "[{sev}] salvage_module_found :: Module found: {module_id}",
             "es": "[{sev}] salvage_module_found :: Módulo encontrado: {module_id}",
         },
+        "node_depleted": {
+            "en": "[{sev}] node_depleted :: Node depleted",
+            "es": "[{sev}] node_depleted :: Nodo agotado",
+        },
     }
+    def _format_effects(effects: dict) -> str:
+        if not effects:
+            return ""
+        parts = []
+        if "p_gen_bonus_kw" in effects:
+            parts.append(f"P_gen+{float(effects['p_gen_bonus_kw']):.2f}kW")
+        if "e_batt_bonus_kwh" in effects:
+            parts.append(f"E_batt_max+{float(effects['e_batt_bonus_kwh']):.2f}kWh")
+        if "power_quality_offset" in effects:
+            parts.append(f"Q+{float(effects['power_quality_offset']):.2f}")
+        return ", ".join(parts)
     boot_blocked_reasons = {
         "service_missing": {
             "en": "Unknown service '{service}'. Available: {available}{suggestion}",
             "es": "Servicio desconocido '{service}'. Disponibles: {available}{suggestion}",
         },
         "deps_unmet": {
-            "en": "Boot blocked: unmet dependencies",
-            "es": "Arranque bloqueado: dependencias no satisfechas",
+            "en": "Boot blocked: {service} requires {dep_target}>={dep_required} (current={dep_current})",
+            "es": "Arranque bloqueado: {service} requiere {dep_target}>={dep_required} (actual={dep_current})",
         },
         "drone_missing": {
             "en": "Action blocked: drone not found ({drone_id})",
@@ -168,6 +189,18 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Action blocked: drone not disabled ({drone_id})",
             "es": "Acción bloqueada: dron no deshabilitado ({drone_id})",
         },
+        "drone_already_deployed": {
+            "en": "Action blocked: drone already deployed ({drone_id})",
+            "es": "Acción bloqueada: dron ya desplegado ({drone_id})",
+        },
+        "drone_disabled": {
+            "en": "Action blocked: drone disabled ({drone_id})",
+            "es": "Acción bloqueada: dron deshabilitado ({drone_id})",
+        },
+        "recall_not_docked": {
+            "en": "Recall blocked: ship not docked at {node_id}",
+            "es": "Recall bloqueado: nave no acoplada en {node_id}",
+        },
         "system_missing": {
             "en": "Action blocked: system not found ({system_id})",
             "es": "Acción bloqueada: sistema no encontrado ({system_id})",
@@ -187,6 +220,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "not_docked": {
             "en": "Action blocked: not docked at {node_id}",
             "es": "Acción bloqueada: no acoplado en {node_id}",
+        },
+        "scrap_empty": {
+            "en": "No scrap available",
+            "es": "No hay chatarra disponible",
         },
         "emergency_override": {
             "en": "Emergency override: deploying despite unmet dependencies",
@@ -222,6 +259,14 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Drone rebooted: {drone_id}",
             "es": "Dron reiniciado: {drone_id}",
         },
+        "job_completed_recall": {
+            "en": "Drone recalled: {drone_id}",
+            "es": "Dron recuperado: {drone_id}",
+        },
+        "job_failed_recall": {
+            "en": "Drone recall failed: {drone_id}",
+            "es": "Fallo en recuperación de dron: {drone_id}",
+        },
         "job_completed_salvage": {
             "en": "Salvage complete: +{amount} {kind} from {node_id}",
             "es": "Recuperación completa: +{amount} {kind} de {node_id}",
@@ -241,7 +286,12 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         if origin_override:
             origin_tag = origin_override
         else:
-            origin_tag = "AUTO" if origin == "auto" else "CMD"
+            if origin == "auto":
+                origin_tag = "AUTO"
+            elif origin == "step":
+                origin_tag = "STEP"
+            else:
+                origin_tag = "CMD"
         sev = e.severity.value.upper()
         payload = _build_event_payload(e)
         if e.type == EventType.JOB_QUEUED:
@@ -253,7 +303,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             kind = target.get("kind", "?")
             tid = target.get("id", "?")
             locale = state.os.locale.value
-            tmpl = job_queued_templates.get(locale, job_queued_templates["en"])
+            if job_type == "salvage_scrap" and "requested" in e.data:
+                tmpl = salvage_job_queued_templates.get(locale, salvage_job_queued_templates["en"])
+            else:
+                tmpl = job_queued_templates.get(locale, job_queued_templates["en"])
             payload.update({
                 "job_id": job_id,
                 "job_type": job_type,
@@ -261,6 +314,9 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                 "tid": tid,
                 "eta_s": eta_s,
                 "emergency": emergency,
+                "requested": e.data.get("requested", "?"),
+                "available": e.data.get("available", "?"),
+                "effective": e.data.get("effective", "?"),
             })
             try:
                 print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
@@ -378,11 +434,27 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             continue
         if e.type == EventType.MODULE_INSTALLED:
             locale = state.os.locale.value
+            modules = load_modules()
+            mod = modules.get(e.data.get("module_id", ""), {})
+            desc = mod.get("desc_es") if locale == "es" else mod.get("desc_en")
+            effects = e.data.get("effects") or mod.get("effects", {})
+            scrap_cost = mod.get("scrap_cost")
+            effects_text = _format_effects(effects)
+            if desc:
+                if effects_text:
+                    extra = f" — {desc} | effects: {effects_text}"
+                else:
+                    extra = f" — {desc}"
+            else:
+                extra = f" | effects: {effects_text}" if effects_text else ""
+            if scrap_cost is not None:
+                extra = f"{extra} | cost: {scrap_cost} scrap"
             tmpl = {
-                "en": "[{sev}] module_installed :: Module installed: {module_id}",
-                "es": "[{sev}] module_installed :: Módulo instalado: {module_id}",
-            }.get(locale, "[{sev}] module_installed :: Module installed: {module_id}")
+                "en": "[{sev}] module_installed :: Module installed: {module_id}{extra}",
+                "es": "[{sev}] module_installed :: Módulo instalado: {module_id}{extra}",
+            }.get(locale, "[{sev}] module_installed :: Module installed: {module_id}{extra}")
             payload.update({"module_id": e.data.get("module_id", "?")})
+            payload.update({"extra": extra})
             try:
                 print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
             except Exception:
@@ -405,6 +477,14 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                 locale, salvage_templates["salvage_module_found"]["en"]
             )
             payload.update({"module_id": e.data.get("module_id", "?")})
+            try:
+                print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
+            except Exception:
+                print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
+            continue
+        if e.type == EventType.NODE_DEPLETED:
+            locale = state.os.locale.value
+            tmpl = salvage_templates["node_depleted"].get(locale, salvage_templates["node_depleted"]["en"])
             try:
                 print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
             except Exception:
@@ -596,6 +676,10 @@ def _resolve_localized_path(state, path: str) -> str:
         candidate = f"{base}.{state.os.locale.value}.txt"
         if candidate in state.os.fs:
             return candidate
+        fallback = "en" if state.os.locale.value == "es" else "es"
+        candidate = f"{base}.{fallback}.txt"
+        if candidate in state.os.fs:
+            return candidate
     return path
 
 
@@ -694,75 +778,11 @@ def _emit_runtime_event(state, events_out, origin: str, event_type: EventType, s
     events_out.append((origin, event))
 
 
-def _weighted_choice(rng, items: list[dict]) -> str | None:
-    total = sum(float(i.get("weight", 0)) for i in items)
-    if total <= 0:
-        return None
-    r = rng.random() * total
-    upto = 0.0
-    for item in items:
-        w = float(item.get("weight", 0))
-        upto += w
-        if r <= upto:
-            return item.get("id")
-    return None
+ 
 
 
 def _apply_salvage_loot(loop, state, events):
-    rng = loop.get_rng()
-    for item in list(events):
-        if isinstance(item, tuple) and len(item) == 2:
-            origin, e = item
-        else:
-            origin, e = "cmd", item
-        if e.type != EventType.JOB_COMPLETED:
-            continue
-        if e.data.get("message_key") != "job_completed_salvage":
-            continue
-        node_id = e.data.get("node_id")
-        if not node_id:
-            continue
-        loot = load_loot(node_id)
-        scrap_cfg = loot.get("scrap", {"min": 0, "max": 0})
-        base_gain = rng.randint(int(scrap_cfg.get("min", 0)), int(scrap_cfg.get("max", 0)))
-        mult = int(e.data.get("amount", 1)) if isinstance(e.data, dict) else 1
-        if mult <= 0:
-            mult = 1
-        scrap_gain = base_gain * mult
-        state.ship.scrap += scrap_gain
-        if isinstance(e.data, dict):
-            e.data["amount"] = scrap_gain
-            e.data["kind"] = "scrap"
-        _emit_runtime_event(
-            state,
-            events,
-            origin,
-            EventType.SALVAGE_SCRAP_GAINED,
-            Severity.INFO,
-            SourceRef(kind="world", id=node_id),
-            f"Salvage gained: +{scrap_gain} scrap",
-            data={"amount": scrap_gain, "node_id": node_id, "message_key": "salvage_scrap_gained"},
-        )
-        base_p = float(loot.get("module_drop_chance", 0.0))
-        p = base_p + 0.10 * math.log1p(mult)
-        if p > 0.90:
-            p = 0.90
-        if p < 0.0:
-            p = 0.0
-        if rng.random() < p:
-            module_id = _weighted_choice(rng, loot.get("modules", []))
-            if module_id:
-                state.ship.modules.append(module_id)
-                _emit_runtime_event(
-                    state,
-                    events,
-                    origin,
-                    EventType.SALVAGE_MODULE_FOUND,
-                    Severity.INFO,
-                    SourceRef(kind="world", id=node_id),
-                    f"Module found: {module_id}",
-                    data={"module_id": module_id, "node_id": node_id, "message_key": "salvage_module_found"},
-                )
+    return
 
 
 def render_about(state, system_id: str) -> None:
@@ -849,7 +869,7 @@ def render_alert_explain(state, alert_key: str) -> None:
         over = " (over limit)" if headroom < 0 else ""
         print(f"- battery_headroom={headroom:.2f}kW{over}")
     if alert_key == "low_power_quality":
-        print("- threshold=0.70")
+        print(f"- threshold={Balance.LOW_POWER_QUALITY_THRESHOLD:.2f}")
     if alert_key == "power_bus_instability":
         dist = state.ship.systems.get("energy_distribution")
         if dist:
@@ -870,6 +890,169 @@ def main() -> None:
         loop.start()
     else:
         loop.set_auto_tick(False)
+
+    base_commands = [
+        "help",
+        "ls",
+        "cat",
+        "man",
+        "about",
+        "config",
+        "mail",
+        "status",
+        "power",
+        "alerts",
+        "contacts",
+        "scan",
+        "sectors",
+        "map",
+        "locate",
+        "dock",
+        "salvage",
+        "diag",
+        "boot",
+        "repair",
+        "inventory",
+        "install",
+        "modules",
+        "drone",
+        "wait",
+        "debug",
+        "exit",
+        "quit",
+    ]
+
+    def _completer(text: str, state_idx: int) -> str | None:
+        buf = readline.get_line_buffer()
+        tokens = buf.strip().split()
+        token = ""
+        if buf and not buf.endswith(" ") and tokens:
+            token = tokens[-1]
+        if not tokens:
+            candidates = [c for c in base_commands if c.startswith(text)]
+        else:
+            cmd = tokens[0]
+            candidates = []
+            with loop.with_lock() as locked_state:
+                systems = list(locked_state.ship.systems.keys())
+                drones = list(locked_state.ship.drones.keys())
+                sectors = list(locked_state.ship.sectors.keys())
+                contacts = sorted(locked_state.world.known_contacts)
+                modules = list(set(locked_state.ship.modules))
+                services = []
+                for sys in locked_state.ship.systems.values():
+                    if sys.service and sys.service.is_installed:
+                        services.append(sys.service.service_name)
+                fs_paths = list(locked_state.os.fs.keys())
+
+            if len(tokens) == 1:
+                candidates = [c for c in base_commands if c.startswith(text)]
+            elif cmd == "diag" or cmd == "about" or cmd == "locate":
+                candidates = [s for s in systems if s.startswith(text)]
+            elif cmd == "boot":
+                candidates = [s for s in services if s.startswith(text)]
+            elif cmd in {"ls", "cat"}:
+                path_text = token or text
+                if "/" in path_text:
+                    dir_part, base_part = path_text.rsplit("/", 1)
+                    dir_path = normalize_path(dir_part or "/")
+                    prefix = base_part
+                else:
+                    dir_path = "/"
+                    prefix = path_text
+                try:
+                    entries = list_dir(locked_state.os.fs, dir_path, locked_state.os.access_level)
+                except Exception:
+                    entries = []
+                for name in entries:
+                    if not name.startswith(prefix):
+                        continue
+                    if "/" in path_text:
+                        if path_text.startswith("/"):
+                            full = normalize_path(f"{dir_path}/{name}")
+                        else:
+                            full = f"{dir_part}/{name}" if dir_part else name
+                        candidates.append(full)
+                    else:
+                        candidates.append(name)
+            elif cmd == "repair":
+                if len(tokens) == 2:
+                    candidates = [d for d in drones if d.startswith(text)]
+                elif len(tokens) == 3:
+                    candidates = [s for s in systems if s.startswith(text)]
+            elif cmd == "dock":
+                candidates = [c for c in contacts if c.startswith(text)]
+            elif cmd == "install":
+                candidates = [m for m in modules if m.startswith(text)]
+            elif cmd == "man":
+                topics: set[str] = set()
+                for path in fs_paths:
+                    if path.startswith("/manuals/commands/") or path.startswith("/manuals/systems/") or path.startswith("/manuals/alerts/") or path.startswith("/manuals/modules/"):
+                        name = path.rsplit("/", 1)[-1]
+                        if name.endswith(".txt"):
+                            name = name[:-4]
+                        if name.endswith(".en") or name.endswith(".es"):
+                            name = name[:-3]
+                        topics.add(name)
+                candidates = [t for t in sorted(topics) if t.startswith(text)]
+            elif cmd == "about":
+                topics = set(systems)
+                topics.update(locked_state.events.alerts.keys())
+                for path in fs_paths:
+                    if path.startswith("/manuals/modules/"):
+                        name = path.rsplit("/", 1)[-1]
+                        if name.endswith(".txt"):
+                            name = name[:-4]
+                        if name.endswith(".en") or name.endswith(".es"):
+                            name = name[:-3]
+                        topics.add(name)
+                candidates = [t for t in sorted(topics) if t.startswith(text)]
+            elif cmd == "alerts":
+                if len(tokens) == 2:
+                    candidates = [c for c in ["explain"] if c.startswith(text)]
+                elif len(tokens) == 3 and tokens[1] == "explain":
+                    candidates = [k for k in locked_state.events.alerts.keys() if k.startswith(text)]
+            elif cmd == "drone":
+                if len(tokens) == 2:
+                    candidates = [c for c in ["status", "deploy", "deploy!", "reboot", "recall"] if c.startswith(text)]
+                elif len(tokens) == 3 and tokens[1] in {"deploy", "deploy!", "reboot", "recall"}:
+                    candidates = [d for d in drones if d.startswith(text)]
+                elif len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
+                    candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
+            elif cmd == "salvage":
+                if len(tokens) == 2:
+                    candidates = [c for c in ["scrap", "module", "modules"] if c.startswith(text)]
+                elif len(tokens) == 3:
+                    candidates = [d for d in drones if d.startswith(text)]
+                elif len(tokens) == 4:
+                    candidates = [c for c in contacts if c.startswith(text)]
+            elif cmd == "config":
+                if len(tokens) == 2:
+                    candidates = [c for c in ["set", "show"] if c.startswith(text)]
+                elif len(tokens) == 3 and tokens[1] == "set":
+                    candidates = [c for c in ["lang"] if c.startswith(text)]
+                elif len(tokens) == 4 and tokens[1] == "set" and tokens[2] == "lang":
+                    candidates = [c for c in ["en", "es"] if c.startswith(text)]
+            elif cmd == "mail":
+                if len(tokens) == 2:
+                    candidates = [c for c in ["inbox", "read"] if c.startswith(text)]
+                elif len(tokens) == 3 and tokens[1] == "read":
+                    candidates = [c for c in ["latest"] if c.startswith(text)]
+
+        if state_idx < len(candidates):
+            return candidates[state_idx]
+        return None
+
+    readline.set_completer_delims(" \t\n")
+    readline.set_completer(_completer)
+    readline.parse_and_bind("tab: complete")
+
+    def _drain_auto_events() -> None:
+        auto_ev = loop.drain_events()
+        if auto_ev:
+            with loop.with_lock() as locked_state:
+                _apply_salvage_loot(loop, locked_state, auto_ev)
+                render_events(locked_state, auto_ev)
 
     print("RETORNO (prologue)")
     print("Tip: cat /mail/inbox/0000.notice.txt")
@@ -905,11 +1088,7 @@ def main() -> None:
             loop.stop()
             break
         if parsed == "HELP":
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
+            _drain_auto_events()
             print_help()
             continue
         if parsed == "CONFIG_SHOW":
@@ -951,128 +1130,72 @@ def main() -> None:
                 print("DEBUG mode disabled")
                 continue
         if isinstance(parsed, tuple) and parsed[0] == "LS":
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
+            _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_ls(locked_state, parsed[1])
             continue
         if isinstance(parsed, tuple) and parsed[0] == "CAT":
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
+            _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_cat(locked_state, parsed[1])
             continue
         if parsed == "CONTACTS":
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
+            _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_contacts(locked_state)
             continue
         if parsed == "INVENTORY":
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
+            _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_inventory(locked_state)
             continue
         if parsed == "MODULES":
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
+            _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_modules_catalog(locked_state)
             continue
         if parsed == "SECTORS":
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
+            _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_sectors(locked_state)
             continue
         if parsed == "ALERTS":
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
+            _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_alerts(locked_state)
             continue
         if isinstance(parsed, tuple) and parsed[0] == "ALERTS_EXPLAIN":
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
+            _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_alert_explain(locked_state, parsed[1])
             continue
         if parsed == "LOGS":
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
+            _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_logs(locked_state)
             continue
         if parsed == "POWER_STATUS":
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
+            _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_power_status(locked_state)
             continue
         if parsed == "DRONE_STATUS":
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
+            _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_drone_status(locked_state)
             continue
         if isinstance(parsed, tuple) and parsed[0] == "ABOUT":
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
+            _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_about(locked_state, parsed[1])
             continue
         if isinstance(parsed, tuple) and parsed[0] == "MAN":
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
+            _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_man(locked_state, parsed[1])
             continue
         if isinstance(parsed, tuple) and parsed[0] == "LOCATE":
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
+            _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_locate(locked_state, parsed[1])
             continue
@@ -1083,7 +1206,7 @@ def main() -> None:
                     print("wait is available only in DEBUG mode. Use: debug on")
                     continue
             step_events = loop.step_many(seconds, dt=1.0)
-            cmd_events = [("cmd", e) for e in step_events]
+            cmd_events = [("step", e) for e in step_events]
             with loop.with_lock() as locked_state:
                 _apply_salvage_loot(loop, locked_state, cmd_events)
                 render_events(locked_state, cmd_events)
@@ -1098,20 +1221,12 @@ def main() -> None:
 
         # Acciones del motor
         if parsed.__class__.__name__ == "Diag":
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
+            _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_diag(locked_state, parsed.system_id)
             continue
         if parsed.__class__.__name__ == "Status":
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
+            _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_status(locked_state)
             continue

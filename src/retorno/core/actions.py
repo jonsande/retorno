@@ -60,3 +60,21 @@ class Install(Action):
 @dataclass(slots=True)
 class DroneReboot(Action):
     drone_id: str
+
+
+@dataclass(slots=True)
+class DroneRecall(Action):
+    drone_id: str
+
+
+@dataclass(slots=True)
+class SalvageScrap(Action):
+    drone_id: str
+    node_id: str
+    amount: int
+
+
+@dataclass(slots=True)
+class SalvageModule(Action):
+    drone_id: str
+    node_id: str

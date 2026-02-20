@@ -11,10 +11,13 @@ from retorno.core.actions import (
     Dock,
     DroneDeploy,
     DroneReboot,
+    DroneRecall,
     Install,
     PowerShed,
     Repair,
     Salvage,
+    SalvageModule,
+    SalvageScrap,
     Status,
 )
 from retorno.core.gamestate import GameState
@@ -23,19 +26,11 @@ from retorno.model.events import AlertState, Event, EventManagerState, EventType
 from retorno.model.jobs import Job, JobManagerState, JobStatus, JobType, RiskProfile, TargetRef
 from retorno.runtime.data_loader import load_modules
 from retorno.model.systems import Dependency, ShipSystem, SystemState
+from retorno.config.balance import Balance
 
 
 class Engine:
-    _BUS_INSTABILITY_AFTER_S = 120
-    _LOW_POWER_QUALITY_THRESHOLD = 0.7
-    _R_REF = 0.05
     _MAX_RECENT_EVENTS = 50
-
-    _REPAIR_TIME_S = 25.0
-    _DEPLOY_TIME_S = 6.0
-    _REBOOT_TIME_S = 15.0
-    _DOCK_TIME_S = 12.0
-    _SALVAGE_BASE_TIME_S = 8.0
 
     def tick(self, state: GameState, dt: float) -> list[Event]:
         if dt <= 0:
@@ -110,42 +105,8 @@ class Engine:
                 JobType.DOCK,
                 TargetRef(kind="world_node", id=action.node_id),
                 owner_id=None,
-                eta_s=self._DOCK_TIME_S,
+                eta_s=Balance.DOCK_TIME_S,
                 params={"node_id": action.node_id},
-            )
-            return events
-
-        if isinstance(action, Salvage):
-            if action.amount <= 0:
-                event = self._make_event(
-                    state,
-                    EventType.BOOT_BLOCKED,
-                    Severity.WARN,
-                    SourceRef(kind="world", id=action.node_id),
-                    "Salvage blocked: amount must be > 0",
-                    data={"message_key": "boot_blocked", "reason": "invalid_amount", "node_id": action.node_id},
-                )
-                self._record_event(state.events, event)
-                return [event]
-            if state.world.current_node_id != action.node_id:
-                event = self._make_event(
-                    state,
-                    EventType.BOOT_BLOCKED,
-                    Severity.WARN,
-                    SourceRef(kind="world", id=action.node_id),
-                    f"Salvage blocked: not docked at {action.node_id}",
-                    data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": action.node_id},
-                )
-                self._record_event(state.events, event)
-                return [event]
-            eta = self._SALVAGE_BASE_TIME_S + float(action.amount)
-            events = self._enqueue_job(
-                state,
-                JobType.SALVAGE,
-                TargetRef(kind="world_node", id=action.node_id),
-                owner_id=None,
-                eta_s=eta,
-                params={"node_id": action.node_id, "kind": action.kind, "amount": action.amount},
             )
             return events
 
@@ -195,7 +156,7 @@ class Engine:
                 JobType.INSTALL_MODULE,
                 TargetRef(kind="ship", id=state.ship.ship_id),
                 owner_id=None,
-                eta_s=10.0,
+                eta_s=Balance.INSTALL_TIME_S,
                 params={"module_id": action.module_id, "scrap_cost": scrap_cost},
             )
 
@@ -233,6 +194,28 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
+            if drone.status == DroneStatus.DEPLOYED:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Drone deploy blocked: {drone.drone_id} already deployed",
+                    data={"message_key": "boot_blocked", "reason": "drone_already_deployed", "drone_id": drone.drone_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if drone.status == DroneStatus.DISABLED:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Drone deploy blocked: {drone.drone_id} disabled",
+                    data={"message_key": "boot_blocked", "reason": "drone_disabled", "drone_id": drone.drone_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
             if drone.status != DroneStatus.DOCKED:
                 event = self._make_event(
                     state,
@@ -244,6 +227,22 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
+            target_kind = "ship_sector"
+            target_id = action.sector_id
+            if action.sector_id in state.world.space.nodes:
+                if state.world.current_node_id != action.sector_id:
+                    event = self._make_event(
+                        state,
+                        EventType.BOOT_BLOCKED,
+                        Severity.WARN,
+                        SourceRef(kind="world", id=action.sector_id),
+                        f"Drone deploy blocked: ship not docked at {action.sector_id}",
+                        data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": action.sector_id},
+                    )
+                    self._record_event(state.events, event)
+                    return [event]
+                target_kind = "world_node"
+                target_id = action.sector_id
             drone_bay = state.ship.systems.get("drone_bay")
             if not drone_bay or drone_bay.state == SystemState.OFFLINE or drone_bay.forced_offline:
                 event = self._make_event(
@@ -280,19 +279,22 @@ class Engine:
                 return self._enqueue_job(
                     state,
                     JobType.DEPLOY_DRONE,
-                    TargetRef(kind="ship_sector", id=action.sector_id),
+                    TargetRef(kind=target_kind, id=target_id),
                     owner_id=action.drone_id,
-                    eta_s=self._DEPLOY_TIME_S,
+                    eta_s=Balance.DEPLOY_TIME_S,
                     params={"drone_id": action.drone_id, "emergency": True},
-                    risk=RiskProfile(p_glitch_per_s=0.05, p_fail_per_s=0.03),
+                    risk=RiskProfile(
+                        p_glitch_per_s=Balance.EMERGENCY_DEPLOY_P_GLITCH_PER_S,
+                        p_fail_per_s=Balance.EMERGENCY_DEPLOY_P_FAIL_PER_S,
+                    ),
                 )
 
             return self._enqueue_job(
                 state,
                 JobType.DEPLOY_DRONE,
-                TargetRef(kind="ship_sector", id=action.sector_id),
+                TargetRef(kind=target_kind, id=target_id),
                 owner_id=action.drone_id,
-                eta_s=self._DEPLOY_TIME_S,
+                eta_s=Balance.DEPLOY_TIME_S,
                 params={"drone_id": action.drone_id},
             )
 
@@ -325,7 +327,52 @@ class Engine:
                 JobType.REBOOT_DRONE,
                 TargetRef(kind="drone", id=drone.drone_id),
                 owner_id=drone.drone_id,
-                eta_s=self._REBOOT_TIME_S,
+                eta_s=Balance.REBOOT_TIME_S,
+                params={"drone_id": drone.drone_id},
+            )
+
+        if isinstance(action, DroneRecall):
+            drone = state.ship.drones.get(action.drone_id)
+            if not drone:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=action.drone_id),
+                    f"Recall blocked: drone {action.drone_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "drone_missing", "drone_id": action.drone_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if drone.status != DroneStatus.DEPLOYED:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Recall blocked: {drone.drone_id} not deployed",
+                    data={"message_key": "boot_blocked", "reason": "drone_not_deployed", "drone_id": drone.drone_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if drone.location.kind == "world_node":
+                if state.world.current_node_id != drone.location.id:
+                    event = self._make_event(
+                        state,
+                        EventType.BOOT_BLOCKED,
+                        Severity.WARN,
+                        SourceRef(kind="drone", id=drone.drone_id),
+                        f"Recall blocked: ship not docked at {drone.location.id}",
+                        data={"message_key": "boot_blocked", "reason": "recall_not_docked", "node_id": drone.location.id},
+                    )
+                    self._record_event(state.events, event)
+                    return [event]
+            return self._enqueue_job(
+                state,
+                JobType.RECALL_DRONE,
+                TargetRef(kind="drone", id=drone.drone_id),
+                owner_id=drone.drone_id,
+                eta_s=Balance.RECALL_TIME_S,
                 params={"drone_id": drone.drone_id},
             )
 
@@ -374,8 +421,172 @@ class Engine:
                 JobType.REPAIR_SYSTEM,
                 TargetRef(kind="ship_system", id=action.system_id),
                 owner_id=action.drone_id,
-                eta_s=self._REPAIR_TIME_S,
+                eta_s=Balance.REPAIR_TIME_S,
                 params=params,
+            )
+
+        if isinstance(action, SalvageScrap):
+            drone = state.ship.drones.get(action.drone_id)
+            if not drone:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=action.drone_id),
+                    f"Salvage blocked: drone {action.drone_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "drone_missing", "drone_id": action.drone_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if drone.status != DroneStatus.DEPLOYED:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Salvage blocked: {drone.drone_id} not deployed",
+                    data={"message_key": "boot_blocked", "reason": "drone_not_deployed", "drone_id": drone.drone_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            node = state.world.space.nodes.get(action.node_id)
+            if not node:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    f"Salvage blocked: node {action.node_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "node_missing", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if drone.location.kind != "world_node" or drone.location.id != action.node_id:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Salvage blocked: {drone.drone_id} not at node {action.node_id}",
+                    data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if state.world.current_node_id != action.node_id:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    f"Salvage blocked: ship not docked at {action.node_id}",
+                    data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if action.amount <= 0:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    "Salvage blocked: amount must be > 0",
+                    data={"message_key": "boot_blocked", "reason": "invalid_amount", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            effective = min(action.amount, node.salvage_scrap_available)
+            if effective <= 0:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    "No scrap available",
+                    data={"message_key": "boot_blocked", "reason": "scrap_empty", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            eta = Balance.SALVAGE_SCRAP_BASE_S + Balance.SALVAGE_SCRAP_PER_UNIT_S * effective
+            return self._enqueue_job(
+                state,
+                JobType.SALVAGE_SCRAP,
+                TargetRef(kind="world_node", id=action.node_id),
+                owner_id=action.drone_id,
+                eta_s=eta,
+                params={
+                    "node_id": action.node_id,
+                    "requested": action.amount,
+                    "effective": effective,
+                    "available": node.salvage_scrap_available,
+                },
+            )
+
+        if isinstance(action, SalvageModule):
+            drone = state.ship.drones.get(action.drone_id)
+            if not drone:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=action.drone_id),
+                    f"Salvage blocked: drone {action.drone_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "drone_missing", "drone_id": action.drone_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if drone.status != DroneStatus.DEPLOYED:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Salvage blocked: {drone.drone_id} not deployed",
+                    data={"message_key": "boot_blocked", "reason": "drone_not_deployed", "drone_id": drone.drone_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            node = state.world.space.nodes.get(action.node_id)
+            if not node:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    f"Salvage blocked: node {action.node_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "node_missing", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if drone.location.kind != "world_node" or drone.location.id != action.node_id:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Salvage blocked: {drone.drone_id} not at node {action.node_id}",
+                    data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if state.world.current_node_id != action.node_id:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    f"Salvage blocked: ship not docked at {action.node_id}",
+                    data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            eta = Balance.SALVAGE_MODULE_TIME_S
+            return self._enqueue_job(
+                state,
+                JobType.SALVAGE_MODULE,
+                TargetRef(kind="world_node", id=action.node_id),
+                owner_id=action.drone_id,
+                eta_s=eta,
+                params={"node_id": action.node_id},
             )
 
         if isinstance(action, Boot):
@@ -407,13 +618,38 @@ class Engine:
             if system.service.is_running:
                 return []
             if self._dependencies_blocked(state.ship.systems, system.dependencies):
+                dep_detail = self._first_unmet_dependency(state.ship.systems, system.dependencies)
+                if dep_detail:
+                    dep_target, dep_required, dep_current = dep_detail
+                    msg = (
+                        f"Boot blocked: {service_name} requires {dep_target}>={dep_required} "
+                        f"(current={dep_current})"
+                    )
+                    data = {
+                        "message_key": "boot_blocked",
+                        "reason": "deps_unmet",
+                        "service": service_name,
+                        "dep_target": dep_target,
+                        "dep_required": dep_required,
+                        "dep_current": dep_current,
+                    }
+                else:
+                    msg = f"Boot blocked: unmet dependencies for {service_name}"
+                    data = {
+                        "message_key": "boot_blocked",
+                        "reason": "deps_unmet",
+                        "service": service_name,
+                        "dep_target": "unknown",
+                        "dep_required": "unknown",
+                        "dep_current": "unknown",
+                    }
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
                     Severity.WARN,
                     SourceRef(kind="ship_system", id=system.system_id),
-                    f"Boot blocked: unmet dependencies for {service_name}",
-                    data={"message_key": "boot_blocked", "reason": "deps_unmet", "service": service_name},
+                    msg,
+                    data=data,
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -532,7 +768,10 @@ class Engine:
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
                 drone.status = DroneStatus.DEPLOYED
-                drone.location = DroneLocation(kind="ship_sector", id=job.target.id)
+                if job.target.kind == "world_node":
+                    drone.location = DroneLocation(kind="world_node", id=job.target.id)
+                else:
+                    drone.location = DroneLocation(kind="ship_sector", id=job.target.id)
                 events.append(
                     self._make_event(
                         state,
@@ -557,7 +796,7 @@ class Engine:
             if drone:
                 rng = self._job_rng(state, job)
                 integrity = drone.integrity
-                p_success = self._clamp(integrity, 0.2, 0.9)
+                p_success = self._clamp(integrity, Balance.DRONE_REBOOT_P_MIN, Balance.DRONE_REBOOT_P_MAX)
                 if rng.random() < p_success:
                     drone.status = DroneStatus.DOCKED
                     drone.location = DroneLocation(kind="ship_sector", id="drone_bay")
@@ -595,6 +834,49 @@ class Engine:
                     )
             return events
 
+        if job.job_type == JobType.RECALL_DRONE and job.target:
+            drone_id = job.params.get("drone_id")
+            drone = state.ship.drones.get(drone_id) if drone_id else None
+            if drone:
+                rng = self._rng(state)
+                p_success = self._clamp(drone.integrity, Balance.DRONE_RECALL_P_MIN, Balance.DRONE_RECALL_P_MAX)
+                if rng.random() < p_success:
+                    drone.status = DroneStatus.DOCKED
+                    drone.location = DroneLocation(kind="ship_sector", id="drone_bay")
+                    events.append(
+                        self._make_event(
+                            state,
+                            EventType.JOB_COMPLETED,
+                            Severity.INFO,
+                            SourceRef(kind="drone", id=drone.drone_id),
+                            f"Drone recalled: {drone.drone_id}",
+                            data={
+                                "job_id": job.job_id,
+                                "job_type": job.job_type.value,
+                                "drone_id": drone.drone_id,
+                                "message_key": "job_completed_recall",
+                            },
+                        )
+                    )
+                else:
+                    job.status = JobStatus.FAILED
+                    events.append(
+                        self._make_event(
+                            state,
+                            EventType.JOB_FAILED,
+                            Severity.WARN,
+                            SourceRef(kind="drone", id=drone.drone_id),
+                            f"Drone recall failed: {drone.drone_id}",
+                            data={
+                                "job_id": job.job_id,
+                                "job_type": job.job_type.value,
+                                "drone_id": drone.drone_id,
+                                "message_key": "job_failed_recall",
+                            },
+                        )
+                    )
+            return events
+
         if job.job_type == JobType.DOCK and job.target:
             state.world.current_node_id = job.target.id
             events.append(
@@ -614,27 +896,113 @@ class Engine:
             )
             return events
 
-        if job.job_type == JobType.SALVAGE and job.target:
+        if job.job_type == JobType.SALVAGE_SCRAP and job.target:
             node_id = job.params.get("node_id", job.target.id)
-            kind = job.params.get("kind", "scrap")
-            amount = int(job.params.get("amount", 1))
+            node = state.world.space.nodes.get(node_id)
+            requested = int(job.params.get("requested", 0))
+            effective = int(job.params.get("effective", 0))
+            recovered = 0
+            if node:
+                recovered = min(effective, node.salvage_scrap_available)
+                node.salvage_scrap_available = max(0, node.salvage_scrap_available - recovered)
+            state.ship.scrap += recovered
             events.append(
                 self._make_event(
                     state,
-                    EventType.JOB_COMPLETED,
+                    EventType.SALVAGE_SCRAP_GAINED,
                     Severity.INFO,
                     SourceRef(kind="world", id=node_id),
-                    f"Salvage complete: +{amount} {kind} from {node_id}",
+                    f"Salvage gained: +{recovered} scrap",
                     data={
-                        "job_id": job.job_id,
-                        "job_type": job.job_type.value,
-                        "kind": kind,
-                        "amount": amount,
+                        "amount": recovered,
+                        "requested": requested,
+                        "remaining": node.salvage_scrap_available if node else 0,
                         "node_id": node_id,
-                        "message_key": "job_completed_salvage",
+                        "message_key": "salvage_scrap_gained",
                     },
                 )
             )
+            if requested > recovered:
+                events.append(
+                    self._make_event(
+                        state,
+                        EventType.JOB_COMPLETED,
+                        Severity.INFO,
+                        SourceRef(kind="world", id=node_id),
+                        f"Only {recovered} scrap available; recovered {recovered}",
+                        data={"message_key": "salvage_partial", "recovered": recovered, "node_id": node_id},
+                    )
+                )
+            if node and node.salvage_scrap_available == 0 and not node.salvage_dry:
+                node.salvage_dry = True
+                events.append(
+                    self._make_event(
+                        state,
+                        EventType.NODE_DEPLETED,
+                        Severity.INFO,
+                        SourceRef(kind="world", id=node_id),
+                        "Node depleted",
+                        data={"message_key": "salvage_depleted", "node_id": node_id},
+                    )
+                )
+            if node and node.salvage_modules_available:
+                rng = self._rng(state)
+                if rng.random() < Balance.SALVAGE_SCRAP_FIND_MODULE_P:
+                    module_id = rng.choice(node.salvage_modules_available)
+                    node.salvage_modules_available.remove(module_id)
+                    state.ship.modules.append(module_id)
+                    events.append(
+                        self._make_event(
+                            state,
+                            EventType.SALVAGE_MODULE_FOUND,
+                            Severity.INFO,
+                            SourceRef(kind="world", id=node_id),
+                            f"Module found: {module_id}",
+                            data={
+                                "module_id": module_id,
+                                "node_id": node_id,
+                                "message_key": "salvage_module_found",
+                            },
+                        )
+                    )
+            return events
+
+        if job.job_type == JobType.SALVAGE_MODULE and job.target:
+            node_id = job.params.get("node_id", job.target.id)
+            node = state.world.space.nodes.get(node_id)
+            found = False
+            if node and node.salvage_modules_available:
+                rng = self._rng(state)
+                if rng.random() < Balance.SALVAGE_MODULE_FIND_P:
+                    module_id = rng.choice(node.salvage_modules_available)
+                    node.salvage_modules_available.remove(module_id)
+                    state.ship.modules.append(module_id)
+                    events.append(
+                        self._make_event(
+                            state,
+                            EventType.SALVAGE_MODULE_FOUND,
+                            Severity.INFO,
+                            SourceRef(kind="world", id=node_id),
+                            f"Module found: {module_id}",
+                            data={
+                                "module_id": module_id,
+                                "node_id": node_id,
+                                "message_key": "salvage_module_found",
+                            },
+                        )
+                    )
+                    found = True
+            if not found:
+                events.append(
+                    self._make_event(
+                        state,
+                        EventType.JOB_COMPLETED,
+                        Severity.INFO,
+                        SourceRef(kind="world", id=node_id),
+                        "No modules found",
+                        data={"message_key": "salvage_none", "node_id": node_id},
+                    )
+                )
             return events
 
         if job.job_type == JobType.INSTALL_MODULE and job.target:
@@ -674,7 +1042,7 @@ class Engine:
                     Severity.INFO,
                     SourceRef(kind="ship", id=state.ship.ship_id),
                     f"Module installed: {module_id}",
-                    data={"module_id": module_id},
+                    data={"module_id": module_id, "effects": effects},
                 )
             )
             return events
@@ -727,7 +1095,7 @@ class Engine:
 
     def _apply_degradation(self, state: GameState, dt: float, power_quality: float) -> list[Event]:
         r_env = state.ship.radiation_env_rad_per_s
-        r_env_norm = self._clamp(r_env / self._R_REF)
+        r_env_norm = self._clamp(r_env / Balance.R_REF)
         events: list[Event] = []
         for system in state.ship.systems.values():
             s_factor = 1.0 + system.k_power * (1.0 - power_quality) + system.k_rad * r_env_norm
@@ -775,7 +1143,7 @@ class Engine:
         if (
             distribution
             and distribution.state in (SystemState.DAMAGED, SystemState.CRITICAL)
-            and state.clock.t >= self._BUS_INSTABILITY_AFTER_S
+            and state.clock.t >= Balance.BUS_INSTABILITY_AFTER_S
         ):
             events.extend(
                 self._ensure_alert(
@@ -789,7 +1157,7 @@ class Engine:
             )
             active_keys.add(EventType.POWER_BUS_INSTABILITY.value)
 
-        if power_quality < self._LOW_POWER_QUALITY_THRESHOLD:
+        if power_quality < Balance.LOW_POWER_QUALITY_THRESHOLD:
             existing = state.events.alerts.get(EventType.LOW_POWER_QUALITY.value)
             if not existing or not existing.is_active:
                 events.extend(
@@ -913,12 +1281,27 @@ class Engine:
         }
         if params.get("emergency"):
             data["emergency"] = True
+        message = f"Job queued: {job_type.value} -> {target.kind}:{target.id} (ETA {int(eta_s)}s)"
+        if job_type == JobType.SALVAGE_SCRAP:
+            requested = params.get("requested")
+            available = params.get("available")
+            effective = params.get("effective")
+            if requested is not None:
+                data["requested"] = requested
+            if available is not None:
+                data["available"] = available
+            if effective is not None:
+                data["effective"] = effective
+            message = (
+                f"Job queued: salvage_scrap requested={requested} available={available} "
+                f"will_recover={effective} (ETA {int(eta_s)}s)"
+            )
         event = self._make_event(
             state,
             EventType.JOB_QUEUED,
             Severity.INFO,
             source,
-            f"Job queued: {job_type.value} -> {target.kind}:{target.id} (ETA {int(eta_s)}s)",
+            message,
             data=data,
         )
         self._record_event(state.events, event)
@@ -979,6 +1362,20 @@ class Engine:
             if self._state_rank(target.state) < required:
                 return True
         return False
+
+    def _first_unmet_dependency(
+        self, systems: dict[str, ShipSystem], dependencies: list[Dependency]
+    ) -> tuple[str, str, str] | None:
+        for dep in dependencies:
+            if dep.dep_type != "system_state_at_least":
+                continue
+            target = systems.get(dep.target_id)
+            if not target:
+                return (dep.target_id, str(dep.value), "missing")
+            required = SystemState(dep.value)
+            if self._state_rank(target.state) < self._state_rank(required):
+                return (dep.target_id, required.value, target.state.value)
+        return None
 
     def _state_rank(self, state: SystemState) -> int:
         order = {
@@ -1127,3 +1524,21 @@ class Engine:
         job_num = int(job.job_id[1:]) if job.job_id.startswith("J") else 0
         seed = state.meta.rng_seed + int(state.clock.t * 1000.0) + job_num
         return random.Random(seed)
+
+    def _rng(self, state: GameState) -> random.Random:
+        r = random.Random(state.meta.rng_seed + state.meta.rng_counter)
+        state.meta.rng_counter += 1
+        return r
+
+    def _weighted_choice(self, rng: random.Random, items: list[dict]) -> str | None:
+        total = sum(float(i.get("weight", 0)) for i in items)
+        if total <= 0:
+            return None
+        r = rng.random() * total
+        upto = 0.0
+        for item in items:
+            w = float(item.get("weight", 0))
+            upto += w
+            if r <= upto:
+                return item.get("id")
+        return None

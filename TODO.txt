@@ -7,6 +7,9 @@ obtener scrap.
 
 - [ ] La cuestión de implementar Textual.
 
+- [ ] Las tareas de un mismo dron deberían ir en cola. Ahora mismo las hace simultáneamente si
+le mandas más de una antes de de acabe la anterior.
+
 - [ ] Un comando que liste los trabajos (jobs) en proceso o en cola.
 
 - [ ] Ahora mismo tu status muestra P_load=4.20kW estando docked; eso sugiere que el docking 

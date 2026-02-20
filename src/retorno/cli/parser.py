@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import difflib
 
-from retorno.core.actions import Boot, Diag, Dock, DroneDeploy, DroneReboot, Install, PowerShed, Repair, Salvage, Status
+from retorno.core.actions import Boot, Diag, Dock, DroneDeploy, DroneRecall, DroneReboot, Install, PowerShed, Repair, SalvageModule, SalvageScrap, Status
 
 
 @dataclass(slots=True)
@@ -67,26 +67,28 @@ def parse_command(line: str):
         return Dock(node_id=args[0])
 
     if cmd == "salvage":
-        if len(args) not in {1, 2, 3}:
-            raise ParseError("Uso: salvage <node_id> [scrap] [amount]")
-        node_id = args[0]
-        kind = "scrap"
-        amount = 1
-        if len(args) == 2:
+        if len(args) < 2:
+            raise ParseError(
+                "Uso: salvage scrap <drone_id> <node_id> <amount> | salvage module(s) <drone_id> <node_id>"
+            )
+        kind = args[0].lower()
+        if kind == "scrap":
+            if len(args) != 4:
+                raise ParseError("Uso: salvage scrap <drone_id> <node_id> <amount>")
             try:
-                amount = int(args[1])
-                kind = "scrap"
-            except ValueError:
-                kind = args[1]
-        if len(args) == 3:
-            kind = args[1]
-            try:
-                amount = int(args[2])
+                amount = int(args[3])
             except ValueError as e:
                 raise ParseError("salvage: amount debe ser entero") from e
-        if amount <= 0:
-            raise ParseError("salvage: amount debe ser > 0")
-        return Salvage(node_id=node_id, kind=kind, amount=amount)
+            if amount <= 0:
+                raise ParseError("salvage: amount debe ser > 0")
+            return SalvageScrap(drone_id=args[1], node_id=args[2], amount=amount)
+        if kind in {"module", "modules"}:
+            if len(args) != 3:
+                raise ParseError("Missing node_id. Example: salvage modules D1 ECHO_7")
+            return SalvageModule(drone_id=args[1], node_id=args[2])
+        raise ParseError(
+            "Uso: salvage scrap <drone_id> <node_id> <amount> | salvage module(s) <drone_id> <node_id>"
+        )
 
     if cmd == "inventory":
         return "INVENTORY"
@@ -177,6 +179,10 @@ def parse_command(line: str):
         sub = args[0].lower()
         if sub == "status":
             return "DRONE_STATUS"
+        if sub == "recall":
+            if len(args) != 2:
+                raise ParseError("Uso: drone recall <drone_id>")
+            return DroneRecall(drone_id=args[1])
         if sub == "reboot":
             if len(args) != 2:
                 raise ParseError("Uso: drone reboot <drone_id>")

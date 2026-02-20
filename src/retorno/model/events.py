@@ -25,6 +25,7 @@ class EventType(str, Enum):
     DOCKED = "docked"
     SALVAGE_SCRAP_GAINED = "salvage_scrap_gained"
     SALVAGE_MODULE_FOUND = "salvage_module_found"
+    NODE_DEPLETED = "node_depleted"
     MODULE_INSTALLED = "module_installed"
     DRONE_DISABLED = "drone_disabled"
 

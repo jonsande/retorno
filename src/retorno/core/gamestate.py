@@ -13,6 +13,7 @@ from retorno.model.world import WorldState
 class MetaState:
     save_version: int = 1
     rng_seed: int = 12345
+    rng_counter: int = 0
     prologue_complete: bool = False
 
 

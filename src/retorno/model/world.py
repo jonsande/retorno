@@ -9,6 +9,9 @@ class SpaceNode:
     name: str
     kind: str  # "ship", "station", "derelict"
     radiation_rad_per_s: float = 0.0
+    salvage_scrap_available: int = 0
+    salvage_modules_available: list[str] = field(default_factory=list)
+    salvage_dry: bool = False
 
 
 @dataclass(slots=True)
