@@ -11,14 +11,17 @@ from retorno.core.actions import (
     Diag,
     Dock,
     DroneDeploy,
+    DroneMove,
     DroneReboot,
     DroneRecall,
     Hibernate,
-    InventoryUpdate,
+    CargoAudit,
     Install,
     PowerPlan,
     PowerShed,
+    SystemOn,
     Repair,
+    SelfTestRepair,
     Salvage,
     SalvageModule,
     SalvageScrap,
@@ -83,6 +86,7 @@ class Engine:
 
         events.extend(self._apply_degradation(state, dt, power_quality))
         self._apply_radiation(state, dt)
+        self._update_drone_maintenance(state, dt)
 
         events.extend(self._update_alerts(state, p_load, p_gen, power_quality))
 
@@ -266,7 +270,7 @@ class Engine:
             return events
 
         if isinstance(action, Install):
-            if action.module_id not in state.ship.modules:
+            if action.module_id not in state.ship.cargo_modules:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
@@ -290,13 +294,13 @@ class Engine:
                 self._record_event(state.events, event)
                 return [event]
             scrap_cost = int(modules[action.module_id].get("scrap_cost", 0))
-            if state.ship.scrap < scrap_cost:
+            if state.ship.cargo_scrap < scrap_cost:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
                     Severity.WARN,
                     SourceRef(kind="ship", id=state.ship.ship_id),
-                    f"Install blocked: insufficient scrap ({state.ship.scrap}/{scrap_cost})",
+                    f"Install blocked: insufficient scrap ({state.ship.cargo_scrap}/{scrap_cost})",
                     data={
                         "message_key": "boot_blocked",
                         "reason": "scrap_insufficient",
@@ -315,13 +319,69 @@ class Engine:
                 params={"module_id": action.module_id, "scrap_cost": scrap_cost},
             )
 
-        if isinstance(action, InventoryUpdate):
+        if isinstance(action, CargoAudit):
+            system = state.ship.systems.get("data_core")
+            if not system:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id="data_core"),
+                    "Cargo audit blocked: data_core missing",
+                    data={"message_key": "boot_blocked", "reason": "cargo_audit_blocked"},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if system.forced_offline or system.state == SystemState.OFFLINE:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=system.system_id),
+                    "Cargo audit blocked: data_core offline (CRUISE plan may have shed it). Try: power plan normal",
+                    data={"message_key": "boot_blocked", "reason": "cargo_audit_blocked"},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if not system.service or system.service.service_name != "datad":
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=system.system_id),
+                    "Cargo audit blocked: datad not installed",
+                    data={"message_key": "boot_blocked", "reason": "cargo_audit_blocked"},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if not system.service.is_running:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=system.system_id),
+                    "Cargo audit blocked: datad not running. Try: boot datad",
+                    data={"message_key": "boot_blocked", "reason": "cargo_audit_blocked"},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if self._state_rank(system.state) < self._state_rank(SystemState.LIMITED):
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=system.system_id),
+                    "Cargo audit blocked: data_core degraded (requires >= limited).",
+                    data={"message_key": "boot_blocked", "reason": "cargo_audit_blocked"},
+                )
+                self._record_event(state.events, event)
+                return [event]
             return self._enqueue_job(
                 state,
-                JobType.INVENTORY_UPDATE,
+                JobType.CARGO_AUDIT,
                 TargetRef(kind="ship", id=state.ship.ship_id),
                 owner_id=None,
-                eta_s=Balance.INVENTORY_UPDATE_TIME_S,
+                eta_s=Balance.CARGO_AUDIT_TIME_S,
                 params={},
             )
 
@@ -344,6 +404,46 @@ class Engine:
                 self._record_event(state.events, event)
                 return [event]
             system.forced_offline = True
+            return []
+
+        if isinstance(action, SystemOn):
+            system = state.ship.systems.get(action.system_id)
+            if not system:
+                return []
+            if system.health <= 0.0 or (system.state == SystemState.OFFLINE and not system.forced_offline):
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=system.system_id),
+                    f"System on blocked: {system.system_id} too damaged",
+                    data={"message_key": "boot_blocked", "reason": "system_too_damaged"},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if system.forced_offline:
+                system.forced_offline = False
+                events: list[Event] = []
+                self._apply_health_state(system, state, events, cause="manual_restore")
+                for event in events:
+                    self._record_event(state.events, event)
+                restored = self._make_event(
+                    state,
+                    EventType.SYSTEM_POWER_RESTORED,
+                    Severity.INFO,
+                    SourceRef(kind="ship_system", id=system.system_id),
+                    f"Manual power restored: {system.system_id}",
+                    data={
+                        "from": SystemState.OFFLINE.value,
+                        "to": system.state.value,
+                        "cause": "manual_restore",
+                        "health": system.health,
+                        "message_key": "system_power_restored",
+                    },
+                )
+                self._record_event(state.events, restored)
+                events.append(restored)
+                return events
             return []
 
         if isinstance(action, DroneDeploy):
@@ -378,6 +478,22 @@ class Engine:
                     SourceRef(kind="drone", id=drone.drone_id),
                     f"Drone deploy blocked: {drone.drone_id} disabled",
                     data={"message_key": "boot_blocked", "reason": "drone_disabled", "drone_id": drone.drone_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if drone.integrity < Balance.DRONE_DEPLOY_MIN_INTEGRITY:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Drone deploy blocked: {drone.drone_id} integrity too low",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "drone_too_damaged",
+                        "drone_id": drone.drone_id,
+                        "integrity": drone.integrity,
+                    },
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -422,13 +538,31 @@ class Engine:
                 return [event]
             if self._dependencies_blocked(state.ship.systems, drone_bay.dependencies):
                 if not action.emergency:
+                    dep_detail = self._first_unmet_dependency(state.ship.systems, drone_bay.dependencies)
+                    if dep_detail:
+                        dep_target, dep_required, dep_current = dep_detail
+                        msg = (
+                            f"Drone deploy blocked: drone_bay requires {dep_target}>={dep_required} "
+                            f"(current={dep_current}). Use deploy! for emergency override."
+                        )
+                        data = {
+                            "message_key": "boot_blocked",
+                            "reason": "drone_bay_deps_unmet",
+                            "system_id": "drone_bay",
+                            "dep_target": dep_target,
+                            "dep_required": dep_required,
+                            "dep_current": dep_current,
+                        }
+                    else:
+                        msg = "Drone deploy blocked: drone bay dependencies unmet"
+                        data = {"message_key": "boot_blocked", "reason": "drone_bay_deps_unmet", "system_id": "drone_bay"}
                     event = self._make_event(
                         state,
                         EventType.BOOT_BLOCKED,
                         Severity.WARN,
                         SourceRef(kind="ship_system", id="drone_bay"),
-                        "Drone deploy blocked: drone bay dependencies unmet",
-                        data={"message_key": "boot_blocked", "reason": "deps_unmet", "system_id": "drone_bay"},
+                        msg,
+                        data=data,
                     )
                     self._record_event(state.events, event)
                     return [event]
@@ -437,7 +571,7 @@ class Engine:
                     EventType.BOOT_BLOCKED,
                     Severity.WARN,
                     SourceRef(kind="ship_system", id="drone_bay"),
-                    "Emergency override: deploying despite unmet dependencies",
+                    "Emergency override: deploying despite unmet dependencies. Risk of failure and drone damage.",
                     data={"emergency": True, "message_key": "boot_blocked", "reason": "emergency_override"},
                 )
                 self._record_event(state.events, event)
@@ -461,6 +595,94 @@ class Engine:
                 owner_id=action.drone_id,
                 eta_s=Balance.DEPLOY_TIME_S,
                 params={"drone_id": action.drone_id},
+            )
+
+        if isinstance(action, DroneMove):
+            drone = state.ship.drones.get(action.drone_id)
+            if not drone:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=action.drone_id),
+                    f"Drone move blocked: drone {action.drone_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "drone_missing", "drone_id": action.drone_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if drone.status != DroneStatus.DEPLOYED:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Drone move blocked: {drone.drone_id} not deployed",
+                    data={"message_key": "boot_blocked", "reason": "drone_not_deployed", "drone_id": drone.drone_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if drone.integrity < Balance.DRONE_MOVE_MIN_INTEGRITY:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Drone move blocked: {drone.drone_id} integrity too low",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "drone_too_damaged",
+                        "drone_id": drone.drone_id,
+                        "integrity": drone.integrity,
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
+            target_kind = None
+            target_id = action.target_id
+            if target_id in state.ship.sectors:
+                if drone.location.kind != "ship_sector":
+                    event = self._make_event(
+                        state,
+                        EventType.BOOT_BLOCKED,
+                        Severity.WARN,
+                        SourceRef(kind="drone", id=drone.drone_id),
+                        f"Drone move blocked: {drone.drone_id} not on ship",
+                        data={"message_key": "boot_blocked", "reason": "not_on_ship", "drone_id": drone.drone_id},
+                    )
+                    self._record_event(state.events, event)
+                    return [event]
+                target_kind = "ship_sector"
+            elif target_id in state.world.space.nodes:
+                if state.world.current_node_id != target_id:
+                    event = self._make_event(
+                        state,
+                        EventType.BOOT_BLOCKED,
+                        Severity.WARN,
+                        SourceRef(kind="world", id=target_id),
+                        f"Drone move blocked: ship not docked at {target_id}",
+                        data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": target_id},
+                    )
+                    self._record_event(state.events, event)
+                    return [event]
+                target_kind = "world_node"
+            else:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Drone move blocked: target {target_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "target_missing", "target_id": target_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            return self._enqueue_job(
+                state,
+                JobType.MOVE_DRONE,
+                TargetRef(kind=target_kind, id=target_id),
+                owner_id=drone.drone_id,
+                eta_s=Balance.DEPLOY_TIME_S,
+                params={"drone_id": drone.drone_id},
             )
 
         if isinstance(action, DroneReboot):
@@ -520,6 +742,22 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
+            if drone.integrity < Balance.DRONE_RECALL_MIN_INTEGRITY:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Recall blocked: {drone.drone_id} integrity too low",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "drone_too_damaged",
+                        "drone_id": drone.drone_id,
+                        "integrity": drone.integrity,
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
             if drone.location.kind == "world_node":
                 if state.world.current_node_id != drone.location.id:
                     event = self._make_event(
@@ -531,7 +769,23 @@ class Engine:
                         data={"message_key": "boot_blocked", "reason": "recall_not_docked", "node_id": drone.location.id},
                     )
                     self._record_event(state.events, event)
-                    return [event]
+                return [event]
+            if drone.integrity < Balance.DRONE_RECALL_MIN_INTEGRITY:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Recall blocked: {drone.drone_id} integrity too low",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "drone_too_damaged",
+                        "drone_id": drone.drone_id,
+                        "integrity": drone.integrity,
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
             return self._enqueue_job(
                 state,
                 JobType.RECALL_DRONE,
@@ -588,6 +842,39 @@ class Engine:
                 owner_id=action.drone_id,
                 eta_s=Balance.REPAIR_TIME_S,
                 params=params,
+            )
+
+        if isinstance(action, SelfTestRepair):
+            system = state.ship.systems.get(action.system_id)
+            if not system:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=action.system_id),
+                    f"Repair blocked: system {action.system_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "system_missing", "system_id": action.system_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if not self._has_unlock(state, "selftest_repair"):
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=system.system_id),
+                    "Repair blocked: self-test rig not installed",
+                    data={"message_key": "boot_blocked", "reason": "selftest_not_available"},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            return self._enqueue_job(
+                state,
+                JobType.SELFTEST_REPAIR,
+                TargetRef(kind="ship_system", id=action.system_id),
+                owner_id=None,
+                eta_s=Balance.SELFTEST_REPAIR_TIME_S,
+                params={"system_id": action.system_id},
             )
 
         if isinstance(action, SalvageScrap):
@@ -695,6 +982,7 @@ class Engine:
                     "requested": action.amount,
                     "effective": effective,
                     "available": node.salvage_scrap_available,
+                    "drone_id": action.drone_id,
                 },
             )
 
@@ -775,7 +1063,7 @@ class Engine:
                 TargetRef(kind="world_node", id=node_id),
                 owner_id=action.drone_id,
                 eta_s=eta,
-                params={"node_id": node_id},
+                params={"node_id": node_id, "drone_id": action.drone_id},
             )
 
         if isinstance(action, Boot):
@@ -887,9 +1175,33 @@ class Engine:
 
     def _apply_job_effect(self, state: GameState, job: Job) -> list[Event]:
         events: list[Event] = []
+        if job.job_type == JobType.SELFTEST_REPAIR and job.target:
+            system = state.ship.systems.get(job.target.id)
+            if system:
+                system.health = min(1.0, system.health + Balance.SELFTEST_REPAIR_AMOUNT)
+                self._apply_health_state(system, state, events, cause="selftest")
+                events.append(
+                    self._make_event(
+                        state,
+                        EventType.JOB_COMPLETED,
+                        Severity.INFO,
+                        SourceRef(kind="ship_system", id=system.system_id),
+                        f"Self-test repair completed: {system.system_id}",
+                        data={
+                            "job_id": job.job_id,
+                            "job_type": job.job_type.value,
+                            "message_key": "job_completed_selftest",
+                        },
+                    )
+                )
+            return events
         if job.job_type == JobType.REPAIR_SYSTEM and job.target:
             system = state.ship.systems.get(job.target.id)
             if system:
+                drone_id = job.params.get("drone_id")
+                drone = state.ship.drones.get(drone_id) if drone_id else None
+                if drone:
+                    drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_REPAIR)
                 default_repair = 0.25 if system.system_id == "energy_distribution" else 0.15
                 repair_amount = float(job.params.get("repair_amount", default_repair))
                 system.health = min(1.0, system.health + repair_amount)
@@ -957,6 +1269,7 @@ class Engine:
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
                 drone.status = DroneStatus.DEPLOYED
+                drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_DEPLOY)
                 if job.target.kind == "world_node":
                     drone.location = DroneLocation(kind="world_node", id=job.target.id)
                 else:
@@ -979,6 +1292,33 @@ class Engine:
                 )
             return events
 
+        if job.job_type == JobType.MOVE_DRONE and job.target:
+            drone_id = job.params.get("drone_id")
+            drone = state.ship.drones.get(drone_id) if drone_id else None
+            if drone:
+                if job.target.kind == "world_node":
+                    drone.location = DroneLocation(kind="world_node", id=job.target.id)
+                else:
+                    drone.location = DroneLocation(kind="ship_sector", id=job.target.id)
+                drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_MOVE)
+                events.append(
+                    self._make_event(
+                        state,
+                        EventType.JOB_COMPLETED,
+                        Severity.INFO,
+                        SourceRef(kind="drone", id=drone.drone_id),
+                        f"Drone moved to {job.target.id}",
+                        data={
+                            "job_id": job.job_id,
+                            "job_type": job.job_type.value,
+                            "drone_id": drone.drone_id,
+                            "sector_id": job.target.id,
+                            "message_key": "job_completed_move",
+                        },
+                    )
+                )
+            return events
+
         if job.job_type == JobType.REBOOT_DRONE and job.target:
             drone_id = job.params.get("drone_id")
             drone = state.ship.drones.get(drone_id) if drone_id else None
@@ -989,6 +1329,8 @@ class Engine:
                 if rng.random() < p_success:
                     drone.status = DroneStatus.DOCKED
                     drone.location = DroneLocation(kind="ship_sector", id="drone_bay")
+                    drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_RECALL)
+                    drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_REBOOT)
                     events.append(
                         self._make_event(
                             state,
@@ -1095,8 +1437,12 @@ class Engine:
             if node:
                 recovered = min(effective, node.salvage_scrap_available)
                 node.salvage_scrap_available = max(0, node.salvage_scrap_available - recovered)
-            state.ship.scrap += recovered
-            state.ship.cargo_dirty = True
+            state.ship.cargo_scrap += recovered
+            state.ship.manifest_dirty = True
+            drone_id = job.params.get("drone_id")
+            drone = state.ship.drones.get(drone_id) if drone_id else None
+            if drone:
+                drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_SALVAGE)
             events.append(
                 self._make_event(
                     state,
@@ -1141,8 +1487,8 @@ class Engine:
                 if rng.random() < Balance.SALVAGE_SCRAP_FIND_MODULE_P:
                     module_id = rng.choice(node.salvage_modules_available)
                     node.salvage_modules_available.remove(module_id)
-                    state.ship.modules.append(module_id)
-                    state.ship.cargo_dirty = True
+                    state.ship.cargo_modules.append(module_id)
+                    state.ship.manifest_dirty = True
                     events.append(
                         self._make_event(
                             state,
@@ -1168,8 +1514,8 @@ class Engine:
                 if rng.random() < Balance.SALVAGE_MODULE_FIND_P:
                     module_id = rng.choice(node.salvage_modules_available)
                     node.salvage_modules_available.remove(module_id)
-                    state.ship.modules.append(module_id)
-                    state.ship.cargo_dirty = True
+                    state.ship.cargo_modules.append(module_id)
+                    state.ship.manifest_dirty = True
                     events.append(
                         self._make_event(
                             state,
@@ -1196,11 +1542,15 @@ class Engine:
                         data={"message_key": "salvage_none", "node_id": node_id},
                     )
                 )
+            drone_id = job.params.get("drone_id")
+            drone = state.ship.drones.get(drone_id) if drone_id else None
+            if drone:
+                drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_SALVAGE)
             return events
 
         if job.job_type == JobType.INSTALL_MODULE and job.target:
             module_id = job.params.get("module_id")
-            if module_id and module_id in state.ship.modules:
+            if module_id and module_id in state.ship.cargo_modules:
                 modules = load_modules()
                 mod = modules.get(module_id, {})
                 effects = mod.get("effects", {})
@@ -1211,9 +1561,10 @@ class Engine:
                 if "p_gen_bonus_kw" in effects:
                     state.ship.power.p_gen_kw += float(effects["p_gen_bonus_kw"])
                 scrap_cost = int(job.params.get("scrap_cost", mod.get("scrap_cost", 0)))
-                state.ship.scrap = max(0, state.ship.scrap - scrap_cost)
-                state.ship.modules.remove(module_id)
-                state.ship.cargo_dirty = True
+                state.ship.cargo_scrap = max(0, state.ship.cargo_scrap - scrap_cost)
+                state.ship.cargo_modules.remove(module_id)
+                state.ship.manifest_dirty = True
+                state.ship.installed_modules.append(module_id)
             events.append(
                 self._make_event(
                     state,
@@ -1241,22 +1592,23 @@ class Engine:
             )
             return events
 
-        if job.job_type == JobType.INVENTORY_UPDATE:
+        if job.job_type == JobType.CARGO_AUDIT:
             ship = state.ship
-            ship.inventory_known_scrap = ship.scrap
-            ship.inventory_known_modules = list(ship.modules)
-            ship.cargo_dirty = False
+            ship.manifest_scrap = ship.cargo_scrap
+            ship.manifest_modules = list(ship.cargo_modules)
+            ship.manifest_dirty = False
+            ship.manifest_last_sync_t = state.clock.t
             events.append(
                 self._make_event(
                     state,
                     EventType.JOB_COMPLETED,
                     Severity.INFO,
                     SourceRef(kind="ship", id=ship.ship_id),
-                    "Inventory updated",
+                    "Inventory synchronized",
                     data={
                         "job_id": job.job_id,
                         "job_type": job.job_type.value,
-                        "message_key": "job_completed_inventory_update",
+                        "message_key": "job_completed_cargo_audit",
                     },
                 )
             )
@@ -1345,6 +1697,24 @@ class Engine:
         r_env = state.ship.radiation_env_rad_per_s
         for drone in state.ship.drones.values():
             drone.dose_rad += r_env * drone.shield_factor * dt
+
+    def _update_drone_maintenance(self, state: GameState, dt: float) -> None:
+        drone_bay = state.ship.systems.get("drone_bay")
+        if not drone_bay or drone_bay.state == SystemState.OFFLINE:
+            return
+        if self._state_rank(drone_bay.state) < self._state_rank(SystemState.LIMITED):
+            return
+        for drone in state.ship.drones.values():
+            if drone.status == DroneStatus.DOCKED:
+                # charge battery
+                drone.battery = min(1.0, drone.battery + Balance.DRONE_BATTERY_CHARGE_PER_S * dt)
+                # repair integrity slowly using scrap
+                if drone.integrity < 1.0 and state.ship.cargo_scrap > 0:
+                    state.ship.cargo_scrap = max(0, state.ship.cargo_scrap - 1)
+                    state.ship.manifest_dirty = True
+                    drone.integrity = min(1.0, drone.integrity + Balance.DRONE_REPAIR_INTEGRITY_PER_SCRAP)
+            elif drone.status == DroneStatus.DEPLOYED:
+                drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_IDLE_DRAIN_DEPLOYED_PER_S * dt)
 
     def _update_alerts(self, state: GameState, p_load: float, p_gen: float, power_quality: float) -> list[Event]:
         events: list[Event] = []
@@ -1586,6 +1956,16 @@ class Engine:
         services.sort()
         return services
 
+    def _has_unlock(self, state: GameState, command_key: str) -> bool:
+        modules = load_modules()
+        for mod_id in state.ship.installed_modules:
+            mod = modules.get(mod_id, {})
+            effects = mod.get("effects", {})
+            unlocks = effects.get("unlock_commands", [])
+            if command_key in unlocks:
+                return True
+        return False
+
     def _suggest_service(self, service_name: str, candidates: list[str]) -> str | None:
         if not candidates:
             return None
@@ -1745,6 +2125,15 @@ class Engine:
                 drone.status = DroneStatus.DISABLED
                 drone.integrity = max(0.0, drone.integrity - 0.25)
                 source = SourceRef(kind="drone", id=drone.drone_id)
+                damaged_event = self._make_event(
+                    state,
+                    EventType.DRONE_DAMAGED,
+                    Severity.WARN,
+                    source,
+                    f"Drone damaged: {drone.drone_id}",
+                    data={"drone_id": drone.drone_id, "message_key": "drone_damaged"},
+                )
+                self._record_event(state.events, damaged_event)
                 disabled_event = self._make_event(
                     state,
                     EventType.DRONE_DISABLED,

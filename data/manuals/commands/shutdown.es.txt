@@ -1,0 +1,6 @@
+shutdown <system_id>
+system off <system_id>
+power off <system_id>
+power on <system_id>
+- Apaga manualmente un sistema (forced offline).
+- Úsalo para reducir carga o aislar fallos.

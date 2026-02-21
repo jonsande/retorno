@@ -7,8 +7,10 @@ from typing import Any
 
 class JobType(str, Enum):
     REPAIR_SYSTEM = "repair_system"
+    SELFTEST_REPAIR = "selftest_repair"
     BOOT_SERVICE = "boot_service"
     DEPLOY_DRONE = "deploy_drone"
+    MOVE_DRONE = "move_drone"
     DOCK = "dock"
     SALVAGE = "salvage"
     INSTALL_MODULE = "install_module"
@@ -16,7 +18,7 @@ class JobType(str, Enum):
     SALVAGE_SCRAP = "salvage_scrap"
     SALVAGE_MODULE = "salvage_module"
     RECALL_DRONE = "recall_drone"
-    INVENTORY_UPDATE = "inventory_update"
+    CARGO_AUDIT = "cargo_audit"
 
 
 class JobStatus(str, Enum):

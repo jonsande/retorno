@@ -1,0 +1,6 @@
+selftest_rig
+- Arnés de auto‑prueba y calibración para subsistemas.
+- Habilita ciclos internos de reparación sin drones.
+- Útil en sistemas LIMITADOS cuando no hay drones disponibles.
+- Más lento que la reparación de campo, pero más seguro.
+Lore: Se diseñó para estaciones con tripulación mínima.

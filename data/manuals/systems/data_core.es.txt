@@ -1,0 +1,6 @@
+data_core
+- Servicios de datos y auditoría.
+- Requerido para auditoría de bodega (datad).
+- Si está offline o degradado, se bloquea la auditoría.
+- Mantén al menos LIMITED para auditorías fiables.
+- Comandos: boot datad, cargo audit.

@@ -1,0 +1,6 @@
+shutdown <system_id>
+system off <system_id>
+power off <system_id>
+power on <system_id>
+- Manually powers down a system (forced offline).
+- Use to reduce load or isolate faults.

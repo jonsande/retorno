@@ -64,12 +64,18 @@ class ShipState:
     drones: dict[str, DroneState] = field(default_factory=dict)
     sectors: dict[str, "ShipSector"] = field(default_factory=dict)
 
-    scrap: int = 0
-    modules: list[str] = field(default_factory=list)
-    # Last inventoried snapshot; UI shows these until an inventory update job runs.
-    inventory_known_scrap: int = 0
-    inventory_known_modules: list[str] = field(default_factory=list)
-    cargo_dirty: bool = False
+    # Cargo (truth)
+    cargo_scrap: int = 0
+    cargo_modules: list[str] = field(default_factory=list)
+
+    # Manifest (record)
+    manifest_scrap: int = 0
+    manifest_modules: list[str] = field(default_factory=list)
+    manifest_dirty: bool = False
+    manifest_last_sync_t: float = 0.0
+
+    # Installed modules (active effects)
+    installed_modules: list[str] = field(default_factory=list)
 
     inventory: Inventory = field(default_factory=Inventory)
 

@@ -14,6 +14,25 @@ drone recall D1
 boot sensors
 scan
 dock ECHO_7
+---
+drone deploy D1 ECHO_7
+drone salvage modules D1
+drone salvage scrap D1 30
+drone salvage modules D1
+cargo audit
+drone recall
+power plan audit
+travel DERELICT_A3
+hibernate until_arrival
+
+DEBUG
+
+Saltar prólogo:
+Iniciar con RETORNO_SCENARIO=sandbox python -m retorno.cli.repl
+Dentro del juego, se puede cambiar de escenario con:
+debug scenario prologue
+debug scenario sandbox
+debug scenario dev
 
 
 
@@ -33,11 +52,21 @@ que no se ejecute el commando "inventory update". No obstante, en la informació
 
 - [ ] El comando "travel" hay que cambiarlo quizá por "navigate" (o algo primero como "trazar ruta" y después "navigate").
 
+- [ ] Diseñar el sistema de encontrar nuevos destinos. A nivel de sistema solar, tiene que ser posible detectar vía escáneres o algo así; a nivel de galaxia, quizá sólo a partir de información que se obtenga (cartas de navegación). Más allá de galaxia, no se sabe. El comando contacts/scan debe tener un alcance pequeño relativamente.
+
+- [ ] Cómo se desconectan sistemas ahora mismo? Cómo se reduce carga de energía?
+
+- [ ] Se debería poder mover un dron desplegado a otro plot sin necesidad de llevarlo a dock antes y desplegar de nuevo.
+
+- [ ] Entiendo que el drone_bay se tiene que poder desconectar, para ahorrar energía.
+
 - [ ] Quiero que al arrancar el juego por primera vez se imprima un mensaje "técnico" que dé a entender de un modo u otro que ha habido un error y que se está ejecutando una instrucción de emergencia de descriogenización de los sarcófagos del sector en el que están los sarcófagos de criogenización; que ha fallado la descriogenización excepto en el caso de un sarcófago (que tendrá que tener su correspondiente id o código identificativo técnico); que no se ha podido completar satisfactoriamente la descriogenización de la persona que hay dentro (el personaje jugador) por un problema indeterminado en el sistema; pero que la persona (esto es el PJ) está consciente y puede llevar a cabo operaciones a través de la terminal de algún modo conectada a su cabeza. Este mensaje se imprimirá al iniciar el juego, pero quedará también como mail, de forma que se podrá volver a leer, en su versión española si se cambia la configuración de idioma. Antes de construir la instrucción para codex, constrúyeme una versión del mensaje, para que lo pulamos.
+
+- [ ] Algunos world_node, como las naves, las estaciones y los derelics tienen que tener plots ship_sector. O station_sector. Los planetas también tendrán que tener sectores (cuando hagamos planetas y drones capaces de desplegarse en ellos),
 
 - [ ] Implementar guardar/cargar juego (savegames).
 
-- [ ] hay que crear manuales para /manuals/systems/power_core , security, life_support y los sistemas que faltan.
+- [x] hay que crear manuales para /manuals/systems/power_core , security, life_support y los sistemas que faltan.
 
 - [ ] La cuestión de implementar Textual.
 
@@ -45,7 +74,7 @@ que no se ejecute el commando "inventory update". No obstante, en la informació
 le mandas más de una antes de de acabe la anterior.
 - [ ] Los drones deben perder batería al trabajar. Deben recargarse al atracar (dock). Su batería debe también poder deteriorarse (por radiación u otros daños).
 
-- [ ] Un comando que liste los trabajos (jobs) en proceso o en cola.
+- [x] Un comando que liste los trabajos (jobs) en proceso o en cola.
 
 - [ ] Ahora mismo tu status muestra P_load=4.20kW estando docked; eso sugiere que el docking 
 añade consumo o activa algo. Está bien, pero ojo con el prólogo: podrías querer que dock 
@@ -58,6 +87,17 @@ tenerlo en mente.
 
 - [ ] [Esto quedó pendiente de hacer] Si quieres, también podemos añadir un mail automático al primer módulo encontrado (lore + “esto se instala con install <id>”), pero lo dejo para después de que el loop funcione.
 
+
+
+=========== Versión 2 ============
+
+data_core. Ahora mismo data_core sirve para habilitar operaciones de auditoría de bodega y para servicios de datos: Audit de cargo/manifest: cargo audit / inventory audit se bloquean si data_core no está operativo o si datad no está corriendo.
+Servicio asociado: datad (se debe bootear para auditorías).
+
+Fuera de eso, todavía no tiene funciones “de gameplay” adicionales (p. ej. análisis avanzado, logs, descifrado). Es el lugar previsto para futuro contenido de datos/registro, pero hoy su uso principal es permitir la auditoría del inventario.
+
+
+
 economía
 
 viajes
@@ -65,7 +105,6 @@ viajes
 amenazas
 
 eventos dinámicos
-
 
 
 
@@ -141,3 +180,8 @@ cambios del entorno: radiación, señales, densidad de restos
 wake events raros (poco frecuentes al principio, más si vas mal preparado)
 
 Pero eso es Paso 2. Ahora mismo lo correcto es consolidar CRUISE.
+
+
+
+siguiente bloque real: descubrimiento en el nodo destino (DERELICT_A3) + salvaging por sectores + primer “encounter” no-combate (por ejemplo, puerta cerrada, señal, o sistema de acceso).
+

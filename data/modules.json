@@ -19,5 +19,12 @@
     "desc_es": "Aumenta ligeramente la generación.",
     "scrap_cost": 30,
     "effects": { "p_gen_bonus_kw": 0.5 }
+  },
+  "selftest_rig": {
+    "name": "Self-Test Rig",
+    "desc_en": "Enables internal self-test repair cycles without a drone.",
+    "desc_es": "Habilita ciclos internos de auto-reparación sin dron.",
+    "scrap_cost": 16,
+    "effects": { "unlock_commands": ["selftest_repair"] }
   }
 }

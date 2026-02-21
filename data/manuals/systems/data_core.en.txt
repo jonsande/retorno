@@ -1,0 +1,6 @@
+data_core
+- Data services and audit subsystem.
+- Required for cargo/manifest audit (datad).
+- If offline or degraded, inventory audit is blocked.
+- Keep at least LIMITED for reliable audits.
+- Related commands: boot datad, cargo audit.

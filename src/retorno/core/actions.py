@@ -23,6 +23,11 @@ class PowerShed(Action):
 
 
 @dataclass(slots=True)
+class SystemOn(Action):
+    system_id: str
+
+
+@dataclass(slots=True)
 class PowerPlan(Action):
     mode: str  # "cruise" | "normal"
 
@@ -35,8 +40,19 @@ class DroneDeploy(Action):
 
 
 @dataclass(slots=True)
+class DroneMove(Action):
+    drone_id: str
+    target_id: str
+
+
+@dataclass(slots=True)
 class Repair(Action):
     drone_id: str
+    system_id: str
+
+
+@dataclass(slots=True)
+class SelfTestRepair(Action):
     system_id: str
 
 
@@ -86,7 +102,7 @@ class SalvageModule(Action):
 
 
 @dataclass(slots=True)
-class InventoryUpdate(Action):
+class CargoAudit(Action):
     pass
 
 

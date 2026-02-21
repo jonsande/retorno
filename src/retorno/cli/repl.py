@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from retorno.bootstrap import create_initial_state_prologue
+from retorno.bootstrap import create_initial_state_prologue, create_initial_state_sandbox
+import os
+import random
 import readline
 from retorno.core.engine import Engine
 from retorno.core.actions import Hibernate
@@ -21,21 +23,24 @@ def print_help() -> None:
         "  man <topic> | about <system_id>\n"
         "  config set lang <en|es> | config show\n"
         "  mail [inbox] | mail read <id>\n"
-        "  status | jobs | power status | power plan cruise|normal | alerts | logs\n"
+        "  status | jobs | power status | power plan cruise|normal | power shed/off/on <system_id> | alerts | logs\n"
         "  alerts explain <alert_key>\n"
         "  contacts | scan\n"
         "  sectors | map | locate <system_id>\n"
         "  dock <node_id> | travel <node_id>\n"
-        "  diag <system_id> | boot <service_name>\n"
-        "  inventory | inventory update | install <module_id> | modules\n"
+        "  diag <system_id> | boot <service_name> | shutdown <system_id> | system on <system_id>\n"
+        "  repair <system_id> --selftest\n"
+        "  inventory | cargo audit | inventory audit | install <module_id> | modules\n"
         "  hibernate until_arrival | hibernate <años>\n"
         "  drone status | drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>\n"
+        "  drone move <drone_id> <target_id>\n"
         "  drone repair <drone_id> <system_id>\n"
         "  drone salvage scrap <drone_id> <node_id> <amount>\n"
         "  drone salvage module <drone_id> [node_id]\n"
         "  drone reboot <drone_id> | drone recall <drone_id>\n"
+        "  system off <system_id> | system on <system_id>\n"
         "  wait <segundos> (DEBUG only)\n"
-        "  debug on|off|status\n"
+        "  debug on|off|status | debug scenario prologue|sandbox|dev\n"
         "  exit | quit\n"
         "\nSugerencias:\n"
         "  ls /manuals/commands\n"
@@ -49,10 +54,8 @@ class SafeDict(dict):
 
 
 def _inventory_view(ship):
-    # Returns the last inventoried view plus dirty flag.
-    if ship.cargo_dirty:
-        return ship.inventory_known_scrap, list(ship.inventory_known_modules), True
-    return ship.scrap, list(ship.modules), False
+    # Returns manifest view plus dirty flag.
+    return ship.manifest_scrap, list(ship.manifest_modules), ship.manifest_dirty
 
 
 def _build_event_payload(e) -> dict:
@@ -166,6 +169,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "es": "[{sev}] low_power_quality :: Baja calidad de energía",
         },
     }
+    power_restore_templates = {
+        "en": "[{sev}] system_power_restored :: Power restored: {system_id} ({from_state} -> {to_state})",
+        "es": "[{sev}] system_power_restored :: Energía restaurada: {system_id} ({from_state} -> {to_state})",
+    }
     salvage_templates = {
         "salvage_scrap_gained": {
             "en": "[{sev}] salvage_scrap_gained :: +{amount} scrap",
@@ -199,6 +206,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "deps_unmet": {
             "en": "Boot blocked: {service} requires {dep_target}>={dep_required} (current={dep_current})",
             "es": "Arranque bloqueado: {service} requiere {dep_target}>={dep_required} (actual={dep_current})",
+        },
+        "drone_bay_deps_unmet": {
+            "en": "Drone deploy blocked: drone_bay requires {dep_target}>={dep_required} (current={dep_current}). Use deploy! for emergency override.",
+            "es": "Despliegue bloqueado: drone_bay requiere {dep_target}>={dep_required} (actual={dep_current}). Usa deploy! para emergencia.",
         },
         "drone_missing": {
             "en": "Action blocked: drone not found ({drone_id})",
@@ -257,8 +268,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "es": "No hay chatarra disponible",
         },
         "emergency_override": {
-            "en": "Emergency override: deploying despite unmet dependencies",
-            "es": "Anulación de emergencia: despliegue pese a dependencias",
+            "en": "Emergency override: deploying despite unmet dependencies. Risk of failure and drone damage.",
+            "es": "Anulación de emergencia: despliegue pese a dependencias. Riesgo de fallo y daño al dron.",
         },
         "module_missing": {
             "en": "Install blocked: module not in inventory ({module_id})",
@@ -271,6 +282,18 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "scrap_insufficient": {
             "en": "Install blocked: insufficient scrap ({scrap_cost})",
             "es": "Instalación bloqueada: chatarra insuficiente ({scrap_cost})",
+        },
+        "selftest_not_available": {
+            "en": "Repair blocked: self-test rig not installed",
+            "es": "Reparación bloqueada: Self-Test Rig no instalado",
+        },
+        "drone_too_damaged": {
+            "en": "Recall blocked: drone integrity too low ({integrity:.2f})",
+            "es": "Recall bloqueado: integridad de dron demasiado baja ({integrity:.2f})",
+        },
+        "system_too_damaged": {
+            "en": "System on blocked: system too damaged",
+            "es": "System on bloqueado: sistema demasiado dañado",
         },
         "in_transit": {
             "en": "Action blocked: ship in transit. Use 'hibernate until_arrival' to advance.",
@@ -314,9 +337,9 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Module installed: {module_id}",
             "es": "Módulo instalado: {module_id}",
         },
-        "job_completed_inventory_update": {
-            "en": "Inventory synchronized",
-            "es": "Inventario sincronizado",
+        "job_completed_cargo_audit": {
+            "en": "Cargo manifest updated",
+            "es": "Manifiesto de bodega actualizado",
         },
     }
     def _safe_format(tmpl: str, payload: dict) -> str:
@@ -522,6 +545,18 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             except Exception:
                 print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
             continue
+        if e.type == EventType.SYSTEM_POWER_RESTORED:
+            locale = state.os.locale.value
+            tmpl = power_restore_templates.get(locale, power_restore_templates["en"])
+            system_id = e.source.id if e.source.kind == "ship_system" else "system"
+            from_state = e.data.get("from", "offline")
+            to_state = e.data.get("to", "?")
+            payload.update({"system_id": system_id, "from_state": from_state, "to_state": to_state})
+            try:
+                print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
+            except Exception:
+                print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
+            continue
         if e.type == EventType.SALVAGE_SCRAP_GAINED:
             locale = state.os.locale.value
             tmpl = salvage_templates["salvage_scrap_gained"].get(
@@ -539,6 +574,18 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                 locale, salvage_templates["salvage_module_found"]["en"]
             )
             payload.update({"module_id": e.data.get("module_id", "?")})
+            try:
+                print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
+            except Exception:
+                print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
+            continue
+        if e.type == EventType.DRONE_DAMAGED:
+            locale = state.os.locale.value
+            tmpl = {
+                "en": "[{sev}] drone_damaged :: Drone damaged: {drone_id}",
+                "es": "[{sev}] drone_damaged :: Dron dañado: {drone_id}",
+            }.get(locale, "[{sev}] drone_damaged :: Drone damaged: {drone_id}")
+            payload.update({"drone_id": e.data.get("drone_id", "?")})
             try:
                 print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
             except Exception:
@@ -580,6 +627,7 @@ def render_status(state) -> None:
     print(f"time: {state.clock.t:.1f}s")
     mode = "DEBUG" if state.os.debug_enabled else "NORMAL"
     print(f"mode: {mode}")
+    print(f"ship_mode: {ship.op_mode}")
     current_loc = ship.current_node_id or state.world.current_node_id
     node = state.world.space.nodes.get(current_loc)
     node_name = node.name if node else current_loc
@@ -592,7 +640,7 @@ def render_status(state) -> None:
         print(f"location: {current_loc} ({node_name})")
     print(f"power: P_gen={p.p_gen_kw:.2f}kW  P_load={p.p_load_kw:.2f}kW  net={net:+.2f}kW headroom={headroom:.2f}kW  SoC={soc:.2f}  Q={p.power_quality:.2f}  brownout={p.brownout}")
     disp_scrap, disp_modules, dirty = _inventory_view(ship)
-    dirty_suffix = " [needs inventory update]" if dirty else ""
+    dirty_suffix = " [manifest stale]" if dirty else ""
     print(f"inventory: scrap={disp_scrap} modules={len(disp_modules)}{dirty_suffix}")
     if disp_modules:
         counts: dict[str, int] = {}
@@ -600,6 +648,12 @@ def render_status(state) -> None:
             counts[mid] = counts.get(mid, 0) + 1
         summary = ", ".join(f"{mid} x{count}" for mid, count in sorted(counts.items()))
         print(f"modules: {summary}")
+    if ship.installed_modules:
+        counts: dict[str, int] = {}
+        for mid in ship.installed_modules:
+            counts[mid] = counts.get(mid, 0) + 1
+        summary = ", ".join(f"{mid} x{count}" for mid, count in sorted(counts.items()))
+        print(f"installed: {summary}")
     print("systems:")
     for sid, sys in ship.systems.items():
         svc = ""
@@ -642,6 +696,8 @@ def render_diag(state, system_id: str) -> None:
     print(f"p_nom: {sys.p_nom_kw:.2f} kW  p_eff: {sys.p_effective_kw():.2f} kW")
     print(f"priority: {sys.priority}")
     print(f"forced_offline: {sys.forced_offline}")
+    if sys.forced_offline:
+        print("notes: manually powered down (power shed/shutdown).")
     if sys.dependencies:
         print("dependencies:")
         for d in sys.dependencies:
@@ -660,6 +716,12 @@ def render_alerts(state) -> None:
     if not active:
         print("(none)")
         return
+    locale = state.os.locale.value
+    hint = {
+        "en": "Hint: use 'alerts explain <alert_key>' for more details.",
+        "es": "Sugerencia: usa 'alerts explain <alert_key>' para más detalles.",
+    }.get(locale, "Hint: use 'alerts explain <alert_key>' for more details.")
+    print(hint)
     # Ordena por severidad y recencia
     sev_rank = {"critical": 0, "warn": 1, "info": 2}
     active.sort(key=lambda a: (sev_rank.get(a.severity.value, 9), -a.last_seen_t))
@@ -720,7 +782,7 @@ def render_drone_status(state) -> None:
 def render_inventory(state) -> None:
     print("\n=== INVENTORY ===")
     disp_scrap, disp_modules, dirty = _inventory_view(state.ship)
-    suffix = " (stale; run 'inventory update')" if dirty else ""
+    suffix = " (stale; run 'cargo audit')" if dirty else ""
     print(f"scrap: {disp_scrap}{suffix}")
     if disp_modules:
         counts: dict[str, int] = {}
@@ -733,7 +795,7 @@ def render_inventory(state) -> None:
     else:
         print("modules: (none)")
     if dirty:
-        print("(cargo changes pending; run 'inventory update' to refresh)")
+        print("(cargo changes pending; run 'cargo audit' to refresh)")
 
 
 def render_modules_catalog(state) -> None:
@@ -1062,6 +1124,7 @@ def render_alert_explain(state, alert_key: str) -> None:
         headroom = metrics["battery_headroom_kw"]
         over = " (over limit)" if headroom < 0 else ""
         print(f"- battery_headroom={headroom:.2f}kW{over}")
+        print("- condition: P_load > P_gen (battery may cover until headroom exhausted)")
     if alert_key == "low_power_quality":
         print(f"- threshold={Balance.LOW_POWER_QUALITY_THRESHOLD:.2f}")
     if alert_key == "power_bus_instability":
@@ -1076,7 +1139,11 @@ def main() -> None:
     from retorno.cli.parser import ParseError, parse_command
 
     engine = Engine()
-    state = create_initial_state_prologue()
+    scenario = os.environ.get("RETORNO_SCENARIO", "prologue").lower()
+    if scenario in {"sandbox", "dev"}:
+        state = create_initial_state_sandbox()
+    else:
+        state = create_initial_state_prologue()
     loop = GameLoop(engine, state, tick_s=1.0)
     loop.step(1.0)
     if not state.os.debug_enabled:
@@ -1109,8 +1176,11 @@ def main() -> None:
         "boot",
         "repair",
         "inventory",
+        "cargo",
         "install",
         "modules",
+        "shutdown",
+        "system",
         "hibernate",
         "drone",
         "wait",
@@ -1135,7 +1205,7 @@ def main() -> None:
                 drones = list(locked_state.ship.drones.keys())
                 sectors = list(locked_state.ship.sectors.keys())
                 contacts = sorted(locked_state.world.known_contacts)
-                modules = list(set(locked_state.ship.modules))
+                modules = list(set(locked_state.ship.cargo_modules))
                 services = []
                 for sys in locked_state.ship.systems.values():
                     if sys.service and sys.service.is_installed:
@@ -1174,25 +1244,44 @@ def main() -> None:
                         candidates.append(name)
             elif cmd == "repair":
                 if len(tokens) == 2:
-                    candidates = [d for d in drones if d.startswith(text)]
+                    candidates = [d for d in drones if d.startswith(text)] + [s for s in systems if s.startswith(text)]
                 elif len(tokens) == 3:
-                    candidates = [s for s in systems if s.startswith(text)]
+                    if tokens[1] in systems:
+                        candidates = [c for c in ["--selftest"] if c.startswith(text)]
+                    else:
+                        candidates = [s for s in systems if s.startswith(text)]
             elif cmd == "dock":
                 candidates = [c for c in contacts if c.startswith(text)]
             elif cmd == "travel":
                 candidates = [c for c in contacts if c.startswith(text)]
             elif cmd == "power":
                 if len(tokens) == 2:
-                    candidates = [c for c in ["status", "shed", "plan"] if c.startswith(text)]
-                elif len(tokens) == 3 and tokens[1] == "shed":
+                    candidates = [c for c in ["status", "shed", "off", "on", "plan"] if c.startswith(text)]
+                elif len(tokens) == 3 and tokens[1] in {"shed", "off", "on"}:
                     candidates = [s for s in systems if s.startswith(text)]
                 elif len(tokens) == 3 and tokens[1] == "plan":
                     candidates = [c for c in ["cruise", "normal"] if c.startswith(text)]
+            elif cmd == "debug":
+                if len(tokens) == 2:
+                    candidates = [c for c in ["on", "off", "status", "scenario"] if c.startswith(text)]
+                elif len(tokens) == 3 and tokens[1] == "scenario":
+                    candidates = [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
             elif cmd == "install":
                 candidates = [m for m in modules if m.startswith(text)]
             elif cmd == "inventory":
                 if len(tokens) == 2:
-                    candidates = [c for c in ["update"] if c.startswith(text)]
+                    candidates = [c for c in ["audit"] if c.startswith(text)]
+            elif cmd == "cargo":
+                if len(tokens) == 2:
+                    candidates = [c for c in ["audit"] if c.startswith(text)]
+            elif cmd == "shutdown":
+                if len(tokens) == 2:
+                    candidates = [s for s in systems if s.startswith(text)]
+            elif cmd == "system":
+                if len(tokens) == 2:
+                    candidates = [c for c in ["off", "on"] if c.startswith(text)]
+                elif len(tokens) == 3 and tokens[1] in {"off", "on"}:
+                    candidates = [s for s in systems if s.startswith(text)]
             elif cmd == "hibernate":
                 if len(tokens) == 2:
                     candidates = [c for c in ["until_arrival"] if c.startswith(text)]
@@ -1227,12 +1316,14 @@ def main() -> None:
             elif cmd == "drone":
                 if len(tokens) == 2:
                     candidates = [
-                        c for c in ["status", "deploy", "deploy!", "reboot", "recall", "repair", "salvage"]
+                        c for c in ["status", "deploy", "deploy!", "move", "reboot", "recall", "repair", "salvage"]
                         if c.startswith(text)
                     ]
-                elif len(tokens) == 3 and tokens[1] in {"deploy", "deploy!", "reboot", "recall", "repair"}:
+                elif len(tokens) == 3 and tokens[1] in {"deploy", "deploy!", "reboot", "recall", "repair", "move"}:
                     candidates = [d for d in drones if d.startswith(text)]
                 elif len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
+                    candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
+                elif len(tokens) == 4 and tokens[1] == "move":
                     candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
                 elif len(tokens) == 3 and tokens[1] == "salvage":
                     candidates = [c for c in ["scrap", "module", "modules"] if c.startswith(text)]
@@ -1350,6 +1441,29 @@ def main() -> None:
                 loop.start()
                 print("DEBUG mode disabled")
                 continue
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SCENARIO":
+            scenario = parsed[1]
+            loop.set_auto_tick(False)
+            loop.stop()
+            with loop.with_lock() as locked_state:
+                keep_debug = locked_state.os.debug_enabled
+            if scenario in {"sandbox", "dev"}:
+                new_state = create_initial_state_sandbox()
+            else:
+                new_state = create_initial_state_prologue()
+            new_state.os.debug_enabled = keep_debug
+            with loop.with_lock() as locked_state:
+                loop.state = new_state
+                loop._events_auto.clear()
+                loop._rng = random.Random(new_state.meta.rng_seed)
+            loop.step(1.0)
+            if not keep_debug:
+                loop.set_auto_tick(True)
+                loop.start()
+            with loop.with_lock() as locked_state:
+                print(f"Scenario set to {scenario}")
+                render_status(locked_state)
+            continue
         if isinstance(parsed, tuple) and parsed[0] == "LS":
             _drain_auto_events()
             with loop.with_lock() as locked_state:

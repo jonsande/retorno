@@ -3,7 +3,27 @@ from __future__ import annotations
 from dataclasses import dataclass
 import difflib
 
-from retorno.core.actions import Boot, Diag, Dock, DroneDeploy, DroneRecall, DroneReboot, Hibernate, Install, InventoryUpdate, PowerPlan, PowerShed, Repair, SalvageModule, SalvageScrap, Status, Travel
+from retorno.core.actions import (
+    Boot,
+    CargoAudit,
+    Diag,
+    Dock,
+    DroneDeploy,
+    DroneMove,
+    DroneRecall,
+    DroneReboot,
+    Hibernate,
+    Install,
+    PowerPlan,
+    PowerShed,
+    Repair,
+    SelfTestRepair,
+    SystemOn,
+    SalvageModule,
+    SalvageScrap,
+    Status,
+    Travel,
+)
 
 
 @dataclass(slots=True)
@@ -60,8 +80,10 @@ def parse_command(line: str):
         return ("WAIT", seconds)
 
     if cmd == "debug":
+        if len(args) == 2 and args[0] == "scenario" and args[1] in {"prologue", "sandbox", "dev"}:
+            return ("DEBUG_SCENARIO", args[1])
         if len(args) != 1 or args[0] not in {"on", "off", "status"}:
-            raise ParseError("Uso: debug on|off|status")
+            raise ParseError("Uso: debug on|off|status | debug scenario prologue|sandbox|dev")
         return ("DEBUG", args[0])
 
     if cmd == "dock":
@@ -114,9 +136,14 @@ def parse_command(line: str):
     if cmd == "inventory":
         if len(args) == 0:
             return "INVENTORY"
-        if len(args) == 1 and args[0].lower() == "update":
-            return InventoryUpdate()
-        raise ParseError("Uso: inventory | inventory update")
+        if len(args) == 1 and args[0].lower() == "audit":
+            return CargoAudit()
+        raise ParseError("Uso: inventory | inventory audit")
+
+    if cmd == "cargo":
+        if len(args) == 1 and args[0].lower() == "audit":
+            return CargoAudit()
+        raise ParseError("Uso: cargo audit")
 
     if cmd == "modules":
         return "MODULES"
@@ -188,7 +215,7 @@ def parse_command(line: str):
 
     if cmd == "power":
         if not args:
-            raise ParseError("Uso: power shed <system_id> | power status")
+            raise ParseError("Uso: power status | power plan cruise|normal | power shed <system_id> | power off <system_id>")
         sub = args[0].lower()
         if sub == "status":
             return "POWER_STATUS"
@@ -196,11 +223,26 @@ def parse_command(line: str):
             if len(args) != 2 or args[1].lower() not in {"cruise", "normal"}:
                 raise ParseError("Uso: power plan cruise|normal")
             return PowerPlan(mode=args[1].lower())
-        if sub == "shed":
+        if sub in {"shed", "off"}:
             if len(args) != 2:
-                raise ParseError("Uso: power shed <system_id>")
+                raise ParseError("Uso: power shed <system_id> | power off <system_id>")
             return PowerShed(system_id=args[1])
-        raise ParseError("Subcomando power desconocido. Usa: power status | power shed <system_id>")
+        if sub == "on":
+            if len(args) != 2:
+                raise ParseError("Uso: power on <system_id>")
+            return SystemOn(system_id=args[1])
+        raise ParseError("Subcomando power desconocido. Usa: power status | power plan cruise|normal | power shed/off <system_id> | power on <system_id>")
+
+    if cmd in {"shutdown", "system"}:
+        if cmd == "system":
+            if len(args) != 2 or args[0].lower() not in {"off", "on"}:
+                raise ParseError("Uso: system off <system_id> | system on <system_id>")
+            if args[0].lower() == "off":
+                return PowerShed(system_id=args[1])
+            return SystemOn(system_id=args[1])
+        if len(args) != 1:
+            raise ParseError("Uso: shutdown <system_id>")
+        return PowerShed(system_id=args[0])
 
     if cmd == "drone":
         if len(args) < 1:
@@ -220,6 +262,10 @@ def parse_command(line: str):
             if len(args) != 3:
                 raise ParseError("Uso: drone repair <drone_id> <system_id>")
             return Repair(drone_id=args[1], system_id=args[2])
+        if sub == "move":
+            if len(args) != 3:
+                raise ParseError("Uso: drone move <drone_id> <target_id>")
+            return DroneMove(drone_id=args[1], target_id=args[2])
         if sub == "salvage":
             if len(args) < 3:
                 raise ParseError(
@@ -267,8 +313,10 @@ def parse_command(line: str):
         raise ParseError("Subcomando drone desconocido. Usa: drone status | drone deploy ...")
 
     if cmd == "repair":
+        if len(args) == 2 and args[1] == "--selftest":
+            return SelfTestRepair(system_id=args[0])
         if len(args) != 2:
-            raise ParseError("Uso: drone repair <drone_id> <system_id>")
+            raise ParseError("Uso: drone repair <drone_id> <system_id> | repair <system_id> --selftest")
         return Repair(drone_id=args[0], system_id=args[1])
 
     suggestion = _suggest_command(cmd)
@@ -300,6 +348,8 @@ def _suggest_command(cmd: str) -> str | None:
         "salvage",
         "drone",
         "repair",
+        "inventory",
+        "cargo",
         "boot",
         "hibernate",
         "wait",

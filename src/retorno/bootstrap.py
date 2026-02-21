@@ -227,12 +227,47 @@ def create_initial_state_prologue() -> GameState:
 
     _bootstrap_os(state)
     _bootstrap_alerts(state)
-    state.ship.inventory_known_scrap = state.ship.scrap
-    state.ship.inventory_known_modules = list(state.ship.modules)
-    state.ship.cargo_dirty = False
+    state.ship.manifest_scrap = state.ship.cargo_scrap
+    state.ship.manifest_modules = list(state.ship.cargo_modules)
+    state.ship.manifest_dirty = False
+    state.ship.manifest_last_sync_t = state.clock.t
 
     return state
 
+
+def create_initial_state_sandbox() -> GameState:
+    state = create_initial_state_prologue()
+
+    # Sandbox overrides: systems healthy, services running, known contacts.
+    for sys in state.ship.systems.values():
+        if sys.system_id in {"energy_distribution", "power_core", "drone_bay"}:
+            sys.state = SystemState.NOMINAL
+            sys.health = max(sys.health, 0.9)
+            sys.state_locked = False
+        if sys.system_id == "sensors":
+            sys.state = SystemState.NOMINAL
+            sys.health = max(sys.health, 0.9)
+            sys.state_locked = False
+    data_core = state.ship.systems.get("data_core")
+    if data_core and data_core.service:
+        data_core.service.is_running = True
+
+    sensors = state.ship.systems.get("sensors")
+    if sensors and sensors.service:
+        sensors.service.is_running = True
+
+    state.ship.op_mode = "NORMAL"
+    state.ship.current_node_id = "ECHO_7"
+    state.world.current_node_id = "ECHO_7"
+
+    # Known contacts for testing
+    state.world.known_contacts.update({"ECHO_7", "HARBOR_12", "DERELICT_A3"})
+
+    # Give some cargo for testing
+    state.ship.cargo_scrap = max(state.ship.cargo_scrap, 20)
+    state.ship.manifest_dirty = True
+
+    return state
 
 def _bootstrap_modules(rng: random.Random, module_ids: list[str]) -> list[str]:
     if not module_ids:
@@ -337,15 +372,53 @@ def _bootstrap_os(state: GameState) -> None:
         "- Requiere dependencias satisfechas.\n",
     )
     add_file(
+        "/manuals/commands/shutdown.en.txt",
+        "shutdown <system_id>\n"
+        "system off <system_id>\n"
+        "power off <system_id>\n"
+        "power on <system_id>\n"
+        "- Manually powers down a system (forced offline).\n"
+        "- Use to reduce load or isolate faults.\n",
+    )
+    add_file(
+        "/manuals/commands/shutdown.es.txt",
+        "shutdown <system_id>\n"
+        "system off <system_id>\n"
+        "power off <system_id>\n"
+        "power on <system_id>\n"
+        "- Apaga manualmente un sistema (forced offline).\n"
+        "- Úsalo para reducir carga o aislar fallos.\n",
+    )
+    add_file(
+        "/manuals/commands/system.en.txt",
+        "system on <system_id>\n"
+        "system off <system_id>\n"
+        "- Toggles manual power state for a subsystem.\n"
+        "- 'off' forces the system offline (no load).\n"
+        "- 'on' clears the manual lock; state follows health.\n",
+    )
+    add_file(
+        "/manuals/commands/system.es.txt",
+        "system on <system_id>\n"
+        "system off <system_id>\n"
+        "- Cambia el estado manual de energía de un subsistema.\n"
+        "- 'off' fuerza el sistema a offline (sin carga).\n"
+        "- 'on' libera el bloqueo manual; el estado sigue la salud.\n",
+    )
+    add_file(
         "/manuals/commands/repair.en.txt",
         "drone repair <drone_id> <system_id>\n"
+        "repair <system_id> --selftest\n"
         "- Repairs a system using a drone.\n"
+        "- Self-test repair is slower and requires a Self-Test Rig module.\n"
         "- Repair operations require deployed drone units.\n",
     )
     add_file(
         "/manuals/commands/repair.es.txt",
         "drone repair <drone_id> <system_id>\n"
+        "repair <system_id> --selftest\n"
         "- Repara un sistema con un dron.\n"
+        "- La auto-reparación es más lenta y requiere el módulo Self-Test Rig.\n"
         "- Las reparaciones requieren drones desplegados.\n",
     )
     add_file(
@@ -384,27 +457,77 @@ def _bootstrap_os(state: GameState) -> None:
     )
     add_file(
         "/manuals/commands/inventory.en.txt",
+        "SHIP OS — Cargo Manifest / Audit Procedure\n"
+        "Ref: OS-MAN/CMD/CARGO-01\n"
+        "\n"
+        "The sarcophagus terminal distinguishes between:\n"
+        "\n"
+        "Cargo (truth)\n"
+        "What is physically stored in the hold. Cargo changes immediately when you salvage materials,\n"
+        "install modules, or consume resources.\n"
+        "\n"
+        "Manifest (record)\n"
+        "What the ship's record believes is stored. The manifest can become stale after field operations,\n"
+        "power loss, or partial subsystem failures.\n"
+        "\n"
+        "The sarcophagus terminal reads the manifest, so you may see old totals until an audit is run.\n"
+        "\n"
+        "Commands\n"
+        "\n"
         "inventory\n"
-        "- Shows last inventoried scrap and installed modules.\n"
-        "- If cargo changed, run 'inventory update' to refresh numbers.\n",
+        "Shows the manifest (record view). If stale, the terminal will indicate it.\n"
+        "\n"
+        "cargo audit / inventory audit\n"
+        "Queues an audit job and synchronizes the manifest with the actual hold contents.\n"
+        "\n"
+        "Audits take time. Under instability (low Q) they may be delayed or incomplete (future behavior).\n"
+        "\n"
+        "Operational notes\n"
+        "\n"
+        "Salvage and module installation affect cargo immediately.\n"
+        "\n"
+        "Audit updates only the manifest.\n"
+        "\n"
+        "Installation costs are deducted from cargo even if the manifest is stale.\n"
+        "Audit requirements\n"
+        "- Cargo audits require data_core to be online and the service datad running.\n"
+        "- In CRUISE, restore NORMAL (power plan normal) before auditing.\n",
     )
     add_file(
         "/manuals/commands/inventory.es.txt",
+        "SHIP OS — Manifiesto de bodega / Procedimiento de auditoría\n"
+        "Ref: OS-MAN/CMD/CARGO-01\n"
+        "\n"
+        "La terminal del sarcófago distingue entre:\n"
+        "\n"
+        "Cargo (verdad)\n"
+        "Lo que está físicamente en la bodega. El cargo cambia inmediatamente cuando recuperas materiales, instalas módulos o consumes recursos.\n"
+        "\n"
+        "Manifest (registro)\n"
+        "Lo que el registro de la nave cree que hay almacenado. El manifiesto puede quedar desactualizado tras operaciones de campo, pérdida de energía o fallos parciales de subsistemas.\n"
+        "\n"
+        "La terminal del sarcófago consulta el manifest, por lo que puedes ver totales antiguos hasta que se realice una auditoría.\n"
+        "\n"
+        "Comandos\n"
+        "\n"
         "inventory\n"
-        "- Muestra la chatarra y módulos según el último inventario.\n"
-        "- Si hubo cambios en bodega, ejecuta 'inventory update' para refrescar.\n",
-    )
-    add_file(
-        "/manuals/commands/inventory_update.en.txt",
-        "inventory update\n"
-        "- Runs a cargo inventory job to sync counts.\n"
-        "- Takes time; queues a job in the system.\n",
-    )
-    add_file(
-        "/manuals/commands/inventory_update.es.txt",
-        "inventory update\n"
-        "- Ejecuta un trabajo de inventariado para sincronizar cantidades.\n"
-        "- Tarda un tiempo; encola un job en el sistema.\n",
+        "Muestra el manifest (vista del registro). Si está desactualizado, la terminal lo indicará.\n"
+        "\n"
+        "cargo audit / inventory audit\n"
+        "Lanza un trabajo de auditoría y sincroniza el manifest con el contenido real de la bodega.\n"
+        "\n"
+        "Las auditorías requieren tiempo. Con inestabilidad (Q baja) pueden demorarse o resultar incompletas (comportamiento futuro).\n"
+        "\n"
+        "Notas operativas\n"
+        "\n"
+        "Recuperación de materiales e instalación de módulos afectan al cargo inmediatamente.\n"
+        "\n"
+        "La auditoría actualiza solo el manifest.\n"
+        "\n"
+        "Los costes de instalación se descuentan del cargo, aunque el manifest esté desactualizado.\n"
+        "Requisitos de auditoría\n"
+        "- La auditoría requiere data_core operativo y el servicio datad en ejecución.\n"
+        "- En CRUISE, vuelve a NORMAL (power plan normal) antes de auditar.\n",
     )
     add_file(
         "/manuals/commands/install.en.txt",
@@ -610,6 +733,7 @@ def _bootstrap_os(state: GameState) -> None:
         "/manuals/commands/drone.en.txt",
         "drone deploy <drone_id> <sector_id>\n"
         "drone deploy! <drone_id> <sector_id>\n"
+        "drone move <drone_id> <target_id>\n"
         "drone repair <drone_id> <system_id>\n"
         "drone salvage scrap <drone_id> <node_id> <amount>\n"
         "drone salvage module <drone_id> [node_id]\n"
@@ -617,13 +741,19 @@ def _bootstrap_os(state: GameState) -> None:
         "drone recall <drone_id>\n"
         "- Deploys a drone to a ship sector.\n"
         "- Use 'sectors' to list available ship sectors.\n"
-        "- Emergency deploy may risk failure.\n"
+        "- Move repositions a deployed drone between sectors or nodes.\n"
+        "- If deploy is blocked by dependencies, use deploy! for emergency override.\n"
+        "- Emergency deploy may risk failure and drone damage.\n"
+        "- Drones consume battery on jobs and movement.\n"
+        "- Docked drones recharge in the bay if it is at least LIMITED.\n"
+        "- Docked drones can be repaired slowly using scrap.\n"
         "- Reboot attempts recovery of a disabled drone.\n",
     )
     add_file(
         "/manuals/commands/drone.es.txt",
         "drone deploy <drone_id> <sector_id>\n"
         "drone deploy! <drone_id> <sector_id>\n"
+        "drone move <drone_id> <target_id>\n"
         "drone repair <drone_id> <system_id>\n"
         "drone salvage scrap <drone_id> <node_id> <amount>\n"
         "drone salvage module <drone_id> [node_id]\n"
@@ -631,7 +761,12 @@ def _bootstrap_os(state: GameState) -> None:
         "drone recall <drone_id>\n"
         "- Despliega un dron a un sector de la nave.\n"
         "- Usa 'sectors' para listar sectores disponibles.\n"
-        "- El despliegue de emergencia puede fallar.\n"
+        "- Move reposiciona un dron desplegado entre sectores o nodos.\n"
+        "- Si el despliegue está bloqueado por dependencias, usa deploy! como anulación de emergencia.\n"
+        "- El despliegue de emergencia puede fallar y dañar al dron.\n"
+        "- Los drones consumen batería en trabajos y desplazamientos.\n"
+        "- En el dock recargan si la bahía está al menos en LIMITED.\n"
+        "- En el dock se reparan lentamente usando chatarra.\n"
         "- Reboot intenta recuperar un dron deshabilitado.\n",
     )
     add_file(
@@ -673,6 +808,24 @@ def _bootstrap_os(state: GameState) -> None:
         "- Boot sensord para activar.\n",
     )
     add_file(
+        "/manuals/systems/data_core.en.txt",
+        "data_core\n"
+        "- Data services and audit subsystem.\n"
+        "- Required for cargo/manifest audit (datad).\n"
+        "- If offline or degraded, inventory audit is blocked.\n"
+        "- Keep at least LIMITED for reliable audits.\n"
+        "- Related commands: boot datad, cargo audit.\n",
+    )
+    add_file(
+        "/manuals/systems/data_core.es.txt",
+        "data_core\n"
+        "- Servicios de datos y auditoría.\n"
+        "- Requerido para auditoría de bodega (datad).\n"
+        "- Si está offline o degradado, se bloquea la auditoría.\n"
+        "- Mantén al menos LIMITED para auditorías fiables.\n"
+        "- Comandos: boot datad, cargo audit.\n",
+    )
+    add_file(
         "/manuals/systems/drone_bay.en.txt",
         "drone_bay\n"
         "- Drone launch subsystem.\n"
@@ -687,17 +840,17 @@ def _bootstrap_os(state: GameState) -> None:
     add_file(
         "/manuals/alerts/power_net_deficit.en.txt",
         "power_net_deficit\n"
-        "- Load exceeds generation (plus battery discharge limit).\n"
+        "- Load exceeds generation (battery may cover the gap).\n"
         "- Typical causes: high load, low generation, damaged core.\n"
-        "- If persistent: brownouts, forced shutdowns.\n"
+        "- If persistent: reduced quality, possible brownout if headroom runs out.\n"
         "Recommended: reduce load, repair power_core, charge batteries.\n",
     )
     add_file(
         "/manuals/alerts/power_net_deficit.es.txt",
         "power_net_deficit\n"
-        "- La carga supera la generación (más el límite de descarga).\n"
+        "- La carga supera la generación (la batería puede cubrir el hueco).\n"
         "- Causas típicas: carga alta, baja generación, core dañado.\n"
-        "- Si persiste: apagones, apagados forzados.\n"
+        "- Si persiste: menor calidad, posible brownout si se agota el margen.\n"
         "Recomendado: reduce consumo, aumenta generación, recarga baterías.\n",
     )
     add_file(
@@ -795,6 +948,24 @@ def _bootstrap_os(state: GameState) -> None:
         "- Requiere calibración cuidadosa tras instalar.\n"
         "- No recomendado si el core está en estado crítico.\n"
         "Lore: Los ingenieros lo llamaban \"parche susurro\".\n",
+    )
+    add_file(
+        "/manuals/modules/selftest_rig.en.txt",
+        "selftest_rig\n"
+        "- Self-test and calibration harness for onboard subsystems.\n"
+        "- Enables internal repair cycles without drones.\n"
+        "- Best used for limited systems that cannot spare drone time.\n"
+        "- Slower than field repair but safer for critical bays.\n"
+        "Lore: The rig was designed for stations that ran with skeleton crews.\n",
+    )
+    add_file(
+        "/manuals/modules/selftest_rig.es.txt",
+        "selftest_rig\n"
+        "- Arnés de auto‑prueba y calibración para subsistemas.\n"
+        "- Habilita ciclos internos de reparación sin drones.\n"
+        "- Útil en sistemas LIMITADOS cuando no hay drones disponibles.\n"
+        "- Más lento que la reparación de campo, pero más seguro.\n"
+        "Lore: Se diseñó para estaciones con tripulación mínima.\n",
     )
 
     add_file(
