@@ -1,0 +1,5 @@
+low_power_quality
+- Calidad de energía por debajo del rango nominal.
+- Causas: SoC bajo, déficit sostenido, distribución dañada.
+- Si persiste: degradación acelerada de sistemas.
+Recomendado: recarga baterías, reduce carga, repara `energy_distribution`.

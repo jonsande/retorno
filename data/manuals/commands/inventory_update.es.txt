@@ -1,0 +1,3 @@
+inventory update
+- Ejecuta un trabajo de inventariado para sincronizar cantidades.
+- Tarda un tiempo; encola un job en el sistema.

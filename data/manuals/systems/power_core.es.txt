@@ -1,0 +1,19 @@
+RESUMEN DE SISTEMA — power_core
+Ref: OS-MAN/SYS/CORE-PWR
+
+power_core proporciona la generación primaria de la nave.
+
+Función
+- Convierte masa reactiva/almacenada en potencia eléctrica.
+- Estabiliza la salida dentro de tolerancias cuando la red está sana.
+
+Qué significa “degraded”
+- La salida puede estar limitada o “ruidosa”.
+- Efecto neto: menor P_gen, Q más baja bajo carga y envejecimiento más rápido del resto.
+
+Recuperación típica
+- Usa un dron de mantenimiento: repair power_core.
+- Si tienes módulos, instala parches de generación (futuro: micro_reactor_patch).
+
+Comandos relacionados
+- power status, alerts explain power_core_degraded, diag power_core, repair <drone> power_core

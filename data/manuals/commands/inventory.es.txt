@@ -1,0 +1,3 @@
+inventory
+- Muestra la chatarra y módulos según el último inventario.
+- Si hubo cambios en bodega, ejecuta 'inventory update' para refrescar.

@@ -1,0 +1,7 @@
+micro_reactor_patch
+- Micro-injector retrofit for tired reactor cores.
+- Improves fuel mixing and thermal balance.
+- Grants a small but steady generation increase.
+- Requires careful calibration after install.
+- Not recommended if the core is critical.
+Lore: Field engineers dubbed it "the whisper patch".

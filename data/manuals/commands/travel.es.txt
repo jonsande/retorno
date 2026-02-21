@@ -1,0 +1,4 @@
+travel <node_id>
+- Inicia un tránsito interestelar hacia el nodo destino.
+- Muestra ETA en años; la nave queda en tránsito hasta llegar.
+- Los comandos operativos quedan bloqueados en tránsito.

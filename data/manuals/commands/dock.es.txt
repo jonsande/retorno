@@ -1,0 +1,3 @@
+dock <node_id>
+- Acopla la nave al nodo.
+- Debe ser contacto conocido.

@@ -1,0 +1,23 @@
+RESUMEN DE SISTEMA — energy_distribution
+Ref: OS-MAN/SYS/DIST
+
+energy_distribution es el bus y la capa de distribución: disyuntores, alineación de fase, líneas troncales.
+
+Función
+- Lleva energía desde power_core al resto de sistemas.
+- Mantiene la alineación de fase y evita oscilaciones.
+
+Por qué importa
+- Muchos sistemas exigen distribución al menos nominal para arrancar con seguridad.
+- Si está dañado, baja Q y puede haber fallos en cascada.
+
+Síntomas comunes
+- low_power_quality
+- power_bus_instability (si el daño persiste)
+
+Recuperación típica
+- Despliega un dron al troncal y repair energy_distribution.
+- Si encuentras módulos de estabilización, instálalos (p.ej. bus_stabilizer).
+
+Comandos relacionados
+- diag energy_distribution, repair <drone> energy_distribution, alerts explain power_bus_instability

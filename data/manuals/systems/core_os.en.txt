@@ -1,0 +1,18 @@
+SYSTEM BRIEF — core_os
+Ref: OS-MAN/SYS/CORE-OS
+
+core_os is the ship’s minimal supervisory layer. If it fails, you lose command authority.
+
+Role
+- Schedules jobs, routes alerts, maintains operator session.
+- Provides the basic command interface.
+
+Symptoms of degradation
+- Missing telemetry, delayed job execution, corrupted logs.
+
+Operational notes
+- Treated as critical. The ship will attempt to preserve it during shedding.
+- If the bus becomes unstable (low Q), core_os may become unreliable long before it “dies”.
+
+Relevant commands
+- status, alerts, logs, diag core_os

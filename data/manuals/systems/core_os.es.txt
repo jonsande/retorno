@@ -1,0 +1,18 @@
+RESUMEN DE SISTEMA — core_os
+Ref: OS-MAN/SYS/CORE-OS
+
+core_os es la capa mínima de supervisión de la nave. Si falla, pierdes autoridad de mando.
+
+Función
+- Planifica trabajos (jobs), enruta alertas, mantiene sesión del operador.
+- Proporciona la interfaz básica de comandos.
+
+Síntomas de degradación
+- Telemetría incompleta, retrasos en tareas, registros corruptos.
+
+Notas operativas
+- Es crítico. La nave intentará preservarlo durante apagados automáticos.
+- Si la red se vuelve inestable (Q baja), core_os puede volverse errático antes de “morir”.
+
+Comandos relacionados
+- status, alerts, logs, diag core_os

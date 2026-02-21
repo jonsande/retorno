@@ -23,6 +23,11 @@ class PowerShed(Action):
 
 
 @dataclass(slots=True)
+class PowerPlan(Action):
+    mode: str  # "cruise" | "normal"
+
+
+@dataclass(slots=True)
 class DroneDeploy(Action):
     drone_id: str
     sector_id: str
@@ -78,3 +83,19 @@ class SalvageScrap(Action):
 class SalvageModule(Action):
     drone_id: str
     node_id: str | None
+
+
+@dataclass(slots=True)
+class InventoryUpdate(Action):
+    pass
+
+
+@dataclass(slots=True)
+class Travel(Action):
+    node_id: str
+
+
+@dataclass(slots=True)
+class Hibernate(Action):
+    mode: str  # "until_arrival" or "years"
+    years: float = 0.0

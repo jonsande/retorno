@@ -1,0 +1,3 @@
+contacts | scan
+- Lists detected signals.
+- Requires sensord active.

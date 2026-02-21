@@ -1,0 +1,3 @@
+dock <node_id>
+- Dock the ship at a node.
+- Must be a known contact.

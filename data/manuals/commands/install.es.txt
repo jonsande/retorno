@@ -1,0 +1,3 @@
+install <module_id>
+- Instala un módulo del inventario.
+- Consume el módulo.

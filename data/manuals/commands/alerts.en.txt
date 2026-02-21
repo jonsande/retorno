@@ -1,0 +1,5 @@
+alerts
+- Lists active alerts.
+- Critical alerts require attention.
+alerts explain <alert_key>
+- Shows explanation and current values.

@@ -1,0 +1,5 @@
+alerts
+- Lista alertas activas.
+- Las críticas requieren atención.
+alerts explain <alert_key>
+- Muestra explicación y valores actuales.

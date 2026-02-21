@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import difflib
 
-from retorno.core.actions import Boot, Diag, Dock, DroneDeploy, DroneRecall, DroneReboot, Install, PowerShed, Repair, SalvageModule, SalvageScrap, Status
+from retorno.core.actions import Boot, Diag, Dock, DroneDeploy, DroneRecall, DroneReboot, Hibernate, Install, InventoryUpdate, PowerPlan, PowerShed, Repair, SalvageModule, SalvageScrap, Status, Travel
 
 
 @dataclass(slots=True)
@@ -34,6 +34,9 @@ def parse_command(line: str):
 
     if cmd == "status":
         return Status()
+
+    if cmd == "jobs":
+        return "JOBS"
 
     if cmd == "alerts":
         if len(args) == 0:
@@ -66,6 +69,24 @@ def parse_command(line: str):
             raise ParseError("Uso: dock <node_id>")
         return Dock(node_id=args[0])
 
+    if cmd == "travel":
+        if len(args) != 1:
+            raise ParseError("Uso: travel <node_id>")
+        return Travel(node_id=args[0])
+
+    if cmd == "hibernate":
+        if len(args) != 1:
+            raise ParseError("Uso: hibernate until_arrival | hibernate <años>")
+        if args[0].lower() == "until_arrival":
+            return Hibernate(mode="until_arrival")
+        try:
+            years = float(args[0])
+        except ValueError as e:
+            raise ParseError("hibernate: <años> debe ser número") from e
+        if years <= 0:
+            raise ParseError("hibernate: <años> debe ser > 0")
+        return Hibernate(mode="years", years=years)
+
     if cmd == "salvage":
         if len(args) < 2:
             raise ParseError(
@@ -91,7 +112,11 @@ def parse_command(line: str):
         )
 
     if cmd == "inventory":
-        return "INVENTORY"
+        if len(args) == 0:
+            return "INVENTORY"
+        if len(args) == 1 and args[0].lower() == "update":
+            return InventoryUpdate()
+        raise ParseError("Uso: inventory | inventory update")
 
     if cmd == "modules":
         return "MODULES"
@@ -167,6 +192,10 @@ def parse_command(line: str):
         sub = args[0].lower()
         if sub == "status":
             return "POWER_STATUS"
+        if sub == "plan":
+            if len(args) != 2 or args[1].lower() not in {"cruise", "normal"}:
+                raise ParseError("Uso: power plan cruise|normal")
+            return PowerPlan(mode=args[1].lower())
         if sub == "shed":
             if len(args) != 2:
                 raise ParseError("Uso: power shed <system_id>")
@@ -252,6 +281,7 @@ def _suggest_command(cmd: str) -> str | None:
     commands = [
         "help",
         "status",
+        "jobs",
         "alerts",
         "diag",
         "about",
@@ -266,10 +296,12 @@ def _suggest_command(cmd: str) -> str | None:
         "map",
         "locate",
         "dock",
+        "travel",
         "salvage",
         "drone",
         "repair",
         "boot",
+        "hibernate",
         "wait",
         "debug",
         "power",

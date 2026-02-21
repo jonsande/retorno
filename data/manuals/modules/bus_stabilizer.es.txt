@@ -1,0 +1,9 @@
+bus_stabilizer
+- Filtro de fase para buses de distribución envejecidos.
+- Atenúa picos transitorios y ruido de línea.
+- Suaviza el reparto de carga entre subsistemas.
+- Común en kits de modernización de largo alcance.
+- La instalación requiere una resincronización breve.
+- Efecto secundario: mayor consumo en reposo.
+- Recomendado cuando Q es inestable.
+Lore: En la tripulación se le llamaba "calmador".

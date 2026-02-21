@@ -1,0 +1,3 @@
+drone repair <drone_id> <system_id>
+- Repairs a system using a drone.
+- Repair operations require deployed drone units.

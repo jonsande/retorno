@@ -3,8 +3,10 @@ from __future__ import annotations
 from retorno.bootstrap import create_initial_state_prologue
 import readline
 from retorno.core.engine import Engine
+from retorno.core.actions import Hibernate
 from retorno.runtime.loop import GameLoop
 from retorno.model.events import Event, EventType, Severity, SourceRef
+from retorno.model.jobs import JobStatus
 from retorno.runtime.data_loader import load_modules
 from retorno.config.balance import Balance
 from retorno.model.systems import SystemState
@@ -19,13 +21,14 @@ def print_help() -> None:
         "  man <topic> | about <system_id>\n"
         "  config set lang <en|es> | config show\n"
         "  mail [inbox] | mail read <id>\n"
-        "  status | power status | alerts | logs\n"
+        "  status | jobs | power status | power plan cruise|normal | alerts | logs\n"
         "  alerts explain <alert_key>\n"
         "  contacts | scan\n"
         "  sectors | map | locate <system_id>\n"
-        "  dock <node_id>\n"
+        "  dock <node_id> | travel <node_id>\n"
         "  diag <system_id> | boot <service_name>\n"
-        "  inventory | install <module_id> | modules\n"
+        "  inventory | inventory update | install <module_id> | modules\n"
+        "  hibernate until_arrival | hibernate <años>\n"
         "  drone status | drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>\n"
         "  drone repair <drone_id> <system_id>\n"
         "  drone salvage scrap <drone_id> <node_id> <amount>\n"
@@ -43,6 +46,13 @@ def print_help() -> None:
 class SafeDict(dict):
     def __missing__(self, key):
         return "?"
+
+
+def _inventory_view(ship):
+    # Returns the last inventoried view plus dirty flag.
+    if ship.cargo_dirty:
+        return ship.inventory_known_scrap, list(ship.inventory_known_modules), True
+    return ship.scrap, list(ship.modules), False
 
 
 def _build_event_payload(e) -> dict:
@@ -119,6 +129,24 @@ def render_events(state, events, origin_override: str | None = None) -> None:
     docked_templates = {
         "en": "[{sev}] docked :: Docked at {node_id}",
         "es": "[{sev}] docked :: Acoplado en {node_id}",
+    }
+    travel_templates = {
+        "travel_started": {
+            "en": "[{sev}] travel_started :: To {to} dist={distance_ly:.2f}ly ETA={eta_years:.2f}y",
+            "es": "[{sev}] travel_started :: A {to} dist={distance_ly:.2f}ly ETA={eta_years:.2f}a",
+        },
+        "arrived": {
+            "en": "[{sev}] arrived :: Arrived at {to} (from {from})",
+            "es": "[{sev}] arrived :: Llegada a {to} (desde {from})",
+        },
+        "hibernation_started": {
+            "en": "[{sev}] hibernation_started :: Sleeping for {years:.2f}y",
+            "es": "[{sev}] hibernation_started :: Hibernando durante {years:.2f}a",
+        },
+        "hibernation_ended": {
+            "en": "[{sev}] hibernation_ended :: Woke up after {years:.2f}y",
+            "es": "[{sev}] hibernation_ended :: Despertaste tras {years:.2f}a",
+        },
     }
     power_alert_templates = {
         "power_net_deficit": {
@@ -244,6 +272,14 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Install blocked: insufficient scrap ({scrap_cost})",
             "es": "Instalación bloqueada: chatarra insuficiente ({scrap_cost})",
         },
+        "in_transit": {
+            "en": "Action blocked: ship in transit. Use 'hibernate until_arrival' to advance.",
+            "es": "Acción bloqueada: nave en tránsito. Usa 'hibernate until_arrival' para avanzar.",
+        },
+        "already_at_target": {
+            "en": "Action blocked: already at destination ({node_id})",
+            "es": "Acción bloqueada: ya estás en destino ({node_id})",
+        },
     }
     job_completed_keys = {
         "job_completed_repair": {
@@ -277,6 +313,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "job_completed_install": {
             "en": "Module installed: {module_id}",
             "es": "Módulo instalado: {module_id}",
+        },
+        "job_completed_inventory_update": {
+            "en": "Inventory synchronized",
+            "es": "Inventario sincronizado",
         },
     }
     def _safe_format(tmpl: str, payload: dict) -> str:
@@ -423,6 +463,25 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             except Exception:
                 print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
             continue
+        if e.type in {EventType.TRAVEL_STARTED, EventType.ARRIVED, EventType.HIBERNATION_STARTED, EventType.HIBERNATION_ENDED}:
+            locale = state.os.locale.value
+            key = e.type.value
+            tmpl = travel_templates.get(key, {}).get(locale)
+            payload.update({
+                "to": e.data.get("to", "?"),
+                "from": e.data.get("from", "?"),
+                "distance_ly": e.data.get("distance_ly", 0.0),
+                "eta_years": e.data.get("eta_years", 0.0),
+                "years": e.data.get("years", 0.0),
+            })
+            if tmpl:
+                try:
+                    print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
+                except Exception:
+                    print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
+            else:
+                print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message}")
+            continue
         if e.type == EventType.DRONE_DISABLED:
             locale = state.os.locale.value
             tmpl = {
@@ -514,18 +573,30 @@ def render_status(state) -> None:
     ship = state.ship
     p = ship.power
     soc = (p.e_batt_kwh / p.e_batt_max_kwh) if p.e_batt_max_kwh else 0.0
+    net = p.p_gen_kw - p.p_load_kw
+    deficit = max(0.0, p.p_load_kw - p.p_gen_kw)
+    headroom = p.p_discharge_max_kw - deficit
     print("\n=== STATUS ===")
     print(f"time: {state.clock.t:.1f}s")
     mode = "DEBUG" if state.os.debug_enabled else "NORMAL"
     print(f"mode: {mode}")
-    node = state.world.space.nodes.get(state.world.current_node_id)
-    node_name = node.name if node else state.world.current_node_id
-    print(f"location: {state.world.current_node_id} ({node_name})")
-    print(f"power: P_gen={p.p_gen_kw:.2f}kW  P_load={p.p_load_kw:.2f}kW  SoC={soc:.2f}  Q={p.power_quality:.2f}  brownout={p.brownout}")
-    print(f"inventory: scrap={ship.scrap} modules={len(ship.modules)}")
-    if ship.modules:
+    current_loc = ship.current_node_id or state.world.current_node_id
+    node = state.world.space.nodes.get(current_loc)
+    node_name = node.name if node else current_loc
+    if ship.in_transit:
+        remaining_s = max(0.0, ship.arrival_t - state.clock.t)
+        remaining_years = remaining_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
+        remaining_days = remaining_s / Balance.DAY_S if Balance.DAY_S else 0.0
+        print(f"location: en route to {ship.transit_to} (from {ship.transit_from}) ETA={remaining_years:.2f}y ({remaining_days:.1f}d)")
+    else:
+        print(f"location: {current_loc} ({node_name})")
+    print(f"power: P_gen={p.p_gen_kw:.2f}kW  P_load={p.p_load_kw:.2f}kW  net={net:+.2f}kW headroom={headroom:.2f}kW  SoC={soc:.2f}  Q={p.power_quality:.2f}  brownout={p.brownout}")
+    disp_scrap, disp_modules, dirty = _inventory_view(ship)
+    dirty_suffix = " [needs inventory update]" if dirty else ""
+    print(f"inventory: scrap={disp_scrap} modules={len(disp_modules)}{dirty_suffix}")
+    if disp_modules:
         counts: dict[str, int] = {}
-        for mid in ship.modules:
+        for mid in disp_modules:
             counts[mid] = counts.get(mid, 0) + 1
         summary = ", ".join(f"{mid} x{count}" for mid, count in sorted(counts.items()))
         print(f"modules: {summary}")
@@ -542,9 +613,13 @@ def render_power_status(state) -> None:
     ship = state.ship
     p = ship.power
     soc = (p.e_batt_kwh / p.e_batt_max_kwh) if p.e_batt_max_kwh else 0.0
+    net = p.p_gen_kw - p.p_load_kw
+    deficit = max(0.0, p.p_load_kw - p.p_gen_kw)
+    headroom = p.p_discharge_max_kw - deficit
     print("\n=== POWER ===")
     print(f"P_gen={p.p_gen_kw:.2f} kW")
     print(f"P_load={p.p_load_kw:.2f} kW")
+    print(f"net={net:+.2f} kW  headroom={headroom:.2f} kW")
     print(f"Battery={p.e_batt_kwh:.3f}/{p.e_batt_max_kwh:.3f} kWh (SoC={soc:.2f})")
     print(f"Quality={p.power_quality:.2f}  DeficitRatio={p.deficit_ratio:.2f}  Brownout={p.brownout}")
 
@@ -598,6 +673,44 @@ def render_logs(state, limit: int = 15) -> None:
         print(f"- t={e.t:6d} [{e.severity.value.upper():8s}] {e.type.value}: {e.message}")
 
 
+def render_jobs(state) -> None:
+    print("\n=== JOBS ===")
+    jobs_state = state.jobs
+    active_jobs = []
+    for job_id in jobs_state.active_job_ids:
+        job = jobs_state.jobs.get(job_id)
+        if job:
+            active_jobs.append(job)
+
+    if not jobs_state.jobs:
+        print("(none)")
+        return
+
+    def _format_job(job):
+        target = f"{job.target.kind}:{job.target.id}" if job.target else "-"
+        eta = f"{max(0, int(job.eta_s))}s" if job.status in {JobStatus.QUEUED, JobStatus.RUNNING} else "-"
+        owner = job.owner_id or "-"
+        emergency = " EMERGENCY" if job.params.get("emergency") else ""
+        return f"- {job.job_id}: {job.status.value:8s} type={job.job_type.value} target={target} ETA={eta} owner={owner}{emergency}"
+
+    print("Active (queued/running):")
+    if active_jobs:
+        for job in active_jobs:
+            print(_format_job(job))
+    else:
+        print("- (none)")
+
+    history = [
+        job
+        for job in jobs_state.jobs.values()
+        if job.job_id not in jobs_state.active_job_ids and job.status in {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}
+    ]
+    if history:
+        print("Recent complete/failed:")
+        for job in sorted(history, key=lambda j: j.job_id, reverse=True)[:5]:
+            print(_format_job(job))
+
+
 def render_drone_status(state) -> None:
     print("\n=== DRONES ===")
     for did, d in state.ship.drones.items():
@@ -606,10 +719,12 @@ def render_drone_status(state) -> None:
 
 def render_inventory(state) -> None:
     print("\n=== INVENTORY ===")
-    print(f"scrap: {state.ship.scrap}")
-    if state.ship.modules:
+    disp_scrap, disp_modules, dirty = _inventory_view(state.ship)
+    suffix = " (stale; run 'inventory update')" if dirty else ""
+    print(f"scrap: {disp_scrap}{suffix}")
+    if disp_modules:
         counts: dict[str, int] = {}
-        for mid in state.ship.modules:
+        for mid in disp_modules:
             counts[mid] = counts.get(mid, 0) + 1
         print("modules:")
         for mid, count in sorted(counts.items()):
@@ -617,6 +732,8 @@ def render_inventory(state) -> None:
             print(f"- {mid}{suffix}")
     else:
         print("modules: (none)")
+    if dirty:
+        print("(cargo changes pending; run 'inventory update' to refresh)")
 
 
 def render_modules_catalog(state) -> None:
@@ -788,28 +905,102 @@ def _apply_salvage_loot(loop, state, events):
     return
 
 
+def _run_hibernate(loop, years: float) -> None:
+    total_s = max(0.0, years * Balance.YEAR_S)
+    if total_s <= 0:
+        print("hibernate: nothing to do (duration <= 0)")
+        return
+    events_to_render: list[tuple[str, Event]] = []
+    with loop.with_lock() as locked_state:
+        locked_state.ship.op_mode = "CRUISE"
+        start_soc = locked_state.ship.power.e_batt_kwh / locked_state.ship.power.e_batt_max_kwh if locked_state.ship.power.e_batt_max_kwh else 0.0
+        start_health = {sid: sys.health for sid, sys in locked_state.ship.systems.items() if "critical" in sys.tags}
+    with loop.with_lock() as locked_state:
+        _emit_runtime_event(
+            locked_state,
+            events_to_render,
+            "cmd",
+            EventType.HIBERNATION_STARTED,
+            Severity.INFO,
+            SourceRef(kind="ship", id=locked_state.ship.ship_id),
+            f"Hibernation for {years:.2f} years",
+            data={"years": years},
+        )
+    was_auto = getattr(loop, "_auto_tick_enabled", True)
+    loop.set_auto_tick(False)
+    remaining = total_s
+    step_events: list[tuple[str, Event]] = []
+    while remaining > 0:
+        step = Balance.HIBERNATE_CHUNK_S if remaining >= Balance.HIBERNATE_CHUNK_S else remaining
+        ev = loop.step(step)
+        step_events.extend([("step", e) for e in ev])
+        remaining -= step
+    with loop.with_lock() as locked_state:
+        _emit_runtime_event(
+            locked_state,
+            events_to_render,
+            "cmd",
+            EventType.HIBERNATION_ENDED,
+            Severity.INFO,
+            SourceRef(kind="ship", id=locked_state.ship.ship_id),
+            f"Hibernation ended after {years:.2f} years",
+            data={"years": years},
+        )
+        end_soc = locked_state.ship.power.e_batt_kwh / locked_state.ship.power.e_batt_max_kwh if locked_state.ship.power.e_batt_max_kwh else 0.0
+        end_health = {sid: sys.health for sid, sys in locked_state.ship.systems.items() if "critical" in sys.tags}
+        # Keep cruise profile active unless manually changed later
+        if not locked_state.ship.in_transit:
+            locked_state.ship.op_mode = "CRUISE"
+    loop.set_auto_tick(was_auto)
+    filtered = [pair for pair in step_events if pair[1].severity == Severity.CRITICAL or pair[1].type in {EventType.ARRIVED}]
+    events_to_render.extend(filtered)
+    with loop.with_lock() as locked_state:
+        if events_to_render:
+            render_events(locked_state, events_to_render)
+        days = years * (Balance.YEAR_S / Balance.DAY_S)
+        print(f"Advanced time by {years:.2f} years ({days:.1f} days).")
+        # digest de degradación para críticos
+        if start_health:
+            print("Hibernate digest (critical systems):")
+            for sid, h0 in start_health.items():
+                h1 = end_health.get(sid, h0)
+                dh = h1 - h0
+                print(f"- {sid}: Δhealth={dh:+.3f} now={h1:.3f}")
+        print(f"SoC: start={start_soc:.3f} end={end_soc:.3f}")
+
+
 def render_about(state, system_id: str) -> None:
     path = _resolve_localized_path(state, f"/manuals/systems/{system_id}.txt")
-    if path not in state.os.fs:
-        path = _resolve_localized_path(state, f"/manuals/alerts/{system_id}.txt")
-    render_cat(state, path)
+    if path in state.os.fs:
+        render_cat(state, path)
+        return
+    concept_path = _resolve_localized_path(state, f"/manuals/concepts/{system_id}.txt")
+    if concept_path in state.os.fs:
+        print(f"No system manual for '{system_id}'. Try: man {system_id}")
+        return
+    print("No manual available. Try: ls /manuals/systems")
 
 
 def render_man(state, topic: str) -> None:
     cmd_path = _resolve_localized_path(state, f"/manuals/commands/{topic}.txt")
+    concept_path = _resolve_localized_path(state, f"/manuals/concepts/{topic}.txt")
     sys_path = _resolve_localized_path(state, f"/manuals/systems/{topic}.txt")
     alert_path = _resolve_localized_path(state, f"/manuals/alerts/{topic}.txt")
-    for path in (cmd_path, sys_path, alert_path):
-        try:
-            print(f"\n=== MAN {topic} ===")
-            print(read_file(state.os.fs, path, state.os.access_level))
-            return
-        except PermissionError:
-            print("Permission denied")
-            return
-        except Exception:
-            continue
-    print("No manual found")
+    resolved_path = None
+    for path in (cmd_path, concept_path, sys_path, alert_path):
+        if path in state.os.fs:
+            resolved_path = path
+            break
+    if not resolved_path:
+        print("No manual found")
+        return
+    try:
+        print(f"\n=== MAN {topic} ===")
+        print(read_file(state.os.fs, resolved_path, state.os.access_level))
+    except PermissionError:
+        print("Permission denied")
+    except Exception:
+        print("No manual found")
 
 
 def get_power_metrics(state) -> dict:
@@ -903,6 +1094,7 @@ def main() -> None:
         "config",
         "mail",
         "status",
+        "jobs",
         "power",
         "alerts",
         "contacts",
@@ -911,6 +1103,7 @@ def main() -> None:
         "map",
         "locate",
         "dock",
+        "travel",
         "salvage",
         "diag",
         "boot",
@@ -918,6 +1111,7 @@ def main() -> None:
         "inventory",
         "install",
         "modules",
+        "hibernate",
         "drone",
         "wait",
         "debug",
@@ -985,8 +1179,23 @@ def main() -> None:
                     candidates = [s for s in systems if s.startswith(text)]
             elif cmd == "dock":
                 candidates = [c for c in contacts if c.startswith(text)]
+            elif cmd == "travel":
+                candidates = [c for c in contacts if c.startswith(text)]
+            elif cmd == "power":
+                if len(tokens) == 2:
+                    candidates = [c for c in ["status", "shed", "plan"] if c.startswith(text)]
+                elif len(tokens) == 3 and tokens[1] == "shed":
+                    candidates = [s for s in systems if s.startswith(text)]
+                elif len(tokens) == 3 and tokens[1] == "plan":
+                    candidates = [c for c in ["cruise", "normal"] if c.startswith(text)]
             elif cmd == "install":
                 candidates = [m for m in modules if m.startswith(text)]
+            elif cmd == "inventory":
+                if len(tokens) == 2:
+                    candidates = [c for c in ["update"] if c.startswith(text)]
+            elif cmd == "hibernate":
+                if len(tokens) == 2:
+                    candidates = [c for c in ["until_arrival"] if c.startswith(text)]
             elif cmd == "man":
                 topics: set[str] = set()
                 for path in fs_paths:
@@ -1186,6 +1395,11 @@ def main() -> None:
             with loop.with_lock() as locked_state:
                 render_logs(locked_state)
             continue
+        if parsed == "JOBS":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                render_jobs(locked_state)
+            continue
         if parsed == "POWER_STATUS":
             _drain_auto_events()
             with loop.with_lock() as locked_state:
@@ -1229,6 +1443,19 @@ def main() -> None:
                 with loop.with_lock() as locked_state:
                     _apply_salvage_loot(loop, locked_state, auto_ev)
                     render_events(locked_state, auto_ev)
+            continue
+        if isinstance(parsed, Hibernate):
+            _drain_auto_events()
+            if parsed.mode == "until_arrival":
+                with loop.with_lock() as locked_state:
+                    if not locked_state.ship.in_transit:
+                        print("hibernate: not in transit")
+                        continue
+                    remaining_s = max(0.0, locked_state.ship.arrival_t - locked_state.clock.t)
+                    years = remaining_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
+            else:
+                years = parsed.years
+            _run_hibernate(loop, years)
             continue
 
         # Acciones del motor

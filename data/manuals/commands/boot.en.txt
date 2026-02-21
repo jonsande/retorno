@@ -1,0 +1,3 @@
+boot <service_name>
+- Starts an installed service.
+- Requires dependencies satisfied.

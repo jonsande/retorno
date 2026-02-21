@@ -1,0 +1,4 @@
+travel <node_id>
+- Start an interstellar transit to the target node.
+- Shows ETA in years; ship goes in-transit until arrival.
+- Operational commands are blocked during transit.

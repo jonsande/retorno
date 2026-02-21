@@ -1,0 +1,5 @@
+power_net_deficit
+- Load exceeds generation (plus battery discharge limit).
+- Typical causes: high load, low generation, damaged core.
+- If persistent: brownouts, forced shutdowns.
+Recommended: reduce load, repair power_core, charge batteries.

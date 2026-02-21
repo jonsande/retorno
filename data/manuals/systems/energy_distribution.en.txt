@@ -1,0 +1,23 @@
+SYSTEM BRIEF — energy_distribution
+Ref: OS-MAN/SYS/DIST
+
+energy_distribution is the ship’s bus and routing layer: breakers, phase alignment, trunk lines.
+
+Role
+- Delivers power from power_core to all systems.
+- Maintains phase alignment and prevents oscillation.
+
+Why it matters
+- Many systems require distribution to be at least nominal to boot safely.
+- If damaged, Q drops and bus instability may cascade.
+
+Common symptoms
+- low_power_quality
+- power_bus_instability (if damage persists)
+
+Typical recovery
+- Deploy a drone to the trunk location and repair energy_distribution.
+- If you find stabilization modules, install them (e.g., bus_stabilizer).
+
+Relevant commands
+- diag energy_distribution, repair <drone> energy_distribution, alerts explain power_bus_instability

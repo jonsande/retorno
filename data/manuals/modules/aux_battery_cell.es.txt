@@ -1,0 +1,7 @@
+aux_battery_cell
+- Pack auxiliar de celdas LiFe para amortiguación.
+- Aumenta la capacidad máxima sin tocar la química base.
+- Reduce el estrés por descargas profundas.
+- Instalación no invasiva al núcleo de energía.
+- Mejor rendimiento con distribución estable.
+Lore: El fabricante los vendía como "celdas salvavidas".

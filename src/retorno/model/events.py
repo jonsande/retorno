@@ -28,6 +28,10 @@ class EventType(str, Enum):
     NODE_DEPLETED = "node_depleted"
     MODULE_INSTALLED = "module_installed"
     DRONE_DISABLED = "drone_disabled"
+    TRAVEL_STARTED = "travel_started"
+    ARRIVED = "arrived"
+    HIBERNATION_STARTED = "hibernation_started"
+    HIBERNATION_ENDED = "hibernation_ended"
 
 
 @dataclass(slots=True)

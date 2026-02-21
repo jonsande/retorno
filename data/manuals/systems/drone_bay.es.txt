@@ -1,0 +1,3 @@
+drone_bay
+- Salida de drones al casco.
+- En emergencia usa deploy!.

@@ -1,0 +1,43 @@
+SHIP OS — Guía de energía y red (Copia de campo)
+Ref: OS-MAN/ENG/POWER-01
+
+La terminal del sarcófago informa del estado eléctrico con cinco valores:
+
+SoC (State of Charge)
+Fracción de carga de la batería. 0.00 vacía, 1.00 llena.
+SoC amortigua déficits momentáneos y absorbe excedentes.
+
+P_gen (kW)
+Generación instantánea disponible. Principalmente desde power_core.
+Un P_gen bajo suele indicar daño del núcleo, falta de combustible o limitación de potencia.
+
+P_load (kW)
+Demanda instantánea de los sistemas activos. Más sistemas en marcha → más carga.
+Algunos estados consumen más: un sistema degradado o inestable puede “chupar” potencia extra.
+
+Q (power_quality)
+Puntuación de calidad (0..1). Es, en la práctica, lo limpia y estable que está la red.
+SoC bajo, déficit sostenido o energy_distribution dañado reducen Q.
+Con Q baja los sistemas envejecen más rápido y aumenta la probabilidad de inestabilidad.
+
+brownout (True/False)
+Brownout indica que la demanda excedió lo que la red puede entregar (incluso descargando batería).
+Cuando ocurre, la nave puede apagar forzosamente sistemas no vitales para proteger el bus.
+
+Diagnóstico rápido (qué hacer)
+1) Calcula el balance
+net = P_gen - P_load
+- net > 0: puedes recargar baterías.
+- net < 0: estás descargando baterías o entrando en déficit.
+
+2) Margen de batería (cuánto déficit puedes cubrir)
+headroom = P_discharge_max - max(0, P_load - P_gen)
+- Si el margen es pequeño, estás cerca del brownout.
+
+Protocolo mínimo de estabilización
+1) Reduce consumo: apaga primero sistemas no críticos (power shed).
+2) Restaura distribución: repara energy_distribution (estabilidad).
+3) Restaura generación: repara power_core (suministro sostenido).
+4) Recupera SoC: deja que la batería se recargue antes de operar o viajar.
+
+Nota: En perfiles de CRUISE/hibernación, la nave solo puede sobrevivir largos periodos si Q se mantiene estable y la carga queda por debajo de la generación.

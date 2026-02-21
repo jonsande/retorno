@@ -1,0 +1,19 @@
+RESUMEN DE SISTEMA — life_support
+Ref: OS-MAN/SYS/LIFE
+
+life_support mantiene viable el sarcófago: oxigenación, control térmico, perfusión nutritiva.
+
+Función
+- Mantiene atmósfera y soporte metabólico del sarcófago.
+- Regula temperatura y filtrado de CO₂.
+
+Modos de fallo
+- Deriva lenta (la más común): baja eficiencia → sube consumo y aparecen alarmas.
+- Pérdida catastrófica: cuenta atrás de viabilidad (módulo futuro).
+
+Notas operativas
+- Es crítico. Apagarlo equivale a rendirse.
+- Si debes recortar energía, recorta todo lo demás primero.
+
+Comandos relacionados
+- status, alerts, diag life_support

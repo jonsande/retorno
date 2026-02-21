@@ -1,0 +1,4 @@
+hibernate until_arrival | hibernate <años>
+- Avanza el tiempo en bloques grandes durante el tránsito.
+- until_arrival duerme hasta el fin del viaje actual.
+- Suprime el ruido intermedio; muestra llegada y eventos críticos.

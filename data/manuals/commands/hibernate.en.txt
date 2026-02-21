@@ -1,0 +1,4 @@
+hibernate until_arrival | hibernate <years>
+- Advances time in large chunks during transit.
+- until_arrival sleeps until the current trip ends.
+- Suppresses intermediate spam; shows arrival and critical events.

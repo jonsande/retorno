@@ -1,0 +1,9 @@
+bus_stabilizer
+- Phase-lock filter for aging distribution busses.
+- Dampens transient spikes and line noise.
+- Restores smoother load-sharing across subsystems.
+- Common in long-haul retrofit kits.
+- Installation requires brief bus re-sync.
+- Side effect: slightly higher idle draw.
+- Recommended when Q is unstable.
+Lore: These units were nicknamed "calmers" by deck crews.

@@ -1,0 +1,7 @@
+micro_reactor_patch
+- Retroadaptación de microinyectores para núcleos fatigados.
+- Mejora mezcla de combustible y balance térmico.
+- Aporta un aumento estable de generación.
+- Requiere calibración cuidadosa tras instalar.
+- No recomendado si el core está en estado crítico.
+Lore: Los ingenieros lo llamaban "parche susurro".

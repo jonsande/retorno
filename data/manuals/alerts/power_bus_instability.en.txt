@@ -1,0 +1,5 @@
+power_bus_instability
+- Distribution bus instability detected.
+- Often tied to damaged energy_distribution.
+- If persistent: intermittent shutdowns, sensor dropouts.
+Recommended: repair energy_distribution, reduce load.

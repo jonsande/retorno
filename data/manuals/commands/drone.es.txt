@@ -1,0 +1,11 @@
+drone deploy <drone_id> <sector_id>
+drone deploy! <drone_id> <sector_id>
+drone repair <drone_id> <system_id>
+drone salvage scrap <drone_id> <node_id> <amount>
+drone salvage module <drone_id> [node_id]
+drone reboot <drone_id>
+drone recall <drone_id>
+- Despliega un dron a un sector de la nave.
+- Usa 'sectors' para listar sectores disponibles.
+- El despliegue de emergencia puede fallar.
+- Reboot intenta recuperar un dron deshabilitado.

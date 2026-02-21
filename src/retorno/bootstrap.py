@@ -10,6 +10,7 @@ from retorno.model.world import SpaceNode
 from retorno.runtime.data_loader import load_modules
 from retorno.config.balance import Balance
 import random
+from pathlib import Path
 
 
 def create_initial_state_prologue() -> GameState:
@@ -32,7 +33,7 @@ def create_initial_state_prologue() -> GameState:
             sector_id="BRG-01",
             p_nom_kw=0.4,
             priority=1,
-            base_decay_per_s=1.0e-5,
+            base_decay_per_s=6.0e-11,  # calibrated for decades-long travel
             k_power=0.35,
             k_rad=0.15,
             service=ServiceState(service_name="core_os", is_running=True, boot_time_s=2),
@@ -46,7 +47,7 @@ def create_initial_state_prologue() -> GameState:
             sector_id="BRG-01",
             p_nom_kw=1.2,
             priority=1,
-            base_decay_per_s=1.2e-5,
+            base_decay_per_s=8.0e-11,
             k_power=0.40,
             k_rad=0.20,
             tags={"critical"},
@@ -59,7 +60,7 @@ def create_initial_state_prologue() -> GameState:
             sector_id="PWR-A2",
             p_nom_kw=0.2,
             priority=2,
-            base_decay_per_s=1.5e-5,
+            base_decay_per_s=1.0e-10,
             k_power=0.25,
             k_rad=0.10,
             tags={"critical"},
@@ -73,7 +74,7 @@ def create_initial_state_prologue() -> GameState:
             sector_id="PWR-A2",
             p_nom_kw=0.3,
             priority=1,
-            base_decay_per_s=1.1e-5,
+            base_decay_per_s=8.0e-11,
             k_power=0.35,
             k_rad=0.15,
             tags={"critical"},
@@ -86,7 +87,7 @@ def create_initial_state_prologue() -> GameState:
             sector_id="DRN-BAY",
             p_nom_kw=0.6,
             priority=4,
-            base_decay_per_s=1.0e-5,
+            base_decay_per_s=8.0e-11,
             k_power=0.35,
             k_rad=0.15,
             dependencies=[
@@ -107,7 +108,7 @@ def create_initial_state_prologue() -> GameState:
             sector_id="BRG-01",
             p_nom_kw=0.5,
             priority=3,
-            base_decay_per_s=1.1e-5,
+            base_decay_per_s=8.5e-11,
             k_power=0.30,
             k_rad=0.10,
             dependencies=[
@@ -127,7 +128,7 @@ def create_initial_state_prologue() -> GameState:
             sector_id="BRG-01",
             p_nom_kw=0.4,
             priority=3,
-            base_decay_per_s=1.1e-5,
+            base_decay_per_s=8.5e-11,
             k_power=0.30,
             k_rad=0.10,
             dependencies=[
@@ -148,7 +149,7 @@ def create_initial_state_prologue() -> GameState:
             sector_id="BRG-01",
             p_nom_kw=0.7,
             priority=4,
-            base_decay_per_s=1.2e-5,
+            base_decay_per_s=9.0e-11,
             k_power=0.35,
             k_rad=0.15,
             dependencies=[
@@ -177,6 +178,7 @@ def create_initial_state_prologue() -> GameState:
         "DRN-BAY": ShipSector(sector_id="DRN-BAY", name="Drone Bay", tags={"bay"}),
         "PWR-A2": ShipSector(sector_id="PWR-A2", name="Power Trunk A2", tags={"power"}),
         "BRG-01": ShipSector(sector_id="BRG-01", name="Bridge Access", tags={"restricted"}),
+        "CRG-01": ShipSector(sector_id="CRG-01", name="Cargo Hold", tags={"cargo"}),
     }
 
     state.world.space.nodes[state.ship.ship_id] = SpaceNode(
@@ -184,7 +186,11 @@ def create_initial_state_prologue() -> GameState:
         name=state.ship.name,
         kind="ship",
         radiation_rad_per_s=state.ship.radiation_env_rad_per_s,
+        x_ly=0.0,
+        y_ly=0.0,
+        z_ly=0.0,
     )
+    state.ship.current_node_id = state.world.current_node_id
     rng = random.Random(state.meta.rng_seed)
     modules = load_modules()
     module_ids = list(modules.keys())
@@ -193,12 +199,37 @@ def create_initial_state_prologue() -> GameState:
         name="ECHO-7 Relay Station",
         kind="station",
         radiation_rad_per_s=0.002,
+        x_ly=0.0,
+        y_ly=0.0,
+        z_ly=0.0,
         salvage_scrap_available=rng.randint(Balance.ECHO_7_SCRAP_MIN, Balance.ECHO_7_SCRAP_MAX),
         salvage_modules_available=_bootstrap_modules(rng, module_ids),
     )
+    state.world.space.nodes["HARBOR_12"] = SpaceNode(
+        node_id="HARBOR_12",
+        name="Harbor-12 Waystation",
+        kind="station",
+        radiation_rad_per_s=0.001,
+        x_ly=12.0,
+        y_ly=4.0,
+        z_ly=0.0,
+    )
+    state.world.space.nodes["DERELICT_A3"] = SpaceNode(
+        node_id="DERELICT_A3",
+        name="Derelict A-3",
+        kind="derelict",
+        radiation_rad_per_s=0.003,
+        x_ly=45.0,
+        y_ly=-2.0,
+        z_ly=1.0,
+    )
+    state.world.known_contacts.update({"HARBOR_12", "DERELICT_A3"})
 
     _bootstrap_os(state)
     _bootstrap_alerts(state)
+    state.ship.inventory_known_scrap = state.ship.scrap
+    state.ship.inventory_known_modules = list(state.ship.modules)
+    state.ship.cargo_dirty = False
 
     return state
 
@@ -250,17 +281,30 @@ def _bootstrap_os(state: GameState) -> None:
     state.os.access_level = AccessLevel.GUEST
     state.os.locale = Locale.EN
 
+    manuals_root = Path(__file__).resolve().parents[2] / "data" / "manuals"
+
     def add_dir(path: str, access: AccessLevel = AccessLevel.GUEST) -> None:
         norm = normalize_path(path)
         fs[norm] = FSNode(path=norm, node_type=FSNodeType.DIR, access=access)
 
     def add_file(path: str, content: str, access: AccessLevel = AccessLevel.GUEST) -> None:
         norm = normalize_path(path)
+        if norm.startswith("/manuals/"):
+            disk_path = manuals_root / norm[len("/manuals/") :].lstrip("/")
+            try:
+                if disk_path.exists():
+                    content = disk_path.read_text(encoding="utf-8")
+                else:
+                    disk_path.parent.mkdir(parents=True, exist_ok=True)
+                    disk_path.write_text(content, encoding="utf-8")
+            except Exception:
+                pass
         fs[norm] = FSNode(path=norm, node_type=FSNodeType.FILE, content=content, access=access)
 
     add_dir("/")
     add_dir("/manuals")
     add_dir("/manuals/commands")
+    add_dir("/manuals/concepts")
     add_dir("/manuals/systems")
     add_dir("/manuals/alerts")
     add_dir("/manuals/modules")
@@ -311,6 +355,18 @@ def _bootstrap_os(state: GameState) -> None:
         "- Útil para completar jobs.\n",
     )
     add_file(
+        "/manuals/commands/jobs.en.txt",
+        "jobs\n"
+        "- Shows queued/running jobs and recent results.\n"
+        "- Columns: id status type target ETA owner.\n",
+    )
+    add_file(
+        "/manuals/commands/jobs.es.txt",
+        "jobs\n"
+        "- Muestra trabajos en cola/ejecución y recientes.\n"
+        "- Columnas: id estado tipo objetivo ETA owner.\n",
+    )
+    add_file(
         "/manuals/commands/alerts.en.txt",
         "alerts\n"
         "- Lists active alerts.\n"
@@ -329,14 +385,26 @@ def _bootstrap_os(state: GameState) -> None:
     add_file(
         "/manuals/commands/inventory.en.txt",
         "inventory\n"
-        "- Shows scrap and installed modules.\n"
-        "- Use after salvage or install.\n",
+        "- Shows last inventoried scrap and installed modules.\n"
+        "- If cargo changed, run 'inventory update' to refresh numbers.\n",
     )
     add_file(
         "/manuals/commands/inventory.es.txt",
         "inventory\n"
-        "- Muestra chatarra y módulos instalados.\n"
-        "- Úsalo después de salvage o install.\n",
+        "- Muestra la chatarra y módulos según el último inventario.\n"
+        "- Si hubo cambios en bodega, ejecuta 'inventory update' para refrescar.\n",
+    )
+    add_file(
+        "/manuals/commands/inventory_update.en.txt",
+        "inventory update\n"
+        "- Runs a cargo inventory job to sync counts.\n"
+        "- Takes time; queues a job in the system.\n",
+    )
+    add_file(
+        "/manuals/commands/inventory_update.es.txt",
+        "inventory update\n"
+        "- Ejecuta un trabajo de inventariado para sincronizar cantidades.\n"
+        "- Tarda un tiempo; encola un job en el sistema.\n",
     )
     add_file(
         "/manuals/commands/install.en.txt",
@@ -351,6 +419,34 @@ def _bootstrap_os(state: GameState) -> None:
         "- Consume el módulo.\n",
     )
     add_file(
+        "/manuals/commands/travel.en.txt",
+        "travel <node_id>\n"
+        "- Start an interstellar transit to the target node.\n"
+        "- Shows ETA in years; ship goes in-transit until arrival.\n"
+        "- Operational commands are blocked during transit.\n",
+    )
+    add_file(
+        "/manuals/commands/travel.es.txt",
+        "travel <node_id>\n"
+        "- Inicia un tránsito interestelar hacia el nodo destino.\n"
+        "- Muestra ETA en años; la nave queda en tránsito hasta llegar.\n"
+        "- Los comandos operativos quedan bloqueados en tránsito.\n",
+    )
+    add_file(
+        "/manuals/commands/hibernate.en.txt",
+        "hibernate until_arrival | hibernate <years>\n"
+        "- Advances time in large chunks during transit.\n"
+        "- until_arrival sleeps until the current trip ends.\n"
+        "- Suppresses intermediate spam; shows arrival and critical events.\n",
+    )
+    add_file(
+        "/manuals/commands/hibernate.es.txt",
+        "hibernate until_arrival | hibernate <años>\n"
+        "- Avanza el tiempo en bloques grandes durante el tránsito.\n"
+        "- until_arrival duerme hasta el fin del viaje actual.\n"
+        "- Suprime el ruido intermedio; muestra llegada y eventos críticos.\n",
+    )
+    add_file(
         "/manuals/commands/modules.en.txt",
         "modules\n"
         "- Lists available module definitions.\n"
@@ -361,6 +457,114 @@ def _bootstrap_os(state: GameState) -> None:
         "modules\n"
         "- Lista módulos disponibles.\n"
         "- Úsalo para ver opciones de instalación.\n",
+    )
+    add_file(
+        "/manuals/concepts/power.en.txt",
+        "POWER\n"
+        "- P_gen: generation (kW)\n"
+        "- P_load: current load (kW)\n"
+        "- net: P_gen - P_load (positive = charging)\n"
+        "- SoC: battery state of charge (0..1)\n"
+        "- headroom: remaining discharge margin (kW)\n"
+        "- Q (power_quality): stability of the bus (0..1)\n"
+        "- brownout: True when overdraw persists\n"
+        "Recommended:\n"
+        " - reduce load or shed non-critical systems\n"
+        " - repair energy_distribution if Q is low\n"
+        " - install stabilizers / extra batteries when possible\n",
+    )
+    add_file(
+        "/manuals/concepts/power.es.txt",
+        "ENERGÍA\n"
+        "- P_gen: generación (kW)\n"
+        "- P_load: carga actual (kW)\n"
+        "- neto: P_gen - P_load (positivo = cargando)\n"
+        "- SoC: estado de carga de baterías (0..1)\n"
+        "- margen: descarga restante (kW)\n"
+        "- Q (power_quality): estabilidad del bus (0..1)\n"
+        "- brownout: True cuando el sobreconsumo persiste\n"
+        "Recomendado:\n"
+        " - reducir carga o cortar sistemas no críticos\n"
+        " - reparar energy_distribution si Q es baja\n"
+        " - instalar estabilizadores / baterías extra cuando sea posible\n",
+    )
+    add_file(
+        "/manuals/systems/core_os.en.txt",
+        "core_os\n"
+        "- Bridge kernel and control stack. Keeps the ship coherent.\n"
+        "- Tags: critical. Power draw is modest but ever-present.\n"
+        "- Dependencies: none. Keep power stable to avoid resets.\n"
+        "- Related commands: status, diag core_os.\n",
+    )
+    add_file(
+        "/manuals/systems/core_os.es.txt",
+        "core_os\n"
+        "- Núcleo de control y coordinación. Mantiene la nave coherente.\n"
+        "- Tags: crítico. Consumo modesto pero continuo.\n"
+        "- Dependencias: ninguna. Mantén energía estable para evitar resets.\n"
+        "- Comandos: status, diag core_os.\n",
+    )
+    add_file(
+        "/manuals/systems/life_support.en.txt",
+        "life_support\n"
+        "- Atmosphere, pressure, and environmental control for crew.\n"
+        "- Tags: critical. Higher draw; degrades faster under bad power.\n"
+        "- Dependencies: stable power distribution.\n"
+        "- Related commands: status, diag life_support.\n",
+    )
+    add_file(
+        "/manuals/systems/life_support.es.txt",
+        "life_support\n"
+        "- Atmósfera, presión y control ambiental para la tripulación.\n"
+        "- Tags: crítico. Consumo alto; degrada más rápido con mala energía.\n"
+        "- Dependencias: distribución estable.\n"
+        "- Comandos: status, diag life_support.\n",
+    )
+    add_file(
+        "/manuals/systems/power_core.en.txt",
+        "power_core\n"
+        "- Primary generation core. Provides baseline P_gen.\n"
+        "- Tags: critical. Degraded state reduces stability and Q.\n"
+        "- Dependencies: distribution nominal to avoid instability.\n"
+        "- Related commands: diag power_core, install modules to boost.\n",
+    )
+    add_file(
+        "/manuals/systems/power_core.es.txt",
+        "power_core\n"
+        "- Núcleo principal de generación. Fuente de P_gen base.\n"
+        "- Tags: crítico. En degradado reduce estabilidad y Q.\n"
+        "- Dependencias: distribución nominal para evitar inestabilidad.\n"
+        "- Comandos: diag power_core, install módulos para mejorar.\n",
+    )
+    add_file(
+        "/manuals/systems/energy_distribution.en.txt",
+        "energy_distribution\n"
+        "- Routes power across subsystems. Locked if badly damaged.\n"
+        "- Tags: critical. Poor state lowers Q and blocks boots.\n"
+        "- Dependencies: healthy enough to unlock services.\n"
+        "- Related commands: status, diag energy_distribution.\n",
+    )
+    add_file(
+        "/manuals/systems/energy_distribution.es.txt",
+        "energy_distribution\n"
+        "- Enruta energía entre subsistemas. Bloquea si está muy dañado.\n"
+        "- Tags: crítico. Mal estado reduce Q y bloquea arranques.\n"
+        "- Dependencias: salud suficiente para desbloquear servicios.\n"
+        "- Comandos: status, diag energy_distribution.\n",
+    )
+    add_file(
+        "/manuals/systems/sensors.en.txt",
+        "sensors\n"
+        "- External signal detection. Boots sensord to detect contacts.\n"
+        "- Tags: locked initially. Requires distribution nominal.\n"
+        "- Related commands: boot sensord, contacts, scan, diag sensors.\n",
+    )
+    add_file(
+        "/manuals/systems/sensors.es.txt",
+        "sensors\n"
+        "- Detección de señales externas. Arranca sensord para contactos.\n"
+        "- Tags: bloqueado al inicio. Requiere distribución nominal.\n"
+        "- Comandos: boot sensord, contacts, scan, diag sensors.\n",
     )
     add_file(
         "/manuals/commands/contacts.en.txt",

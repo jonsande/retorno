@@ -1,0 +1,7 @@
+aux_battery_cell
+- Auxiliary LiFe cell pack for emergency buffer.
+- Raises maximum capacity without altering core chemistry.
+- Slows depth-of-discharge stress during deficits.
+- Installation is non-invasive to power core.
+- Best paired with stable distribution.
+Lore: The original vendor marketed these as "lifeboat cells".

@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 from typing import Iterable
 import difflib
+import math
 
 from retorno.core.actions import (
     Action,
@@ -12,13 +13,17 @@ from retorno.core.actions import (
     DroneDeploy,
     DroneReboot,
     DroneRecall,
+    Hibernate,
+    InventoryUpdate,
     Install,
+    PowerPlan,
     PowerShed,
     Repair,
     Salvage,
     SalvageModule,
     SalvageScrap,
     Status,
+    Travel,
 )
 from retorno.core.gamestate import GameState
 from retorno.model.drones import DroneLocation, DroneStatus
@@ -41,9 +46,28 @@ class Engine:
 
         events: list[Event] = []
 
+        if state.ship.in_transit and state.clock.t >= state.ship.arrival_t:
+            state.ship.in_transit = False
+            state.ship.current_node_id = state.ship.transit_to or state.ship.current_node_id
+            state.world.current_node_id = state.ship.current_node_id
+            events.append(
+                self._make_event(
+                    state,
+                    EventType.ARRIVED,
+                    Severity.INFO,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    f"Arrived at {state.ship.current_node_id}",
+                    data={
+                        "from": state.ship.transit_from,
+                        "to": state.ship.transit_to,
+                        "distance_ly": state.ship.last_travel_distance_ly,
+                    },
+                )
+            )
+
         events.extend(self._process_jobs(state, dt))
 
-        p_load = self._compute_load_kw(state.ship.systems.values())
+        p_load = self._compute_load_kw(state)
         p_gen = state.ship.power.p_gen_kw
         p_discharge_max = state.ship.power.p_discharge_max_kw
 
@@ -74,7 +98,138 @@ class Engine:
             return []
 
         if isinstance(action, Diag):
+            if state.ship.in_transit:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    "Action blocked: ship in transit",
+                    data={"message_key": "boot_blocked", "reason": "in_transit"},
+                )
+                self._record_event(state.events, event)
+                return [event]
             return []
+
+        if isinstance(action, Travel):
+            if state.ship.in_transit:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    "Travel blocked: ship already in transit",
+                    data={"message_key": "boot_blocked", "reason": "in_transit"},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            target = state.world.space.nodes.get(action.node_id)
+            if not target:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    f"Travel blocked: node {action.node_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "node_missing", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            current_id = state.world.current_node_id
+            if action.node_id == current_id:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    "Travel blocked: already at destination",
+                    data={"message_key": "boot_blocked", "reason": "already_at_target", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            distance_ly = self._distance_between_nodes(state, current_id, action.node_id)
+            speed = max(0.001, state.ship.cruise_speed_ly_per_year)
+            years = distance_ly / speed
+            travel_s = years * Balance.YEAR_S
+            state.ship.in_transit = True
+            state.ship.transit_from = current_id
+            state.ship.transit_to = action.node_id
+            state.ship.arrival_t = state.clock.t + travel_s
+            state.ship.last_travel_distance_ly = distance_ly
+            state.world.known_contacts.add(action.node_id)
+            state.ship.op_mode = "CRUISE"
+            event = self._make_event(
+                state,
+                EventType.TRAVEL_STARTED,
+                Severity.INFO,
+                SourceRef(kind="ship", id=state.ship.ship_id),
+                f"Travel started to {action.node_id} ETA {years:.2f}y",
+                data={
+                    "from": current_id,
+                    "to": action.node_id,
+                    "distance_ly": distance_ly,
+                    "eta_years": years,
+                    "arrival_t": state.ship.arrival_t,
+                },
+            )
+            self._record_event(state.events, event)
+            return [event]
+
+        if isinstance(action, Hibernate):
+            return []
+
+        if isinstance(action, PowerPlan):
+            events: list[Event] = []
+            targets = ["sensors", "security", "data_core", "drone_bay"]
+            if action.mode == "cruise":
+                state.ship.op_mode = "CRUISE"
+                for sid in targets:
+                    sys = state.ship.systems.get(sid)
+                    if not sys:
+                        continue
+                    old_state = sys.state
+                    sys.forced_offline = True
+                    if sys.state != SystemState.OFFLINE:
+                        sys.state = SystemState.OFFLINE
+                        if sys.service:
+                            sys.service.is_running = False
+                        events.append(
+                            self._make_event(
+                                state,
+                                EventType.SYSTEM_STATE_CHANGED,
+                                Severity.WARN,
+                                SourceRef(kind="ship_system", id=sys.system_id),
+                                f"Power plan cruise: {sys.system_id} -> OFFLINE",
+                                data={"from": old_state.value, "to": sys.state.value, "cause": "manual_shed"},
+                            )
+                        )
+                return events
+            if action.mode == "normal":
+                state.ship.op_mode = "NORMAL"
+                for sid in targets:
+                    sys = state.ship.systems.get(sid)
+                    if not sys:
+                        continue
+                    sys.forced_offline = False
+                for sid in targets:
+                    sys = state.ship.systems.get(sid)
+                    if not sys:
+                        continue
+                    self._apply_health_state(sys, state, events, cause="plan_normal")
+                return events
+            return []
+
+        if state.ship.in_transit:
+            event = self._make_event(
+                state,
+                EventType.BOOT_BLOCKED,
+                Severity.WARN,
+                SourceRef(kind="ship", id=state.ship.ship_id),
+                "Action blocked: ship in transit",
+                data={"message_key": "boot_blocked", "reason": "in_transit"},
+            )
+            self._record_event(state.events, event)
+            return [event]
 
         if isinstance(action, Dock):
             node = state.world.space.nodes.get(action.node_id)
@@ -158,6 +313,16 @@ class Engine:
                 owner_id=None,
                 eta_s=Balance.INSTALL_TIME_S,
                 params={"module_id": action.module_id, "scrap_cost": scrap_cost},
+            )
+
+        if isinstance(action, InventoryUpdate):
+            return self._enqueue_job(
+                state,
+                JobType.INVENTORY_UPDATE,
+                TargetRef(kind="ship", id=state.ship.ship_id),
+                owner_id=None,
+                eta_s=Balance.INVENTORY_UPDATE_TIME_S,
+                params={},
             )
 
         if isinstance(action, PowerShed):
@@ -903,6 +1068,7 @@ class Engine:
 
         if job.job_type == JobType.DOCK and job.target:
             state.world.current_node_id = job.target.id
+            state.ship.current_node_id = job.target.id
             events.append(
                 self._make_event(
                     state,
@@ -930,6 +1096,7 @@ class Engine:
                 recovered = min(effective, node.salvage_scrap_available)
                 node.salvage_scrap_available = max(0, node.salvage_scrap_available - recovered)
             state.ship.scrap += recovered
+            state.ship.cargo_dirty = True
             events.append(
                 self._make_event(
                     state,
@@ -975,6 +1142,7 @@ class Engine:
                     module_id = rng.choice(node.salvage_modules_available)
                     node.salvage_modules_available.remove(module_id)
                     state.ship.modules.append(module_id)
+                    state.ship.cargo_dirty = True
                     events.append(
                         self._make_event(
                             state,
@@ -1001,6 +1169,7 @@ class Engine:
                     module_id = rng.choice(node.salvage_modules_available)
                     node.salvage_modules_available.remove(module_id)
                     state.ship.modules.append(module_id)
+                    state.ship.cargo_dirty = True
                     events.append(
                         self._make_event(
                             state,
@@ -1044,6 +1213,7 @@ class Engine:
                 scrap_cost = int(job.params.get("scrap_cost", mod.get("scrap_cost", 0)))
                 state.ship.scrap = max(0, state.ship.scrap - scrap_cost)
                 state.ship.modules.remove(module_id)
+                state.ship.cargo_dirty = True
             events.append(
                 self._make_event(
                     state,
@@ -1071,10 +1241,54 @@ class Engine:
             )
             return events
 
+        if job.job_type == JobType.INVENTORY_UPDATE:
+            ship = state.ship
+            ship.inventory_known_scrap = ship.scrap
+            ship.inventory_known_modules = list(ship.modules)
+            ship.cargo_dirty = False
+            events.append(
+                self._make_event(
+                    state,
+                    EventType.JOB_COMPLETED,
+                    Severity.INFO,
+                    SourceRef(kind="ship", id=ship.ship_id),
+                    "Inventory updated",
+                    data={
+                        "job_id": job.job_id,
+                        "job_type": job.job_type.value,
+                        "message_key": "job_completed_inventory_update",
+                    },
+                )
+            )
+            return events
+
         return events
 
-    def _compute_load_kw(self, systems: Iterable[ShipSystem]) -> float:
+    def _compute_load_kw(self, state: GameState) -> float:
+        systems = state.ship.systems.values()
+        if state.ship.op_mode == "CRUISE":
+            cruise_zero = {"sensors", "security", "data_core", "drone_bay"}
+            def _factor(sys: ShipSystem) -> float:
+                if sys.state == SystemState.OFFLINE:
+                    return 0.0
+                if "critical" in sys.tags or sys.system_id in {"energy_distribution"}:
+                    return 1.0
+                if sys.system_id in cruise_zero:
+                    return 0.0
+                return 0.1
+            return sum(sys.p_effective_kw() * _factor(sys) for sys in systems)
         return sum(system.p_effective_kw() for system in systems if system.state != SystemState.OFFLINE)
+
+    def _distance_between_nodes(self, state: GameState, from_id: str, to_id: str) -> float:
+        nodes = state.world.space.nodes
+        a = nodes.get(from_id)
+        b = nodes.get(to_id)
+        if not a or not b:
+            return 0.0
+        dx = float(a.x_ly) - float(b.x_ly)
+        dy = float(a.y_ly) - float(b.y_ly)
+        dz = float(a.z_ly) - float(b.z_ly)
+        return math.sqrt(dx * dx + dy * dy + dz * dz)
 
     def _auto_load_shed(self, state: GameState, p_capacity: float, p_load: float) -> list[Event]:
         events: list[Event] = []
@@ -1474,6 +1688,8 @@ class Engine:
         cause: str,
     ) -> None:
         if system.forced_offline:
+            if system.service:
+                system.service.is_running = False
             system.state = SystemState.OFFLINE
             return
         if system.state_locked:
@@ -1509,6 +1725,9 @@ class Engine:
                     },
                 )
             )
+        if system.state == SystemState.OFFLINE or system.health <= 0.0:
+            if system.service:
+                system.service.is_running = False
 
     def _maybe_fail_emergency_job(self, state: GameState, job: Job, dt: float) -> Event | None:
         p_fail = self._clamp(job.risk.p_fail_per_s * dt)

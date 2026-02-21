@@ -1,0 +1,5 @@
+power_bus_instability
+- Inestabilidad detectada en el bus de distribución.
+- Suele asociarse a energy_distribution dañado.
+- Si persiste: apagados intermitentes, pérdida de sensores.
+Recomendado: repara `energy_distribution`, reduce carga.

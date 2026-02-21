@@ -1,0 +1,5 @@
+low_power_quality
+- Power quality below nominal range.
+- Causes: low SoC, sustained deficit, distribution damage.
+- If persistent: system degradation accelerates.
+Recommended: stabilize distribution, reduce load, restore SoC.

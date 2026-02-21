@@ -1,0 +1,43 @@
+SHIP OS — Power & Grid Primer (Field Copy)
+Ref: OS-MAN/ENG/POWER-01
+
+Your capsule terminal reports the ship’s electrical state using five values:
+
+SoC (State of Charge)
+Battery charge fraction. 0.00 empty, 1.00 full.
+SoC buffers moment-to-moment deficits and absorbs surpluses.
+
+P_gen (kW)
+Instant generation available to the ship. Primarily from power_core.
+Low P_gen usually means core damage, fuel starvation, or throttling.
+
+P_load (kW)
+Instant demand from active systems. More running systems → higher load.
+Some states consume more: a degraded or unstable system may draw extra power.
+
+Q (power_quality)
+Grid quality score (0..1). Think of it as how clean and stable the bus is.
+Low SoC, sustained deficit, or damaged energy_distribution will reduce Q.
+When Q drops, systems age faster and instability becomes more likely.
+
+brownout (True/False)
+Brownout indicates demand exceeded what the grid can deliver (even with battery discharge).
+When brownout happens, the ship may forcibly shed non-vital systems to protect the bus.
+
+Quick diagnostics (what to do)
+1) Compute net power
+net = P_gen - P_load
+- net > 0: you can charge batteries.
+- net < 0: you are drawing from batteries or entering deficit.
+
+2) Battery headroom (how much deficit you can cover)
+headroom = P_discharge_max - max(0, P_load - P_gen)
+- If headroom is small, you are close to brownout.
+
+Recommended stabilization protocol (minimal)
+1) Reduce load: power shed non-critical systems first.
+2) Restore distribution: repair energy_distribution (grid stability).
+3) Restore generation: repair power_core (sustained supply).
+4) Recover SoC: let batteries recharge before long operations or travel.
+
+Note: In CRUISE/hibernation profiles, the ship can survive long spans only if Q remains stable and load stays below generation.

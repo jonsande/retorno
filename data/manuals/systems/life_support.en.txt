@@ -1,0 +1,19 @@
+SYSTEM BRIEF — life_support
+Ref: OS-MAN/SYS/LIFE
+
+life_support keeps the capsule viable: oxygenation, thermal control, nutrient perfusion.
+
+Role
+- Maintains capsule atmosphere and metabolic support.
+- Regulates temperature and CO₂ scrubbing.
+
+Failure modes
+- Slow drift (most common): efficiency loss → increasing load and alarms.
+- Catastrophic loss: capsule viability countdown (future module).
+
+Operational notes
+- Treated as critical. Shedding it is equivalent to surrender.
+- If you must cut power, cut everything else first.
+
+Relevant commands
+- status, alerts, diag life_support

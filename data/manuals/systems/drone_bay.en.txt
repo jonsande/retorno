@@ -1,0 +1,3 @@
+drone_bay
+- Drone launch subsystem.
+- In emergencies use deploy!.

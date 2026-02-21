@@ -1,0 +1,3 @@
+inventory update
+- Runs a cargo inventory job to sync counts.
+- Takes time; queues a job in the system.

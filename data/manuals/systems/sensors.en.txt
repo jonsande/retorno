@@ -1,0 +1,19 @@
+SYSTEM BRIEF — sensors
+Ref: OS-MAN/SYS/SENS
+
+sensors is your reach beyond the capsule: signal capture, passive scan, contact inference.
+
+Role
+- Detects contacts (scan, contacts).
+- Identifies signals and basic node classification.
+
+Boot requirements
+- Requires energy_distribution >= nominal (bus stability).
+- The service is sensord (must be booted separately).
+
+Operational notes
+- In CRUISE/hibernation profiles, sensors may be disabled by default to save power.
+- A running sensord on an offline system is a fault; reboot after restoring the system.
+
+Relevant commands
+- boot sensord, diag sensors, scan, contacts

@@ -41,6 +41,15 @@ class ShipState:
     ship_id: str
     name: str
 
+    op_mode: str = "NORMAL"  # NORMAL, CRUISE
+    current_node_id: str = ""
+    in_transit: bool = False
+    transit_from: str = ""
+    transit_to: str = ""
+    arrival_t: float = 0.0
+    cruise_speed_ly_per_year: float = 1.0
+    last_travel_distance_ly: float = 0.0
+
     location: ShipLocation = field(default_factory=ShipLocation)
     hull_integrity: float = 1.0
 
@@ -57,6 +66,10 @@ class ShipState:
 
     scrap: int = 0
     modules: list[str] = field(default_factory=list)
+    # Last inventoried snapshot; UI shows these until an inventory update job runs.
+    inventory_known_scrap: int = 0
+    inventory_known_modules: list[str] = field(default_factory=list)
+    cargo_dirty: bool = False
 
     inventory: Inventory = field(default_factory=Inventory)
 

@@ -2,6 +2,10 @@ from __future__ import annotations
 
 
 class Balance:
+    DAY_S = 86400.0
+    YEAR_S = 365.0 * DAY_S
+    HIBERNATE_CHUNK_S = 7 * DAY_S
+
     # Power/alerts
     BUS_INSTABILITY_AFTER_S = 120
     LOW_POWER_QUALITY_THRESHOLD = 0.7
@@ -17,6 +21,7 @@ class Balance:
     SALVAGE_SCRAP_BASE_S = 4.0
     SALVAGE_SCRAP_PER_UNIT_S = 1.5
     SALVAGE_MODULE_TIME_S = 12.0
+    INVENTORY_UPDATE_TIME_S = 8.0
 
     # Emergency deploy risk (per second)
     EMERGENCY_DEPLOY_P_FAIL_PER_S = 0.03

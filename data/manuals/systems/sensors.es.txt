@@ -1,0 +1,19 @@
+RESUMEN DE SISTEMA — sensors
+Ref: OS-MAN/SYS/SENS
+
+sensors es tu alcance más allá del sarcófago: captura de señal, escaneo pasivo, inferencia de contactos.
+
+Función
+- Detecta contactos (scan, contacts).
+- Identifica señales y clasifica nodos de forma básica.
+
+Requisitos de arranque
+- Requiere energy_distribution >= nominal (estabilidad de red).
+- El servicio es sensord (hay que arrancarlo aparte).
+
+Notas operativas
+- En perfiles CRUISE/hibernación, sensores pueden estar desactivados por defecto para ahorrar energía.
+- Si sensord está “running” con el sistema offline, es un fallo: reinicia tras restaurar el sistema.
+
+Comandos relacionados
+- boot sensord, diag sensors, scan, contacts

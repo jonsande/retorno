@@ -1,0 +1,19 @@
+SYSTEM BRIEF — power_core
+Ref: OS-MAN/SYS/CORE-PWR
+
+power_core provides primary generation to the ship.
+
+Role
+- Converts stored/reactive mass into electrical output.
+- Stabilizes output within tolerances when the bus is healthy.
+
+What “degraded” means
+- Output may be throttled or noisy.
+- Net effect: lower P_gen, lower Q under load, faster aging elsewhere.
+
+Typical recovery
+- Use a maintenance drone to repair power_core.
+- If you have modules, install generation patches (future: micro_reactor_patch).
+
+Relevant commands
+- power status, alerts explain power_core_degraded, diag power_core, repair <drone> power_core

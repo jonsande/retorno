@@ -1,0 +1,3 @@
+modules
+- Lists available module definitions.
+- Use to inspect install options.
