@@ -1,0 +1,12 @@
+{
+  "node": {
+    "node_id": "HARBOR_12",
+    "name": "Harbor-12 Waystation",
+    "kind": "station",
+    "radiation_rad_per_s": 0.001,
+    "x_ly": 12.0,
+    "y_ly": 4.0,
+    "z_ly": 0.0
+  },
+  "known_on_start": true
+}

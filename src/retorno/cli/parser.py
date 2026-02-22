@@ -50,7 +50,7 @@ def parse_command(line: str):
         return "CONTACTS"
 
     if cmd == "scan":
-        return "CONTACTS"
+        return "SCAN"
 
     if cmd == "status":
         return Status()
@@ -133,17 +133,12 @@ def parse_command(line: str):
             "Uso: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id]"
         )
 
-    if cmd == "inventory":
+    if cmd in {"inventory", "cargo"}:
         if len(args) == 0:
             return "INVENTORY"
         if len(args) == 1 and args[0].lower() == "audit":
             return CargoAudit()
-        raise ParseError("Uso: inventory | inventory audit")
-
-    if cmd == "cargo":
-        if len(args) == 1 and args[0].lower() == "audit":
-            return CargoAudit()
-        raise ParseError("Uso: cargo audit")
+        raise ParseError("Uso: inventory|cargo | inventory|cargo audit")
 
     if cmd == "modules":
         return "MODULES"
@@ -168,6 +163,11 @@ def parse_command(line: str):
         if len(args) == 2 and args[0] == "read":
             return ("MAIL_READ", args[1])
         raise ParseError("Uso: mail [inbox] | mail read <id|latest>")
+
+    if cmd == "intel":
+        if len(args) == 2 and args[0] == "import":
+            return ("INTEL_IMPORT", args[1])
+        raise ParseError("Uso: intel import <path>")
 
     if cmd == "sectors" or cmd == "map":
         return "SECTORS"
@@ -336,6 +336,7 @@ def _suggest_command(cmd: str) -> str | None:
         "man",
         "config",
         "mail",
+        "intel",
         "ls",
         "cat",
         "contacts",

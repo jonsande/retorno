@@ -48,17 +48,6 @@ class RetornoTextualApp(App):
         scrollbar-background-active: transparent;
         scrollbar-corner-color: transparent;
     }
-    * {
-        scrollbar-size-vertical: 0;
-        scrollbar-size-horizontal: 0;
-        scrollbar-background: transparent;
-        scrollbar-background-hover: transparent;
-        scrollbar-background-active: transparent;
-        scrollbar-corner-color: transparent;
-        scrollbar-color: transparent;
-        scrollbar-color-hover: transparent;
-        scrollbar-color-active: transparent;
-    }
     #header {
         height: 1;
         padding: 0 2;
@@ -69,39 +58,83 @@ class RetornoTextualApp(App):
         height: 1fr;
     }
     #status {
-        width: 2fr;
+        width: 1.1fr;
         padding: 1 2;
         border: none;
         background: $background;
+        scrollbar-size-vertical: 1;
+        scrollbar-size-horizontal: 1;
+        scrollbar-color: #666666;
+        scrollbar-color-hover: #777777;
+        scrollbar-color-active: #888888;
+        scrollbar-background: $background;
+        scrollbar-background-hover: $background;
+        scrollbar-background-active: $background;
+        scrollbar-corner-color: $background;
     }
     #right {
-        width: 1fr;
+        width: 1.9fr;
     }
-    #alerts, #jobs {
-        height: 1fr;
-        padding: 1 2;
-        border: none;
+    #sep_header_right {
+        height: 1;
         background: $background;
     }
+    #alerts {
+        height: 1fr;
+        padding: 0 2;
+        border: none;
+        background: $background;
+        scrollbar-size-vertical: 1;
+        scrollbar-size-horizontal: 0;
+        scrollbar-color: #666666;
+        scrollbar-color-hover: #777777;
+        scrollbar-color-active: #888888;
+        scrollbar-background: $background;
+        scrollbar-background-hover: $background;
+        scrollbar-background-active: $background;
+        scrollbar-corner-color: $background;
+    }
+    #jobs {
+        height: 1fr;
+        padding: 0 2;
+        border: none;
+        background: $background;
+        scrollbar-size-vertical: 1;
+        scrollbar-size-horizontal: 0;
+        scrollbar-color: #666666;
+        scrollbar-color-hover: #777777;
+        scrollbar-color-active: #888888;
+        scrollbar-background: $background;
+        scrollbar-background-hover: $background;
+        scrollbar-background-active: $background;
+        scrollbar-corner-color: $background;
+    }
     #log {
-        height: 10;
+        height: 12;
         border: none;
         margin: 1 0;
+        padding: 0 2;
         scrollbar-size-vertical: 1;
         scrollbar-size-horizontal: 1;
         background: $background;
-        scrollbar-color: #888888;
-        scrollbar-color-hover: #aaaaaa;
-        scrollbar-color-active: #cccccc;
-        scrollbar-background: #000000;
-        scrollbar-background-hover: #000000;
-        scrollbar-background-active: #000000;
-        scrollbar-corner-color: #000000;
+        scrollbar-color: #666666;
+        scrollbar-color-hover: #777777;
+        scrollbar-color-active: #888888;
+        scrollbar-background: $background;
+        scrollbar-background-hover: $background;
+        scrollbar-background-active: $background;
+        scrollbar-corner-color: $background;
     }
     #input {
         height: 1;
         background: $background;
         border: none;
+    }
+    #power {
+        height: 1;
+        padding: 0 2;
+        background: #002F69;
+        color: #f2f2f2;
     }
     """
 
@@ -140,12 +173,14 @@ class RetornoTextualApp(App):
     def compose(self) -> ComposeResult:
         yield Static(id="header")
         with Horizontal(id="main"):
-            yield Static(id="status")
+            yield RichLog(id="status", wrap=True, highlight=False, min_width=0)
             with Vertical(id="right"):
-                yield Static(id="alerts")
-                yield Static(id="jobs")
+                yield Static(id="sep_header_right")
+                yield RichLog(id="alerts", wrap=True, highlight=False, min_width=0)
+                yield RichLog(id="jobs", wrap=True, highlight=False, min_width=0)
         yield RichLog(id="log", wrap=True, highlight=False)
         yield CommandInput(id="input", placeholder="Enter command…")
+        yield Static(id="power")
 
     def on_mount(self) -> None:
         self.loop.step(1.0)
@@ -154,6 +189,11 @@ class RetornoTextualApp(App):
             self.loop.start()
         else:
             self.loop.set_auto_tick(False)
+        # Prevent auto-scroll in alerts/jobs so manual scroll doesn't jump on refresh.
+        self.query_one("#alerts", RichLog).auto_scroll = False
+        self.query_one("#jobs", RichLog).auto_scroll = False
+        # Status should never auto-scroll; user controls position.
+        self.query_one("#status", RichLog).auto_scroll = False
         self.set_interval(0.25, self.refresh_panels)
         self.refresh_panels()
         # Ensure input is focused on start.
@@ -268,6 +308,7 @@ class RetornoTextualApp(App):
             "man",
             "config",
             "mail",
+            "intel",
             "ls",
             "cat",
             "contacts",
@@ -295,7 +336,7 @@ class RetornoTextualApp(App):
         systems = list(state.ship.systems.keys())
         drones = list(state.ship.drones.keys())
         sectors = list(state.ship.sectors.keys())
-        contacts = sorted(state.world.known_contacts)
+        contacts = sorted(state.world.known_nodes if hasattr(state.world, "known_nodes") and state.world.known_nodes else state.world.known_contacts)
         modules = list(set(state.ship.cargo_modules))
         services = []
         for sys in state.ship.systems.values():
@@ -438,6 +479,34 @@ class RetornoTextualApp(App):
                 return [c for c in ["inbox", "read"] if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "read":
                 return [c for c in ["latest"] if c.startswith(text)]
+        if cmd == "intel":
+            if len(tokens) == 2:
+                return [c for c in ["import"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] == "import":
+                path_text = token or text
+                if "/" in path_text:
+                    dir_part, base_part = path_text.rsplit("/", 1)
+                    dir_path = normalize_path(dir_part or "/")
+                    prefix = base_part
+                else:
+                    dir_path = "/"
+                    prefix = path_text
+                try:
+                    entries = list_dir(state.os.fs, dir_path, state.os.access_level)
+                except Exception:
+                    entries = []
+                for name in entries:
+                    if not name.startswith(prefix):
+                        continue
+                    if "/" in path_text:
+                        if path_text.startswith("/"):
+                            full = normalize_path(f"{dir_path}/{name}")
+                        else:
+                            full = f"{dir_part}/{name}" if dir_part else name
+                        candidates.append(full)
+                    else:
+                        candidates.append(name)
+                return candidates
         return candidates
 
     def _log_line(self, line: str) -> None:
@@ -449,16 +518,51 @@ class RetornoTextualApp(App):
         for line in lines:
             self._log_line(line)
 
+    def _set_log_content(self, widget: RichLog, lines: list[str], preserve_scroll: bool = False, follow_end: bool = False) -> None:
+        scroll_y = widget.scroll_y if preserve_scroll else None
+        prev_auto = widget.auto_scroll
+        if preserve_scroll:
+            widget.auto_scroll = False
+        widget.clear()
+        for line in lines:
+            widget.write(line)
+        if follow_end:
+            widget.scroll_end(animate=False)
+        elif preserve_scroll and scroll_y is not None:
+            widget.scroll_y = min(scroll_y, widget.max_scroll_y)
+        if preserve_scroll:
+            widget.auto_scroll = prev_auto
+
     def refresh_panels(self) -> None:
         with self.loop.with_lock() as state:
             header = presenter.build_header(state)
             status_lines = presenter.build_status_lines(state)
             alerts_lines = presenter.build_alerts_lines(state)
             jobs_lines = presenter.build_jobs_lines(state)
+            power_lines = presenter.build_power_lines(state)
         self.query_one("#header", Static).update(header)
-        self.query_one("#status", Static).update("\n".join(status_lines))
-        self.query_one("#alerts", Static).update("\n".join(alerts_lines))
-        self.query_one("#jobs", Static).update("\n".join(jobs_lines))
+        status_widget = self.query_one("#status", RichLog)
+        self._set_log_content(
+            status_widget,
+            status_lines,
+            preserve_scroll=True,
+            follow_end=False,
+        )
+        alerts_widget = self.query_one("#alerts", RichLog)
+        jobs_widget = self.query_one("#jobs", RichLog)
+        self._set_log_content(
+            alerts_widget,
+            alerts_lines,
+            preserve_scroll=(self.focused is alerts_widget),
+            follow_end=(self.focused is not alerts_widget),
+        )
+        self._set_log_content(
+            jobs_widget,
+            jobs_lines,
+            preserve_scroll=(self.focused is jobs_widget),
+            follow_end=(self.focused is not jobs_widget),
+        )
+        self.query_one("#power", Static).update("\n".join(power_lines))
         auto_events = self.loop.drain_events()
         if auto_events:
             with self.loop.with_lock() as state:
@@ -500,6 +604,7 @@ class RetornoTextualApp(App):
         # Informational commands (drain AUTO first to avoid mixing)
         info_tokens = {
             "CONTACTS",
+            "SCAN",
             "JOBS",
             "ALERTS",
             "LOGS",
@@ -518,6 +623,13 @@ class RetornoTextualApp(App):
         if parsed == "CONTACTS":
             with self.loop.with_lock() as state:
                 self._log_lines(presenter.build_command_output(repl.render_contacts, state))
+            return
+        if parsed == "SCAN":
+            with self.loop.with_lock() as state:
+                seen, discovered = repl._scan_and_discover(state)
+                self._log_lines(presenter.build_command_output(repl.render_scan_results, state, seen))
+                if discovered:
+                    self._log_line(f"(scan) new: {', '.join(sorted(discovered))}")
             return
         if parsed == "JOBS":
             with self.loop.with_lock() as state:
@@ -568,6 +680,10 @@ class RetornoTextualApp(App):
         if isinstance(parsed, tuple) and parsed[0] == "MAIL_READ":
             with self.loop.with_lock() as state:
                 self._log_lines(presenter.build_command_output(repl.render_mail_read, state, parsed[1]))
+            return
+        if isinstance(parsed, tuple) and parsed[0] == "INTEL_IMPORT":
+            with self.loop.with_lock() as state:
+                self._log_lines(presenter.build_command_output(repl._handle_intel_import, state, parsed[1]))
             return
         if isinstance(parsed, tuple) and parsed[0] == "LS":
             with self.loop.with_lock() as state:

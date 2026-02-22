@@ -53,6 +53,9 @@ class Engine:
             state.ship.in_transit = False
             state.ship.current_node_id = state.ship.transit_to or state.ship.current_node_id
             state.world.current_node_id = state.ship.current_node_id
+            node = state.world.space.nodes.get(state.world.current_node_id)
+            if node:
+                state.world.current_pos_ly = (node.x_ly, node.y_ly, node.z_ly)
             events.append(
                 self._make_event(
                     state,
@@ -151,6 +154,19 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
+            known = state.world.known_nodes if hasattr(state.world, "known_nodes") else state.world.known_contacts
+            intel = state.world.known_intel if hasattr(state.world, "known_intel") else {}
+            if action.node_id not in known and action.node_id not in intel:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    f"Travel blocked: unknown destination {action.node_id}",
+                    data={"message_key": "boot_blocked", "reason": "unknown_contact", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
             distance_ly = self._distance_between_nodes(state, current_id, action.node_id)
             speed = max(0.001, state.ship.cruise_speed_ly_per_year)
             years = distance_ly / speed
@@ -160,6 +176,8 @@ class Engine:
             state.ship.transit_to = action.node_id
             state.ship.arrival_t = state.clock.t + travel_s
             state.ship.last_travel_distance_ly = distance_ly
+            if hasattr(state.world, "known_nodes"):
+                state.world.known_nodes.add(action.node_id)
             state.world.known_contacts.add(action.node_id)
             state.ship.op_mode = "CRUISE"
             event = self._make_event(
@@ -248,7 +266,9 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            if action.node_id != state.world.current_node_id and action.node_id not in state.world.known_contacts:
+            known = state.world.known_nodes if hasattr(state.world, "known_nodes") else state.world.known_contacts
+            intel = state.world.known_intel if hasattr(state.world, "known_intel") else {}
+            if action.node_id != state.world.current_node_id and action.node_id not in known and action.node_id not in intel:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
@@ -1300,8 +1320,12 @@ class Engine:
                     )
                 )
                 if system.service.service_name == "sensord":
-                    if "ECHO_7" not in state.world.known_contacts:
+                    if "ECHO_7" not in state.world.known_contacts and (
+                        not hasattr(state.world, "known_nodes") or "ECHO_7" not in state.world.known_nodes
+                    ):
                         state.world.known_contacts.add("ECHO_7")
+                        if hasattr(state.world, "known_nodes"):
+                            state.world.known_nodes.add("ECHO_7")
                         events.append(
                             self._make_event(
                                 state,
@@ -1461,6 +1485,9 @@ class Engine:
         if job.job_type == JobType.DOCK and job.target:
             state.world.current_node_id = job.target.id
             state.ship.current_node_id = job.target.id
+            node = state.world.space.nodes.get(job.target.id)
+            if node:
+                state.world.current_pos_ly = (node.x_ly, node.y_ly, node.z_ly)
             events.append(
                 self._make_event(
                     state,

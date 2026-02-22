@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from retorno.bootstrap import create_initial_state_prologue, create_initial_state_sandbox
 import os
+import math
 import random
 import readline
 from retorno.core.engine import Engine
@@ -13,35 +14,48 @@ from retorno.runtime.data_loader import load_modules
 from retorno.config.balance import Balance
 from retorno.model.systems import SystemState
 from retorno.model.os import FSNodeType, Locale, list_dir, normalize_path, read_file
+from retorno.model.world import SECTOR_SIZE_LY, sector_id_for_pos
+from retorno.model.world import SpaceNode, region_for_pos
+from retorno.worldgen.generator import ensure_sector_generated
+from retorno.util.timefmt import format_elapsed_long
 
 
 def print_help() -> None:
     print(
         "\nComandos (resumen):\n"
-        "  help\n"
+        "  help | exit | quit\n"
+        "\nFS / Manuales / Correo:\n"
         "  ls [path] | cat <path>\n"
         "  man <topic> | about <system_id>\n"
-        "  config set lang <en|es> | config show\n"
         "  mail [inbox] | mail read <id>\n"
-        "  status | jobs | power status | power plan cruise|normal | power shed/off/on <system_id> | alerts | logs\n"
-        "  alerts explain <alert_key>\n"
+        "  intel import <path>\n"
+        "  config set lang <en|es> | config show\n"
+        "\nInformación:\n"
+        "  status | jobs | alerts | alerts explain <alert_key> | logs\n"
         "  contacts | scan\n"
         "  sectors | map | locate <system_id>\n"
+        "\nNavegación:\n"
         "  dock <node_id> | travel <node_id>\n"
-        "  diag <system_id> | boot <service_name> | shutdown <system_id> | system on <system_id>\n"
-        "  repair <system_id> --selftest\n"
-        "  inventory | cargo audit | inventory audit | install <module_id> | modules\n"
         "  hibernate until_arrival | hibernate <años>\n"
-        "  drone status | drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>\n"
+        "\nSistemas / Energía:\n"
+        "  diag <system_id> | boot <service_name>\n"
+        "  system off <system_id> | system on <system_id>\n"
+        "  power status | power plan cruise|normal | power shed/off/on <system_id>\n"
+        "  repair <system_id> --selftest\n"
+        "\nDrones:\n"
+        "  drone status\n"
+        "  drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>\n"
         "  drone move <drone_id> <target_id>\n"
         "  drone repair <drone_id> <system_id>\n"
         "  drone salvage scrap <drone_id> <node_id> <amount>\n"
         "  drone salvage module <drone_id> [node_id]\n"
         "  drone reboot <drone_id> | drone recall <drone_id>\n"
-        "  system off <system_id> | system on <system_id>\n"
+        "\nBodega / Módulos:\n"
+        "  inventory | cargo | cargo audit | inventory audit\n"
+        "  install <module_id> | modules\n"
+        "\nDebug:\n"
         "  wait <segundos> (DEBUG only)\n"
         "  debug on|off|status | debug scenario prologue|sandbox|dev\n"
-        "  exit | quit\n"
         "\nSugerencias:\n"
         "  ls /manuals/commands\n"
         "  cat /mail/inbox/0001.txt\n"
@@ -252,8 +266,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "es": "Acción bloqueada: nodo no encontrado ({node_id})",
         },
         "unknown_contact": {
-            "en": "Action blocked: unknown contact ({node_id}). Use 'scan' to discover nearby nodes.",
-            "es": "Acción bloqueada: contacto desconocido ({node_id}). Usa 'scan' para descubrir nodos cercanos.",
+            "en": "Action blocked: unknown contact ({node_id}). Use 'scan' or acquire navigation intel.",
+            "es": "Acción bloqueada: contacto desconocido ({node_id}). Usa 'scan' o consigue inteligencia de navegación.",
         },
         "invalid_amount": {
             "en": "Action blocked: invalid amount",
@@ -628,7 +642,7 @@ def render_status(state) -> None:
     deficit = max(0.0, p.p_load_kw - p.p_gen_kw)
     headroom = p.p_discharge_max_kw - deficit
     print("\n=== STATUS ===")
-    print(f"time: {state.clock.t:.1f}s")
+    print(f"time: {format_elapsed_long(state.clock.t)}")
     mode = "DEBUG" if state.os.debug_enabled else "NORMAL"
     print(f"mode: {mode}")
     print(f"ship_mode: {ship.op_mode}")
@@ -640,6 +654,8 @@ def render_status(state) -> None:
         remaining_years = remaining_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
         remaining_days = remaining_s / Balance.DAY_S if Balance.DAY_S else 0.0
         print(f"location: en route to {ship.transit_to} (from {ship.transit_from}) ETA={remaining_years:.2f}y ({remaining_days:.1f}d)")
+        dist = getattr(ship, "transit_distance_ly", 0.0) or 0.0
+        print(f"transit: {ship.transit_from} -> {ship.transit_to}  dist={dist:.2f}ly  ETA={remaining_years:.2f}y ({remaining_days:.1f}d)")
     else:
         print(f"location: {current_loc} ({node_name})")
     print(f"power: P_gen={p.p_gen_kw:.2f}kW  P_load={p.p_load_kw:.2f}kW  net={net:+.2f}kW headroom={headroom:.2f}kW  SoC={soc:.2f}  Q={p.power_quality:.2f}  brownout={p.brownout}")
@@ -835,15 +851,130 @@ def render_modules_catalog(state) -> None:
 
 def render_contacts(state) -> None:
     print("\n=== CONTACTS ===")
-    if not state.world.known_contacts:
+    known = state.world.known_nodes if hasattr(state.world, "known_nodes") and state.world.known_nodes else state.world.known_contacts
+    if not known:
         print("(no signals detected)")
         return
-    for cid in sorted(state.world.known_contacts):
+    for cid in sorted(known):
         node = state.world.space.nodes.get(cid)
         if node:
             print(f"- {cid}: {node.name} ({node.kind})")
         else:
             print(f"- {cid}")
+
+
+def render_scan_results(state, node_ids: list[str]) -> None:
+    print("\n=== SCAN ===")
+    if not node_ids:
+        print("(no signals detected)")
+        return
+    for cid in sorted(node_ids):
+        node = state.world.space.nodes.get(cid)
+        if node:
+            print(f"- {cid}: {node.name} ({node.kind})")
+        else:
+            print(f"- {cid}")
+
+
+def _scan_and_discover(state) -> tuple[list[str], list[str]]:
+    current_id = state.world.current_node_id
+    node = state.world.space.nodes.get(current_id)
+    if node:
+        x, y, z = node.x_ly, node.y_ly, node.z_ly
+    else:
+        x, y, z = state.world.current_pos_ly
+    r = state.ship.sensors_range_ly
+    min_sx = math.floor((x - r) / SECTOR_SIZE_LY)
+    max_sx = math.floor((x + r) / SECTOR_SIZE_LY)
+    min_sy = math.floor((y - r) / SECTOR_SIZE_LY)
+    max_sy = math.floor((y + r) / SECTOR_SIZE_LY)
+    min_sz = math.floor((z - r) / SECTOR_SIZE_LY)
+    max_sz = math.floor((z + r) / SECTOR_SIZE_LY)
+    for sx in range(min_sx, max_sx + 1):
+        for sy in range(min_sy, max_sy + 1):
+            for sz in range(min_sz, max_sz + 1):
+                sector_id = f"S{sx:+04d}_{sy:+04d}_{sz:+04d}"
+                ensure_sector_generated(state, sector_id)
+
+    discovered: list[str] = []
+    seen: list[str] = []
+    for nid, n in state.world.space.nodes.items():
+        dx = n.x_ly - x
+        dy = n.y_ly - y
+        dz = n.z_ly - z
+        if dx * dx + dy * dy + dz * dz <= r * r:
+            seen.append(nid)
+            if nid not in state.world.known_nodes:
+                discovered.append(nid)
+            state.world.known_nodes.add(nid)
+            state.world.known_contacts.add(nid)
+    return seen, discovered
+
+
+def _handle_intel_import(state, path: str) -> None:
+    try:
+        content = read_file(state.os.fs, path, state.os.access_level)
+    except PermissionError:
+        print("intel import: permission denied")
+        return
+    except Exception:
+        print("intel import: file not found")
+        return
+
+    added: list[str] = []
+    for raw in content.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.upper().startswith("NODE:"):
+            node_id = line.split(":", 1)[1].strip()
+            if not node_id:
+                continue
+            if node_id.startswith("S") and ":" in node_id:
+                sector_id = node_id.split(":", 1)[0]
+                ensure_sector_generated(state, sector_id)
+            state.world.known_intel[node_id] = {"source": path}
+            state.world.known_nodes.add(node_id)
+            state.world.known_contacts.add(node_id)
+            added.append(node_id)
+        if line.upper().startswith("SECTOR:"):
+            sector_id = line.split(":", 1)[1].strip()
+            if not sector_id:
+                continue
+            ensure_sector_generated(state, sector_id)
+            state.world.known_intel[sector_id] = {"source": path, "sector": True}
+            added.append(sector_id)
+        if line.upper().startswith("COORD:"):
+            coord_txt = line.split(":", 1)[1].strip()
+            try:
+                x_s, y_s, z_s = [p.strip() for p in coord_txt.split(",")]
+                x, y, z = float(x_s), float(y_s), float(z_s)
+            except Exception:
+                continue
+            import hashlib
+            h = hashlib.blake2b(digest_size=4)
+            h.update(coord_txt.encode("utf-8"))
+            nid = f"NAV_{int.from_bytes(h.digest(), 'big'):08x}"
+            if nid not in state.world.space.nodes:
+                node = SpaceNode(
+                    node_id=nid,
+                    name="Nav Point",
+                    kind="nav_point",
+                    radiation_rad_per_s=0.0,
+                    x_ly=x,
+                    y_ly=y,
+                    z_ly=z,
+                )
+                node.region = region_for_pos(x, y, z)
+                state.world.space.nodes[nid] = node
+            state.world.known_intel[nid] = {"source": path, "coord": [x, y, z]}
+            state.world.known_nodes.add(nid)
+            state.world.known_contacts.add(nid)
+            added.append(nid)
+    if added:
+        print(f"(intel) added: {', '.join(sorted(set(added)))}")
+    else:
+        print("(intel) no usable intel found")
 
 def render_sectors(state) -> None:
     print("\n=== SECTORS ===")
@@ -1178,6 +1309,7 @@ def main() -> None:
         "about",
         "config",
         "mail",
+        "intel",
         "status",
         "jobs",
         "power",
@@ -1222,7 +1354,9 @@ def main() -> None:
                 systems = list(locked_state.ship.systems.keys())
                 drones = list(locked_state.ship.drones.keys())
                 sectors = list(locked_state.ship.sectors.keys())
-                contacts = sorted(locked_state.world.known_contacts)
+                contacts = sorted(
+                    locked_state.world.known_nodes if hasattr(locked_state.world, "known_nodes") and locked_state.world.known_nodes else locked_state.world.known_contacts
+                )
                 modules = list(set(locked_state.ship.cargo_modules))
                 services = []
                 for sys in locked_state.ship.systems.values():
@@ -1368,6 +1502,33 @@ def main() -> None:
                     candidates = [c for c in ["inbox", "read"] if c.startswith(text)]
                 elif len(tokens) == 3 and tokens[1] == "read":
                     candidates = [c for c in ["latest"] if c.startswith(text)]
+            elif cmd == "intel":
+                if len(tokens) == 2:
+                    candidates = [c for c in ["import"] if c.startswith(text)]
+                elif len(tokens) == 3 and tokens[1] == "import":
+                    path_text = token or text
+                    if "/" in path_text:
+                        dir_part, base_part = path_text.rsplit("/", 1)
+                        dir_path = normalize_path(dir_part or "/")
+                        prefix = base_part
+                    else:
+                        dir_path = "/"
+                        prefix = path_text
+                    try:
+                        entries = list_dir(locked_state.os.fs, dir_path, locked_state.os.access_level)
+                    except Exception:
+                        entries = []
+                    for name in entries:
+                        if not name.startswith(prefix):
+                            continue
+                        if "/" in path_text:
+                            if path_text.startswith("/"):
+                                full = normalize_path(f"{dir_path}/{name}")
+                            else:
+                                full = f"{dir_part}/{name}" if dir_part else name
+                            candidates.append(full)
+                        else:
+                            candidates.append(name)
 
         if state_idx < len(candidates):
             return candidates[state_idx]
@@ -1440,6 +1601,11 @@ def main() -> None:
             with loop.with_lock() as locked_state:
                 render_mail_read(locked_state, parsed[1])
             continue
+        if isinstance(parsed, tuple) and parsed[0] == "INTEL_IMPORT":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                _handle_intel_import(locked_state, parsed[1])
+            continue
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG":
             mode = parsed[1]
             if mode == "status":
@@ -1496,6 +1662,14 @@ def main() -> None:
             _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_contacts(locked_state)
+            continue
+        if parsed == "SCAN":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                seen, discovered = _scan_and_discover(locked_state)
+                render_scan_results(locked_state, seen)
+                if discovered:
+                    print(f"(scan) new: {', '.join(sorted(discovered))}")
             continue
         if parsed == "INVENTORY":
             _drain_auto_events()

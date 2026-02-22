@@ -1,0 +1,19 @@
+{
+  "region": "bulge",
+  "node_count_min": 3,
+  "node_count_max": 7,
+  "z_sigma": 0.8,
+  "kind_weights": {
+    "relay": 0.25,
+    "derelict": 0.25,
+    "station": 0.35,
+    "ship": 0.15
+  },
+  "salvage": {
+    "scrap_min": 15,
+    "scrap_max": 60,
+    "modules_min": 1,
+    "modules_max": 3
+  },
+  "radiation_base": 0.004
+}

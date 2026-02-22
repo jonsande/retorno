@@ -1,0 +1,19 @@
+{
+  "region": "halo",
+  "node_count_min": 0,
+  "node_count_max": 2,
+  "z_sigma": 2.0,
+  "kind_weights": {
+    "derelict": 0.55,
+    "relay": 0.25,
+    "station": 0.10,
+    "ship": 0.10
+  },
+  "salvage": {
+    "scrap_min": 5,
+    "scrap_max": 25,
+    "modules_min": 0,
+    "modules_max": 1
+  },
+  "radiation_base": 0.001
+}

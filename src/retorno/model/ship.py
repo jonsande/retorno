@@ -78,6 +78,7 @@ class ShipState:
     installed_modules: list[str] = field(default_factory=list)
 
     inventory: Inventory = field(default_factory=Inventory)
+    sensors_range_ly: float = 2.5
 
 
 @dataclass(slots=True)

@@ -1,4 +1,4 @@
-inventory
+cargo
+- Alias of 'inventory'.
 - Shows last inventoried scrap and installed modules.
-- Alias: 'cargo'
 - If cargo changed, run 'cargo audit' or 'inventory audit' to refresh numbers.

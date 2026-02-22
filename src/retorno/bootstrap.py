@@ -6,8 +6,8 @@ from retorno.model.events import AlertState, Event, EventType, Severity, SourceR
 from retorno.model.ship import PowerNetworkState, ShipSector
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, normalize_path
 from retorno.model.systems import Dependency, ServiceState, ShipSystem, SystemState
-from retorno.model.world import SpaceNode
-from retorno.runtime.data_loader import load_modules
+from retorno.model.world import SpaceNode, region_for_pos, sector_id_for_pos
+from retorno.runtime.data_loader import load_modules, load_locations
 from retorno.config.balance import Balance
 import random
 from pathlib import Path
@@ -195,36 +195,13 @@ def create_initial_state_prologue() -> GameState:
     rng = random.Random(state.meta.rng_seed)
     modules = load_modules()
     module_ids = list(modules.keys())
-    state.world.space.nodes["ECHO_7"] = SpaceNode(
-        node_id="ECHO_7",
-        name="ECHO-7 Relay Station",
-        kind="station",
-        radiation_rad_per_s=0.002,
-        x_ly=0.0,
-        y_ly=0.0,
-        z_ly=0.0,
-        salvage_scrap_available=rng.randint(Balance.ECHO_7_SCRAP_MIN, Balance.ECHO_7_SCRAP_MAX),
-        salvage_modules_available=_bootstrap_modules(rng, module_ids),
-    )
-    state.world.space.nodes["HARBOR_12"] = SpaceNode(
-        node_id="HARBOR_12",
-        name="Harbor-12 Waystation",
-        kind="station",
-        radiation_rad_per_s=0.001,
-        x_ly=12.0,
-        y_ly=4.0,
-        z_ly=0.0,
-    )
-    state.world.space.nodes["DERELICT_A3"] = SpaceNode(
-        node_id="DERELICT_A3",
-        name="Derelict A-3",
-        kind="derelict",
-        radiation_rad_per_s=0.003,
-        x_ly=45.0,
-        y_ly=-2.0,
-        z_ly=1.0,
-    )
-    state.world.known_contacts.update({"HARBOR_12", "DERELICT_A3"})
+    _bootstrap_locations(state, rng, module_ids)
+    # Sync known_nodes for compatibility
+    if state.world.known_contacts:
+        state.world.known_nodes.update(state.world.known_contacts)
+    current_node = state.world.space.nodes.get(state.world.current_node_id)
+    if current_node:
+        state.world.current_pos_ly = (current_node.x_ly, current_node.y_ly, current_node.z_ly)
 
     _bootstrap_os(state)
     _bootstrap_alerts(state)
@@ -260,9 +237,13 @@ def create_initial_state_sandbox() -> GameState:
     state.ship.op_mode = "NORMAL"
     state.ship.current_node_id = "ECHO_7"
     state.world.current_node_id = "ECHO_7"
+    node = state.world.space.nodes.get("ECHO_7")
+    if node:
+        state.world.current_pos_ly = (node.x_ly, node.y_ly, node.z_ly)
 
     # Known contacts for testing
     state.world.known_contacts.update({"ECHO_7", "HARBOR_12", "DERELICT_A3"})
+    state.world.known_nodes.update({"ECHO_7", "HARBOR_12", "DERELICT_A3"})
 
     # Give some cargo for testing
     state.ship.cargo_scrap = max(state.ship.cargo_scrap, 20)
@@ -270,11 +251,71 @@ def create_initial_state_sandbox() -> GameState:
 
     return state
 
-def _bootstrap_modules(rng: random.Random, module_ids: list[str]) -> list[str]:
-    if not module_ids:
-        return []
-    count = rng.randint(Balance.ECHO_7_MODULES_MIN, Balance.ECHO_7_MODULES_MAX)
-    return [rng.choice(module_ids) for _ in range(count)]
+def _bootstrap_locations(state: GameState, rng: random.Random, module_ids: list[str]) -> None:
+    locations = load_locations()
+    if not locations:
+        return
+
+    def _pick_modules(cfg: dict) -> list[str]:
+        if not module_ids:
+            return []
+        min_count = int(cfg.get("modules_min", 0))
+        max_count = int(cfg.get("modules_max", 0))
+        if max_count <= 0:
+            return []
+        count = rng.randint(min_count, max_count)
+        pool = cfg.get("modules_pool", "all")
+        if isinstance(pool, list) and pool:
+            candidates = [m for m in pool if m in module_ids]
+        else:
+            candidates = module_ids
+        if not candidates:
+            return []
+        return [rng.choice(candidates) for _ in range(count)]
+
+    def _access_level(value: str) -> AccessLevel:
+        try:
+            return AccessLevel(value)
+        except Exception:
+            return AccessLevel.GUEST
+
+    for loc in locations:
+        node_cfg = loc.get("node", {})
+        node_id = node_cfg.get("node_id")
+        if node_id and node_id not in state.world.space.nodes:
+            node = SpaceNode(
+                node_id=node_id,
+                name=node_cfg.get("name", node_id),
+                kind=node_cfg.get("kind", "unknown"),
+                radiation_rad_per_s=float(node_cfg.get("radiation_rad_per_s", 0.0)),
+                x_ly=float(node_cfg.get("x_ly", 0.0)),
+                y_ly=float(node_cfg.get("y_ly", 0.0)),
+                z_ly=float(node_cfg.get("z_ly", 0.0)),
+            )
+            node.region = region_for_pos(node.x_ly, node.y_ly, node.z_ly)
+            node.radiation_base = float(node_cfg.get("radiation_base", 0.0))
+            salvage_cfg = loc.get("salvage") or {}
+            if salvage_cfg:
+                scrap_min = int(salvage_cfg.get("scrap_min", 0))
+                scrap_max = int(salvage_cfg.get("scrap_max", 0))
+                if scrap_max > 0:
+                    node.salvage_scrap_available = rng.randint(scrap_min, scrap_max)
+                node.salvage_modules_available = _pick_modules(salvage_cfg)
+            state.world.space.nodes[node_id] = node
+        if loc.get("known_on_start") and node_id:
+            state.world.known_contacts.add(node_id)
+            state.world.known_nodes.add(node_id)
+
+        # Optional filesystem files (mails/logs) attached to location data
+        fs_files = loc.get("fs_files", [])
+        for file_cfg in fs_files:
+            path = file_cfg.get("path")
+            if not path:
+                continue
+            content = file_cfg.get("content", "")
+            access = _access_level(file_cfg.get("access", "GUEST"))
+            norm = normalize_path(path)
+            state.os.fs[norm] = FSNode(path=norm, node_type=FSNodeType.FILE, content=content, access=access)
 
 
 def _bootstrap_alerts(state: GameState) -> None:
@@ -346,6 +387,9 @@ def _bootstrap_os(state: GameState) -> None:
     add_dir("/manuals/modules")
     add_dir("/mail")
     add_dir("/mail/inbox")
+    add_dir("/data")
+    add_dir("/data/nav")
+    add_dir("/data/nav/fragments")
     add_dir("/logs", access=AccessLevel.ENG)
 
     add_file(
@@ -969,60 +1013,4 @@ def _bootstrap_os(state: GameState) -> None:
         "Lore: Se diseñó para estaciones con tripulación mínima.\n",
     )
 
-    add_file(
-        "/mail/inbox/0000.notice.txt",
-        "EN: Language can be changed with: config set lang en|es\n"
-        "ES: El idioma se puede cambiar con: config set lang en|es\n",
-    )
-    add_file(
-        "/mail/inbox/0001.en.txt",
-        "FROM: Autonomous Systems\n"
-        "SUBJ: Emergency Wake Event\n"
-        "\n"
-        "Wake condition triggered by power instability.\n"
-        "\n"
-        "Primary distribution grid integrity below nominal thresholds.\n"
-        "Core output fluctuating.\n"
-        "\n"
-        "Emergency maintenance protocols available to conscious operator.\n"
-        "\n"
-        "Recommended actions:\n"
-        " - review system diagnostics\n"
-        " - assess maintenance drone availability\n"
-        " - stabilize signal infrastructure\n"
-        "\n"
-        "Warning: cascading failures possible if instability persists.\n"
-        "\n"
-        "— Ship OS\n",
-    )
-    add_file(
-        "/mail/inbox/0001.es.txt",
-        "FROM: Autonomous Systems\n"
-        "SUBJ: Emergency Wake Event\n"
-        "\n"
-        "Condición de despertar activada por inestabilidad de energía.\n"
-        "\n"
-        "Integridad de la red de distribución primaria bajo umbrales nominales.\n"
-        "La salida del núcleo fluctúa.\n"
-        "\n"
-        "Protocolos de mantenimiento de emergencia disponibles para el operador consciente.\n"
-        "\n"
-        "Acciones recomendadas:\n"
-        " - revisar diagnósticos del sistema\n"
-        " - evaluar disponibilidad de drones de mantenimiento\n"
-        " - estabilizar la infraestructura de señal\n"
-        "\n"
-        "Advertencia: fallas en cascada posibles si la inestabilidad persiste.\n"
-        "\n"
-        "— Ship OS\n",
-    )
-    add_file(
-        "/logs/boot.log",
-        "BOOT TRACE\n"
-        "core_os: ok\n"
-        "power_core: degraded\n"
-        "energy_distribution: damaged\n"
-        "sensors: offline\n"
-        "drone_bay: nominal\n",
-        access=AccessLevel.ENG,
-    )
+    # Location-specific mails/logs are loaded from data/locations/*.json

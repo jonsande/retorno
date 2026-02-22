@@ -1,0 +1,39 @@
+{
+  "node": {
+    "node_id": "SHIP_1",
+    "name": "Retorno",
+    "kind": "ship",
+    "radiation_rad_per_s": 0.0,
+    "x_ly": 0.0,
+    "y_ly": 0.0,
+    "z_ly": 0.0
+  },
+  "known_on_start": true,
+  "fs_files": [
+    {
+      "path": "/mail/inbox/0000.notice.txt",
+      "access": "GUEST",
+      "content": "EN: Language can be changed with: config set lang en|es\nES: El idioma se puede cambiar con: config set lang en|es\n"
+    },
+    {
+      "path": "/mail/inbox/0001.en.txt",
+      "access": "GUEST",
+      "content": "FROM: Autonomous Systems\nSUBJ: Emergency Wake Event\n\nWake condition triggered by power instability.\n\nPrimary distribution grid integrity below nominal thresholds.\nCore output fluctuating.\n\nEmergency maintenance protocols available to conscious operator.\n\nRecommended actions:\n - review system diagnostics\n - assess maintenance drone availability\n - stabilize signal infrastructure\n\nWarning: cascading failures possible if instability persists.\n\n— Ship OS\n"
+    },
+    {
+      "path": "/mail/inbox/0001.es.txt",
+      "access": "GUEST",
+      "content": "FROM: Autonomous Systems\nSUBJ: Emergency Wake Event\n\nCondición de despertar activada por inestabilidad de energía.\n\nIntegridad de la red de distribución primaria bajo umbrales nominales.\nLa salida del núcleo fluctúa.\n\nProtocolos de mantenimiento de emergencia disponibles para el operador consciente.\n\nAcciones recomendadas:\n - revisar diagnósticos del sistema\n - evaluar disponibilidad de drones de mantenimiento\n - estabilizar la infraestructura de señal\n\nAdvertencia: fallas en cascada posibles si la inestabilidad persiste.\n\n— Ship OS\n"
+    },
+    {
+      "path": "/logs/boot.log",
+      "access": "ENG",
+      "content": "BOOT TRACE\ncore_os: ok\npower_core: degraded\nenergy_distribution: damaged\nsensors: offline\ndrone_bay: nominal\n"
+    },
+    {
+      "path": "/data/nav/fragments/frag_0001.txt",
+      "access": "GUEST",
+      "content": "NODE: HARBOR_12\n"
+    }
+  ]
+}

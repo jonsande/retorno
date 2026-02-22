@@ -1,4 +1,4 @@
-inventory
+cargo
+- Alias de 'inventory'.
 - Muestra la chatarra y módulos según el último inventario.
-- Alias: 'cargo'
 - Si hubo cambios en bodega, ejecuta 'cargo audit' o 'inventory audit' para inventariar.

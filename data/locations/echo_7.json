@@ -1,0 +1,19 @@
+{
+  "node": {
+    "node_id": "ECHO_7",
+    "name": "ECHO-7 Relay Station",
+    "kind": "station",
+    "radiation_rad_per_s": 0.002,
+    "x_ly": 0.0,
+    "y_ly": 0.0,
+    "z_ly": 0.0
+  },
+  "known_on_start": false,
+  "salvage": {
+    "scrap_min": 40,
+    "scrap_max": 60,
+    "modules_min": 1,
+    "modules_max": 2,
+    "modules_pool": "all"
+  }
+}

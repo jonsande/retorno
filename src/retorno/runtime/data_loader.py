@@ -20,3 +20,28 @@ def load_modules() -> dict:
     path = _DATA_ROOT / "modules.json"
     with path.open("r", encoding="utf-8") as fh:
         return json.load(fh)
+
+
+def load_locations() -> list[dict]:
+    path = _DATA_ROOT / "locations"
+    if not path.exists():
+        return []
+    locations: list[dict] = []
+    for file in sorted(path.glob("*.json")):
+        with file.open("r", encoding="utf-8") as fh:
+            locations.append(json.load(fh))
+    return locations
+
+
+def load_worldgen_templates() -> dict[str, dict]:
+    path = _DATA_ROOT / "worldgen" / "templates"
+    if not path.exists():
+        return {}
+    templates: dict[str, dict] = {}
+    for file in sorted(path.glob("*.json")):
+        with file.open("r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        region = data.get("region")
+        if region:
+            templates[region] = data
+    return templates
