@@ -60,7 +60,7 @@ que no se ejecute el commando "inventory update". No obstante, en la informació
 
 - [ ] Entiendo que el drone_bay se tiene que poder desconectar, para ahorrar energía.
 
-- [ ] Quiero que al arrancar el juego por primera vez se imprima un mensaje "técnico" que dé a entender de un modo u otro que ha habido un error y que se está ejecutando una instrucción de emergencia de descriogenización de los sarcófagos del sector en el que están los sarcófagos de criogenización; que ha fallado la descriogenización excepto en el caso de un sarcófago (que tendrá que tener su correspondiente id o código identificativo técnico); que no se ha podido completar satisfactoriamente la descriogenización de la persona que hay dentro (el personaje jugador) por un problema indeterminado en el sistema; pero que la persona (esto es el PJ) está consciente y puede llevar a cabo operaciones a través de la terminal de algún modo conectada a su cabeza. Este mensaje se imprimirá al iniciar el juego, pero quedará también como mail, de forma que se podrá volver a leer, en su versión española si se cambia la configuración de idioma. Antes de construir la instrucción para codex, constrúyeme una versión del mensaje, para que lo pulamos.
+- [ ] Quiero que al arrancar el juego por primera vez se imprima un mensaje "técnico" diegético que dé a entender de un modo u otro que ha habido un error y que se está ejecutando una instrucción de emergencia de descriogenización del sarcófago; que no se ha podido completar satisfactoriamente la descriogenización de la persona que hay dentro (el personaje jugador) del <id_sarcófago> por un problema indeterminado en el sistema; que se procede a intentar poner al huesped en estado consciente para que pueda llevar a cabo operaciones a través de la terminal conectada a su cerebro. Este mensaje se imprimirá al iniciar el juego, pero quedará también como mail, de forma que se podrá volver a leer, en su versión española si se cambia la configuración de idioma. También quiero que se generen otros 5 mails con un texto muy similar, pero refiriendo cada uno de ellos a un sarcófago diferente, e indicando que ha fallado la descriogenización, y que no se detectan constantes vitales en el huesped (los 5 mails serán iguales, sólo cambiará <id_sarcófago>, de modo que al leerlos se pueda deducir que todos los compañeros del Personaje Jugador han muerto). Antes de construir la instrucción para codex, constrúyeme una versión del mensaje, para que lo pulamos.
 
 - [ ] Algunos world_node, como las naves, las estaciones y los derelics tienen que tener plots ship_sector. O station_sector. Los planetas también tendrán que tener sectores (cuando hagamos planetas y drones capaces de desplegarse en ellos),
 
@@ -70,11 +70,15 @@ que no se ejecute el commando "inventory update". No obstante, en la informació
 
 - [ ] La cuestión de implementar Textual.
 
-- [!] Las tareas de un mismo dron deberían ir en cola. Ahora mismo las hace simultáneamente si
-le mandas más de una antes de de acabe la anterior.
-- [ ] Los drones deben perder batería al trabajar. Deben recargarse al atracar (dock). Su batería debe también poder deteriorarse (por radiación u otros daños).
+- [x] Las tareas de un mismo dron deberían ir en cola. Ahora mismo las hace simultáneamente. Si le mandas más de una antes de que acabe la anterior.
+
+- [x] Los drones deben perder batería al trabajar. Deben recargarse al atracar (dock). 
+
+- [ ] Su batería debe también poder deteriorarse (por radiación u otros daños).
 
 - [x] Un comando que liste los trabajos (jobs) en proceso o en cola.
+
+- [ ] Aclarar cómo se crean nuevas naves, estaciones, etc. Ahora mismo hay un json pero parece que se está haciendo desde bootstrap.
 
 - [ ] Ahora mismo tu status muestra P_load=4.20kW estando docked; eso sugiere que el docking 
 añade consumo o activa algo. Está bien, pero ojo con el prólogo: podrías querer que dock 

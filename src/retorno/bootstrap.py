@@ -173,6 +173,7 @@ def create_initial_state_prologue() -> GameState:
             shield_factor=0.9,
         )
     }
+    state.ship.cargo_scrap = 20
 
     state.ship.sectors = {
         "DRN-BAY": ShipSector(sector_id="DRN-BAY", name="Drone Bay", tags={"bay"}),

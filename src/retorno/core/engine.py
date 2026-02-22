@@ -832,7 +832,27 @@ class Engine:
                 self._record_event(state.events, event)
                 return [event]
 
-            params = {"drone_id": action.drone_id}
+            default_repair = 0.25 if action.system_id == "energy_distribution" else 0.15
+            repair_amount = float(default_repair)
+            repair_scrap = max(1, int(round(repair_amount * Balance.REPAIR_SCRAP_PER_HEALTH)))
+            if state.ship.cargo_scrap < repair_scrap:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    f"Repair blocked: insufficient scrap ({state.ship.cargo_scrap}/{repair_scrap})",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "scrap_insufficient_repair",
+                        "scrap_cost": repair_scrap,
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
+            state.ship.cargo_scrap = max(0, state.ship.cargo_scrap - repair_scrap)
+            state.ship.manifest_dirty = True
+            params = {"drone_id": action.drone_id, "repair_amount": repair_amount, "repair_scrap": repair_scrap}
             if action.system_id == "energy_distribution":
                 params["repair_amount"] = 0.25
             return self._enqueue_job(
@@ -868,13 +888,31 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
+            repair_scrap = max(1, int(round(Balance.SELFTEST_REPAIR_AMOUNT * Balance.SELFTEST_REPAIR_SCRAP_PER_HEALTH)))
+            if state.ship.cargo_scrap < repair_scrap:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    f"Repair blocked: insufficient scrap ({state.ship.cargo_scrap}/{repair_scrap})",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "scrap_insufficient_repair",
+                        "scrap_cost": repair_scrap,
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
+            state.ship.cargo_scrap = max(0, state.ship.cargo_scrap - repair_scrap)
+            state.ship.manifest_dirty = True
             return self._enqueue_job(
                 state,
                 JobType.SELFTEST_REPAIR,
                 TargetRef(kind="ship_system", id=action.system_id),
                 owner_id=None,
                 eta_s=Balance.SELFTEST_REPAIR_TIME_S,
-                params={"system_id": action.system_id},
+                params={"system_id": action.system_id, "repair_scrap": repair_scrap},
             )
 
         if isinstance(action, SalvageScrap):
@@ -1146,6 +1184,14 @@ class Engine:
         events: list[Event] = []
         jobs_state = state.jobs
         completed: list[str] = []
+        running_by_owner: set[str] = set()
+
+        for job_id in list(jobs_state.active_job_ids):
+            job = jobs_state.jobs.get(job_id)
+            if not job:
+                continue
+            if job.status == JobStatus.RUNNING and job.owner_id:
+                running_by_owner.add(job.owner_id)
 
         for job_id in list(jobs_state.active_job_ids):
             job = jobs_state.jobs.get(job_id)
@@ -1153,7 +1199,11 @@ class Engine:
                 completed.append(job_id)
                 continue
             if job.status == JobStatus.QUEUED:
+                if job.owner_id and job.owner_id in running_by_owner:
+                    continue
                 job.status = JobStatus.RUNNING
+                if job.owner_id:
+                    running_by_owner.add(job.owner_id)
             if job.params.get("emergency"):
                 failed_event = self._maybe_fail_emergency_job(state, job, dt)
                 if failed_event:

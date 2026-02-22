@@ -283,6 +283,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Install blocked: insufficient scrap ({scrap_cost})",
             "es": "Instalación bloqueada: chatarra insuficiente ({scrap_cost})",
         },
+        "scrap_insufficient_repair": {
+            "en": "Repair blocked: insufficient scrap ({scrap_cost})",
+            "es": "Reparación bloqueada: chatarra insuficiente ({scrap_cost})",
+        },
         "selftest_not_available": {
             "en": "Repair blocked: self-test rig not installed",
             "es": "Reparación bloqueada: Self-Test Rig no instalado",
@@ -743,17 +747,31 @@ def render_jobs(state) -> None:
         job = jobs_state.jobs.get(job_id)
         if job:
             active_jobs.append(job)
+    running_by_owner: set[str] = set()
+    for job in active_jobs:
+        if job.status == JobStatus.RUNNING and job.owner_id:
+            running_by_owner.add(job.owner_id)
 
     if not jobs_state.jobs:
         print("(none)")
         return
+
+    locale = state.os.locale.value
+    wait_note_templates = {
+        "en": " (waiting: drone busy {drone_id})",
+        "es": " (en espera: dron ocupado {drone_id})",
+    }
 
     def _format_job(job):
         target = f"{job.target.kind}:{job.target.id}" if job.target else "-"
         eta = f"{max(0, int(job.eta_s))}s" if job.status in {JobStatus.QUEUED, JobStatus.RUNNING} else "-"
         owner = job.owner_id or "-"
         emergency = " EMERGENCY" if job.params.get("emergency") else ""
-        return f"- {job.job_id}: {job.status.value:8s} type={job.job_type.value} target={target} ETA={eta} owner={owner}{emergency}"
+        wait_note = ""
+        if job.status == JobStatus.QUEUED and job.owner_id and job.owner_id in running_by_owner:
+            tmpl = wait_note_templates.get(locale, wait_note_templates["en"])
+            wait_note = tmpl.format(drone_id=job.owner_id)
+        return f"- {job.job_id}: {job.status.value:8s} type={job.job_type.value} target={target} ETA={eta} owner={owner}{emergency}{wait_note}"
 
     print("Active (queued/running):")
     if active_jobs:

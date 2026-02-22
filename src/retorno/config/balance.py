@@ -23,6 +23,8 @@ class Balance:
     SALVAGE_MODULE_TIME_S = 12.0
     SELFTEST_REPAIR_TIME_S = 18.0
     SELFTEST_REPAIR_AMOUNT = 0.05
+    REPAIR_SCRAP_PER_HEALTH = 20
+    SELFTEST_REPAIR_SCRAP_PER_HEALTH = 12
     CARGO_AUDIT_TIME_S = 8.0
 
     # Emergency deploy risk (per second)
