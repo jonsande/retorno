@@ -1,0 +1,28 @@
+SHIP OS — Navigation & Route Knowledge (Field Copy)
+Ref: OS-MAN/ENG/NAV-01
+
+You do not “see” the galaxy as a complete map. The capsule terminal operates on partial knowledge:
+- contacts detected by sensors (scan range is limited),
+- and routes obtained from recorded navigation data (intel).
+
+Relays
+A relay is legacy infrastructure: an automated beacon that repeats signals and caches route tables.
+If a relay still responds, you may extract:
+- reachable destinations (routes),
+- long-range echoes (old broadcasts),
+- and partial navigation fragments.
+
+Coordinates vs IDs
+- sector: a grid cell, identified as S{sx}_{sy}_{sz} (derived from x/y/z in ly).
+- coord: sector coordinates reported for a contact.
+- id: the actual node identifier used in commands (travel, dock).
+A contact can share a sector with others but has its own id.
+
+Operational notes
+- A contact can be known without a known route. Knowing “it exists” is not the same as knowing “how to get there”.
+- Relays may be degraded, silent, or looping old data. Do not assume any broadcast is current.
+- In a ruined network, relays are often the only way to expand navigation knowledge without blind jumps.
+
+Relevant commands
+- scan, nav, intel import, travel
+(future) uplink / relay sync

@@ -73,13 +73,15 @@ def ensure_sector_generated(state: GameState, sector_id: str) -> None:
         )
         state.world.space.nodes[hub.node_id] = hub
 
-    for i in range(count):
+    for _i in range(count):
         x = x0 + rng.random() * SECTOR_SIZE_LY
         y = y0 + rng.random() * SECTOR_SIZE_LY
         z_sigma = float(tmpl.get("z_sigma", 0.3))
         z = z0 + rng.gauss(0.0, z_sigma)
         kind = _weighted_choice(rng, tmpl.get("kind_weights", {}))
-        node_id = f"{sector_id}:{i:02d}"
+        node_id = f"{sector_id}:{rng.getrandbits(24):06X}"
+        while node_id in state.world.space.nodes:
+            node_id = f"{sector_id}:{rng.getrandbits(24):06X}"
         if node_id in state.world.space.nodes:
             continue
         name = _generate_name(rng, kind)
@@ -108,7 +110,74 @@ def ensure_sector_generated(state: GameState, sector_id: str) -> None:
             )
         state.world.space.nodes[node_id] = node
 
+    _generate_links_for_sector(state, sector_id, rng)
     state.world.generated_sectors.add(sector_id)
+
+
+def _sector_nodes(state: GameState, sector_id: str) -> list[SpaceNode]:
+    return [
+        n
+        for n in state.world.space.nodes.values()
+        if sector_id_for_pos(n.x_ly, n.y_ly, n.z_ly) == sector_id
+    ]
+
+
+def _pick_hub(nodes: list[SpaceNode]) -> SpaceNode | None:
+    if not nodes:
+        return None
+    preferred = [n for n in nodes if n.kind in {"station", "relay", "waystation"}]
+    if preferred:
+        return sorted(preferred, key=lambda n: n.node_id)[0]
+    return sorted(nodes, key=lambda n: n.node_id)[0]
+
+
+def _generate_links_for_sector(state: GameState, sector_id: str, rng: random.Random) -> None:
+    nodes = _sector_nodes(state, sector_id)
+    if not nodes:
+        return
+    hub = _pick_hub(nodes)
+    if not hub:
+        return
+    hub.is_hub = True
+    for node in nodes:
+        if node.node_id == hub.node_id:
+            continue
+        node.links.add(hub.node_id)
+        hub.links.add(node.node_id)
+
+    # Optional extra links inside sector
+    for node in nodes:
+        if node.node_id == hub.node_id:
+            continue
+        if rng.random() < 0.10:
+            target = rng.choice(nodes)
+            if target.node_id != node.node_id:
+                node.links.add(target.node_id)
+                target.links.add(node.node_id)
+
+    # Link hub to neighbor sector hubs (2D neighbors only)
+    try:
+        _, sx, sy, sz = sector_id[1:].split("_")
+        sx_i = int(sx)
+        sy_i = int(sy)
+        sz_i = int(sz)
+    except Exception:
+        sx_i = sy_i = sz_i = 0
+    neighbors = []
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            if dx == 0 and dy == 0:
+                continue
+            neighbor_id = f"S{sx_i+dx:+04d}_{sy_i+dy:+04d}_{sz_i:+04d}"
+            if neighbor_id in state.world.generated_sectors:
+                neighbor_nodes = _sector_nodes(state, neighbor_id)
+                neighbor_hub = _pick_hub(neighbor_nodes)
+                if neighbor_hub:
+                    neighbors.append(neighbor_hub)
+    neighbors = sorted(neighbors, key=lambda n: (n.x_ly - hub.x_ly) ** 2 + (n.y_ly - hub.y_ly) ** 2)
+    for neighbor in neighbors[:2]:
+        hub.links.add(neighbor.node_id)
+        neighbor.links.add(hub.node_id)
 
 
 def _pick_modules(rng: random.Random, module_ids: list[str], min_count: int, max_count: int) -> list[str]:
@@ -128,4 +197,3 @@ def _generate_name(rng: random.Random, kind: str) -> str:
     if kind == "ship":
         return f"Wreck-{rng.randint(1, 99)}"
     return f"Node-{rng.randint(1, 999)}"
-

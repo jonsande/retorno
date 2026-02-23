@@ -102,6 +102,12 @@ class SalvageModule(Action):
 
 
 @dataclass(slots=True)
+class SalvageData(Action):
+    drone_id: str
+    node_id: str
+
+
+@dataclass(slots=True)
 class CargoAudit(Action):
     pass
 
@@ -109,6 +115,12 @@ class CargoAudit(Action):
 @dataclass(slots=True)
 class Travel(Action):
     node_id: str
+    no_cruise: bool = False
+
+
+@dataclass(slots=True)
+class TravelAbort(Action):
+    pass
 
 
 @dataclass(slots=True)

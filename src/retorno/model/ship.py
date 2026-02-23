@@ -42,6 +42,7 @@ class ShipState:
     name: str
 
     op_mode: str = "NORMAL"  # NORMAL, CRUISE
+    op_mode_source: str = "manual"  # manual | auto
     current_node_id: str = ""
     in_transit: bool = False
     transit_from: str = ""
@@ -49,6 +50,8 @@ class ShipState:
     arrival_t: float = 0.0
     cruise_speed_ly_per_year: float = 1.0
     last_travel_distance_ly: float = 0.0
+    transit_prev_op_mode: str = ""
+    transit_prev_op_mode_source: str = ""
 
     location: ShipLocation = field(default_factory=ShipLocation)
     hull_integrity: float = 1.0

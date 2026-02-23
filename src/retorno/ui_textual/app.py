@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import random
+import time
 
 from textual.app import App, ComposeResult
 from textual import events
@@ -168,6 +169,13 @@ class RetornoTextualApp(App):
         self._history: list[str] = []
         self._history_index: int = 0
         self._history_current: str = ""
+        self._pending_confirm_action = None
+        self._pending_confirm_prompt = ""
+        self._pending_confirm_locale = "en"
+        self._pending_years: float = 0.0
+        self._last_complete_key: str = ""
+        self._last_complete_at: float = 0.0
+        self._last_complete_candidates: list[str] = []
         super().__init__()
 
     def compose(self) -> ComposeResult:
@@ -283,13 +291,25 @@ class RetornoTextualApp(App):
             new_value = base + common_prefix
             focused.value = new_value
             focused.cursor_position = len(new_value)
+            self._last_complete_key = ""
             return
 
-        # No longer prefix; show options in log and complete first.
-        self._log_line("completions: " + " ".join(candidates))
-        new_value = base + candidates[0]
-        focused.value = new_value
-        focused.cursor_position = len(new_value)
+        # If multiple options with no new common prefix, require double-tab to list.
+        key = f"{base}|{token}"
+        now = time.time()
+        if (
+            key == self._last_complete_key
+            and now - self._last_complete_at < 1.5
+            and candidates == self._last_complete_candidates
+        ):
+            self._log_line("completions: " + " ".join(candidates))
+            self._last_complete_key = ""
+            self._last_complete_candidates = []
+            return
+        self._last_complete_key = key
+        self._last_complete_at = now
+        self._last_complete_candidates = candidates
+        return
 
     def _get_completion_candidates(self, state, buf: str, text: str) -> list[str]:
         tokens = buf.strip().split()
@@ -455,14 +475,14 @@ class RetornoTextualApp(App):
             if len(tokens) == 4 and tokens[1] == "move":
                 return [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "salvage":
-                return [c for c in ["scrap", "module", "modules"] if c.startswith(text)]
+                return [c for c in ["scrap", "module", "modules", "data"] if c.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "salvage":
                 return [d for d in drones if d.startswith(text)]
             if len(tokens) == 5 and tokens[1] == "salvage":
                 return [c for c in contacts if c.startswith(text)]
         if cmd == "salvage":
             if len(tokens) == 2:
-                return [c for c in ["scrap", "module", "modules"] if c.startswith(text)]
+                return [c for c in ["scrap", "module", "modules", "data"] if c.startswith(text)]
             if len(tokens) == 3:
                 return [d for d in drones if d.startswith(text)]
             if len(tokens) == 4:
@@ -481,8 +501,10 @@ class RetornoTextualApp(App):
                 return [c for c in ["latest"] if c.startswith(text)]
         if cmd == "intel":
             if len(tokens) == 2:
-                return [c for c in ["import"] if c.startswith(text)]
-            if len(tokens) == 3 and tokens[1] == "import":
+                return [c for c in ["show", "import", "export", "all"] if c.startswith(text)] + [t for t in ["10", "20", "50"] if t.startswith(text)]
+            if len(tokens) == 3 and tokens[1] == "show":
+                return [i.intel_id for i in state.world.intel if i.intel_id.startswith(text.upper())]
+            if len(tokens) == 3 and tokens[1] in {"import", "export"}:
                 path_text = token or text
                 if "/" in path_text:
                     dir_part, base_part = path_text.rsplit("/", 1)
@@ -517,6 +539,50 @@ class RetornoTextualApp(App):
     def _log_lines(self, lines: list[str]) -> None:
         for line in lines:
             self._log_line(line)
+
+    def _confirm_abandon_drones_needed(self, state, action) -> bool:
+        current_node = state.world.current_node_id
+        out = []
+        for d in state.ship.drones.values():
+            if d.status in {"deployed", "disabled"} and d.location.kind == "world_node":
+                out.append(d)
+        if not out:
+            return False
+        locale = state.os.locale.value
+        drone_ids = ", ".join(d.drone_id for d in out)
+        prompts = {
+            "en": f"WARNING: drones not aboard ({drone_ids}). Leaving {current_node} will abandon them. Continue? [y/N]",
+            "es": f"ADVERTENCIA: drones fuera de la nave ({drone_ids}). Al salir de {current_node} quedarán abandonados. ¿Continuar? [s/N]",
+        }
+        self._pending_confirm_action = action
+        self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
+        self._pending_confirm_locale = locale
+        self._log_line(self._pending_confirm_prompt)
+        return True
+
+    def _confirm_travel_abort_needed(self, state) -> bool:
+        locale = state.os.locale.value
+        prompts = {
+            "en": "WARNING: aborting travel will return you to the origin node. Continue? [y/N]",
+            "es": "ADVERTENCIA: abortar el viaje te devuelve al nodo de origen. ¿Continuar? [s/N]",
+        }
+        self._pending_confirm_action = "TRAVEL_ABORT"
+        self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
+        self._pending_confirm_locale = locale
+        self._log_line(self._pending_confirm_prompt)
+        return True
+
+    def _confirm_hibernate_non_cruise_needed(self, state) -> bool:
+        locale = state.os.locale.value
+        prompts = {
+            "en": "WARNING: hibernating while not in CRUISE may increase wear. Continue? [y/N]",
+            "es": "ADVERTENCIA: hibernar fuera de CRUISE puede aumentar el desgaste. ¿Continuar? [s/N]",
+        }
+        self._pending_confirm_action = "HIBERNATE_NON_CRUISE"
+        self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
+        self._pending_confirm_locale = locale
+        self._log_line(self._pending_confirm_prompt)
+        return True
 
     def _set_log_content(self, widget: RichLog, lines: list[str], preserve_scroll: bool = False, follow_end: bool = False) -> None:
         scroll_y = widget.scroll_y if preserve_scroll else None
@@ -582,6 +648,29 @@ class RetornoTextualApp(App):
         event.input.value = ""
         if not text:
             return
+        if self._pending_confirm_action is not None:
+            reply = text.lower()
+            locale = self._pending_confirm_locale
+            yes = {"y", "yes"}
+            if locale == "es":
+                yes = {"s", "si", "sí", "y", "yes"}
+            action = self._pending_confirm_action
+            self._pending_confirm_action = None
+            self._pending_confirm_prompt = ""
+            if reply in yes:
+                if action == "TRAVEL_ABORT":
+                    from retorno.core.actions import TravelAbort
+                    self._log_line("> travel abort")
+                    self._log_lines(self.presenter.build_command_output(self.loop.apply_action, TravelAbort()))
+                elif action == "HIBERNATE_NON_CRUISE":
+                    self._log_line("> hibernate until_arrival")
+                    self._log_lines(self.presenter.build_command_output(repl._run_hibernate, self.loop, self._pending_years))
+                else:
+                    self._log_line(f"> {action.__class__.__name__.lower()}")
+                    self._log_lines(self.presenter.build_command_output(self.loop.apply_action, action))
+            else:
+                self._log_line("(cancelled)")
+            return
         if not self._history or self._history[-1] != text:
             self._history.append(text)
         self._history_index = len(self._history)
@@ -606,6 +695,8 @@ class RetornoTextualApp(App):
             "CONTACTS",
             "SCAN",
             "JOBS",
+            "NAV",
+            "UPLINK",
             "ALERTS",
             "LOGS",
             "INVENTORY",
@@ -626,14 +717,28 @@ class RetornoTextualApp(App):
             return
         if parsed == "SCAN":
             with self.loop.with_lock() as state:
-                seen, discovered = repl._scan_and_discover(state)
+                seen, discovered, handshakes = repl._scan_and_discover(state)
                 self._log_lines(presenter.build_command_output(repl.render_scan_results, state, seen))
                 if discovered:
                     self._log_line(f"(scan) new: {', '.join(sorted(discovered))}")
+                if handshakes:
+                    self._log_line(f"(nav) handshake established with {', '.join(sorted(set(handshakes)))}")
             return
         if parsed == "JOBS":
             with self.loop.with_lock() as state:
                 self._log_lines(presenter.build_command_output(repl.render_jobs, state))
+            return
+        if parsed == "NAV":
+            with self.loop.with_lock() as state:
+                self._log_lines(presenter.build_command_output(repl.render_nav, state))
+            return
+        if parsed == "UPLINK":
+            with self.loop.with_lock() as state:
+                self._log_lines(presenter.build_command_output(repl._handle_uplink, state))
+            return
+        if parsed.__class__.__name__ == "TravelAbort":
+            with self.loop.with_lock() as state:
+                self._confirm_travel_abort_needed(state)
             return
         if parsed == "ALERTS":
             with self.loop.with_lock() as state:
@@ -681,9 +786,26 @@ class RetornoTextualApp(App):
             with self.loop.with_lock() as state:
                 self._log_lines(presenter.build_command_output(repl.render_mail_read, state, parsed[1]))
             return
+        if parsed == "INTEL_LIST":
+            with self.loop.with_lock() as state:
+                self._log_lines(presenter.build_command_output(repl.render_intel_list, state))
+            return
+        if isinstance(parsed, tuple) and parsed[0] == "INTEL_LIST":
+            with self.loop.with_lock() as state:
+                limit = None if parsed[1] == "all" else int(parsed[1])
+                self._log_lines(presenter.build_command_output(repl.render_intel_list, state, limit=limit))
+            return
         if isinstance(parsed, tuple) and parsed[0] == "INTEL_IMPORT":
             with self.loop.with_lock() as state:
                 self._log_lines(presenter.build_command_output(repl._handle_intel_import, state, parsed[1]))
+            return
+        if isinstance(parsed, tuple) and parsed[0] == "INTEL_SHOW":
+            with self.loop.with_lock() as state:
+                self._log_lines(presenter.build_command_output(repl.render_intel_show, state, parsed[1]))
+            return
+        if isinstance(parsed, tuple) and parsed[0] == "INTEL_EXPORT":
+            with self.loop.with_lock() as state:
+                self._log_lines(presenter.build_command_output(repl._handle_intel_export, state, parsed[1]))
             return
         if isinstance(parsed, tuple) and parsed[0] == "LS":
             with self.loop.with_lock() as state:
@@ -709,6 +831,14 @@ class RetornoTextualApp(App):
             with self.loop.with_lock() as state:
                 self._log_lines(presenter.build_command_output(repl.render_locate, state, parsed[1]))
             return
+
+        if parsed.__class__.__name__ in {"Dock", "Travel"}:
+            with self.loop.with_lock() as state:
+                resolved = repl._resolve_node_id_from_input(state, parsed.node_id)
+                if resolved:
+                    parsed.node_id = resolved
+                if self._confirm_abandon_drones_needed(state, parsed):
+                    return
 
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG":
             mode = parsed[1]
@@ -775,6 +905,10 @@ class RetornoTextualApp(App):
                     if parsed.mode == "until_arrival":
                         if not state.ship.in_transit:
                             self._log_line("hibernate: not in transit")
+                            return
+                        if state.ship.op_mode != "CRUISE":
+                            self._pending_years = max(0.0, state.ship.arrival_t - state.clock.t) / repl.Balance.YEAR_S if repl.Balance.YEAR_S else 0.0
+                            self._confirm_hibernate_non_cruise_needed(state)
                             return
                         remaining_s = max(0.0, state.ship.arrival_t - state.clock.t)
                         years = remaining_s / repl.Balance.YEAR_S if repl.Balance.YEAR_S else 0.0

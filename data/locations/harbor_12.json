@@ -8,5 +8,12 @@
     "y_ly": 4.0,
     "z_ly": 0.0
   },
-  "known_on_start": true
+  "known_on_start": true,
+  "salvage": {
+    "scrap_min": 20,
+    "scrap_max": 40,
+    "modules_min": 0,
+    "modules_max": 0,
+    "modules_pool": "all"
+  }
 }

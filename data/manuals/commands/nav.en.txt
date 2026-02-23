@@ -1,0 +1,4 @@
+nav
+- Shows known routes from the current node.
+- Use after scan or intel import to see where travel is possible.
+- If no routes appear, you need a relay handshake or navigation intel.

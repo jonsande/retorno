@@ -56,9 +56,21 @@ que no se ejecute el commando "inventory update". No obstante, en la informació
 
 - [!] Al hibernar para viajar el "time" debería reflejar los años que han pasado desde que el PJ se despertó por primera vez. Necesitamos un reloj mejor. No vale sólo indicar segundos, pues el número es demasiado grando. Necesitamos un reloj que indique años luz, días, horas, minutos, segundos (o algo así; díme tú qué opinas).
 
+- [ ] Ahora mismo los manuals se han generado con un tono "diegético". Me gustaría ver cómo sería la versión más "técnica", pues chatgpt y codex me la han propuesto varias veces pero siempre la he rechazado sin llegar a ver cómo sería.
+
 - [ ] El comando "travel" hay que cambiarlo quizá por "navigate" (o algo primero como "trazar ruta" y después "navigate").
 
-- [ ] Quiero que me ayudes a diseñar y desarrollar el sistema de generación del "universo/mundo", es decir, los distintos plots (después habrá que diseñar cómo el jugador obtiene las id's de nuevas localizaciones a las que poder viajar, pues no quiero que tenga siempre disponibles todos los destinos, y además quiero que los destinos y sus contenidos se vayan generando proceduralmente). Me gustaría que el universo estuviera "organizado" o dividido. Ayúdame tú a esa organización, pero, por lo pronto, se me ocurre que podría ser algo como lo siguiente (pero hazme sugerencias o corrígeme si algo no es muy realista): el universo accesible al jugador será una galaxia de forma de espiral (la vía láctea, aun que el Jugador no tiene por qué saberlo al empezar el juego): la galaxia estará por lo pronto dividida en tres regiones: halo (zona más externa), el disco, y bulbo (zona central de la galaxia, donde la densidad de estrallas es mayor, y en cuyo centro se encuentra en agujero negro supermasivo Sagitario A*). Esas partes no serán plots; pero se me ocurre que ciertas localizaciones o plots sólo puedan generarse en una des estas regiones u otras, y que en cada una de las regiones apliquen ciertas condiciones (por ejemplo, que en los sectores pertenecientes al bulbo haya más radiación, o que puedan darse ciertos eventos especiales específicos de cada región). Aparte de esas tres regiones, cada región deberia estar dividida en... ¿sectores quizá? Qué me sugieres? Deberían dividirse también los sectores, o será complicarlo mucho? Suponiendo que no se dividan, entiendo que en cada uno de esos sectores habría world_plots, no? Esos world_plots podrían ser estaiones abandonadas, naves abandonadas (o no abandonadas), derelicts, planetas... Por otra parte, ahora que lo pienso, hará falta conectar unos sectores con otros, de forma que no se pueda llegar a cualquiera desde cualquiera. ¿O es una complicación innecesaria? Lo que sí tengo más claro es que no me gustaría que la nave pudiera scanear plots a mucha distancia. Quizá sólo los plots dentre de su sector (o la división más pequeña que decidamos). Aparte de eso, las nuevas localizaciones (es decir los plots en nuevos sectores) sólo se podrán descubrir obteniendo información por otros medios: por ejemplo accediedo a los mails de una nave o al registro de navegación o cosas así. Dame ideas también a este respecto.
+- [!] Ahora mismo si queremos viajar a "S+000_-001_-001:02: Relay-97 (relay) dist=1.30ly" hace falta introducir "travel S+000_-001_-001:0". Me gustaría que también se pudiera introducit "travel Realy-97" simplemente, y que el autocompletado funcionara. Y por cierto: ¿qué quiere decir "000_-001_-001:02"? ¿Son unas coordenadas? Si es así, creo que estaría bien indicar de algún modo que esa numeración son unas coordenadas. 
+
+- [ ] También creo que tendría que aparecer en primer lugar el nombre de la hubicación (si la tiene), por ejemplo Relay-97 (relay) dist=1.30ly coord=S+000_-001_-001:02""
+
+- [x] Si un drone se encuentra fuera de la nave propia y se intenta "desdockear" la nave propia (por ejemplo para dockear en otra localización o para emprender un viaje), me gustaría que saliera un mensaje de alerta advirtiendo de que el drone en cuestión no está en la nave propia y pidiendo confirmación para abandonarlo.
+
+- [ ] dose es la dosis acumulada de radiación que ha recibido el dron (en rad). Se incrementa cada tick en función de la radiación ambiental (state.ship.radiation_env_rad_per_s) y el shield_factor del dron:
+drone.dose_rad += r_env * shield_factor * dt
+Ahora mismo es informativo (no afecta directamente a integridad/batería), pero lo usamos como base para futuras penalizaciones o fallos por exposición prolongada. Si quieres, puedo añadir un aviso cuando supere umbrales, o hacerlo afectar a la integridad.
+
+- [x] Quiero que me ayudes a diseñar y desarrollar el sistema de generación del "universo/mundo", es decir, los distintos plots (después habrá que diseñar cómo el jugador obtiene las id's de nuevas localizaciones a las que poder viajar, pues no quiero que tenga siempre disponibles todos los destinos, y además quiero que los destinos y sus contenidos se vayan generando proceduralmente). Me gustaría que el universo estuviera "organizado" o dividido. Ayúdame tú a esa organización, pero, por lo pronto, se me ocurre que podría ser algo como lo siguiente (pero hazme sugerencias o corrígeme si algo no es muy realista): el universo accesible al jugador será una galaxia de forma de espiral (la vía láctea, aun que el Jugador no tiene por qué saberlo al empezar el juego): la galaxia estará por lo pronto dividida en tres regiones: halo (zona más externa), el disco, y bulbo (zona central de la galaxia, donde la densidad de estrallas es mayor, y en cuyo centro se encuentra en agujero negro supermasivo Sagitario A*). Esas partes no serán plots; pero se me ocurre que ciertas localizaciones o plots sólo puedan generarse en una des estas regiones u otras, y que en cada una de las regiones apliquen ciertas condiciones (por ejemplo, que en los sectores pertenecientes al bulbo haya más radiación, o que puedan darse ciertos eventos especiales específicos de cada región). Aparte de esas tres regiones, cada región deberia estar dividida en... ¿sectores quizá? Qué me sugieres? Deberían dividirse también los sectores, o será complicarlo mucho? Suponiendo que no se dividan, entiendo que en cada uno de esos sectores habría world_plots, no? Esos world_plots podrían ser estaiones abandonadas, naves abandonadas (o no abandonadas), derelicts, planetas... Por otra parte, ahora que lo pienso, hará falta conectar unos sectores con otros, de forma que no se pueda llegar a cualquiera desde cualquiera. ¿O es una complicación innecesaria? Lo que sí tengo más claro es que no me gustaría que la nave pudiera scanear plots a mucha distancia. Quizá sólo los plots dentre de su sector (o la división más pequeña que decidamos). Aparte de eso, las nuevas localizaciones (es decir los plots en nuevos sectores) sólo se podrán descubrir obteniendo información por otros medios: por ejemplo accediedo a los mails de una nave o al registro de navegación o cosas así. Dame ideas también a este respecto.
 
 1. Por qué migrar también los manuales a JSON? Ventajas y desventajas?
 2. Sí, añade plantillas y generaión procedural por región, pero teniendo en cuenta la orden que te voy a dar más abajo (ver más abajo).
@@ -213,12 +225,32 @@ tenerlo en mente.
 - [ ] [Esto quedó pendiente de hacer] Si quieres, también podemos añadir un mail automático al primer módulo encontrado (lore + “esto se instala con install <id>”), pero lo dejo para después de que el loop funcione.
 
 
+
+Cuándo tendría interés desactivar el auto-CRUISE (más adelante)
+
+Cuando implementes al menos una de estas cosas:
+
+eventos de ruta que solo detectas si sensores están activos
+
+amenazas que requieren security online
+
+trabajos en tránsito (reparación, auditoría, análisis) que consumen carga pero te ahorran tiempo al llegar
+
+viaje corto (días) dentro del mismo “vecindario” donde no hibernas
+
+En ese momento, NORMAL deja de ser “castigo” y pasa a ser una opción táctica.
+
+
+
 =========== USER INTERFACE ===========
 TEXTUAL
 
 Alternar foco del panel:  alt+j/k
 Scroll arriba/abajo en panel activo: k/j
 Comandos textual: ctrl+p
+
+- [ ] El panel status debería poder modificarse por otro.
+- [ ] Los paneles, excepto header, botton, comandos y logs deberían poder activarse desactivarse, para tener más espacio para logs.
 
 - [x] cuando se arranca el juego, debería por defecto estar activo el panel en el que se introducen órdenes. Ahora mismo no está funcionando así.
 - [x] Me gustaría darle a la interfaz Textual un aspecto mucho más parecido a como se vería con Curses. Quiero además que el color de fondo sea igual en todos los paneles. No quiero que se dibujen líneas de contorno en los paneles.
@@ -228,6 +260,8 @@ Comandos textual: ctrl+p
 - [x] en el header no quiero que ponga "mode=" sino "ship_mode="
 
 =========== Versión 2 ============
+
+- [ ] Virus informáticos. Que afectan a alguno de los sistemas, pudiendo llegar a inutilizarlo total o temporalmente, o a hacer que falle ocasionalmente.
 
 data_core. Ahora mismo data_core sirve para habilitar operaciones de auditoría de bodega y para servicios de datos: Audit de cargo/manifest: cargo audit / inventory audit se bloquean si data_core no está operativo o si datad no está corriendo.
 Servicio asociado: datad (se debe bootear para auditorías).

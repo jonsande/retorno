@@ -1,0 +1,5 @@
+uplink
+- Establece un uplink de datos con el relay/waystation actual.
+- Requiere estar acoplado y data_core + datad operativos.
+- Puede revelar nuevas rutas de tablas de navegación en caché.
+- Escribe un registro en /logs/nav/ con los enlaces descubiertos.

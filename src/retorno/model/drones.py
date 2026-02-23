@@ -32,6 +32,7 @@ class DroneState:
 
     integrity: float = 1.0
     battery: float = 1.0
+    low_battery_warned: bool = False
 
     shield_factor: float = 1.0
     dose_rad: float = 0.0

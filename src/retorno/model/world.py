@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Optional, Tuple
 
 
 @dataclass(slots=True)
@@ -17,6 +18,8 @@ class SpaceNode:
     salvage_scrap_available: int = 0
     salvage_modules_available: list[str] = field(default_factory=list)
     salvage_dry: bool = False
+    links: set[str] = field(default_factory=set)
+    is_hub: bool = False
 
 
 @dataclass(slots=True)
@@ -26,13 +29,31 @@ class SpaceGraph:
 
 
 @dataclass(slots=True)
+class IntelItem:
+    intel_id: str
+    t: float
+    kind: str  # "node", "link", "sector", "coord"
+    from_id: Optional[str] = None
+    to_id: Optional[str] = None
+    sector_id: Optional[str] = None
+    coord: Optional[Tuple[float, float, float]] = None
+    confidence: float = 0.0
+    source_kind: str = "nav_fragment"  # uplink | nav_fragment | mail | log | manual | scan
+    source_ref: Optional[str] = None
+    note: Optional[str] = None
+
+
+@dataclass(slots=True)
 class WorldState:
     space: SpaceGraph = field(default_factory=SpaceGraph)
     known_contacts: set[str] = field(default_factory=set)
     known_nodes: set[str] = field(default_factory=set)
     known_intel: dict[str, dict] = field(default_factory=dict)
+    intel: list[IntelItem] = field(default_factory=list)
+    next_intel_seq: int = 1
     generated_sectors: set[str] = field(default_factory=set)
-    current_node_id: str = "SHIP_1"
+    known_links: dict[str, set[str]] = field(default_factory=dict)
+    current_node_id: str = "RETORNO_SHIP"
     current_pos_ly: tuple[float, float, float] = (0.0, 0.0, 0.0)
     rng_seed: int = 0
 
@@ -57,3 +78,67 @@ def region_for_pos(x_ly: float, y_ly: float, z_ly: float) -> str:
     if r < 15.0:
         return "disk"
     return "halo"
+
+
+def add_known_link(
+    state: WorldState, from_id: str, to_id: str, bidirectional: bool = False
+) -> bool:
+    if not from_id or not to_id or from_id == to_id:
+        return False
+    before = len(state.known_links.get(from_id, set()))
+    state.known_links.setdefault(from_id, set()).add(to_id)
+    added = len(state.known_links.get(from_id, set())) > before
+    if bidirectional and from_id != to_id:
+        state.known_links.setdefault(to_id, set()).add(from_id)
+    return added
+
+
+def _intel_key(
+    kind: str,
+    from_id: Optional[str],
+    to_id: Optional[str],
+    sector_id: Optional[str],
+    coord: Optional[Tuple[float, float, float]],
+) -> tuple:
+    return (kind, from_id, to_id, sector_id, coord)
+
+
+def record_intel(
+    state: WorldState,
+    *,
+    t: float,
+    kind: str,
+    confidence: float,
+    source_kind: str,
+    source_ref: Optional[str] = None,
+    from_id: Optional[str] = None,
+    to_id: Optional[str] = None,
+    sector_id: Optional[str] = None,
+    coord: Optional[Tuple[float, float, float]] = None,
+    note: Optional[str] = None,
+) -> Optional[IntelItem]:
+    key = _intel_key(kind, from_id, to_id, sector_id, coord)
+    for item in state.intel:
+        if _intel_key(item.kind, item.from_id, item.to_id, item.sector_id, item.coord) == key:
+            return None
+    intel_id = f"I{state.next_intel_seq:05d}"
+    state.next_intel_seq += 1
+    item = IntelItem(
+        intel_id=intel_id,
+        t=t,
+        kind=kind,
+        from_id=from_id,
+        to_id=to_id,
+        sector_id=sector_id,
+        coord=coord,
+        confidence=confidence,
+        source_kind=source_kind,
+        source_ref=source_ref,
+        note=note,
+    )
+    state.intel.append(item)
+    return item
+
+
+def reachable_from(state: WorldState, current_id: str) -> set[str]:
+    return set(state.known_links.get(current_id, set()))

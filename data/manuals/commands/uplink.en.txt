@@ -1,0 +1,5 @@
+uplink
+- Establishes a data uplink with the current relay/waystation.
+- Requires docking at a relay/station and data_core + datad online.
+- May reveal new routes from cached navigation tables.
+- Writes a log under /logs/nav/ with discovered links.

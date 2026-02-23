@@ -13,7 +13,7 @@
     "scrap_min": 40,
     "scrap_max": 60,
     "modules_min": 1,
-    "modules_max": 2,
+    "modules_max": 1,
     "modules_pool": "all"
   }
 }

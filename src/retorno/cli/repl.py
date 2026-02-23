@@ -13,8 +13,9 @@ from retorno.model.jobs import JobStatus
 from retorno.runtime.data_loader import load_modules
 from retorno.config.balance import Balance
 from retorno.model.systems import SystemState
-from retorno.model.os import FSNodeType, Locale, list_dir, normalize_path, read_file
-from retorno.model.world import SECTOR_SIZE_LY, sector_id_for_pos
+from retorno.model.drones import DroneStatus
+from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, list_dir, normalize_path, read_file
+from retorno.model.world import SECTOR_SIZE_LY, sector_id_for_pos, add_known_link, record_intel
 from retorno.model.world import SpaceNode, region_for_pos
 from retorno.worldgen.generator import ensure_sector_generated
 from retorno.util.timefmt import format_elapsed_long
@@ -28,14 +29,14 @@ def print_help() -> None:
         "  ls [path] | cat <path>\n"
         "  man <topic> | about <system_id>\n"
         "  mail [inbox] | mail read <id>\n"
-        "  intel import <path>\n"
+        "  intel | intel show <intel_id> | intel import <path> | intel export <path>\n"
         "  config set lang <en|es> | config show\n"
         "\nInformación:\n"
-        "  status | jobs | alerts | alerts explain <alert_key> | logs\n"
+        "  status | jobs | nav | alerts | alerts explain <alert_key> | logs\n"
         "  contacts | scan\n"
         "  sectors | map | locate <system_id>\n"
         "\nNavegación:\n"
-        "  dock <node_id> | travel <node_id>\n"
+        "  dock <node_id> | travel <node_id> | travel abort | uplink\n"
         "  hibernate until_arrival | hibernate <años>\n"
         "\nSistemas / Energía:\n"
         "  diag <system_id> | boot <service_name>\n"
@@ -49,6 +50,7 @@ def print_help() -> None:
         "  drone repair <drone_id> <system_id>\n"
         "  drone salvage scrap <drone_id> <node_id> <amount>\n"
         "  drone salvage module <drone_id> [node_id]\n"
+        "  drone salvage data <drone_id> <node_id>\n"
         "  drone reboot <drone_id> | drone recall <drone_id>\n"
         "\nBodega / Módulos:\n"
         "  inventory | cargo | cargo audit | inventory audit\n"
@@ -58,6 +60,7 @@ def print_help() -> None:
         "  debug on|off|status | debug scenario prologue|sandbox|dev\n"
         "\nSugerencias:\n"
         "  ls /manuals/commands\n"
+        "  man navigation\n"
         "  cat /mail/inbox/0001.txt\n"
     )
 
@@ -149,12 +152,16 @@ def render_events(state, events, origin_override: str | None = None) -> None:
     }
     travel_templates = {
         "travel_started": {
-            "en": "[{sev}] travel_started :: To {to} dist={distance_ly:.2f}ly ETA={eta_years:.2f}y",
-            "es": "[{sev}] travel_started :: A {to} dist={distance_ly:.2f}ly ETA={eta_years:.2f}a",
+            "en": "[{sev}] travel_started :: To {to} dist={distance_ly:.2f}ly ETA={eta_years:.2f}y (hint: travel abort)",
+            "es": "[{sev}] travel_started :: A {to} dist={distance_ly:.2f}ly ETA={eta_years:.2f}a (pista: travel abort)",
         },
         "arrived": {
             "en": "[{sev}] arrived :: Arrived at {to} (from {from})",
             "es": "[{sev}] arrived :: Llegada a {to} (desde {from})",
+        },
+        "travel_aborted": {
+            "en": "[{sev}] travel_aborted :: Travel aborted",
+            "es": "[{sev}] travel_aborted :: Viaje abortado",
         },
         "hibernation_started": {
             "en": "[{sev}] hibernation_started :: Sleeping for {years:.2f}y",
@@ -269,6 +276,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Action blocked: unknown contact ({node_id}). Use 'scan' or acquire navigation intel.",
             "es": "Acción bloqueada: contacto desconocido ({node_id}). Usa 'scan' o consigue inteligencia de navegación.",
         },
+        "no_route": {
+            "en": "Action blocked: no known route to {node_id}. Try: nav, uplink (at relay/waystation), or acquire intel.",
+            "es": "Acción bloqueada: no hay ruta conocida a {node_id}. Prueba: nav, uplink (en relay/waystation) o consigue inteligencia.",
+        },
         "invalid_amount": {
             "en": "Action blocked: invalid amount",
             "es": "Acción bloqueada: cantidad inválida",
@@ -276,6 +287,14 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "not_docked": {
             "en": "Action blocked: not docked at {node_id}",
             "es": "Acción bloqueada: no acoplado en {node_id}",
+        },
+        "drone_not_at_node": {
+            "en": "Action blocked: drone not at {node_id} (current {drone_loc})",
+            "es": "Acción bloqueada: dron no está en {node_id} (actual {drone_loc})",
+        },
+        "ship_not_docked": {
+            "en": "Action blocked: ship not docked at {node_id}",
+            "es": "Acción bloqueada: nave no acoplada en {node_id}",
         },
         "scrap_empty": {
             "en": "No scrap available",
@@ -309,6 +328,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Recall blocked: drone integrity too low ({integrity:.2f})",
             "es": "Recall bloqueado: integridad de dron demasiado baja ({integrity:.2f})",
         },
+        "drone_low_battery": {
+            "en": "Action blocked: drone battery too low ({battery:.2f} < {threshold:.2f})",
+            "es": "Acción bloqueada: batería de dron demasiado baja ({battery:.2f} < {threshold:.2f})",
+        },
         "system_too_damaged": {
             "en": "System on blocked: system too damaged",
             "es": "System on bloqueado: sistema demasiado dañado",
@@ -320,6 +343,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "already_at_target": {
             "en": "Action blocked: already at destination ({node_id})",
             "es": "Acción bloqueada: ya estás en destino ({node_id})",
+        },
+        "not_in_transit": {
+            "en": "Action blocked: not in transit",
+            "es": "Acción bloqueada: no estás en tránsito",
         },
     }
     job_completed_keys = {
@@ -504,7 +531,7 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             except Exception:
                 print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
             continue
-        if e.type in {EventType.TRAVEL_STARTED, EventType.ARRIVED, EventType.HIBERNATION_STARTED, EventType.HIBERNATION_ENDED}:
+        if e.type in {EventType.TRAVEL_STARTED, EventType.TRAVEL_ABORTED, EventType.ARRIVED, EventType.HIBERNATION_STARTED, EventType.HIBERNATION_ENDED}:
             locale = state.os.locale.value
             key = e.type.value
             tmpl = travel_templates.get(key, {}).get(locale)
@@ -515,6 +542,28 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                 "eta_years": e.data.get("eta_years", 0.0),
                 "years": e.data.get("years", 0.0),
             })
+            if tmpl:
+                try:
+                    print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
+                except Exception:
+                    print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
+            else:
+                print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message}")
+            continue
+        if e.type == EventType.TRAVEL_PROFILE_SET:
+            locale = state.os.locale.value
+            key = e.data.get("message_key", "")
+            templates = {
+                "travel_profile_auto": {
+                    "en": "[{sev}] travel_profile_set :: Travel profile set: CRUISE (auto). Use 'travel --no-cruise <dest>' to override.",
+                    "es": "[{sev}] travel_profile_set :: Perfil de viaje: CRUISE (auto). Usa 'travel --no-cruise <dest>' para anular.",
+                },
+                "travel_profile_manual": {
+                    "en": "[{sev}] travel_profile_set :: Travel override: CRUISE disabled. Increased wear expected.",
+                    "es": "[{sev}] travel_profile_set :: Anulación de viaje: CRUISE desactivado. Se espera mayor desgaste.",
+                },
+            }
+            tmpl = templates.get(key, {}).get(locale)
             if tmpl:
                 try:
                     print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
@@ -609,6 +658,23 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             except Exception:
                 print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
             continue
+        if e.type == EventType.DRONE_LOW_BATTERY:
+            locale = state.os.locale.value
+            tmpl = {
+                "en": "[{sev}] drone_low_battery :: Low battery: {drone_id} ({battery:.2f})",
+                "es": "[{sev}] drone_low_battery :: Batería baja: {drone_id} ({battery:.2f})",
+            }.get(locale, "[{sev}] drone_low_battery :: Low battery: {drone_id} ({battery:.2f})")
+            payload.update(
+                {
+                    "drone_id": e.data.get("drone_id", "?"),
+                    "battery": e.data.get("battery", 0.0),
+                }
+            )
+            try:
+                print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
+            except Exception:
+                print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
+            continue
         if e.type == EventType.NODE_DEPLETED:
             locale = state.os.locale.value
             tmpl = salvage_templates["node_depleted"].get(locale, salvage_templates["node_depleted"]["en"])
@@ -643,9 +709,11 @@ def render_status(state) -> None:
     headroom = p.p_discharge_max_kw - deficit
     print("\n=== STATUS ===")
     print(f"time: {format_elapsed_long(state.clock.t)}")
-    mode = "DEBUG" if state.os.debug_enabled else "NORMAL"
-    print(f"mode: {mode}")
-    print(f"ship_mode: {ship.op_mode}")
+    if ship.op_mode == "CRUISE":
+        source = ship.op_mode_source or "manual"
+        print(f"ship_mode: {ship.op_mode} ({source})")
+    else:
+        print(f"ship_mode: {ship.op_mode}")
     current_loc = ship.current_node_id or state.world.current_node_id
     node = state.world.space.nodes.get(current_loc)
     node_name = node.name if node else current_loc
@@ -858,7 +926,10 @@ def render_contacts(state) -> None:
     for cid in sorted(known):
         node = state.world.space.nodes.get(cid)
         if node:
-            print(f"- {cid}: {node.name} ({node.kind})")
+            sector = ""
+            if node.node_id.startswith("S"):
+                sector = f" sector={node.node_id.split(':', 1)[0]}"
+            print(f"- {node.name} ({node.kind}){sector} id={cid}")
         else:
             print(f"- {cid}")
 
@@ -871,12 +942,15 @@ def render_scan_results(state, node_ids: list[str]) -> None:
     for cid in sorted(node_ids):
         node = state.world.space.nodes.get(cid)
         if node:
-            print(f"- {cid}: {node.name} ({node.kind})")
+            sector = ""
+            if node.node_id.startswith("S"):
+                sector = f" sector={node.node_id.split(':', 1)[0]}"
+            print(f"- {node.name} ({node.kind}){sector} id={cid}")
         else:
             print(f"- {cid}")
 
 
-def _scan_and_discover(state) -> tuple[list[str], list[str]]:
+def _scan_and_discover(state) -> tuple[list[str], list[str], list[str]]:
     current_id = state.world.current_node_id
     node = state.world.space.nodes.get(current_id)
     if node:
@@ -897,6 +971,7 @@ def _scan_and_discover(state) -> tuple[list[str], list[str]]:
                 ensure_sector_generated(state, sector_id)
 
     discovered: list[str] = []
+    handshakes: list[str] = []
     seen: list[str] = []
     for nid, n in state.world.space.nodes.items():
         dx = n.x_ly - x
@@ -904,12 +979,288 @@ def _scan_and_discover(state) -> tuple[list[str], list[str]]:
         dz = n.z_ly - z
         if dx * dx + dy * dy + dz * dz <= r * r:
             seen.append(nid)
-            if nid not in state.world.known_nodes:
+            is_new = nid not in state.world.known_nodes
+            if is_new:
                 discovered.append(nid)
             state.world.known_nodes.add(nid)
             state.world.known_contacts.add(nid)
-    return seen, discovered
+            if is_new:
+                record_intel(
+                    state.world,
+                    t=state.clock.t,
+                    kind="node",
+                    to_id=nid,
+                    confidence=0.6,
+                    source_kind="scan",
+                    source_ref=state.world.current_node_id,
+                )
+            if n.kind in {"relay", "station", "waystation"}:
+                if add_known_link(state.world, current_id, nid, bidirectional=True):
+                    handshakes.append(nid)
+    return seen, discovered, handshakes
 
+
+def _hash64(seed: int, text: str) -> int:
+    import hashlib
+    h = hashlib.blake2b(digest_size=8)
+    h.update(str(seed).encode("utf-8"))
+    h.update(text.encode("utf-8"))
+    return int.from_bytes(h.digest(), "big", signed=False)
+
+
+def _state_rank(state: SystemState) -> int:
+    order = {
+        SystemState.OFFLINE: 0,
+        SystemState.CRITICAL: 1,
+        SystemState.DAMAGED: 2,
+        SystemState.LIMITED: 3,
+        SystemState.NOMINAL: 4,
+        SystemState.UPGRADED: 5,
+    }
+    return order[state]
+
+
+def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> list[str]:
+    if max_new <= 0:
+        return []
+    node = state.world.space.nodes.get(current_id)
+    if node:
+        x, y, z = node.x_ly, node.y_ly, node.z_ly
+    else:
+        x, y, z = state.world.current_pos_ly
+
+    sx = math.floor(x / SECTOR_SIZE_LY)
+    sy = math.floor(y / SECTOR_SIZE_LY)
+    sz = math.floor(z / SECTOR_SIZE_LY)
+    current_sector = f"S{sx:+04d}_{sy:+04d}_{sz:+04d}"
+
+    routes = state.world.known_links.get(current_id, set())
+    hub_kinds = {"relay", "station", "waystation"}
+    candidates: dict[str, int] = {}
+
+    def _add_candidate(nid: str, weight: int) -> None:
+        if nid == current_id or nid in routes:
+            return
+        prev = candidates.get(nid, 0)
+        if weight > prev:
+            candidates[nid] = weight
+
+    # 1) Known contacts without routes (weighted by kind).
+    for nid in state.world.known_nodes:
+        if nid == current_id or nid in routes:
+            continue
+        n = state.world.space.nodes.get(nid)
+        if n and n.kind in hub_kinds:
+            _add_candidate(nid, 10)
+        elif n and n.kind in {"ship", "derelict"}:
+            _add_candidate(nid, 2)
+        else:
+            _add_candidate(nid, 1)
+
+    # 2) Hubs in same sector.
+    for nid, n in state.world.space.nodes.items():
+        if not n.is_hub:
+            continue
+        if sector_id_for_pos(n.x_ly, n.y_ly, n.z_ly) == current_sector:
+            _add_candidate(nid, 6)
+
+    # 3) Hubs in neighboring sectors.
+    neighbor_sectors: list[str] = []
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            sector_id = f"S{sx+dx:+04d}_{sy+dy:+04d}_{sz:+04d}"
+            neighbor_sectors.append(sector_id)
+            ensure_sector_generated(state, sector_id)
+    for nid, n in state.world.space.nodes.items():
+        if not n.is_hub:
+            continue
+        sid = sector_id_for_pos(n.x_ly, n.y_ly, n.z_ly)
+        if sid in neighbor_sectors:
+            _add_candidate(nid, 5)
+
+    # 4) Extra derelicts.
+    for nid, n in state.world.space.nodes.items():
+        if n.kind == "derelict":
+            _add_candidate(nid, 1)
+
+    if not candidates:
+        return []
+
+    seed = _hash64(state.meta.rng_seed + state.meta.rng_counter, current_id)
+    state.meta.rng_counter += 1
+    rng = random.Random(seed)
+
+    added: list[str] = []
+
+    # Guarantee one visible hub without a route if available.
+    visible_hubs = []
+    for nid in state.world.known_nodes:
+        if nid == current_id or nid in routes:
+            continue
+        n = state.world.space.nodes.get(nid)
+        if n and n.kind in hub_kinds:
+            dx = n.x_ly - x
+            dy = n.y_ly - y
+            dz = n.z_ly - z
+            dist = dx * dx + dy * dy + dz * dz
+            visible_hubs.append((dist, nid))
+    if visible_hubs:
+        visible_hubs.sort()
+        picked = visible_hubs[0][1]
+        if add_known_link(state.world, current_id, picked, bidirectional=True):
+            state.world.known_nodes.add(picked)
+            state.world.known_contacts.add(picked)
+            added.append(picked)
+        candidates.pop(picked, None)
+
+    # Weighted selection without replacement.
+    pool = list(candidates.items())
+    while pool and len(added) < max_new:
+        total = sum(weight for _, weight in pool)
+        if total <= 0:
+            break
+        roll = rng.uniform(0, total)
+        upto = 0.0
+        picked_index = 0
+        for i, (_, weight) in enumerate(pool):
+            upto += weight
+            if roll <= upto:
+                picked_index = i
+                break
+        dest, _weight = pool.pop(picked_index)
+        if dest == current_id:
+            continue
+        if add_known_link(state.world, current_id, dest, bidirectional=True):
+            state.world.known_nodes.add(dest)
+            state.world.known_contacts.add(dest)
+            added.append(dest)
+    return added
+
+
+def _uplink_blocked_reason(state) -> str | None:
+    if state.ship.in_transit:
+        return "in_transit"
+    node = state.world.space.nodes.get(state.world.current_node_id)
+    if not node or node.kind not in {"relay", "station", "waystation"}:
+        return "not_relay"
+    system = state.ship.systems.get("data_core")
+    if not system:
+        return "missing_data_core"
+    if system.forced_offline and state.ship.op_mode == "CRUISE":
+        return "data_core_shed"
+    if system.state == SystemState.OFFLINE:
+        return "data_core_offline"
+    if not system.service or system.service.service_name != "datad":
+        return "datad_not_installed"
+    if not system.service.is_running:
+        return "datad_not_running"
+    if _state_rank(system.state) < _state_rank(SystemState.LIMITED):
+        return "data_core_degraded"
+    return None
+
+
+def _handle_uplink(state) -> None:
+    reason = _uplink_blocked_reason(state)
+    locale = state.os.locale.value
+    blocked = {
+        "en": {
+            "in_transit": "Uplink blocked: ship in transit.",
+            "not_relay": "Uplink blocked: current node is not a relay/waystation/station.",
+            "missing_data_core": "Uplink blocked: data_core missing.",
+            "data_core_shed": "Uplink blocked: data_core offline (CRUISE plan may have shed it). Try: power plan normal; boot datad",
+            "data_core_offline": "Uplink blocked: data_core offline.",
+            "datad_not_installed": "Uplink blocked: datad not installed.",
+            "datad_not_running": "Uplink blocked: datad not running. Try: boot datad",
+            "data_core_degraded": "Uplink blocked: data_core degraded (requires >= limited).",
+        },
+        "es": {
+            "in_transit": "Uplink bloqueado: nave en tránsito.",
+            "not_relay": "Uplink bloqueado: el nodo actual no es relay/waystation/estación.",
+            "missing_data_core": "Uplink bloqueado: falta data_core.",
+            "data_core_shed": "Uplink bloqueado: data_core offline (CRUISE puede haberlo apagado). Prueba: power plan normal; boot datad",
+            "data_core_offline": "Uplink bloqueado: data_core offline.",
+            "datad_not_installed": "Uplink bloqueado: datad no instalado.",
+            "datad_not_running": "Uplink bloqueado: datad no está en ejecución. Prueba: boot datad",
+            "data_core_degraded": "Uplink bloqueado: data_core degradado (requiere >= limited).",
+        },
+    }
+    if reason:
+        print(blocked.get(locale, blocked["en"]).get(reason, blocked["en"]["not_relay"]))
+        return
+    added = _discover_routes_via_uplink(state, state.world.current_node_id, max_new=3)
+    if added:
+        for nid in added:
+            record_intel(
+                state.world,
+                t=state.clock.t,
+                kind="link",
+                from_id=state.world.current_node_id,
+                to_id=nid,
+                confidence=0.9,
+                source_kind="uplink",
+                source_ref=state.world.current_node_id,
+            )
+    if "/logs/nav" not in state.os.fs:
+        state.os.fs["/logs/nav"] = FSNode(path="/logs/nav", node_type=FSNodeType.DIR, access=AccessLevel.ENG)
+    seq = state.events.next_event_seq
+    log_path = f"/logs/nav/uplink_{state.world.current_node_id}_{seq:05d}.txt"
+    log_content = "".join(f"LINK: {nid}\n" for nid in added)
+    state.os.fs[log_path] = FSNode(
+        path=log_path,
+        node_type=FSNodeType.FILE,
+        content=log_content,
+        access=AccessLevel.ENG,
+    )
+    if added:
+        msg = {
+            "en": f"uplink_complete :: routes added: {', '.join(sorted(added))}",
+            "es": f"uplink_complete :: rutas añadidas: {', '.join(sorted(added))}",
+        }
+    else:
+        msg = {
+            "en": "uplink_complete :: no new routes found",
+            "es": "uplink_complete :: no se encontraron rutas nuevas",
+        }
+    print(msg.get(locale, msg["en"]))
+    events_out: list[tuple[str, Event]] = []
+    _emit_runtime_event(
+        state,
+        events_out,
+        "cmd",
+        EventType.UPLINK_COMPLETE,
+        Severity.INFO,
+        SourceRef(kind="ship_system", id="data_core"),
+        msg.get(locale, msg["en"]),
+        data={"routes": list(sorted(added))},
+    )
+    log_msg = {
+        "en": f"Log written to {log_path}",
+        "es": f"Registro escrito en {log_path}",
+    }
+    print(log_msg.get(locale, log_msg["en"]))
+
+def _infer_intel_source(path: str) -> tuple[str, float, str]:
+    if path.startswith("/remote/"):
+        if "/mail/" in path:
+            return "mail", 0.7, path
+        if "/logs/" in path:
+            return "log", 0.8, path
+        if "/data/" in path:
+            return "nav_fragment", 0.8, path
+    if path.startswith("/mail"):
+        return "mail", 0.7, path
+    if path.startswith("/logs"):
+        return "log", 0.8, path
+    if path.startswith("/manuals"):
+        return "manual", 0.8, path
+    return "nav_fragment", 0.8, path
+
+def _is_intel_path(path: str) -> bool:
+    if path.startswith("/data/nav") or path.startswith("/mail") or path.startswith("/logs"):
+        return True
+    if path.startswith("/remote/"):
+        return "/data/nav/" in path or "/mail/" in path or "/logs/" in path
+    return False
 
 def _handle_intel_import(state, path: str) -> None:
     try:
@@ -921,7 +1272,8 @@ def _handle_intel_import(state, path: str) -> None:
         print("intel import: file not found")
         return
 
-    added: list[str] = []
+    source_kind, confidence, source_ref = _infer_intel_source(path)
+    added_msgs: list[str] = []
     for raw in content.splitlines():
         line = raw.strip()
         if not line:
@@ -933,17 +1285,71 @@ def _handle_intel_import(state, path: str) -> None:
             if node_id.startswith("S") and ":" in node_id:
                 sector_id = node_id.split(":", 1)[0]
                 ensure_sector_generated(state, sector_id)
-            state.world.known_intel[node_id] = {"source": path}
-            state.world.known_nodes.add(node_id)
-            state.world.known_contacts.add(node_id)
-            added.append(node_id)
+            if node_id not in state.world.known_nodes:
+                state.world.known_intel[node_id] = {"source": path}
+                state.world.known_nodes.add(node_id)
+                state.world.known_contacts.add(node_id)
+                record_intel(
+                    state.world,
+                    t=state.clock.t,
+                    kind="node",
+                    to_id=node_id,
+                    confidence=confidence,
+                    source_kind=source_kind,
+                    source_ref=source_ref,
+                )
+                added_msgs.append(f"(intel) node known: {node_id}")
         if line.upper().startswith("SECTOR:"):
             sector_id = line.split(":", 1)[1].strip()
             if not sector_id:
                 continue
             ensure_sector_generated(state, sector_id)
-            state.world.known_intel[sector_id] = {"source": path, "sector": True}
-            added.append(sector_id)
+            prev = state.world.known_intel.get(sector_id, {}).get("sector")
+            if not prev:
+                state.world.known_intel[sector_id] = {"source": path, "sector": True}
+                record_intel(
+                    state.world,
+                    t=state.clock.t,
+                    kind="sector",
+                    sector_id=sector_id,
+                    confidence=confidence,
+                    source_kind=source_kind,
+                    source_ref=source_ref,
+                )
+                added_msgs.append(f"(intel) sector known: {sector_id}")
+        if line.upper().startswith("LINK:"):
+            payload = line.split(":", 1)[1].strip()
+            if "->" in payload:
+                left, right = [p.strip() for p in payload.split("->", 1)]
+                if left and right:
+                    if add_known_link(state.world, left, right, bidirectional=True):
+                        record_intel(
+                            state.world,
+                            t=state.clock.t,
+                            kind="link",
+                            from_id=left,
+                            to_id=right,
+                            confidence=confidence,
+                            source_kind=source_kind,
+                            source_ref=source_ref,
+                        )
+                        added_msgs.append(f"(intel) route added: {left} -> {right}")
+            else:
+                to_id = payload
+                if to_id:
+                    from_id = state.world.current_node_id
+                    if add_known_link(state.world, from_id, to_id, bidirectional=True):
+                        record_intel(
+                            state.world,
+                            t=state.clock.t,
+                            kind="link",
+                            from_id=from_id,
+                            to_id=to_id,
+                            confidence=confidence,
+                            source_kind=source_kind,
+                            source_ref=source_ref,
+                        )
+                        added_msgs.append(f"(intel) route added: {from_id} -> {to_id}")
         if line.upper().startswith("COORD:"):
             coord_txt = line.split(":", 1)[1].strip()
             try:
@@ -967,14 +1373,139 @@ def _handle_intel_import(state, path: str) -> None:
                 )
                 node.region = region_for_pos(x, y, z)
                 state.world.space.nodes[nid] = node
-            state.world.known_intel[nid] = {"source": path, "coord": [x, y, z]}
-            state.world.known_nodes.add(nid)
-            state.world.known_contacts.add(nid)
-            added.append(nid)
-    if added:
-        print(f"(intel) added: {', '.join(sorted(set(added)))}")
+            if nid not in state.world.known_nodes:
+                state.world.known_intel[nid] = {"source": path, "coord": [x, y, z]}
+                state.world.known_nodes.add(nid)
+                state.world.known_contacts.add(nid)
+                record_intel(
+                    state.world,
+                    t=state.clock.t,
+                    kind="coord",
+                    coord=(x, y, z),
+                    confidence=confidence,
+                    source_kind=source_kind,
+                    source_ref=source_ref,
+                )
+                added_msgs.append(f"(intel) node known: {nid}")
+    if added_msgs:
+        for msg in sorted(set(added_msgs)):
+            print(msg)
     else:
         print("(intel) no usable intel found")
+
+
+def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str]:
+    source_kind, confidence, source_ref = _infer_intel_source(source_path)
+    added_msgs: list[str] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.upper().startswith("NODE:"):
+            node_id = line.split(":", 1)[1].strip()
+            if node_id:
+                if node_id not in state.world.known_nodes:
+                    state.world.known_intel[node_id] = {"source": source_path}
+                    state.world.known_nodes.add(node_id)
+                    state.world.known_contacts.add(node_id)
+                    record_intel(
+                        state.world,
+                        t=state.clock.t,
+                        kind="node",
+                        to_id=node_id,
+                        confidence=confidence,
+                        source_kind=source_kind,
+                        source_ref=source_ref,
+                    )
+                    added_msgs.append(f"(intel) node known: {node_id}")
+        if line.upper().startswith("SECTOR:"):
+            sector_id = line.split(":", 1)[1].strip()
+            if sector_id:
+                ensure_sector_generated(state, sector_id)
+                prev = state.world.known_intel.get(sector_id, {}).get("sector")
+                if not prev:
+                    state.world.known_intel[sector_id] = {"source": source_path, "sector": True}
+                    record_intel(
+                        state.world,
+                        t=state.clock.t,
+                        kind="sector",
+                        sector_id=sector_id,
+                        confidence=confidence,
+                        source_kind=source_kind,
+                        source_ref=source_ref,
+                    )
+                    added_msgs.append(f"(intel) sector known: {sector_id}")
+        if line.upper().startswith("LINK:"):
+            payload = line.split(":", 1)[1].strip()
+            if "->" in payload:
+                left, right = [p.strip() for p in payload.split("->", 1)]
+                if left and right:
+                    if add_known_link(state.world, left, right, bidirectional=True):
+                        record_intel(
+                            state.world,
+                            t=state.clock.t,
+                            kind="link",
+                            from_id=left,
+                            to_id=right,
+                            confidence=confidence,
+                            source_kind=source_kind,
+                            source_ref=source_ref,
+                        )
+                        added_msgs.append(f"(intel) route added: {left} -> {right}")
+            else:
+                to_id = payload
+                if to_id:
+                    from_id = state.world.current_node_id
+                    if add_known_link(state.world, from_id, to_id, bidirectional=True):
+                        record_intel(
+                            state.world,
+                            t=state.clock.t,
+                            kind="link",
+                            from_id=from_id,
+                            to_id=to_id,
+                            confidence=confidence,
+                            source_kind=source_kind,
+                            source_ref=source_ref,
+                        )
+                        added_msgs.append(f"(intel) route added: {from_id} -> {to_id}")
+        if line.upper().startswith("COORD:"):
+            coord_txt = line.split(":", 1)[1].strip()
+            try:
+                x_s, y_s, z_s = [p.strip() for p in coord_txt.split(",")]
+                x, y, z = float(x_s), float(y_s), float(z_s)
+            except Exception:
+                continue
+            import hashlib
+            h = hashlib.blake2b(digest_size=4)
+            h.update(coord_txt.encode("utf-8"))
+            nid = f"NAV_{int.from_bytes(h.digest(), 'big'):08x}"
+            if nid not in state.world.space.nodes:
+                node = SpaceNode(
+                    node_id=nid,
+                    name="Nav Point",
+                    kind="nav_point",
+                    radiation_rad_per_s=0.0,
+                    x_ly=x,
+                    y_ly=y,
+                    z_ly=z,
+                )
+                node.region = region_for_pos(x, y, z)
+                state.world.space.nodes[nid] = node
+            if nid not in state.world.known_nodes:
+                state.world.known_intel[nid] = {"source": source_path, "coord": [x, y, z]}
+                state.world.known_nodes.add(nid)
+                state.world.known_contacts.add(nid)
+                record_intel(
+                    state.world,
+                    t=state.clock.t,
+                    kind="coord",
+                    coord=(x, y, z),
+                    confidence=confidence,
+                    source_kind=source_kind,
+                    source_ref=source_ref,
+                )
+                added_msgs.append(f"(intel) node known: {nid}")
+    return added_msgs
 
 def render_sectors(state) -> None:
     print("\n=== SECTORS ===")
@@ -997,6 +1528,232 @@ def render_locate(state, system_id: str) -> None:
     else:
         print(f"{system_id} -> {sys.sector_id}")
 
+
+def render_nav(state) -> None:
+    print("\n=== NAV ROUTES ===")
+    current_id = state.world.current_node_id
+    player_ship_id = getattr(state.ship, "ship_id", "RETORNO_SHIP")
+    routes = {
+        rid
+        for rid in state.world.known_links.get(current_id, set())
+        if rid != current_id and rid != player_ship_id
+    }
+    current = state.world.space.nodes.get(current_id)
+    cx, cy, cz = (current.x_ly, current.y_ly, current.z_ly) if current else state.world.current_pos_ly
+    if routes:
+        print(f"Known routes from {current_id}:")
+        for nid in sorted(routes):
+            node = state.world.space.nodes.get(nid)
+            if node:
+                dx = node.x_ly - cx
+                dy = node.y_ly - cy
+                dz = node.z_ly - cz
+                dist = (dx * dx + dy * dy + dz * dz) ** 0.5
+                if node.node_id.startswith("S"):
+                    sector_id = node.node_id.split(":", 1)[0]
+                else:
+                    sector_id = sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly)
+                sector = f" sector={sector_id}"
+                print(f"- {node.name} ({node.kind}){sector} id={nid} dist={dist:.2f}ly")
+            else:
+                print(f"- id={nid}")
+    else:
+        print(f"(no known routes from {current_id})")
+    # Nearby contacts without routes
+    nearby = [
+        nid
+        for nid in state.world.known_nodes
+        if nid not in routes and nid != current_id and nid != player_ship_id
+    ]
+    if nearby:
+        print("Nearby contacts without known route:")
+        for nid in sorted(nearby):
+            node = state.world.space.nodes.get(nid)
+            if node:
+                dx = node.x_ly - cx
+                dy = node.y_ly - cy
+                dz = node.z_ly - cz
+                dist = (dx * dx + dy * dy + dz * dz) ** 0.5
+                if node.node_id.startswith("S"):
+                    sector_id = node.node_id.split(":", 1)[0]
+                else:
+                    sector_id = sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly)
+                sector = f" sector={sector_id}"
+                print(f"- {node.name} ({node.kind}){sector} id={nid} dist={dist:.2f}ly")
+            else:
+                print(f"- {nid}")
+        locale = state.os.locale.value
+        hint = {
+            "en": "Try: intel, uplink (at relay/waystation), or acquire intel.",
+            "es": "Prueba: intel, uplink (en relay/waystation) o consigue inteligencia.",
+        }
+        print(hint.get(locale, hint["en"]))
+
+
+def _format_age_short(seconds: float) -> str:
+    seconds = max(0.0, seconds)
+    if seconds >= 86400:
+        return f"{int(seconds // 86400)}d"
+    if seconds >= 3600:
+        return f"{int(seconds // 3600)}h"
+    if seconds >= 60:
+        return f"{int(seconds // 60)}m"
+    return f"{int(seconds)}s"
+
+
+def render_intel_list(state, limit: int | None = 20) -> None:
+    print("\n=== INTEL ===")
+    items = list(state.world.intel)
+    if not items:
+        print("(no intel)")
+        return
+    items.sort(key=lambda i: i.t)
+    if limit is not None:
+        items = items[:limit]
+    print("ID     kind   what                        conf  source                 age")
+    now = state.clock.t
+    for item in items:
+        if item.kind == "link":
+            what = f"{item.from_id} -> {item.to_id}"
+        elif item.kind == "node":
+            what = f"{item.to_id}"
+        elif item.kind == "sector":
+            what = f"{item.sector_id}"
+        elif item.kind == "coord" and item.coord:
+            what = f"{item.coord[0]:.2f},{item.coord[1]:.2f},{item.coord[2]:.2f}"
+        else:
+            what = "?"
+        if len(what) > 28:
+            what = what[:25] + "..."
+        source = item.source_kind
+        if item.source_ref:
+            source = f"{item.source_kind}@{item.source_ref}"
+            if len(source) > 20:
+                source = source[:17] + "..."
+        age = _format_age_short(now - item.t)
+        print(f"{item.intel_id:<6} {item.kind:<6} {what:<28} {item.confidence:>4.2f}  {source:<20} {age:>4}")
+
+
+def render_intel_show(state, intel_id: str) -> None:
+    print("\n=== INTEL DETAIL ===")
+    target = None
+    for item in state.world.intel:
+        if item.intel_id.lower() == intel_id.lower():
+            target = item
+            break
+    if not target:
+        print("(intel) not found")
+        return
+    now = state.clock.t
+    age = _format_age_short(now - target.t)
+    print(f"id: {target.intel_id}")
+    print(f"kind: {target.kind}")
+    if target.from_id:
+        print(f"from: {target.from_id}")
+    if target.to_id:
+        print(f"to: {target.to_id}")
+    if target.sector_id:
+        print(f"sector: {target.sector_id}")
+    if target.coord:
+        x, y, z = target.coord
+        print(f"coord: {x:.3f}, {y:.3f}, {z:.3f}")
+    print(f"confidence: {target.confidence:.2f}")
+    print(f"source_kind: {target.source_kind}")
+    if target.source_ref:
+        print(f"source_ref: {target.source_ref}")
+    print(f"t: {target.t} (age {age})")
+    if target.note:
+        print(f"note: {target.note}")
+
+
+def _handle_intel_export(state, path: str) -> None:
+    path = normalize_path(path)
+    if not (path.startswith("/logs/nav") or path.startswith("/data/nav")):
+        print("intel export: path must be under /logs/nav or /data/nav")
+        return
+    if path.endswith("/"):
+        print("intel export: path must be a file")
+        return
+    if path.startswith("/logs/nav") and "/logs/nav" not in state.os.fs:
+        state.os.fs["/logs/nav"] = FSNode(path="/logs/nav", node_type=FSNodeType.DIR, access=AccessLevel.ENG)
+    if not state.world.intel:
+        print("intel export: no intel to export")
+        return
+    lines: list[str] = []
+    seen: set[str] = set()
+    for item in state.world.intel:
+        line = ""
+        if item.kind == "link" and item.from_id and item.to_id:
+            line = f"LINK: {item.from_id} -> {item.to_id}"
+        elif item.kind == "node" and item.to_id:
+            line = f"NODE: {item.to_id}"
+        elif item.kind == "sector" and item.sector_id:
+            line = f"SECTOR: {item.sector_id}"
+        elif item.kind == "coord" and item.coord:
+            x, y, z = item.coord
+            line = f"COORD: {x}, {y}, {z}"
+        if line and line not in seen:
+            seen.add(line)
+            lines.append(line)
+    if not lines:
+        print("intel export: no intel to export")
+        return
+    content = "\n".join(lines) + "\n"
+    state.os.fs[path] = FSNode(path=path, node_type=FSNodeType.FILE, content=content, access=AccessLevel.ENG)
+    print(f"(intel) export written to {path} ({len(lines)} lines)")
+
+
+def _confirm_abandon_drones(state, action) -> bool:
+    if not state.ship.drones:
+        return True
+    current_node = state.world.current_node_id
+    out = []
+    for d in state.ship.drones.values():
+        if d.status in {DroneStatus.DEPLOYED, DroneStatus.DISABLED} and d.location.kind == "world_node":
+            out.append(d)
+    if not out:
+        return True
+    locale = state.os.locale.value
+    dest = getattr(action, "node_id", "?")
+    drone_ids = ", ".join(d.drone_id for d in out)
+    msg = {
+        "en": f"WARNING: drones not aboard ({drone_ids}). Leaving {current_node} will abandon them. Continue? [y/N] ",
+        "es": f"ADVERTENCIA: drones fuera de la nave ({drone_ids}). Al salir de {current_node} quedarán abandonados. ¿Continuar? [s/N] ",
+    }.get(locale, "WARNING: drones not aboard. Continue? [y/N] ")
+    reply = input(msg).strip().lower()
+    if locale == "es":
+        return reply in {"s", "si", "sí", "y", "yes"}
+    return reply in {"y", "yes"}
+
+
+def _confirm_travel_abort(state) -> bool:
+    locale = state.os.locale.value
+    msg = {
+        "en": "WARNING: aborting travel will return you to the origin node. Continue? [y/N] ",
+        "es": "ADVERTENCIA: abortar el viaje te devuelve al nodo de origen. ¿Continuar? [s/N] ",
+    }.get(locale, "WARNING: aborting travel will return you to the origin node. Continue? [y/N] ")
+    reply = input(msg).strip().lower()
+    if locale == "es":
+        return reply in {"s", "si", "sí", "y", "yes"}
+    return reply in {"y", "yes"}
+
+
+def _resolve_node_id_from_input(state, token: str) -> str | None:
+    token_lower = token.lower()
+    nodes = state.world.space.nodes
+    if token in nodes:
+        return token
+    # Exact name match (case-insensitive)
+    for nid, node in nodes.items():
+        if node.name.lower() == token_lower:
+            return nid
+    # Alias: drop spaces/dashes in name (e.g., Relay-97)
+    normalized = token_lower.replace(" ", "").replace("-", "")
+    for nid, node in nodes.items():
+        name_norm = node.name.lower().replace(" ", "").replace("-", "")
+        if name_norm == normalized:
+            return nid
+    return None
 
 def _resolve_localized_path(state, path: str) -> str:
     path = normalize_path(path)
@@ -1038,10 +1795,15 @@ def render_cat(state, path: str) -> None:
         print("Permission denied")
         return
     except IsADirectoryError:
-        print("Is a directory")
+        print(f"{path} is a directory. Try: ls {path}")
         return
     print(f"\n=== CAT {path} ===")
     print(content)
+    if _is_intel_path(path):
+        added = _auto_import_intel_from_text(state, content, path)
+        if added:
+            for msg in sorted(set(added)):
+                print(msg)
 
 def render_mailbox(state, box: str) -> None:
     path = f"/mail/{box}"
@@ -1123,7 +1885,8 @@ def _run_hibernate(loop, years: float) -> None:
         return
     events_to_render: list[tuple[str, Event]] = []
     with loop.with_lock() as locked_state:
-        locked_state.ship.op_mode = "CRUISE"
+        prev_mode = locked_state.ship.op_mode
+        prev_source = locked_state.ship.op_mode_source
         start_soc = locked_state.ship.power.e_batt_kwh / locked_state.ship.power.e_batt_max_kwh if locked_state.ship.power.e_batt_max_kwh else 0.0
         start_health = {sid: sys.health for sid, sys in locked_state.ship.systems.items() if "critical" in sys.tags}
     with loop.with_lock() as locked_state:
@@ -1159,9 +1922,9 @@ def _run_hibernate(loop, years: float) -> None:
         )
         end_soc = locked_state.ship.power.e_batt_kwh / locked_state.ship.power.e_batt_max_kwh if locked_state.ship.power.e_batt_max_kwh else 0.0
         end_health = {sid: sys.health for sid, sys in locked_state.ship.systems.items() if "critical" in sys.tags}
-        # Keep cruise profile active unless manually changed later
-        if not locked_state.ship.in_transit:
-            locked_state.ship.op_mode = "CRUISE"
+        # Do not change ship_mode; restore previous values.
+        locked_state.ship.op_mode = prev_mode
+        locked_state.ship.op_mode_source = prev_source
     loop.set_auto_tick(was_auto)
     filtered = [pair for pair in step_events if pair[1].severity == Severity.CRITICAL or pair[1].type in {EventType.ARRIVED}]
     events_to_render.extend(filtered)
@@ -1180,10 +1943,29 @@ def _run_hibernate(loop, years: float) -> None:
         print(f"SoC: start={start_soc:.3f} end={end_soc:.3f}")
 
 
+def _confirm_hibernate_non_cruise(state) -> bool:
+    locale = state.os.locale.value
+    msg = {
+        "en": "WARNING: hibernating while not in CRUISE may increase wear. Continue? [y/N] ",
+        "es": "ADVERTENCIA: hibernar fuera de CRUISE puede aumentar el desgaste. ¿Continuar? [s/N] ",
+    }.get(locale, "WARNING: hibernating while not in CRUISE may increase wear. Continue? [y/N] ")
+    reply = input(msg).strip().lower()
+    if locale == "es":
+        return reply in {"s", "si", "sí", "y", "yes"}
+    return reply in {"y", "yes"}
+
+
 def render_about(state, system_id: str) -> None:
     path = _resolve_localized_path(state, f"/manuals/systems/{system_id}.txt")
     if path in state.os.fs:
         render_cat(state, path)
+        # Auto-import intel from nav/mail/logs (including remote)
+        if _is_intel_path(path):
+            content = state.os.fs[path].content
+            added = _auto_import_intel_from_text(state, content, path)
+            if added:
+                for msg in sorted(set(added)):
+                    print(msg)
         return
     concept_path = _resolve_localized_path(state, f"/manuals/concepts/{system_id}.txt")
     if concept_path in state.os.fs:
@@ -1319,6 +2101,9 @@ def main() -> None:
         "sectors",
         "map",
         "locate",
+        "nav",
+        "uplink",
+        "relay",
         "dock",
         "travel",
         "salvage",
@@ -1405,7 +2190,19 @@ def main() -> None:
             elif cmd == "dock":
                 candidates = [c for c in contacts if c.startswith(text)]
             elif cmd == "travel":
-                candidates = [c for c in contacts if c.startswith(text)]
+                name_matches = []
+                for nid in contacts:
+                    node = locked_state.world.space.nodes.get(nid)
+                    if node and node.name.lower().startswith(text.lower()):
+                        name_matches.append(node.name)
+                sector_matches = []
+                for nid in contacts:
+                    node = locked_state.world.space.nodes.get(nid)
+                    if node and node.node_id.startswith("S"):
+                        sector_label = f"sector={node.node_id}"
+                        if sector_label.startswith(text):
+                            sector_matches.append(sector_label)
+                candidates = [c for c in contacts if c.startswith(text)] + name_matches + sector_matches
             elif cmd == "power":
                 if len(tokens) == 2:
                     candidates = [c for c in ["status", "shed", "off", "on", "plan"] if c.startswith(text)]
@@ -1426,6 +2223,11 @@ def main() -> None:
             elif cmd == "cargo":
                 if len(tokens) == 2:
                     candidates = [c for c in ["audit"] if c.startswith(text)]
+            elif cmd == "intel":
+                if len(tokens) == 2:
+                    candidates = [c for c in ["show", "import", "export", "all"] if c.startswith(text)] + [t for t in ["10", "20", "50"] if t.startswith(text)]
+                elif len(tokens) == 3 and tokens[1] == "show":
+                    candidates = [i.intel_id for i in locked_state.world.intel if i.intel_id.startswith(text.upper())]
             elif cmd == "shutdown":
                 if len(tokens) == 2:
                     candidates = [s for s in systems if s.startswith(text)]
@@ -1465,6 +2267,13 @@ def main() -> None:
                     candidates = [c for c in ["explain"] if c.startswith(text)]
                 elif len(tokens) == 3 and tokens[1] == "explain":
                     candidates = [k for k in locked_state.events.alerts.keys() if k.startswith(text)]
+            elif cmd == "nav":
+                candidates = []
+            elif cmd == "uplink":
+                candidates = []
+            elif cmd == "relay":
+                if len(tokens) == 2:
+                    candidates = [c for c in ["uplink"] if c.startswith(text)]
             elif cmd == "drone":
                 if len(tokens) == 2:
                     candidates = [
@@ -1478,14 +2287,14 @@ def main() -> None:
                 elif len(tokens) == 4 and tokens[1] == "move":
                     candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
                 elif len(tokens) == 3 and tokens[1] == "salvage":
-                    candidates = [c for c in ["scrap", "module", "modules"] if c.startswith(text)]
+                    candidates = [c for c in ["scrap", "module", "modules", "data"] if c.startswith(text)]
                 elif len(tokens) == 4 and tokens[1] == "salvage":
                     candidates = [d for d in drones if d.startswith(text)]
                 elif len(tokens) == 5 and tokens[1] == "salvage":
                     candidates = [c for c in contacts if c.startswith(text)]
             elif cmd == "salvage":
                 if len(tokens) == 2:
-                    candidates = [c for c in ["scrap", "module", "modules"] if c.startswith(text)]
+                    candidates = [c for c in ["scrap", "module", "modules", "data"] if c.startswith(text)]
                 elif len(tokens) == 3:
                     candidates = [d for d in drones if d.startswith(text)]
                 elif len(tokens) == 4:
@@ -1666,10 +2475,12 @@ def main() -> None:
         if parsed == "SCAN":
             _drain_auto_events()
             with loop.with_lock() as locked_state:
-                seen, discovered = _scan_and_discover(locked_state)
+                seen, discovered, handshakes = _scan_and_discover(locked_state)
                 render_scan_results(locked_state, seen)
                 if discovered:
                     print(f"(scan) new: {', '.join(sorted(discovered))}")
+                if handshakes:
+                    print(f"(nav) handshake established with {', '.join(sorted(set(handshakes)))}")
             continue
         if parsed == "INVENTORY":
             _drain_auto_events()
@@ -1705,6 +2516,52 @@ def main() -> None:
             _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_jobs(locked_state)
+            continue
+        if parsed == "NAV":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                render_nav(locked_state)
+            continue
+        if parsed == "INTEL_LIST":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                render_intel_list(locked_state)
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "INTEL_LIST":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                limit = None if parsed[1] == "all" else int(parsed[1])
+                render_intel_list(locked_state, limit=limit)
+            continue
+        if parsed.__class__.__name__ == "TravelAbort":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                if not _confirm_travel_abort(locked_state):
+                    continue
+            ev = loop.apply_action(parsed)
+            with loop.with_lock() as locked_state:
+                _apply_salvage_loot(loop, locked_state, ev)
+                render_events(locked_state, ev)
+            auto_ev = loop.drain_events()
+            if auto_ev:
+                with loop.with_lock() as locked_state:
+                    _apply_salvage_loot(loop, locked_state, auto_ev)
+                    render_events(locked_state, auto_ev)
+            continue
+        if parsed == "UPLINK":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                _handle_uplink(locked_state)
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "INTEL_SHOW":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                render_intel_show(locked_state, parsed[1])
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "INTEL_EXPORT":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                _handle_intel_export(locked_state, parsed[1])
             continue
         if parsed == "POWER_STATUS":
             _drain_auto_events()
@@ -1757,6 +2614,9 @@ def main() -> None:
                     if not locked_state.ship.in_transit:
                         print("hibernate: not in transit")
                         continue
+                    if locked_state.ship.op_mode != "CRUISE":
+                        if not _confirm_hibernate_non_cruise(locked_state):
+                            continue
                     remaining_s = max(0.0, locked_state.ship.arrival_t - locked_state.clock.t)
                     years = remaining_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
             else:
@@ -1775,6 +2635,13 @@ def main() -> None:
             with loop.with_lock() as locked_state:
                 render_status(locked_state)
             continue
+        if parsed.__class__.__name__ in {"Dock", "Travel"}:
+            with loop.with_lock() as locked_state:
+                resolved = _resolve_node_id_from_input(locked_state, parsed.node_id)
+                if resolved:
+                    parsed.node_id = resolved
+                if not _confirm_abandon_drones(locked_state, parsed):
+                    continue
 
         ev = loop.apply_action(parsed)
         with loop.with_lock() as locked_state:

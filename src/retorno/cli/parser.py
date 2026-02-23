@@ -21,8 +21,10 @@ from retorno.core.actions import (
     SystemOn,
     SalvageModule,
     SalvageScrap,
+    SalvageData,
     Status,
     Travel,
+    TravelAbort,
 )
 
 
@@ -58,6 +60,12 @@ def parse_command(line: str):
     if cmd == "jobs":
         return "JOBS"
 
+    if cmd == "nav":
+        return "NAV"
+
+    if cmd == "uplink":
+        return "UPLINK"
+
     if cmd == "alerts":
         if len(args) == 0:
             return "ALERTS"
@@ -92,8 +100,12 @@ def parse_command(line: str):
         return Dock(node_id=args[0])
 
     if cmd == "travel":
+        if len(args) == 1 and args[0] == "abort":
+            return TravelAbort()
+        if len(args) == 2 and args[0] == "--no-cruise":
+            return Travel(node_id=args[1], no_cruise=True)
         if len(args) != 1:
-            raise ParseError("Uso: travel <node_id>")
+            raise ParseError("Uso: travel <node_id|name> | travel --no-cruise <dest> | travel abort")
         return Travel(node_id=args[0])
 
     if cmd == "hibernate":
@@ -112,7 +124,7 @@ def parse_command(line: str):
     if cmd == "salvage":
         if len(args) < 2:
             raise ParseError(
-                "Uso: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id]"
+                "Uso: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage data <drone_id> <node_id>"
             )
         kind = args[0].lower()
         if kind == "scrap":
@@ -129,8 +141,12 @@ def parse_command(line: str):
             if len(args) != 3:
                 raise ParseError("Missing node_id. Example: drone salvage modules D1 ECHO_7")
             return SalvageModule(drone_id=args[1], node_id=args[2])
+        if kind == "data":
+            if len(args) != 3:
+                raise ParseError("Uso: drone salvage data <drone_id> <node_id>")
+            return SalvageData(drone_id=args[1], node_id=args[2])
         raise ParseError(
-            "Uso: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id]"
+            "Uso: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage data <drone_id> <node_id>"
         )
 
     if cmd in {"inventory", "cargo"}:
@@ -165,9 +181,30 @@ def parse_command(line: str):
         raise ParseError("Uso: mail [inbox] | mail read <id|latest>")
 
     if cmd == "intel":
+        if len(args) == 0:
+            return "INTEL_LIST"
+        if len(args) == 1:
+            if args[0].lower() == "all":
+                return ("INTEL_LIST", "all")
+            try:
+                amount = int(args[0])
+            except ValueError as e:
+                raise ParseError("Uso: intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>") from e
+            if amount <= 0:
+                raise ParseError("intel: amount debe ser > 0")
+            return ("INTEL_LIST", amount)
         if len(args) == 2 and args[0] == "import":
             return ("INTEL_IMPORT", args[1])
-        raise ParseError("Uso: intel import <path>")
+        if len(args) == 2 and args[0] == "show":
+            return ("INTEL_SHOW", args[1])
+        if len(args) == 2 and args[0] == "export":
+            return ("INTEL_EXPORT", args[1])
+        raise ParseError("Uso: intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>")
+
+    if cmd == "relay":
+        if len(args) == 1 and args[0] == "uplink":
+            return "UPLINK"
+        raise ParseError("Uso: relay uplink")
 
     if cmd == "sectors" or cmd == "map":
         return "SECTORS"
@@ -269,7 +306,7 @@ def parse_command(line: str):
         if sub == "salvage":
             if len(args) < 3:
                 raise ParseError(
-                    "Uso: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id]"
+                    "Uso: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage data <drone_id> <node_id>"
                 )
             kind = args[1].lower()
             rest = args[2:]
@@ -297,8 +334,14 @@ def parse_command(line: str):
                 drone_id = rest[0]
                 node_id = rest[1] if len(rest) == 2 else None
                 return SalvageModule(drone_id=drone_id, node_id=node_id)
+            if kind == "data":
+                if len(rest) != 2:
+                    raise ParseError("Uso: drone salvage data <drone_id> <node_id>")
+                drone_id = rest[0]
+                node_id = rest[1]
+                return SalvageData(drone_id=drone_id, node_id=node_id)
             raise ParseError(
-                "Uso: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id]"
+                "Uso: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage data <drone_id> <node_id>"
             )
         emergency = False
         if sub in {"deploy", "deploy!"}:
@@ -337,6 +380,8 @@ def _suggest_command(cmd: str) -> str | None:
         "config",
         "mail",
         "intel",
+        "uplink",
+        "relay",
         "ls",
         "cat",
         "contacts",

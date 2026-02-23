@@ -1,0 +1,28 @@
+SHIP OS — Navegación y conocimiento de rutas (Copia de campo)
+Ref: OS-MAN/ENG/NAV-01
+
+No “ves” la galaxia como un mapa completo. La terminal del sarcófago opera con conocimiento parcial:
+- contactos detectados por sensores (el alcance de scan es limitado),
+- y rutas obtenidas de datos de navegación registrados (intel).
+
+Relays
+Un relay es infraestructura heredada: una baliza automatizada que repite señales y mantiene en caché tablas de rutas.
+Si un relay todavía responde, puede permitir extraer:
+- destinos alcanzables (rutas),
+- ecos de largo alcance (broadcasts antiguos),
+- y fragmentos parciales de navegación.
+
+Coordenadas vs IDs
+- sector: celda de cuadrícula, identificada como S{sx}_{sy}_{sz} (derivada de x/y/z en ly).
+- coord: coordenada de sector reportada para un contacto.
+- id: identificador real del nodo que se usa en comandos (travel, dock).
+Un mismo sector puede contener varios contactos con ids distintos.
+
+Notas operativas
+- Un contacto puede ser conocido sin que exista una ruta conocida. Saber “que existe” no es saber “cómo llegar”.
+- Los relays pueden estar degradados, silenciosos o repitiendo datos antiguos. No asumas que un broadcast es actual.
+- En una red arruinada, los relays suelen ser la única forma de ampliar conocimiento de navegación sin saltos ciegos.
+
+Comandos relacionados
+- scan, nav, intel import, travel
+(futuro) uplink / relay sync

@@ -1,0 +1,4 @@
+scan
+- Barrido activo de señales cercanas dentro del rango de sensores.
+- Relays y estaciones pueden responder con un enlace de navegación.
+- Un contacto detectado no implica ruta disponible.

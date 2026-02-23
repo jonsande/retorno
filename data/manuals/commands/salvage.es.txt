@@ -1,5 +1,6 @@
 drone salvage scrap <drone_id> <node_id> <amount>
 drone salvage module <drone_id> [node_id]
-- Recupera chatarra o módulos del nodo.
+drone salvage data <drone_id> <node_id>
+- Recupera chatarra, módulos o datos del nodo.
 - El dron debe estar desplegado en el nodo.
 - Si no se indica node_id, se usa el nodo actual del dron.

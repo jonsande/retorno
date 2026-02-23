@@ -1,4 +1,9 @@
-travel <node_id>
-- Inicia un tránsito interestelar hacia el nodo destino.
+travel <node_id|name>
+travel --no-cruise <dest>
+travel abort
+- Inicia tránsito interestelar al nodo destino.
+- Por defecto, travel activa CRUISE automáticamente.
+- Usa --no-cruise para mantener el modo actual (avanzado; mayor desgaste).
+- travel abort cancela el tránsito actual y retorna al origen.
 - Muestra ETA en años; la nave queda en tránsito hasta llegar.
 - Los comandos operativos quedan bloqueados en tránsito.

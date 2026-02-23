@@ -1,0 +1,4 @@
+scan
+- Active sweep for nearby signals within sensor range.
+- Relays and stations may respond with a nav handshake.
+- Discovered contacts are not always reachable without a route.

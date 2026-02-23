@@ -30,10 +30,15 @@ class EventType(str, Enum):
     MODULE_INSTALLED = "module_installed"
     DRONE_DISABLED = "drone_disabled"
     DRONE_DAMAGED = "drone_damaged"
+    DRONE_LOW_BATTERY = "drone_low_battery"
     TRAVEL_STARTED = "travel_started"
+    TRAVEL_PROFILE_SET = "travel_profile_set"
+    TRAVEL_ABORTED = "travel_aborted"
     ARRIVED = "arrived"
     HIBERNATION_STARTED = "hibernation_started"
     HIBERNATION_ENDED = "hibernation_ended"
+    UPLINK_COMPLETE = "uplink_complete"
+    DATA_SALVAGED = "data_salvaged"
 
 
 @dataclass(slots=True)

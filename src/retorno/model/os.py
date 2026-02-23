@@ -89,3 +89,39 @@ def read_file(fs: dict[str, FSNode], file_path: str, access_level: AccessLevel) 
     if node.node_type != FSNodeType.FILE:
         raise IsADirectoryError(file_path)
     return node.content
+
+
+def _ensure_dir(fs: dict[str, FSNode], dir_path: str, access: AccessLevel) -> None:
+    dir_path = normalize_path(dir_path)
+    if dir_path in fs:
+        return
+    fs[dir_path] = FSNode(path=dir_path, node_type=FSNodeType.DIR, access=access)
+
+
+def mount_files(fs: dict[str, FSNode], prefix: str, files: list[dict]) -> int:
+    prefix = normalize_path(prefix)
+    added = 0
+    for entry in files:
+        src_path = normalize_path(entry.get("path", ""))
+        if not src_path:
+            continue
+        if not (src_path.startswith("/mail") or src_path.startswith("/logs") or src_path.startswith("/data")):
+            continue
+        dest_path = normalize_path(prefix + src_path)
+        if dest_path in fs:
+            continue
+        access = entry.get("access", AccessLevel.GUEST)
+        try:
+            access = AccessLevel(access)
+        except Exception:
+            access = AccessLevel.GUEST
+        content = entry.get("content", "")
+        # Ensure parent directories.
+        parts = dest_path.strip("/").split("/")
+        cur = ""
+        for part in parts[:-1]:
+            cur = f"{cur}/{part}" if cur else f"/{part}"
+            _ensure_dir(fs, cur, access)
+        fs[dest_path] = FSNode(path=dest_path, node_type=FSNodeType.FILE, content=content, access=access)
+        added += 1
+    return added

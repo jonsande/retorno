@@ -1,6 +1,6 @@
 {
   "node": {
-    "node_id": "SHIP_1",
+    "node_id": "RETORNO_SHIP",
     "name": "Retorno",
     "kind": "ship",
     "radiation_rad_per_s": 0.0,
@@ -33,7 +33,7 @@
     {
       "path": "/data/nav/fragments/frag_0001.txt",
       "access": "GUEST",
-      "content": "NODE: HARBOR_12\n"
+      "content": "LINK: ECHO_7 -> HARBOR_12\n"
     }
   ]
 }

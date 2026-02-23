@@ -1,0 +1,26 @@
+intel
+- Lista la inteligencia de navegación conocida (más reciente primero).
+Uso: intel | intel <amount> | intel all
+- Columnas:
+  ID: identificador del item de intel.
+  kind: tipo de intel (node/link/sector/coord).
+  what: descripción corta del objetivo.
+  conf: confianza (0.00–1.00).
+  source: origen de la intel (puede incluir @ref).
+  age: tiempo desde que se registró.
+- Tipos de intel:
+  node: nodo/contacto conocido específico (p. ej., HARBOR_12).
+  sector: identificador de sector conocido (p. ej., S+0001_-0002_+0000).
+  link: ruta conocida entre dos nodos (A -> B).
+  coord: coordenadas exactas (x,y,z) que señalan un punto de navegación.
+
+intel show <intel_id>
+- Muestra detalles y procedencia de un item de intel.
+
+intel import <path>
+- Importa inteligencia de navegación desde un archivo.
+- Marcadores soportados: NODE:, LINK:, SECTOR:, COORD:
+- Archivos en /data/nav, /mail o /logs pueden auto‑importar al hacer cat.
+
+intel export <path>
+- Exporta la intel actual a un archivo en /logs/nav o /data/nav.

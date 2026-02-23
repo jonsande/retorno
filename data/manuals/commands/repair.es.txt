@@ -1,3 +1,8 @@
 drone repair <drone_id> <system_id>
-- Repara un sistema con un dron.
+repair <system_id> --selftest
+
+Notas
+- La reparación con dron consume chatarra según el amount de reparación.
+- La auto‑reparación es más lenta y requiere el módulo Self-Test Rig.
+- La auto‑reparación también consume chatarra, pero menos por unidad de salud.
 - Las reparaciones requieren drones desplegados.

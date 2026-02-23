@@ -1,3 +1,8 @@
 drone repair <drone_id> <system_id>
-- Repairs a system using a drone.
-- Repair operations require deployed drone units.
+repair <system_id> --selftest
+
+Notes
+- Drone repair consumes scrap based on repair amount.
+- Self-test repair is slower and requires a Self-Test Rig module.
+- Self-test also consumes scrap, but less per unit of health.
+- Repairs require deployed drone units.

@@ -28,7 +28,7 @@ class GameState:
     meta: MetaState = field(default_factory=MetaState)
     clock: ClockState = field(default_factory=ClockState)
     world: WorldState = field(default_factory=WorldState)
-    ship: ShipState = field(default_factory=lambda: ShipState(ship_id="SHIP_1", name="RETORNO"))
+    ship: ShipState = field(default_factory=lambda: ShipState(ship_id="RETORNO_SHIP", name="RETORNO"))
     os: OSState = field(default_factory=OSState)
     jobs: JobManagerState = field(default_factory=JobManagerState)
     events: EventManagerState = field(default_factory=EventManagerState)
