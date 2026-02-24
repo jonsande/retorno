@@ -51,9 +51,14 @@ class WorldState:
     known_intel: dict[str, dict] = field(default_factory=dict)
     intel: list[IntelItem] = field(default_factory=list)
     next_intel_seq: int = 1
+    next_tmp_seq: int = 1
+    active_tmp_node_id: str | None = None
+    active_tmp_from: str | None = None
+    active_tmp_to: str | None = None
+    active_tmp_progress: float | None = None
     generated_sectors: set[str] = field(default_factory=set)
     known_links: dict[str, set[str]] = field(default_factory=dict)
-    current_node_id: str = "RETORNO_SHIP"
+    current_node_id: str = "UNKNOWN_00"
     current_pos_ly: tuple[float, float, float] = (0.0, 0.0, 0.0)
     rng_seed: int = 0
 

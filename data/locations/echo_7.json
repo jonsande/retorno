@@ -15,5 +15,12 @@
     "modules_min": 1,
     "modules_max": 1,
     "modules_pool": "all"
-  }
+  },
+  "fs_files": [
+    {
+        "path": "/data/nav/fragments/frag_0001b.txt",
+        "access": "GUEST",
+        "content": "LINK: ECHO_7 -> CURL_12\n"
+      }
+    ]
 }

@@ -272,6 +272,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Action blocked: node not found ({node_id})",
             "es": "Acción bloqueada: nodo no encontrado ({node_id})",
         },
+        "ship_sector_missing": {
+            "en": "Action blocked: ship sector not found ({sector_id})",
+            "es": "Acción bloqueada: sector de nave no encontrado ({sector_id})",
+        },
         "unknown_contact": {
             "en": "Action blocked: unknown contact ({node_id}). Use 'scan' or acquire navigation intel.",
             "es": "Acción bloqueada: contacto desconocido ({node_id}). Usa 'scan' o consigue inteligencia de navegación.",
@@ -600,7 +604,7 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             else:
                 extra = f" | effects: {effects_text}" if effects_text else ""
             if scrap_cost is not None:
-                extra = f"{extra} | cost: {scrap_cost} scrap"
+                extra = f"{extra} | installation cost: {scrap_cost} scrap"
             tmpl = {
                 "en": "[{sev}] module_installed :: Module installed: {module_id}{extra}",
                 "es": "[{sev}] module_installed :: Módulo instalado: {module_id}{extra}",
@@ -714,7 +718,7 @@ def render_status(state) -> None:
         print(f"ship_mode: {ship.op_mode} ({source})")
     else:
         print(f"ship_mode: {ship.op_mode}")
-    current_loc = ship.current_node_id or state.world.current_node_id
+    current_loc = state.world.current_node_id
     node = state.world.space.nodes.get(current_loc)
     node_name = node.name if node else current_loc
     if ship.in_transit:
@@ -726,6 +730,24 @@ def render_status(state) -> None:
         print(f"transit: {ship.transit_from} -> {ship.transit_to}  dist={dist:.2f}ly  ETA={remaining_years:.2f}y ({remaining_days:.1f}d)")
     else:
         print(f"location: {current_loc} ({node_name})")
+        if state.world.active_tmp_node_id == current_loc:
+            tmp_from = state.world.active_tmp_from or "?"
+            tmp_to = state.world.active_tmp_to or "?"
+            progress = state.world.active_tmp_progress
+            locale = state.os.locale.value
+            if isinstance(progress, (int, float)):
+                pct = int(progress * 100)
+                msg = {
+                    "en": f"transit: between {tmp_from} and {tmp_to} (aborted, {pct}%)",
+                    "es": f"transit: entre {tmp_from} y {tmp_to} (abortado, {pct}%)",
+                }
+                print(msg.get(locale, msg["en"]))
+            else:
+                msg = {
+                    "en": f"transit: between {tmp_from} and {tmp_to} (aborted)",
+                    "es": f"transit: entre {tmp_from} y {tmp_to} (abortado)",
+                }
+                print(msg.get(locale, msg["en"]))
     print(f"power: P_gen={p.p_gen_kw:.2f}kW  P_load={p.p_load_kw:.2f}kW  net={net:+.2f}kW headroom={headroom:.2f}kW  SoC={soc:.2f}  Q={p.power_quality:.2f}  brownout={p.brownout}")
     disp_scrap, disp_modules, dirty = _inventory_view(ship)
     dirty_suffix = " [manifest stale]" if dirty else ""
@@ -913,11 +935,20 @@ def render_modules_catalog(state) -> None:
         effects = info.get("effects", {})
         effects_str = ", ".join(f"{k}={v}" for k, v in effects.items()) or "no effects"
         desc = info.get("desc_es") if locale == "es" else info.get("desc_en")
-        print(f"- {mid}: {name} (scrap {scrap_cost}) [{effects_str}]")
+        print(f"- {mid}: {name} (installation scrap cost {scrap_cost}) [{effects_str}]")
         if desc:
             print(f"  {desc}")
 
 def render_contacts(state) -> None:
+    system = state.ship.systems.get("sensors")
+    if not system or _state_rank(system.state) < _state_rank(SystemState.LIMITED):
+        locale = state.os.locale.value
+        msg = {
+            "en": "contacts: sensors offline (requires >= limited)",
+            "es": "contacts: sensores fuera de línea (requiere >= limitado)",
+        }
+        print(msg.get(locale, msg["en"]))
+        return
     print("\n=== CONTACTS ===")
     known = state.world.known_nodes if hasattr(state.world, "known_nodes") and state.world.known_nodes else state.world.known_contacts
     if not known:
@@ -951,8 +982,25 @@ def render_scan_results(state, node_ids: list[str]) -> None:
 
 
 def _scan_and_discover(state) -> tuple[list[str], list[str], list[str]]:
+    system = state.ship.systems.get("sensors")
+    if not system or _state_rank(system.state) < _state_rank(SystemState.LIMITED):
+        locale = state.os.locale.value
+        msg = {
+            "en": "scan: sensors offline (requires >= limited)",
+            "es": "scan: sensores fuera de línea (requiere >= limitado)",
+        }
+        print(msg.get(locale, msg["en"]))
+        return [], [], []
     current_id = state.world.current_node_id
     node = state.world.space.nodes.get(current_id)
+    if node and node.kind == "transit":
+        locale = state.os.locale.value
+        msg = {
+            "en": "scan: sensors lock unavailable while adrift",
+            "es": "scan: bloqueo de sensores no disponible en tránsito",
+        }
+        print(msg.get(locale, msg["en"]))
+        return [], [], []
     if node:
         x, y, z = node.x_ly, node.y_ly, node.z_ly
     else:
@@ -1584,8 +1632,8 @@ def render_nav(state) -> None:
                 print(f"- {nid}")
         locale = state.os.locale.value
         hint = {
-            "en": "Try: intel, uplink (at relay/waystation), or acquire intel.",
-            "es": "Prueba: intel, uplink (en relay/waystation) o consigue inteligencia.",
+            "en": "Try: scan, intel, uplink (at relay/waystation), or acquire intel.",
+            "es": "Prueba: scan, intel, uplink (en relay/waystation) o consigue inteligencia.",
         }
         print(hint.get(locale, hint["en"]))
 
@@ -1729,9 +1777,9 @@ def _confirm_abandon_drones(state, action) -> bool:
 def _confirm_travel_abort(state) -> bool:
     locale = state.os.locale.value
     msg = {
-        "en": "WARNING: aborting travel will return you to the origin node. Continue? [y/N] ",
-        "es": "ADVERTENCIA: abortar el viaje te devuelve al nodo de origen. ¿Continuar? [s/N] ",
-    }.get(locale, "WARNING: aborting travel will return you to the origin node. Continue? [y/N] ")
+        "en": "WARNING: aborting travel. Continue? [y/N] ",
+        "es": "ADVERTENCIA: abortar el viaje. ¿Continuar? [s/N] ",
+    }.get(locale, "WARNING: aborting travel. Continue? [y/N] ")
     reply = input(msg).strip().lower()
     if locale == "es":
         return reply in {"s", "si", "sí", "y", "yes"}

@@ -35,6 +35,7 @@ from retorno.core.gamestate import GameState
 from retorno.model.drones import DroneLocation, DroneStatus
 from retorno.model.events import AlertState, Event, EventManagerState, EventType, Severity, SourceRef
 from retorno.model.jobs import Job, JobManagerState, JobStatus, JobType, RiskProfile, TargetRef
+from retorno.model.world import add_known_link, SpaceNode
 from retorno.runtime.data_loader import load_locations, load_modules
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path, mount_files
 from retorno.model.systems import Dependency, ShipSystem, SystemState
@@ -53,6 +54,9 @@ class Engine:
 
         events: list[Event] = []
 
+        # Update effective generation based on power_core state.
+        state.ship.power.p_gen_kw = self._compute_p_gen(state)
+
         if state.ship.in_transit and state.clock.t >= state.ship.arrival_t:
             state.ship.in_transit = False
             state.ship.current_node_id = state.ship.transit_to or state.ship.current_node_id
@@ -60,6 +64,7 @@ class Engine:
             node = state.world.space.nodes.get(state.world.current_node_id)
             if node:
                 state.world.current_pos_ly = (node.x_ly, node.y_ly, node.z_ly)
+            self._clear_tmp_node(state)
             events.append(
                 self._make_event(
                     state,
@@ -148,6 +153,21 @@ class Engine:
                 self._record_event(state.events, event)
                 return [event]
             current_id = state.world.current_node_id
+            if (
+                state.world.active_tmp_node_id
+                and current_id == state.world.active_tmp_node_id
+                and action.node_id not in {state.world.active_tmp_from, state.world.active_tmp_to}
+            ):
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    "Travel blocked: temporary waypoint allows only origin/destination",
+                    data={"message_key": "boot_blocked", "reason": "no_route", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
             if action.node_id == current_id:
                 event = self._make_event(
                     state,
@@ -192,6 +212,7 @@ class Engine:
             state.ship.transit_from = current_id
             state.ship.transit_to = action.node_id
             state.ship.arrival_t = state.clock.t + travel_s
+            state.ship.transit_start_t = state.clock.t
             state.ship.last_travel_distance_ly = distance_ly
             state.ship.transit_prev_op_mode = state.ship.op_mode
             state.ship.transit_prev_op_mode_source = state.ship.op_mode_source
@@ -264,12 +285,54 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
+            from_id = state.ship.transit_from
+            to_id = state.ship.transit_to
+            start_t = state.ship.transit_start_t
+            end_t = state.ship.arrival_t
+            if end_t > start_t:
+                progress = self._clamp((state.clock.t - start_t) / (end_t - start_t))
+            else:
+                progress = 0.0
+            from_node = state.world.space.nodes.get(from_id)
+            to_node = state.world.space.nodes.get(to_id)
+            if from_node and to_node:
+                x = from_node.x_ly + (to_node.x_ly - from_node.x_ly) * progress
+                y = from_node.y_ly + (to_node.y_ly - from_node.y_ly) * progress
+                z = from_node.z_ly + (to_node.z_ly - from_node.z_ly) * progress
+            else:
+                x, y, z = state.world.current_pos_ly
+
+            self._clear_tmp_node(state)
+            rng = self._rng(state)
+            tmp_id = f"NAV_PT_{rng.getrandbits(16):04X}"
+            while tmp_id in state.world.space.nodes:
+                tmp_id = f"NAV_PT_{rng.getrandbits(16):04X}"
+            tmp_node = SpaceNode(
+                node_id=tmp_id,
+                name="Nav Point",
+                kind="transit",
+                radiation_rad_per_s=0.0,
+                x_ly=x,
+                y_ly=y,
+                z_ly=z,
+            )
+            state.world.space.nodes[tmp_id] = tmp_node
+            state.world.current_node_id = tmp_id
+            state.ship.current_node_id = tmp_id
+            state.world.current_pos_ly = (x, y, z)
+            state.world.active_tmp_node_id = tmp_id
+            state.world.active_tmp_from = from_id
+            state.world.active_tmp_to = to_id
+            state.world.active_tmp_progress = progress
+            if from_id:
+                add_known_link(state.world, tmp_id, from_id, bidirectional=True)
+            if to_id:
+                add_known_link(state.world, tmp_id, to_id, bidirectional=True)
             state.ship.in_transit = False
             state.ship.arrival_t = 0.0
-            state.ship.current_node_id = state.ship.transit_from or state.ship.current_node_id
-            state.world.current_node_id = state.ship.current_node_id
             state.ship.transit_to = ""
             state.ship.transit_from = ""
+            state.ship.transit_start_t = 0.0
             if state.ship.transit_prev_op_mode:
                 state.ship.op_mode = state.ship.transit_prev_op_mode
                 state.ship.op_mode_source = state.ship.transit_prev_op_mode_source or "manual"
@@ -281,7 +344,13 @@ class Engine:
                 Severity.WARN,
                 SourceRef(kind="ship", id=state.ship.ship_id),
                 "Travel aborted",
-                data={"message_key": "travel_aborted"},
+                data={
+                    "message_key": "travel_aborted",
+                    "from": from_id,
+                    "to": to_id,
+                    "progress": progress,
+                    "tmp_id": tmp_id,
+                },
             )
             self._record_event(state.events, event)
             return [event]
@@ -521,7 +590,7 @@ class Engine:
             system = state.ship.systems.get(action.system_id)
             if not system:
                 return []
-            if system.health <= 0.0 or (system.state == SystemState.OFFLINE and not system.forced_offline):
+            if system.health <= Balance.SYSTEM_HEALTH_MIN_ON:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
@@ -532,7 +601,27 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            if system.forced_offline:
+            if self._dependencies_blocked(state.ship.systems, system.dependencies):
+                dep_detail = self._first_unmet_dependency(state.ship.systems, system.dependencies)
+                dep_target, dep_required, dep_current = dep_detail if dep_detail else ("?", "?", "?")
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=system.system_id),
+                    f"System on blocked: {system.system_id} requires {dep_target}>={dep_required} (current={dep_current})",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "deps_unmet",
+                        "service": system.system_id,
+                        "dep_target": dep_target,
+                        "dep_required": dep_required,
+                        "dep_current": dep_current,
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if system.forced_offline or system.state == SystemState.OFFLINE:
                 system.forced_offline = False
                 events: list[Event] = []
                 self._apply_health_state(system, state, events, cause="manual_restore")
@@ -635,6 +724,17 @@ class Engine:
                     return [event]
                 target_kind = "world_node"
                 target_id = action.sector_id
+            elif action.sector_id not in state.ship.sectors:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    f"Drone deploy blocked: ship sector {action.sector_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "ship_sector_missing", "sector_id": action.sector_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
             drone_bay = state.ship.systems.get("drone_bay")
             if not drone_bay or drone_bay.state == SystemState.OFFLINE or drone_bay.forced_offline:
                 event = self._make_event(
@@ -1546,18 +1646,19 @@ class Engine:
         def _add(path: str, content: str) -> None:
             files.append({"path": path, "access": AccessLevel.GUEST.value, "content": content})
 
+        link_line = ""
+        if node.links:
+            link = sorted(node.links)[0]
+            link_line = f"LINK: {node.node_id} -> {link}\n"
+
         # Nav log (common)
-        p_log = 0.7 if node.kind in {"station", "ship"} else 0.5
+        p_log = Balance.SALVAGE_DATA_LOG_P_STATION_SHIP if node.kind in {"station", "ship"} else Balance.SALVAGE_DATA_LOG_P_OTHER
         if rng.random() < p_log:
-            if node.links:
-                link = sorted(node.links)[0]
-                content = f"LINK: {node.node_id} -> {link}\n"
-            else:
-                content = f"NODE: {node.node_id}\n"
+            content = link_line or f"NODE: {node.node_id}\n"
             _add("/logs/nav.log", content)
 
         # Mail (occasional)
-        p_mail = 0.5 if node.kind in {"station", "ship"} else 0.3
+        p_mail = Balance.SALVAGE_DATA_MAIL_P_STATION_SHIP if node.kind in {"station", "ship"} else Balance.SALVAGE_DATA_MAIL_P_OTHER
         if rng.random() < p_mail:
             lang = state.os.locale.value
             content = (
@@ -1569,17 +1670,33 @@ class Engine:
             _add(f"/mail/inbox/0001.{lang}.txt", content)
 
         # Nav fragment (rare)
-        p_frag = 0.25 if node.kind in {"station", "derelict"} else 0.15
+        p_frag = (
+            Balance.SALVAGE_DATA_FRAG_P_STATION_DERELICT
+            if node.kind in {"station", "derelict"}
+            else Balance.SALVAGE_DATA_FRAG_P_OTHER
+        )
         if rng.random() < p_frag:
             frag_id = f"{rng.getrandbits(16):04x}"
-            if node.links:
-                link = sorted(node.links)[0]
-                content = f"LINK: {node.node_id} -> {link}\n"
-            else:
-                content = f"NODE: {node.node_id}\n"
+            content = link_line or f"NODE: {node.node_id}\n"
             _add(f"/data/nav/fragments/frag_{frag_id}.txt", content)
 
+        # Guarantee at least one LINK if links exist.
+        if link_line and not any("LINK:" in f.get("content", "") for f in files):
+            frag_id = f"{rng.getrandbits(16):04x}"
+            _add(f"/data/nav/fragments/frag_{frag_id}.txt", link_line)
+
         return files
+
+    def _clear_tmp_node(self, state: GameState) -> None:
+        tmp_id = state.world.active_tmp_node_id
+        if not tmp_id:
+            return
+        state.world.space.nodes.pop(tmp_id, None)
+        state.world.known_links.pop(tmp_id, None)
+        state.world.active_tmp_node_id = None
+        state.world.active_tmp_from = None
+        state.world.active_tmp_to = None
+        state.world.active_tmp_progress = None
 
     def _apply_job_effect(self, state: GameState, job: Job) -> list[Event]:
         events: list[Event] = []
@@ -1826,6 +1943,8 @@ class Engine:
             node = state.world.space.nodes.get(job.target.id)
             if node:
                 state.world.current_pos_ly = (node.x_ly, node.y_ly, node.z_ly)
+            if state.world.active_tmp_node_id and job.target.id != state.world.active_tmp_node_id:
+                self._clear_tmp_node(state)
             events.append(
                 self._make_event(
                     state,
@@ -2002,7 +2121,7 @@ class Engine:
                 if "e_batt_bonus_kwh" in effects:
                     state.ship.power.e_batt_max_kwh += float(effects["e_batt_bonus_kwh"])
                 if "p_gen_bonus_kw" in effects:
-                    state.ship.power.p_gen_kw += float(effects["p_gen_bonus_kw"])
+                    state.ship.power.p_gen_bonus_kw += float(effects["p_gen_bonus_kw"])
                 scrap_cost = int(job.params.get("scrap_cost", mod.get("scrap_cost", 0)))
                 state.ship.cargo_scrap = max(0, state.ship.cargo_scrap - scrap_cost)
                 state.ship.cargo_modules.remove(module_id)
@@ -2551,6 +2670,21 @@ class Engine:
         power_quality += state.ship.power.quality_offset
         return self._clamp(power_quality)
 
+    def _compute_p_gen(self, state: GameState) -> float:
+        base = state.ship.power.p_gen_base_kw + state.ship.power.p_gen_bonus_kw
+        core = state.ship.systems.get("power_core")
+        if not core or core.forced_offline or core.state == SystemState.OFFLINE:
+            mult = Balance.POWER_CORE_MULT_OFFLINE
+        elif core.state == SystemState.CRITICAL:
+            mult = Balance.POWER_CORE_MULT_CRITICAL
+        elif core.state == SystemState.DAMAGED:
+            mult = Balance.POWER_CORE_MULT_DAMAGED
+        elif core.state == SystemState.LIMITED:
+            mult = Balance.POWER_CORE_MULT_LIMITED
+        else:
+            mult = Balance.POWER_CORE_MULT_NOMINAL
+        return max(0.0, base * mult)
+
     def _apply_health_state(
         self,
         system: ShipSystem,
@@ -2567,13 +2701,13 @@ class Engine:
             return
         old_state = system.state
         h = system.health
-        if h <= 0.0:
+        if h <= Balance.SYSTEM_HEALTH_OFFLINE:
             new_state = SystemState.OFFLINE
-        elif h < 0.35:
+        elif h < Balance.SYSTEM_HEALTH_CRITICAL:
             new_state = SystemState.CRITICAL
-        elif h < 0.60:
+        elif h < Balance.SYSTEM_HEALTH_DAMAGED:
             new_state = SystemState.DAMAGED
-        elif h < 0.85:
+        elif h < Balance.SYSTEM_HEALTH_LIMITED:
             new_state = SystemState.LIMITED
         else:
             new_state = SystemState.NOMINAL

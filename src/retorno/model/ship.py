@@ -18,6 +18,8 @@ class PowerNetworkState:
     e_batt_max_kwh: float
     p_charge_max_kw: float
     p_discharge_max_kw: float
+    p_gen_base_kw: float = 0.0
+    p_gen_bonus_kw: float = 0.0
     eta_charge: float = 1.0
     eta_discharge: float = 1.0
 
@@ -48,6 +50,7 @@ class ShipState:
     transit_from: str = ""
     transit_to: str = ""
     arrival_t: float = 0.0
+    transit_start_t: float = 0.0
     cruise_speed_ly_per_year: float = 1.0
     last_travel_distance_ly: float = 0.0
     transit_prev_op_mode: str = ""

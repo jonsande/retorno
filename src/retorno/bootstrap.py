@@ -19,6 +19,7 @@ def create_initial_state_prologue() -> GameState:
 
     state.ship.power = PowerNetworkState(
         p_gen_kw=3.2,
+        p_gen_base_kw=3.2,
         e_batt_kwh=1.6,
         e_batt_max_kwh=5.0,
         p_charge_max_kw=4.0,
@@ -174,7 +175,7 @@ def create_initial_state_prologue() -> GameState:
             shield_factor=0.9,
         )
     }
-    state.ship.cargo_scrap = 20
+    state.ship.cargo_scrap = 40
 
     state.ship.sectors = {
         "DRN-BAY": ShipSector(sector_id="DRN-BAY", name="Drone Bay", tags={"bay"}),
@@ -183,15 +184,7 @@ def create_initial_state_prologue() -> GameState:
         "CRG-01": ShipSector(sector_id="CRG-01", name="Cargo Hold", tags={"cargo"}),
     }
 
-    state.world.space.nodes[state.ship.ship_id] = SpaceNode(
-        node_id=state.ship.ship_id,
-        name=state.ship.name,
-        kind="ship",
-        radiation_rad_per_s=state.ship.radiation_env_rad_per_s,
-        x_ly=0.0,
-        y_ly=0.0,
-        z_ly=0.0,
-    )
+    state.world.current_node_id = "UNKNOWN_00"
     state.ship.current_node_id = state.world.current_node_id
     rng = random.Random(state.meta.rng_seed)
     modules = load_modules()
@@ -212,9 +205,13 @@ def create_initial_state_prologue() -> GameState:
                 hub = next((n for n in state.world.space.nodes.values() if n.is_hub and sector_id_for_pos(n.x_ly, n.y_ly, n.z_ly) == sector_id), None)
                 if hub:
                     add_known_link(state.world, current_node.node_id, hub.node_id, bidirectional=True)
+                    state.world.known_contacts.add(hub.node_id)
+                    state.world.known_nodes.add(hub.node_id)
             else:
                 dest = sorted(current_node.links)[0]
                 add_known_link(state.world, current_node.node_id, dest, bidirectional=True)
+                state.world.known_contacts.add(dest)
+                state.world.known_nodes.add(dest)
 
     _bootstrap_os(state)
     _bootstrap_alerts(state)
@@ -295,6 +292,8 @@ def _bootstrap_locations(state: GameState, rng: random.Random, module_ids: list[
     for loc in locations:
         node_cfg = loc.get("node", {})
         node_id = node_cfg.get("node_id")
+        if node_id == state.ship.ship_id:
+            node_id = None
         if node_id and node_id not in state.world.space.nodes:
             node = SpaceNode(
                 node_id=node_id,

@@ -1,0 +1,12 @@
+{
+  "node": {
+    "node_id": "UNKNOWN_00",
+    "name": "Unknown",
+    "kind": "origin",
+    "radiation_rad_per_s": 0.0005,
+    "x_ly": 0.0,
+    "y_ly": 0.0,
+    "z_ly": 0.0
+  },
+  "known_on_start": true
+}

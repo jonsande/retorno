@@ -7,6 +7,20 @@ Función
 - Convierte masa reactiva/almacenada en potencia eléctrica.
 - Estabiliza la salida dentro de tolerancias cuando la red está sana.
 
+Impacto en la salida (por estado)
+- OFFLINE: 0% de generación
+- CRITICAL: 25% de generación
+- DAMAGED: 50% de generación
+- LIMITED: 75% de generación
+- NOMINAL: 100% de generación
+
+Umbrales de salud (por defecto)
+- salud <= 0.00 -> OFFLINE
+- salud < 0.35  -> CRITICAL
+- salud < 0.60  -> DAMAGED
+- salud < 0.85  -> LIMITED
+- salud >= 0.85 -> NOMINAL
+
 Qué significa “degraded”
 - La salida puede estar limitada o “ruidosa”.
 - Efecto neto: menor P_gen, Q más baja bajo carga y envejecimiento más rápido del resto.

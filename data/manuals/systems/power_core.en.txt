@@ -7,6 +7,20 @@ Role
 - Converts stored/reactive mass into electrical output.
 - Stabilizes output within tolerances when the bus is healthy.
 
+Output impact (by state)
+- OFFLINE: 0% generation
+- CRITICAL: 25% generation
+- DAMAGED: 50% generation
+- LIMITED: 75% generation
+- NOMINAL: 100% generation
+
+Health thresholds (default)
+- health <= 0.00 -> OFFLINE
+- health < 0.35  -> CRITICAL
+- health < 0.60  -> DAMAGED
+- health < 0.85  -> LIMITED
+- health >= 0.85 -> NOMINAL
+
 What “degraded” means
 - Output may be throttled or noisy.
 - Net effect: lower P_gen, lower Q under load, faster aging elsewhere.

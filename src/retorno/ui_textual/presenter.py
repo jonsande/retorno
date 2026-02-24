@@ -32,7 +32,7 @@ def build_header(state) -> str:
         remaining_years = remaining_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
         loc = f"en route to {ship.transit_to} (ETA {remaining_years:.2f}y)"
     else:
-        loc_id = ship.current_node_id or state.world.current_node_id
+        loc_id = state.world.current_node_id
         node = state.world.space.nodes.get(loc_id)
         node_name = node.name if node else loc_id
         loc = f"{loc_id} ({node_name})"

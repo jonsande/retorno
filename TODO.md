@@ -40,7 +40,7 @@ debug scenario prologue
 debug scenario sandbox
 debug scenario dev
 
-
+- [ ] no debe crearse ruta conocida desde el nodo actual al hub ECHO_7 hasta que ECHO_7 no sea descubierto. En el momento en que se descubra ECHO_7, sí debe automáticamente crearse una ruta conocida también, pues se supone que ECHO_7 se encuentra en el mismo nodo de la nave del PJ.
 
 - [x] Operaciones de salvage y de repair deberían estar dentro del comando drone.
 - [x] La cantidad de scrap que se ordena recuperar con 'salvage' tiene que afectar al tiempo
@@ -53,6 +53,40 @@ obtener scrap.
 - [x] Ahora mismo tenemos algo llamado "inventario". Estoy hay que modificarlo. El inventario debería ser un sector de la nave del PJ. Muchas naves (la del PJ incluida) tienen que tener un sector de carga o almacén, es decir, una bodega. Esa bodega junto con su id debe aparecer al ejecutar el comando sectors. Por lo demás, por ahora el funcionamiento de ese "inventario" será igual que actualmente. 
 - [x] Otra cosa: el comando "inventory" debe conservarse, pero quiero modificar algo. Si se añade al inventario scrap nuevo o un módulo o lo que sea, no se verá reflejado en la información correspondiente del status ni en la información que genera el comando "inventory" hasta
 que no se ejecute el commando "inventory update". No obstante, en la información que imprime "status" y en la información que imprime "inventory" debe aparecer de algún modo la indicación de que hay cambios en bodega y que es necesario inventariar para actualizar la información. Ahora bien, la operación "inventory update" quiero ser un "job", un trabajo, con su  orrespondiente ETA. La idea es que al introducir ese comando se ejecute un trabajo de actualización del inventario o inventariado de lo que hay en la bodega, y que eso tarde un rato.
+
+- [ ] Los drones con poca batería deberían de volver solos al dock. De otro modo, hay que ver cómo controlar para que al viajar o hibernar no "mueran". Ahora mismo parece que si te los dejas fuera de su dock e hibernas no les pasa nada. Es como si hibernaran ellos también.
+
+- [x] Con los sensors con health 1.00, al intentar encenderlos con "system on sensors" me ha salido este mensaje:
+[CMD] [WARN] boot_blocked :: System on blocked: system too damaged
+
+- [ ] Hay que modificar el comando "map". No es muy intuitivo. Podría ser algo como "ship sectors" o "map ship".
+
+- [ ] El drone deploy admite como targer "power_core", "energy_distribution" o "sensors", además de ship_sector inexistentes:
+>drone deploy! D1 chiquito
+[CMD] [INFO] job_queued :: J00005 deploy_drone target=ship_sector:chiquito ETA=6.0s (EMERGENCY)
+¿Cómo es posible? Entiendo que tampoco debería admitir "power_core" o "energy_distribution" o "sensors" como targets. Entiendo que esos no son ship_sectors sino sistemas. Entiendo que los sistemas están localizados en ship_sectors. Los ship_sectors sí deberían ser lugares apropiados para desplegar los drones. 
+
+- [ ] Necesitamos un comando para abortar lo que sea que esté haciendo el dron!!
+
+- [ ] Necesitamos una merjor organización del help.
+
+- [ ] Los jobs se numeran como J00001, J00002, etc. No me gusta esto. Implica que el límite está en 99999 jobs. Preveo que el jugador vaya a llevar a cabo más jobs que esos. No hay otra manera de identificar los jobs?
+
+- [ ] Hay muchos mensajes (o partes de mensajes) que aparecen en español cuando el idioma de configuración es el inglés, y al revés, mensajes o partes de mensajes en inglés cuando deberían estar en español. Un ejemplo: estando la configuración en inglés, me ha salido este  mensaje: "ParseError: Subcomando power desconocido. Usa: power status | power plan cruise|normal | power shed/off <system_id> | power on <system_id>"
+
+- [ ] Comando scan detecta a la propia nave. Filtrar esto.
+
+- [ ] se puede usar el comando "scan" estando el servicio "datad" offline?
+
+- En el frontend Textual algunos comandos no se autocompletan. 
+
+- He hecho "uplink" y he obtenido esto:
+
+uplink_complete :: routes added: S+000_-001_+000:A8898C, S-001_+000_+000:7AE9F9, S-001_+000_-001:C06A70
+Log written to /logs/nav/uplink_ECHO_7_00012.txt
+
+Pero no parece que pueda acceder a /logs/nav/uplink_ECHO_7_00012.txt
+Dentro de /logs/ no está la carpeta /nav/
 
 - [!] Al hibernar para viajar el "time" debería reflejar los años que han pasado desde que el PJ se despertó por primera vez. Necesitamos un reloj mejor. No vale sólo indicar segundos, pues el número es demasiado grando. Necesitamos un reloj que indique años luz, días, horas, minutos, segundos (o algo así; díme tú qué opinas).
 
