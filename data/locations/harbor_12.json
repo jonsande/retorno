@@ -20,12 +20,22 @@
     {
       "path": "/mail/inbox/0142.en.txt",
       "access": "GUEST",
-      "content": "FROM: Harbor-12 Relay Ops\nSUBJ: Emergency Reroute Packet\n\nThe relay mesh collapsed in under six hours.\nArchive traffic was sealed behind Vault-01.\nWe left a thin lane on the last stable ring.\n\nNAV:\nLINK: HARBOR_12 -> ARCHIVE_01\n"
+      "content_ref": "lore/harbor_12/mail/0142.en.txt"
     },
     {
       "path": "/mail/inbox/0142.es.txt",
       "access": "GUEST",
-      "content": "DE: Operaciones Relay Harbor-12\nASUNTO: Paquete de reencaminamiento de emergencia\n\nLa malla de relays colapso en menos de seis horas.\nEl trafico del Archivo quedo sellado tras Vault-01.\nDejamos un corredor fino en el ultimo anillo estable.\n\nNAV:\nLINK: HARBOR_12 -> ARCHIVE_01\n"
+      "content_ref": "lore/harbor_12/mail/0142.es.txt"
+    },
+    {
+      "path": "/mail/inbox/0143.en.txt",
+      "access": "GUEST",
+      "content_ref": "lore/harbor_12/mail/0143.en.txt"
+    },
+    {
+      "path": "/mail/inbox/0143.es.txt",
+      "access": "GUEST",
+      "content_ref": "lore/harbor_12/mail/0143.es.txt"
     }
   ]
 }

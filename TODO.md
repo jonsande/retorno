@@ -314,6 +314,13 @@ Comandos textual: ctrl+p
 
 =========== Versión 2 ============
 
+transponders/items como fuente de intel (muy fácil ahora que tienes inventory/modules)
+
+señales como intel parcial (SECTOR/COORD con baja confianza)
+
+eventos en tránsito (sólo 1–2, muy suaves)
+
+
 - [ ] Virus informáticos. Que afectan a alguno de los sistemas, pudiendo llegar a inutilizarlo total o temporalmente, o a hacer que falle ocasionalmente.
 
 data_core. Ahora mismo data_core sirve para habilitar operaciones de auditoría de bodega y para servicios de datos: Audit de cargo/manifest: cargo audit / inventory audit se bloquean si data_core no está operativo o si datad no está corriendo.

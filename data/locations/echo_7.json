@@ -18,19 +18,19 @@
   },
   "fs_files": [
     {
-        "path": "/data/nav/fragments/frag_0001b.txt",
-        "access": "GUEST",
-        "content": "LINK: ECHO_7 -> CURL_12\n"
-      },
+      "path": "/data/nav/fragments/frag_0001b.txt",
+      "access": "GUEST",
+      "content": "LINK: ECHO_7 -> CURL_12\n"
+    },
     {
       "path": "/logs/echo_cache.en.txt",
       "access": "GUEST",
-      "content": "ECHO-7 CACHE // fragment\n\nSignal collapse logged at cycle 309.2.\nHarbor-12 rerouted the last stable paths before going dark.\nIf any route survived, it went through Harbor-12.\n"
+      "content_ref": "lore/echo_7/logs/echo_cache.en.txt"
     },
     {
       "path": "/logs/echo_cache.es.txt",
       "access": "GUEST",
-      "content": "CACHE ECHO-7 // fragmento\n\nColapso de señal registrado en ciclo 309.2.\nHarbor-12 reencamino las ultimas rutas estables antes de apagarse.\nSi alguna ruta sobrevivio, paso por Harbor-12.\n"
+      "content_ref": "lore/echo_7/logs/echo_cache.es.txt"
     }
-    ]
+  ]
 }

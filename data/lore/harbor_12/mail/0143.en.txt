@@ -1,0 +1,18 @@
+FROM: L. Marlow (Harbor-12, Night Shift)
+TO: J. Reeve
+SUBJ: If you come through Harbor
+PRIORITY: low
+STATUS: archived copy (restored)
+
+I’m writing this in the break corner because the comms are busy again and I don’t feel like talking over the noise. We keep telling ourselves it’s a temporary surge, and then the next shift comes in and the surge is still here.
+
+We had three unscheduled arrivals today. Two with transponders that flickered like they’d been welded back together. One that never spoke at all, just gave a clean handshake and dumped a cargo manifest full of blank fields. Ops logged it as “incomplete,” which is a polite word for “we don’t know what that was.”
+
+People keep asking if the corridor is safe. There’s no answer that isn’t a lie. The best we can do is keep the handoffs tidy and keep the lights on. We patch seals, we swap filters, we clear queues, we write down what passed through. That’s what the job is now.
+
+If you come through Harbor, don’t wait around hoping for clarity. Dock, pull what you need, and move. If you’re looking for the corridor history—where ships actually went when the relays started looping—Ops pushed it to the archive buoy because the relays can’t be trusted to remember.
+
+I’m not supposed to send routing directives in personal mail, but I’m sending it anyway because I don’t trust the desk to stay staffed.
+
+NAV (copied from ops cache; do not edit):
+LINK: HARBOR_12 -> ARCHIVE_01

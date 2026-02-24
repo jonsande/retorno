@@ -1,0 +1,16 @@
+ECHO-7 RELAY — INFORME DE CACHÉ (RECUPERADO)
+Ref: E7/OPS/CACHE/0007
+Acceso: ENG (solo lectura)
+Integridad: degradada (reconstrucción parcial)
+
+Este archivo es una captura del relay con rutas en caché y notas operativas. Se generó automáticamente a partir de buffers de mantenimiento y posteriormente se reconstruyó desde bloques de almacenamiento incompletos. Las marcas temporales no son fiables; el orden es estimado.
+
+Durante el último periodo registrado, el relay dedicó la mayor parte del ciclo de servicio a handshakes de baja banda y anuncios cortos de enrutado. Las portadoras de largo alcance estuvieron a menudo indisponibles, ya sea por silencio aguas arriba o por fallos locales de amplificación. Por ello, la caché de rutas se inclina hacia waystations cercanas y transbordos repetidos de corredor.
+
+El token HARBOR-12 aparece con una frecuencia inusual en las tablas en caché. Esto no significa que Harbor-12 fuera “importante” en abstracto; significa que muchas rutas se estaban haciendo pasar por allí. En la práctica: naves que aún tenían hardware de navegación funcional recibían instrucciones de pasar por Harbor-12 en vez de intentar tramos largos directos o depender de relays que ya fallaban de manera intermitente.
+
+Se encontró una breve anotación de operador incrustada en el payload de un paquete de enrutado. El relay la conservó porque coincidía con un perfil de checksum; esto no implica validación. El texto se reproduce literal:
+
+“Los mapas de ruta están desactualizados. No perdáis tiempo persiguiendo lo ruidoso. Si una estación responde, usadla. Harbor-12 todavía responde (por ahora). Si llegas tarde, sigue las tablas del corredor. Si llegas pronto, no esperes.”
+
+Fin del informe recuperado.

@@ -20,12 +20,12 @@
     {
       "path": "/logs/last_signal.en.txt",
       "access": "GUEST",
-      "content": "ARCHIVE-01 // LAST SIGNAL\n\nIf you are reading this, the relays are already dust.\nWe locked the vault and burned the keys.\n\nWe left a breadcrumb through Harbor-12, a last courtesy.\nWhatever remains here is for whoever survives the silence.\n\n— Archive Custodian\n"
+      "content_ref": "lore/archive_01/logs/last_signal.en.txt"
     },
     {
       "path": "/logs/last_signal.es.txt",
       "access": "GUEST",
-      "content": "ARCHIVE-01 // ULTIMA SEÑAL\n\nSi estas leyendo esto, los relays ya son polvo.\nCerramos la bóveda y quemamos las llaves.\n\nDejamos una miga de pan a través de Harbor-12, la ultima cortesía.\nLo que quede aqui es para quien sobreviva al silencio.\n\n— Custodio del Archivo\n"
+      "content_ref": "lore/archive_01/logs/last_signal.es.txt"
     }
   ]
 }

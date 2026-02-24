@@ -1,0 +1,18 @@
+FROM: Harbor-12 Transit Desk
+TO: Harbor-12 Ops (All Shifts)
+SUBJ: Corridor procedures / archive buoy handoff
+PRIORITY: normal
+STATUS: archived copy (restored)
+
+Leaving this here because the same questions keep coming up on every shift.
+
+Harbor-12 is being used as a corridor handoff point. That means we are getting traffic that was not scheduled for us, ships we don’t recognize, and logs that don’t match our local tables. Some of the transponders are damaged. Some are intentionally quiet. Don’t waste time arguing about it over comms — if you get a clean handshake and the ship isn’t actively hostile, do the handoff and move on.
+
+A few practical points, since half the maintenance tickets this week are variations of the same problem: the relay chain is inconsistent. ECHO nodes are caching and repeating old route tables, and some ships are treating those repeats as if they’re real-time instructions. They aren’t. If you can’t verify a long route, don’t promise it. Give them the corridor through known waystations while we still have it.
+
+Second: we’re storing corridor tables off-relay. That’s the whole point of the archive buoy. The buoy was installed for “worst case” scenarios, and yes, this qualifies. It’s crude hardware, but it’s independent. If the relays keep looping, the buoy will still have whatever we managed to write to it.
+
+If you’re on a salvage-capable ship and you need the corridor history (or you’re trying to reconstruct where traffic went), you can ping the buoy and pull its logs. Don’t expect it to be tidy. It was never meant for humans to browse; it was meant to survive.
+
+Routing directive (copy/paste exactly; do not “fix” formatting):
+LINK: HARBOR_12 -> ARCHIVE_01

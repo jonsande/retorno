@@ -30,6 +30,16 @@ def load_locations() -> list[dict]:
     for file in sorted(path.glob("*.json")):
         with file.open("r", encoding="utf-8") as fh:
             locations.append(json.load(fh))
+    for loc in locations:
+        files = loc.get("fs_files") or []
+        for entry in files:
+            content_ref = entry.get("content_ref")
+            if content_ref and "content" not in entry:
+                ref_path = _DATA_ROOT / content_ref
+                try:
+                    entry["content"] = ref_path.read_text(encoding="utf-8")
+                except Exception:
+                    entry["content"] = ""
     return locations
 
 

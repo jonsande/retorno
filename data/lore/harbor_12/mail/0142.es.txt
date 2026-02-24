@@ -1,0 +1,18 @@
+FROM: Mesa de Tránsito Harbor-12
+TO: Operaciones Harbor-12 (Todos los turnos)
+SUBJ: Procedimientos del corredor / transbordo con boya de archivo
+PRIORITY: normal
+STATUS: copia archivada (restaurada)
+
+Dejo esto aquí porque se repiten la mismas preguntas en cada turno.
+
+Harbor-12 se está usando como punto de transbordo de corredor. Eso significa que nos llega tráfico no programado, naves que no reconocemos y registros que no encajan con nuestras tablas locales. Algunos transponders están dañados. Otros están deliberadamente silenciosos. No perdáis tiempo discutiendo por comms — si obtenéis un handshake limpio y la nave no es activamente hostil, haced el transbordo y seguid.
+
+Un par de puntos prácticos, porque la mitad de los tickets de mantenimiento esta semana son la misma historia: la cadena de relés es inconstante. Los nodos ECHO están cacheando y repitiendo tablas de ruta antiguas, y algunas naves están tratando esas repeticiones como si fueran instrucciones en tiempo real. No lo son. Si no podéis verificar una ruta larga, no la prometáis. Dadles el corredor por waystations conocidas mientras aún exista.
+
+Segundo: estamos guardando tablas del corredor fuera de los relés. Para eso está la boya de archivo. La boya se instaló para escenarios de “peor caso”, y sí, esto cuenta. Es hardware tosco, pero independiente. Si los relés se quedan en bucle, la boya seguirá teniendo lo que hayamos sido capaces de escribir.
+
+Si vais en una nave capaz de salvamento y necesitáis el historial del corredor (o estáis intentando reconstruir por dónde se movió el tráfico), podéis pingar la boya y extraer sus logs. No esperéis que esté ordenado. Nunca se pensó para que una persona lo leyera; se pensó para sobrevivir.
+
+Directiva de enrutado (copiar/pegar tal cual; no “arreglar” el formato):
+LINK: HARBOR_12 -> ARCHIVE_01

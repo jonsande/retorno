@@ -1,0 +1,16 @@
+ARCHIVE-01 — EXTRACTO DE LOG DE MANTENIMIENTO / ÚLTIMO UPLINK REGISTRADO
+Ref: AR-01/MAINT/LOG/019
+Integridad: parcial (recuperado)
+Nota: Esta unidad fue diseñada para durabilidad de almacenamiento antes que legibilidad.
+
+Escribo esto como parte del último pase de mantenimiento programado. El trabajo principal de la boya es conservar una copia de tablas de enrutado del corredor y del historial de transbordos sin depender de que los relays estén operativos. Ese trabajo sigue corriendo, pero las entradas se están degradando.
+
+En los últimos días (según relojes internos) hemos tenido casos repetidos en los que Harbor reporta un transbordo, pero las confirmaciones correspondientes del relay nunca llegan. Eso puede significar que los relays están caídos. También puede significar que las naves han dejado de emitir correctamente. En cualquier caso, dificulta la reconstrucción, que es justamente lo contrario de para qué existe este cacharro.
+
+Hicimos un cambio pequeño: cuando la boya no puede validar la confirmación de un relay, guarda igualmente la nota de transbordo en bruto, marcada como no verificada. Es desordenado, pero perder información es peor. Si alguien llega aquí más tarde, decidirá qué confiar. Ahora mismo solo intentamos mantener la línea intacta.
+
+El último uplink registrado fue corto. La boya reconoció a Harbor-12 y volvió a deriva pasiva. En este segmento recuperado no se registran más contactos después.
+
+Si estás aquí intentando entender qué pasó, esta boya no te dará una historia. Te dará fechas, tokens y una pista de confirmaciones a medias. Para una historia hacen falta personas. No sé cuántas quedan.
+
+Fin del extracto.

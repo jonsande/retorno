@@ -1,0 +1,18 @@
+FROM: L. Marlow (Harbor-12, Turno nocturno)
+TO: J. Reeve
+SUBJ: Si pasas por Harbor
+PRIORITY: baja
+STATUS: copia archivada (restaurada)
+
+Escribo esto en el rincón de descanso porque las comms están otra vez ocupadas y no me apetece hablar sobre el ruido. Nos repetimos que es un pico temporal, y luego entra el siguiente turno y el pico sigue aquí.
+
+Hoy tuvimos tres llegadas no programadas. Dos con transponders que parpadeaban como si los hubieran soldado a mano. Una que no habló en absoluto: solo hizo un handshake limpio y soltó un manifiesto de carga lleno de campos en blanco. Ops lo registró como “incompleto”, que es una forma educada de decir “no sabemos qué fue eso”.
+
+La gente pregunta si el corredor es seguro. No hay respuesta que no sea mentira. Lo único que podemos hacer es mantener los transbordos ordenados y las luces encendidas. Parcheamos juntas, cambiamos filtros, limpiamos colas, apuntamos lo que pasa. Ahora el trabajo es eso.
+
+Si pasas por Harbor, no te quedes esperando claridad. Atraca, saca lo que necesites y sigue. Si buscas el historial del corredor—por dónde se movieron realmente las naves cuando los relays empezaron a entrar en bucle—Ops lo volcó en la boya de archivo porque no se puede confiar en que los relays lo recuerden.
+
+No se supone que mande directivas de ruta en correo personal, pero lo mando igual, porque no confío en que la mesa siga cubierta.
+
+NAV (copiado de caché de ops; no editar):
+LINK: HARBOR_12 -> ARCHIVE_01

@@ -1,0 +1,16 @@
+ARCHIVE-01 — MAINTENANCE LOG EXTRACT / LAST RECORDED UPLINK
+Ref: AR-01/MAINT/LOG/019
+Integrity: partial (recovered)
+Note: This unit was designed for storage durability over readability.
+
+I’m writing this as part of the last scheduled maintenance pass. The buoy’s main job is to keep a copy of corridor routing tables and handoff history that doesn’t depend on relay uptime. That job is still running, but the inputs are degrading.
+
+The last few days (as measured by internal clocks) we’ve had repeated cases where Harbor reports a handoff, but the corresponding relay confirmations never arrive. That could mean the relays are down. It could also mean ships are no longer bothering to broadcast properly. Either way, it makes reconstruction harder, which is the opposite of what this thing is for.
+
+We pushed a small change: when the buoy can’t validate a relay confirmation, it stores the raw handoff note anyway, flagged as unverified. It’s messy, but losing information is worse. If someone ever reads this later, they can decide what to trust. Right now we’re just trying to keep the line intact.
+
+Last recorded uplink was short. The buoy acknowledged Harbor-12 and then went back to passive drift. No further contacts were logged after that in this recovered segment.
+
+If you’re here because you’re trying to understand what happened, this buoy won’t give you a story. It will give you dates, tokens, and a trail of half-confirmations. For a story, you’ll need people. I don’t know how many are left.
+
+End of extract.
