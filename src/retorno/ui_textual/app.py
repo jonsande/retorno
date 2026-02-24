@@ -316,7 +316,9 @@ class RetornoTextualApp(App):
         return
 
     def _get_completion_candidates(self, state, buf: str, text: str) -> list[str]:
-        tokens = buf.strip().split()
+        tokens = buf.split()
+        if buf.endswith(" "):
+            tokens.append("")
         token = ""
         if buf and not buf.endswith(" ") and tokens:
             token = tokens[-1]
@@ -349,6 +351,7 @@ class RetornoTextualApp(App):
             "inventory",
             "cargo",
             "boot",
+            "job",
             "hibernate",
             "wait",
             "debug",
@@ -418,6 +421,11 @@ class RetornoTextualApp(App):
                 return [s for s in systems if s.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "plan":
                 return [c for c in ["cruise", "normal"] if c.startswith(text)]
+        if cmd == "job":
+            if len(tokens) == 2:
+                return [c for c in ["cancel"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] == "cancel":
+                return [jid for jid in state.jobs.active_job_ids if jid.startswith(text)]
         if cmd == "debug":
             if len(tokens) == 2:
                 return [c for c in ["on", "off", "status", "scenario"] if c.startswith(text)]
@@ -740,7 +748,7 @@ class RetornoTextualApp(App):
                 if action == "TRAVEL_ABORT":
                     from retorno.core.actions import TravelAbort
                     self._log_line("> travel abort")
-                    self._log_lines(self.presenter.build_command_output(self.loop.apply_action, TravelAbort()))
+                    self._log_lines(presenter.build_command_output(self.loop.apply_action, TravelAbort()))
                 elif action == "HIBERNATE_DRONES":
                     with self.loop.with_lock() as state:
                         self._confirm_hibernate_wake_needed(state)
@@ -748,7 +756,7 @@ class RetornoTextualApp(App):
                 elif action == "HIBERNATE_NON_CRUISE":
                     self._log_line("> hibernate until_arrival")
                     self._log_lines(
-                        self.presenter.build_command_output(
+                        presenter.build_command_output(
                             repl._run_hibernate,
                             self.loop,
                             self._pending_years,
@@ -760,7 +768,7 @@ class RetornoTextualApp(App):
                     self._pending_wake_on_low_battery = False
                 else:
                     self._log_line(f"> {action.__class__.__name__.lower()}")
-                    self._log_lines(self.presenter.build_command_output(self.loop.apply_action, action))
+                    self._log_lines(presenter.build_command_output(self.loop.apply_action, action))
             else:
                 if action in {"HIBERNATE_DRONES", "HIBERNATE_WAKE", "HIBERNATE_NON_CRUISE"}:
                     self._pending_hibernate_parsed = None
@@ -814,10 +822,12 @@ class RetornoTextualApp(App):
             return
         if parsed == "SCAN":
             with self.loop.with_lock() as state:
-                seen, discovered, handshakes, warn = repl._scan_and_discover(state)
+                seen, discovered, handshakes, route_msgs, warn = repl._scan_and_discover(state)
                 if warn:
                     self._log_line(f"[WARN] {warn}")
                 self._log_lines(presenter.build_command_output(repl.render_scan_results, state, seen))
+                for line in route_msgs:
+                    self._log_line(line)
                 if discovered:
                     self._log_line(f"(scan) new: {', '.join(sorted(discovered))}")
             return

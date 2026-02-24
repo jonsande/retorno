@@ -1,3 +1,11 @@
+NOTAS (limpiar)
+Por qué ship_1.json tiene node_id: RETORNO_SHIP
+Ese archivo usa el schema de “location” para almacenar fs_files del barco.
+El node_id ahí no se añade al mundo porque en bootstrap se ignora cualquier location cuyo node_id sea igual a state.ship.ship_id.
+Es decir: se usa solo como contenedor de archivos de la nave.
+
+Si quieres, puedo refactorizar esto para que el fs_files de la nave esté en un archivo propio sin node_id, pero hoy el sistema de carga está pensado para “locations” y por eso aparece así.
+
 SPOILERS!
 
 Solución al puzzle/tutorial inicial:
@@ -42,6 +50,8 @@ debug scenario dev
 
 - [ ] no debe crearse ruta conocida desde el nodo actual al hub ECHO_7 hasta que ECHO_7 no sea descubierto. En el momento en que se descubra ECHO_7, sí debe automáticamente crearse una ruta conocida también, pues se supone que ECHO_7 se encuentra en el mismo nodo de la nave del PJ.
 
+- [ ] Indicar en listado nav qué lugares han sido visitados.
+
 - [x] Operaciones de salvage y de repair deberían estar dentro del comando drone.
 - [x] La cantidad de scrap que se ordena recuperar con 'salvage' tiene que afectar al tiempo
 que se tarda en llevar a cabo la tarea.
@@ -60,6 +70,13 @@ que no se ejecute el commando "inventory update". No obstante, en la informació
 [CMD] [WARN] boot_blocked :: System on blocked: system too damaged
 
 - [ ] Hay que modificar el comando "map". No es muy intuitivo. Podría ser algo como "ship sectors" o "map ship".
+
+- [ ] El comando travel devería ser el comando nav. Si se escribe sin parámetro, lista destinos y rutas, si con parámetro, funciona como travel.
+
+
+También quiero un módulo instalable que permita automatizar ciertas tareas en tránsito (aunque el PJ esté hibernando). Por ejemplo, llevar a cabo un scan cada x tiempo (configurable por el jugador), y dar la opcion de deshibernar en caso de que se detecte algo nuevo.
+
+Al  hacer 'route <node_id>' a un node_id para el que ya conoces ruta,  no se debería iniciar el job. Debería salir un mensaje informando de que ya se conoce ruta a ese objetivo. Por otra parte, debería de haber un comando para cancelar jobs en curso.
 
 - [ ] Al iniciar la hibernación, debería de salir un mensaje (localizado) diciendo algo así como "Iniciando secuencia de hibernación", y una serie de mensajes (meramente narrativos) diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la criogenización, y una cuenta atrás de 10 segundos. Después, debe limpiarse la pantalla de logs (y esto me recuerda que necesitamos un comando "clear" para limpiar pantalla), esperar 3 segundos e imprimirse una serie de mensajes diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la descriogenización, junto con un mensaje (que se repetirá siempre), advirtiendo de que hay un problema crítico y no es posible descriogenizar completamente al sujeto del sarcófago (es decir, al Personaje Jugador). El sarcófago del PJ debe tener un id, por cierto. 
 

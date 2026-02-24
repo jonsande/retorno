@@ -4,6 +4,11 @@ Ref: OS-MAN/ENG/NAV-01
 You do not “see” the galaxy as a complete map. The capsule terminal operates on partial knowledge:
 - contacts detected by sensors (scan range is limited),
 - and routes obtained from recorded navigation data (intel).
+Routes can be acquired through:
+- uplink at relays/waystations,
+- route solving within sensor range,
+- intel import (logs/fragments/mail),
+- scan if a hub is exactly co-located with your current position.
 
 Relays
 A relay is legacy infrastructure: an automated beacon that repeats signals and caches route tables.
@@ -24,5 +29,4 @@ Operational notes
 - In a ruined network, relays are often the only way to expand navigation knowledge without blind jumps.
 
 Relevant commands
-- scan, nav, intel import, travel
-(future) uplink / relay sync
+- scan, nav, route, uplink, intel import, travel

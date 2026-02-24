@@ -1,0 +1,3 @@
+transit_sensor_pack
+- Allows scan and contacts while the ship is in transit.
+- Useful for detecting nearby signals without stopping the journey.

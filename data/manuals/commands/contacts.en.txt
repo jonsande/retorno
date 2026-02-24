@@ -1,3 +1,4 @@
 contacts | scan
 - Lists detected signals.
 - Requires sensord active.
+- Requires sensors lock; can be used in transit with transit_sensor_pack installed.

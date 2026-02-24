@@ -14,6 +14,6 @@
     "scrap_max": 40,
     "modules_min": 0,
     "modules_max": 0,
-    "modules_pool": "all"
+    "modules_pool": "common"
   }
 }

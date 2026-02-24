@@ -56,6 +56,7 @@ class ShipState:
     last_travel_distance_ly: float = 0.0
     transit_prev_op_mode: str = ""
     transit_prev_op_mode_source: str = ""
+    docked_node_id: str | None = None
 
     location: ShipLocation = field(default_factory=ShipLocation)
     hull_integrity: float = 1.0

@@ -1,4 +1,5 @@
 nav
 - Muestra rutas conocidas desde el nodo actual.
-- Úsalo tras scan, route o intel import para ver dónde puedes viajar.
-- Si no hay rutas, necesitas un handshake de relay o inteligencia de navegación.
+- Las rutas se obtienen con: uplink (relay/waystation), route, intel import (logs/fragmentos), o scan si hay un hub co‑ubicado con tu posición actual.
+- Úsalo tras scan, route, uplink o intel import para ver dónde puedes viajar.
+- Si no hay rutas, consigue inteligencia de navegación o intenta uplink/route.

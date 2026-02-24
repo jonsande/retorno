@@ -1,4 +1,5 @@
 nav
 - Shows known routes from the current node.
-- Use after scan, route, or intel import to see where travel is possible.
-- If no routes appear, you need a relay handshake or navigation intel.
+- Routes can be obtained via: uplink (relay/waystation), route, intel import (nav logs/fragments), or scan if a hub is co-located with your current position.
+- Use after scan, route, uplink, or intel import to see where travel is possible.
+- If no routes appear, acquire navigation intel or attempt uplink/route.

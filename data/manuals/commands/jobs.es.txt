@@ -1,3 +1,4 @@
 jobs
 - Muestra trabajos en cola/ejecución y recientes.
 - Columnas: id estado tipo objetivo ETA owner.
+- Usa: job cancel <job_id> para cancelar un trabajo activo.

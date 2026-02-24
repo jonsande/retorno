@@ -14,6 +14,7 @@ from retorno.core.actions import (
     DroneReboot,
     Hibernate,
     Install,
+    JobCancel,
     PowerPlan,
     PowerShed,
     Repair,
@@ -60,6 +61,10 @@ def parse_command(line: str):
 
     if cmd == "jobs":
         return "JOBS"
+    if cmd == "job":
+        if len(args) != 2 or args[0] != "cancel":
+            raise ParseError("Uso: job cancel <job_id>")
+        return JobCancel(job_id=args[1])
 
     if cmd == "nav":
         return "NAV"

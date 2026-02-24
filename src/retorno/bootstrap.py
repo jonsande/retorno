@@ -196,22 +196,23 @@ def create_initial_state_prologue() -> GameState:
     current_node = state.world.space.nodes.get(state.world.current_node_id)
     if current_node:
         state.world.current_pos_ly = (current_node.x_ly, current_node.y_ly, current_node.z_ly)
-        # Generate links for the current sector and seed known routes
-        sector_id = sector_id_for_pos(current_node.x_ly, current_node.y_ly, current_node.z_ly)
-        ensure_sector_generated(state, sector_id)
-        if current_node.links:
-            # If current node is not hub, reveal link to hub. Otherwise reveal one outgoing link.
-            if not current_node.is_hub:
-                hub = next((n for n in state.world.space.nodes.values() if n.is_hub and sector_id_for_pos(n.x_ly, n.y_ly, n.z_ly) == sector_id), None)
-                if hub:
-                    add_known_link(state.world, current_node.node_id, hub.node_id, bidirectional=True)
-                    state.world.known_contacts.add(hub.node_id)
-                    state.world.known_nodes.add(hub.node_id)
-            else:
-                dest = sorted(current_node.links)[0]
-                add_known_link(state.world, current_node.node_id, dest, bidirectional=True)
-                state.world.known_contacts.add(dest)
-                state.world.known_nodes.add(dest)
+        if current_node.node_id != "UNKNOWN_00":
+            # Generate links for the current sector and seed known routes
+            sector_id = sector_id_for_pos(current_node.x_ly, current_node.y_ly, current_node.z_ly)
+            ensure_sector_generated(state, sector_id)
+            if current_node.links:
+                # If current node is not hub, reveal link to hub. Otherwise reveal one outgoing link.
+                if not current_node.is_hub:
+                    hub = next((n for n in state.world.space.nodes.values() if n.is_hub and sector_id_for_pos(n.x_ly, n.y_ly, n.z_ly) == sector_id), None)
+                    if hub:
+                        add_known_link(state.world, current_node.node_id, hub.node_id, bidirectional=True)
+                        state.world.known_contacts.add(hub.node_id)
+                        state.world.known_nodes.add(hub.node_id)
+                else:
+                    dest = sorted(current_node.links)[0]
+                    add_known_link(state.world, current_node.node_id, dest, bidirectional=True)
+                    state.world.known_contacts.add(dest)
+                    state.world.known_nodes.add(dest)
 
     _bootstrap_os(state)
     _bootstrap_alerts(state)
@@ -275,8 +276,16 @@ def _bootstrap_locations(state: GameState, rng: random.Random, module_ids: list[
             return []
         count = rng.randint(min_count, max_count)
         pool = cfg.get("modules_pool", "all")
+        modules = load_modules()
+        pool_map: dict[str, list[str]] = {"common": [], "rare": [], "tech": []}
+        for mid in module_ids:
+            mod = modules.get(mid, {})
+            tag = mod.get("pool", "common")
+            pool_map.setdefault(tag, []).append(mid)
         if isinstance(pool, list) and pool:
             candidates = [m for m in pool if m in module_ids]
+        elif isinstance(pool, str) and pool in pool_map:
+            candidates = pool_map[pool]
         else:
             candidates = module_ids
         if not candidates:

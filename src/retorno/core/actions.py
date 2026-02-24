@@ -118,6 +118,11 @@ class CargoAudit(Action):
 
 
 @dataclass(slots=True)
+class JobCancel(Action):
+    job_id: str
+
+
+@dataclass(slots=True)
 class Travel(Action):
     node_id: str
     no_cruise: bool = False

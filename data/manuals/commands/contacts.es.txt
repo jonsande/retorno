@@ -1,3 +1,4 @@
 contacts | scan
 - Lista señales detectadas.
 - Requiere sensord activo.
+- Requiere bloqueo de sensores; puede usarse en tránsito con transit_sensor_pack instalado.

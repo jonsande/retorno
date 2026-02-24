@@ -13,7 +13,8 @@
     "scrap_min": 15,
     "scrap_max": 60,
     "modules_min": 1,
-    "modules_max": 3
+    "modules_max": 3,
+    "modules_pool": ["tech", "rare"]
   },
   "radiation_base": 0.004
 }

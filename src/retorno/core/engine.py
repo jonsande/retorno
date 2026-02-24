@@ -31,6 +31,7 @@ from retorno.core.actions import (
     Status,
     Travel,
     TravelAbort,
+    JobCancel,
 )
 from retorno.core.gamestate import GameState
 from retorno.model.drones import DroneLocation, DroneStatus
@@ -62,6 +63,7 @@ class Engine:
             state.ship.in_transit = False
             state.ship.current_node_id = state.ship.transit_to or state.ship.current_node_id
             state.world.current_node_id = state.ship.current_node_id
+            state.ship.docked_node_id = None
             node = state.world.space.nodes.get(state.world.current_node_id)
             if node:
                 state.world.current_pos_ly = (node.x_ly, node.y_ly, node.z_ly)
@@ -230,6 +232,7 @@ class Engine:
             state.ship.last_travel_distance_ly = distance_ly
             state.ship.transit_prev_op_mode = state.ship.op_mode
             state.ship.transit_prev_op_mode_source = state.ship.op_mode_source
+            state.ship.docked_node_id = None
             if hasattr(state.world, "known_nodes"):
                 state.world.known_nodes.add(action.node_id)
             state.world.known_contacts.add(action.node_id)
@@ -338,6 +341,7 @@ class Engine:
             state.world.active_tmp_from = from_id
             state.world.active_tmp_to = to_id
             state.world.active_tmp_progress = progress
+            state.ship.docked_node_id = None
             if from_id:
                 add_known_link(state.world, tmp_id, from_id, bidirectional=True)
             if to_id:
@@ -415,7 +419,21 @@ class Engine:
                 return events
             return []
 
-        if state.ship.in_transit:
+        allowed_in_transit = (
+            PowerShed,
+            SystemOn,
+            PowerPlan,
+            Boot,
+            DroneDeploy,
+            DroneMove,
+            DroneRecall,
+            DroneReboot,
+            Repair,
+            SelfTestRepair,
+            Install,
+            CargoAudit,
+        )
+        if state.ship.in_transit and not isinstance(action, allowed_in_transit):
             event = self._make_event(
                 state,
                 EventType.BOOT_BLOCKED,
@@ -428,6 +446,17 @@ class Engine:
             return [event]
 
         if isinstance(action, Dock):
+            if action.node_id != state.world.current_node_id:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    f"Dock blocked: not at {action.node_id}",
+                    data={"message_key": "boot_blocked", "reason": "not_at_node", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
             node = state.world.space.nodes.get(action.node_id)
             if not node:
                 event = self._make_event(
@@ -579,7 +608,61 @@ class Engine:
                 params={},
             )
 
+        if isinstance(action, JobCancel):
+            job = state.jobs.jobs.get(action.job_id)
+            if not job:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    f"Job cancel blocked: job {action.job_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "job_missing", "job_id": action.job_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if job.status in {JobStatus.COMPLETED, JobStatus.CANCELLED, JobStatus.FAILED}:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    f"Job cancel blocked: job {action.job_id} already {job.status.value}",
+                    data={"message_key": "boot_blocked", "reason": "job_not_active", "job_id": action.job_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            job.status = JobStatus.CANCELLED
+            if action.job_id in state.jobs.active_job_ids:
+                state.jobs.active_job_ids.remove(action.job_id)
+            event = self._make_event(
+                state,
+                EventType.JOB_FAILED,
+                Severity.INFO,
+                SourceRef(kind="ship", id=state.ship.ship_id),
+                f"Job cancelled: {action.job_id}",
+                data={
+                    "job_id": action.job_id,
+                    "job_type": job.job_type.value,
+                    "message_key": "job_cancelled",
+                },
+            )
+            self._record_event(state.events, event)
+            return [event]
+
         if isinstance(action, RouteSolve):
+            current_id = state.world.current_node_id
+            if action.node_id in state.world.known_links.get(current_id, set()):
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.INFO,
+                    SourceRef(kind="world", id=action.node_id),
+                    f"Route solve skipped: already known route to {action.node_id}",
+                    data={"message_key": "boot_blocked", "reason": "route_known", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
             system = state.ship.systems.get("sensors")
             if not system or self._state_rank(system.state) < self._state_rank(SystemState.LIMITED):
                 event = self._make_event(
@@ -798,7 +881,7 @@ class Engine:
             target_kind = "ship_sector"
             target_id = action.sector_id
             if action.sector_id in state.world.space.nodes:
-                if state.world.current_node_id != action.sector_id:
+                if state.ship.docked_node_id != action.sector_id:
                     event = self._make_event(
                         state,
                         EventType.BOOT_BLOCKED,
@@ -956,7 +1039,7 @@ class Engine:
                     return [event]
                 target_kind = "ship_sector"
             elif target_id in state.world.space.nodes:
-                if state.world.current_node_id != target_id:
+                if state.ship.docked_node_id != target_id:
                     event = self._make_event(
                         state,
                         EventType.BOOT_BLOCKED,
@@ -1096,7 +1179,7 @@ class Engine:
                 self._record_event(state.events, event)
                 return [event]
             if drone.location.kind == "world_node":
-                if state.world.current_node_id != drone.location.id:
+                if state.ship.docked_node_id != drone.location.id:
                     event = self._make_event(
                         state,
                         EventType.BOOT_BLOCKED,
@@ -1351,7 +1434,7 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            if state.world.current_node_id != node_id:
+            if state.ship.docked_node_id != node_id:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
@@ -1477,7 +1560,7 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            if state.world.current_node_id != node_id:
+            if state.ship.docked_node_id != node_id:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
@@ -1580,7 +1663,7 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            if state.world.current_node_id != node_id:
+            if state.ship.docked_node_id != node_id:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
@@ -1628,7 +1711,20 @@ class Engine:
                 self._record_event(state.events, event)
                 return [event]
             if system.service.is_running:
-                return []
+                event = self._make_event(
+                    state,
+                    EventType.SERVICE_ALREADY_RUNNING,
+                    Severity.INFO,
+                    SourceRef(kind="ship_system", id=system.system_id),
+                    f"Service already running: {service_name}",
+                    data={
+                        "message_key": "service_already_running",
+                        "service": service_name,
+                        "system_id": system.system_id,
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
             if self._dependencies_blocked(state.ship.systems, system.dependencies):
                 dep_detail = self._first_unmet_dependency(state.ship.systems, system.dependencies)
                 if dep_detail:
@@ -2032,6 +2128,7 @@ class Engine:
         if job.job_type == JobType.DOCK and job.target:
             state.world.current_node_id = job.target.id
             state.ship.current_node_id = job.target.id
+            state.ship.docked_node_id = job.target.id
             node = state.world.space.nodes.get(job.target.id)
             if node:
                 state.world.current_pos_ly = (node.x_ly, node.y_ly, node.z_ly)
@@ -2190,6 +2287,10 @@ class Engine:
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
                 drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_SALVAGE)
+            tip = None
+            if node_id not in state.world.salvage_tip_nodes:
+                state.world.salvage_tip_nodes.add(node_id)
+                tip = f"Tip: ls /remote/{node_id}/mail or /remote/{node_id}/logs"
             events.append(
                 self._make_event(
                     state,
@@ -2197,7 +2298,7 @@ class Engine:
                     Severity.INFO,
                     SourceRef(kind="world", id=node_id),
                     f"Data salvaged: {count} files mounted at {mount_root}/",
-                    data={"node_id": node_id, "files_count": count, "mount_root": mount_root},
+                    data={"node_id": node_id, "files_count": count, "mount_root": mount_root, "tip": tip},
                 )
             )
             return events

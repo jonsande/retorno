@@ -4,6 +4,11 @@ Ref: OS-MAN/ENG/NAV-01
 No “ves” la galaxia como un mapa completo. La terminal del sarcófago opera con conocimiento parcial:
 - contactos detectados por sensores (el alcance de scan es limitado),
 - y rutas obtenidas de datos de navegación registrados (intel).
+Las rutas se pueden obtener mediante:
+- uplink en relays/waystations,
+- route dentro del alcance de sensores,
+- intel import (logs/fragmentos/mail),
+- scan si un hub está exactamente co‑ubicado con tu posición actual.
 
 Relays
 Un relay es infraestructura heredada: una baliza automatizada que repite señales y mantiene en caché tablas de rutas.
@@ -24,5 +29,4 @@ Notas operativas
 - En una red arruinada, los relays suelen ser la única forma de ampliar conocimiento de navegación sin saltos ciegos.
 
 Comandos relacionados
-- scan, nav, intel import, travel
-(futuro) uplink / relay sync
+- scan, nav, route, uplink, intel import, travel

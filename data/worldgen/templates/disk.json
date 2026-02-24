@@ -13,7 +13,8 @@
     "scrap_min": 10,
     "scrap_max": 40,
     "modules_min": 0,
-    "modules_max": 2
+    "modules_max": 2,
+    "modules_pool": "common"
   },
   "radiation_base": 0.002
 }

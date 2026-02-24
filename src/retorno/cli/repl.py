@@ -33,7 +33,7 @@ def print_help() -> None:
         "  intel | intel show <intel_id> | intel import <path> | intel export <path>\n"
         "  config set lang <en|es> | config show\n"
         "\nInformación:\n"
-        "  status | jobs | nav | alerts | alerts explain <alert_key> | logs\n"
+        "  status | jobs | job cancel <job_id> | nav | alerts | alerts explain <alert_key> | logs\n"
         "  contacts | scan\n"
         "  sectors | map | locate <system_id>\n"
         "\nNavegación:\n"
@@ -99,6 +99,16 @@ def _build_event_payload(e) -> dict:
     return payload
 
 
+def _has_unlock(state, command_key: str) -> bool:
+    modules = load_modules()
+    for mod_id in state.ship.installed_modules:
+        effects = modules.get(mod_id, {}).get("effects", {})
+        unlocks = effects.get("unlock_commands", [])
+        if command_key in unlocks:
+            return True
+    return False
+
+
 def render_events(state, events, origin_override: str | None = None) -> None:
     if not events:
         return
@@ -147,6 +157,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
     signal_detected_templates = {
         "en": "[{sev}] signal_detected :: Signal detected: {contact_id}",
         "es": "[{sev}] signal_detected :: Señal detectada: {contact_id}",
+    }
+    service_running_templates = {
+        "en": "[{sev}] service_already_running :: Service already running: {service}",
+        "es": "[{sev}] service_already_running :: Servicio ya en ejecución: {service}",
     }
     docked_templates = {
         "en": "[{sev}] docked :: Docked at {node_id}",
@@ -370,6 +384,22 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Action blocked: not in transit",
             "es": "Acción bloqueada: no estás en tránsito",
         },
+        "not_at_node": {
+            "en": "Action blocked: not at {node_id}",
+            "es": "Acción bloqueada: no estás en {node_id}",
+        },
+        "route_known": {
+            "en": "Route already known to {node_id}.",
+            "es": "Ruta ya conocida hacia {node_id}.",
+        },
+        "job_missing": {
+            "en": "Job not found: {job_id}",
+            "es": "Trabajo no encontrado: {job_id}",
+        },
+        "job_not_active": {
+            "en": "Job not active: {job_id}",
+            "es": "Trabajo no activo: {job_id}",
+        },
     }
     job_completed_keys = {
         "job_completed_repair": {
@@ -411,6 +441,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "job_completed_route": {
             "en": "Route solved: {from_id} -> {node_id}",
             "es": "Ruta calculada: {from_id} -> {node_id}",
+        },
+        "job_cancelled": {
+            "en": "Job cancelled: {job_id}",
+            "es": "Trabajo cancelado: {job_id}",
         },
     }
     def _safe_format(tmpl: str, payload: dict) -> str:
@@ -460,6 +494,15 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             except Exception:
                 print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
             continue
+        if e.type == EventType.DATA_SALVAGED:
+            print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message}")
+            tip = e.data.get("tip") if isinstance(e.data, dict) else None
+            if tip:
+                locale = state.os.locale.value
+                if locale == "es" and tip.startswith("Tip:"):
+                    tip = tip.replace("Tip:", "Pista:", 1)
+                print(tip)
+            continue
         if e.type == EventType.SYSTEM_STATE_CHANGED and e.data.get("from") and e.data.get("to"):
             system_id = e.source.id if e.source.kind == "ship_system" else "system"
             cause = e.data.get("cause", "")
@@ -486,15 +529,37 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             except Exception:
                 print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
             continue
-        if e.type == EventType.JOB_FAILED and e.data.get("job_id"):
+        if e.type == EventType.SERVICE_ALREADY_RUNNING:
             locale = state.os.locale.value
-            tmpl = job_failed_templates.get(locale, job_failed_templates["en"])
-            payload.update({
-                "job_id": e.data.get("job_id", "?"),
-                "job_type": e.data.get("job_type", "?"),
-            })
+            tmpl = service_running_templates.get(locale, service_running_templates["en"])
             try:
                 print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
+            except Exception:
+                print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
+            continue
+        if e.type == EventType.JOB_FAILED and e.data.get("job_id"):
+            locale = state.os.locale.value
+            key = e.data.get("message_key", "")
+            if key in job_completed_keys:
+                tmpl = job_completed_keys[key].get(locale, job_completed_keys[key]["en"])
+                message = _safe_format(tmpl, payload)
+            else:
+                tmpl = job_failed_templates.get(locale, job_failed_templates["en"])
+                payload.update({
+                    "job_id": e.data.get("job_id", "?"),
+                    "job_type": e.data.get("job_type", "?"),
+                })
+                message = None
+            try:
+                if message is not None:
+                    payload.update({
+                        "job_id": e.data.get("job_id", "?"),
+                        "message": message,
+                    })
+                    tmpl_ok = job_completed_templates.get(locale, job_completed_templates["en"])
+                    print(f"[{origin_tag}] " + _safe_format(tmpl_ok, payload))
+                else:
+                    print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
             except Exception:
                 print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
             continue
@@ -752,10 +817,20 @@ def render_status(state) -> None:
         remaining_years = remaining_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
         remaining_days = remaining_s / Balance.DAY_S if Balance.DAY_S else 0.0
         print(f"location: en route to {ship.transit_to} (from {ship.transit_from}) ETA={remaining_years:.2f}y ({remaining_days:.1f}d)")
-        dist = getattr(ship, "transit_distance_ly", 0.0) or 0.0
-        print(f"transit: {ship.transit_from} -> {ship.transit_to}  dist={dist:.2f}ly  ETA={remaining_years:.2f}y ({remaining_days:.1f}d)")
+        dist_total = getattr(ship, "last_travel_distance_ly", 0.0) or 0.0
+        total_s = max(0.0, ship.arrival_t - ship.transit_start_t)
+        if total_s > 0:
+            remaining_ly = dist_total * (remaining_s / total_s)
+        else:
+            remaining_ly = dist_total
+        print(
+            f"transit: {ship.transit_from} -> {ship.transit_to}  "
+            f"dist_total={dist_total:.2f}ly  remaining={remaining_ly:.2f}ly  "
+            f"ETA={remaining_years:.2f}y ({remaining_days:.1f}d)"
+        )
     else:
-        print(f"location: {current_loc} ({node_name})")
+        docked = "docked" if ship.docked_node_id == current_loc else "in orbit"
+        print(f"location: {current_loc} ({node_name}) [{docked}]")
         if state.world.active_tmp_node_id == current_loc:
             tmp_from = state.world.active_tmp_from or "?"
             tmp_to = state.world.active_tmp_to or "?"
@@ -978,6 +1053,16 @@ def render_contacts(state) -> None:
         }
         print(msg.get(locale, msg["en"]))
         return
+    current_id = state.world.current_node_id
+    node = state.world.space.nodes.get(current_id)
+    if node and node.kind == "transit" and not _has_unlock(state, "scan_in_transit"):
+        locale = state.os.locale.value
+        msg = {
+            "en": "contacts: sensors lock unavailable while adrift",
+            "es": "contacts: bloqueo de sensores no disponible en tránsito",
+        }
+        print(msg.get(locale, msg["en"]))
+        return
     print("\n=== CONTACTS ===")
     known = state.world.known_nodes if hasattr(state.world, "known_nodes") and state.world.known_nodes else state.world.known_contacts
     if not known:
@@ -1010,7 +1095,7 @@ def render_scan_results(state, node_ids: list[str]) -> None:
             print(f"- {cid}")
 
 
-def _scan_and_discover(state) -> tuple[list[str], list[str], list[str], str | None]:
+def _scan_and_discover(state) -> tuple[list[str], list[str], list[str], list[str], str | None]:
     system = state.ship.systems.get("sensors")
     if not system or _state_rank(system.state) < _state_rank(SystemState.LIMITED):
         locale = state.os.locale.value
@@ -1018,16 +1103,16 @@ def _scan_and_discover(state) -> tuple[list[str], list[str], list[str], str | No
             "en": "scan: sensors offline (requires >= limited)",
             "es": "scan: sensores fuera de línea (requiere >= limitado)",
         }
-        return [], [], [], msg.get(locale, msg["en"])
+        return [], [], [], [], msg.get(locale, msg["en"])
     current_id = state.world.current_node_id
     node = state.world.space.nodes.get(current_id)
-    if node and node.kind == "transit":
+    if node and node.kind == "transit" and not _has_unlock(state, "scan_in_transit"):
         locale = state.os.locale.value
         msg = {
             "en": "scan: sensors lock unavailable while adrift",
             "es": "scan: bloqueo de sensores no disponible en tránsito",
         }
-        return [], [], [], msg.get(locale, msg["en"])
+        return [], [], [], [], msg.get(locale, msg["en"])
     if node:
         x, y, z = node.x_ly, node.y_ly, node.z_ly
     else:
@@ -1048,6 +1133,8 @@ def _scan_and_discover(state) -> tuple[list[str], list[str], list[str], str | No
     discovered: list[str] = []
     handshakes: list[str] = []
     seen: list[str] = []
+    route_msgs: list[str] = []
+    route_links: list[tuple[str, str]] = []
     state_p = {
         SystemState.NOMINAL: Balance.SENSORS_DETECT_P_NOMINAL,
         SystemState.LIMITED: Balance.SENSORS_DETECT_P_LIMITED,
@@ -1090,9 +1177,40 @@ def _scan_and_discover(state) -> tuple[list[str], list[str], list[str], str | No
                     source_kind="scan",
                     source_ref=state.world.current_node_id,
                 )
+            if dist2 == 0.0 and n.is_hub and state.world.current_node_id != nid:
+                if add_known_link(state.world, state.world.current_node_id, nid, bidirectional=True):
+                    locale = state.os.locale.value
+                    msg = {
+                        "en": f"[INFO] (scan) route solved: {state.world.current_node_id} -> {nid}",
+                        "es": f"[INFO] (scan) ruta resuelta: {state.world.current_node_id} -> {nid}",
+                    }
+                    route_msgs.append(msg.get(locale, msg["en"]))
+                    route_links.append((state.world.current_node_id, nid))
+                    record_intel(
+                        state.world,
+                        t=state.clock.t,
+                        kind="link",
+                        from_id=state.world.current_node_id,
+                        to_id=nid,
+                        confidence=0.6,
+                        source_kind="scan",
+                        source_ref=state.world.current_node_id,
+                    )
             if n.kind in {"relay", "station", "waystation"}:
                 handshakes.append(nid)
-    return seen, discovered, handshakes, None
+    if route_links:
+        if "/logs/nav" not in state.os.fs:
+            state.os.fs["/logs/nav"] = FSNode(path="/logs/nav", node_type=FSNodeType.DIR, access=AccessLevel.ENG)
+        seq = state.events.next_event_seq
+        log_path = f"/logs/nav/scan_{state.world.current_node_id}_{seq:05d}.txt"
+        log_content = "".join(f"LINK: {left} -> {right}\n" for left, right in route_links)
+        state.os.fs[log_path] = FSNode(
+            path=log_path,
+            node_type=FSNodeType.FILE,
+            content=log_content,
+            access=AccessLevel.ENG,
+        )
+    return seen, discovered, handshakes, route_msgs, None
 
 
 def _hash64(seed: int, text: str) -> int:
@@ -1603,7 +1721,7 @@ def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str
     return added_msgs
 
 def render_sectors(state) -> None:
-    print("\n=== SECTORS ===")
+    print("\n=== RETORNO SHIP SECTORS ===")
     if not state.ship.sectors:
         print("(none)")
         return
@@ -2286,6 +2404,7 @@ def main() -> None:
         "system",
         "hibernate",
         "drone",
+        "job",
         "wait",
         "debug",
         "exit",
@@ -2294,7 +2413,9 @@ def main() -> None:
 
     def _completer(text: str, state_idx: int) -> str | None:
         buf = readline.get_line_buffer()
-        tokens = buf.strip().split()
+        tokens = buf.split()
+        if buf.endswith(" "):
+            tokens.append("")
         token = ""
         if buf and not buf.endswith(" ") and tokens:
             token = tokens[-1]
@@ -2391,6 +2512,11 @@ def main() -> None:
             elif cmd == "cargo":
                 if len(tokens) == 2:
                     candidates = [c for c in ["audit"] if c.startswith(text)]
+            elif cmd == "job":
+                if len(tokens) == 2:
+                    candidates = [c for c in ["cancel"] if c.startswith(text)]
+                elif len(tokens) == 3 and tokens[1] == "cancel":
+                    candidates = [jid for jid in locked_state.jobs.active_job_ids if jid.startswith(text)]
             elif cmd == "intel":
                 if len(tokens) == 2:
                     candidates = [c for c in ["show", "import", "export", "all"] if c.startswith(text)] + [t for t in ["10", "20", "50"] if t.startswith(text)]
@@ -2643,10 +2769,12 @@ def main() -> None:
         if parsed == "SCAN":
             _drain_auto_events()
             with loop.with_lock() as locked_state:
-                seen, discovered, handshakes, warn = _scan_and_discover(locked_state)
+                seen, discovered, handshakes, route_msgs, warn = _scan_and_discover(locked_state)
                 if warn:
                     print(f"[WARN] {warn}")
                 render_scan_results(locked_state, seen)
+                for line in route_msgs:
+                    print(line)
                 if discovered:
                     print(f"(scan) new: {', '.join(sorted(discovered))}")
             continue

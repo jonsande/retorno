@@ -107,6 +107,7 @@ def ensure_sector_generated(state: GameState, sector_id: str) -> None:
                 module_ids,
                 int(salvage.get("modules_min", 0)),
                 int(salvage.get("modules_max", 0)),
+                salvage.get("modules_pool"),
             )
         state.world.space.nodes[node_id] = node
 
@@ -180,11 +181,30 @@ def _generate_links_for_sector(state: GameState, sector_id: str, rng: random.Ran
         neighbor.links.add(hub.node_id)
 
 
-def _pick_modules(rng: random.Random, module_ids: list[str], min_count: int, max_count: int) -> list[str]:
+def _pick_modules(
+    rng: random.Random,
+    module_ids: list[str],
+    min_count: int,
+    max_count: int,
+    pool: str | list[str] | None = None,
+) -> list[str]:
     if not module_ids or max_count <= 0:
         return []
     count = rng.randint(min_count, max_count)
-    return [rng.choice(module_ids) for _ in range(count)]
+    modules = load_modules()
+    pool_map: dict[str, list[str]] = {"common": [], "rare": [], "tech": []}
+    for mid in module_ids:
+        tag = modules.get(mid, {}).get("pool", "common")
+        pool_map.setdefault(tag, []).append(mid)
+    if isinstance(pool, list) and pool:
+        candidates = [m for m in pool if m in module_ids]
+    elif isinstance(pool, str) and pool in pool_map:
+        candidates = pool_map[pool]
+    else:
+        candidates = module_ids
+    if not candidates:
+        return []
+    return [rng.choice(candidates) for _ in range(count)]
 
 
 def _generate_name(rng: random.Random, kind: str) -> str:

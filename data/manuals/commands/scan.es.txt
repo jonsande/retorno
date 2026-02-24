@@ -1,3 +1,4 @@
 scan
 - Barrido activo de señales cercanas dentro del rango de sensores.
 - Un contacto detectado no implica ruta disponible.
+- Requiere bloqueo de sensores; puede usarse en tránsito con transit_sensor_pack instalado.

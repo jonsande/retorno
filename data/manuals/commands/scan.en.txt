@@ -1,3 +1,4 @@
 scan
 - Active sweep for nearby signals within sensor range.
 - Discovered contacts are not always reachable without a route.
+- Requires sensors lock; can be used in transit with transit_sensor_pack installed.

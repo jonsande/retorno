@@ -1,0 +1,3 @@
+transit_sensor_pack
+- Permite scan y contacts mientras la nave está en tránsito.
+- Útil para detectar señales cercanas sin detener el viaje.

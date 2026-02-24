@@ -4,6 +4,7 @@
     "desc_en": "Stabilizes power bus phase alignment.",
     "desc_es": "Estabiliza la alineación de fase del bus de energía.",
     "scrap_cost": 12,
+    "pool": "common",
     "effects": { "power_quality_offset": 0.05 }
   },
   "aux_battery_cell": {
@@ -11,6 +12,7 @@
     "desc_en": "Adds auxiliary battery capacity.",
     "desc_es": "Añade capacidad auxiliar de baterías.",
     "scrap_cost": 20,
+    "pool": "common",
     "effects": { "e_batt_bonus_kwh": 2.0 }
   },
   "micro_reactor_patch": {
@@ -18,6 +20,7 @@
     "desc_en": "Boosts generation output slightly.",
     "desc_es": "Aumenta ligeramente la generación.",
     "scrap_cost": 30,
+    "pool": "tech",
     "effects": { "p_gen_bonus_kw": 0.5 }
   },
   "selftest_rig": {
@@ -25,6 +28,15 @@
     "desc_en": "Enables internal self-test repair cycles without a drone.",
     "desc_es": "Habilita ciclos internos de auto-reparación sin dron.",
     "scrap_cost": 16,
+    "pool": "tech",
     "effects": { "unlock_commands": ["selftest_repair"] }
+  },
+  "transit_sensor_pack": {
+    "name": "Transit Sensor Pack",
+    "desc_en": "Allows scan and contacts while in transit.",
+    "desc_es": "Permite scan y contacts durante el tránsito.",
+    "scrap_cost": 18,
+    "pool": "rare",
+    "effects": { "unlock_commands": ["scan_in_transit"] }
   }
 }

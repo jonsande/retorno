@@ -1,3 +1,4 @@
 jobs
 - Shows queued/running jobs and recent results.
 - Columns: id status type target ETA owner.
+- Use: job cancel <job_id> to cancel an active job.

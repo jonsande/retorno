@@ -61,6 +61,7 @@ class WorldState:
     current_node_id: str = "UNKNOWN_00"
     current_pos_ly: tuple[float, float, float] = (0.0, 0.0, 0.0)
     rng_seed: int = 0
+    salvage_tip_nodes: set[str] = field(default_factory=set)
 
 
 SECTOR_SIZE_LY = 10.0
