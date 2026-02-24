@@ -61,6 +61,8 @@ que no se ejecute el commando "inventory update". No obstante, en la informació
 
 - [ ] Hay que modificar el comando "map". No es muy intuitivo. Podría ser algo como "ship sectors" o "map ship".
 
+- [ ] Al iniciar la hibernación, debería de salir un mensaje (localizado) diciendo algo así como "Iniciando secuencia de hibernación", y una serie de mensajes (meramente narrativos) diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la criogenización, y una cuenta atrás de 10 segundos. Después, debe limpiarse la pantalla de logs (y esto me recuerda que necesitamos un comando "clear" para limpiar pantalla), esperar 3 segundos e imprimirse una serie de mensajes diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la descriogenización, junto con un mensaje (que se repetirá siempre), advirtiendo de que hay un problema crítico y no es posible descriogenizar completamente al sujeto del sarcófago (es decir, al Personaje Jugador). El sarcófago del PJ debe tener un id, por cierto. 
+
 - [ ] El drone deploy admite como targer "power_core", "energy_distribution" o "sensors", además de ship_sector inexistentes:
 >drone deploy! D1 chiquito
 [CMD] [INFO] job_queued :: J00005 deploy_drone target=ship_sector:chiquito ETA=6.0s (EMERGENCY)

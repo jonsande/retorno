@@ -22,6 +22,7 @@ from retorno.core.actions import (
     SalvageModule,
     SalvageScrap,
     SalvageData,
+    RouteSolve,
     Status,
     Travel,
     TravelAbort,
@@ -200,6 +201,11 @@ def parse_command(line: str):
         if len(args) == 2 and args[0] == "export":
             return ("INTEL_EXPORT", args[1])
         raise ParseError("Uso: intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>")
+
+    if cmd == "route":
+        if len(args) != 1:
+            raise ParseError("Uso: route <node_id>")
+        return RouteSolve(node_id=args[0])
 
     if cmd == "relay":
         if len(args) == 1 and args[0] == "uplink":

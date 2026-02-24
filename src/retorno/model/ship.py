@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from retorno.model.drones import DroneState, Inventory
 from retorno.model.systems import ShipSystem
+from retorno.config.balance import Balance
 
 
 @dataclass(slots=True)
@@ -84,7 +85,7 @@ class ShipState:
     installed_modules: list[str] = field(default_factory=list)
 
     inventory: Inventory = field(default_factory=Inventory)
-    sensors_range_ly: float = 2.5
+    sensors_range_ly: float = Balance.SENSORS_RANGE_LY
 
 
 @dataclass(slots=True)

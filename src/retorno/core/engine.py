@@ -25,6 +25,7 @@ from retorno.core.actions import (
     SelfTestRepair,
     Salvage,
     SalvageData,
+    RouteSolve,
     SalvageModule,
     SalvageScrap,
     Status,
@@ -149,6 +150,19 @@ class Engine:
                     SourceRef(kind="world", id=action.node_id),
                     f"Travel blocked: node {action.node_id} not found",
                     data={"message_key": "boot_blocked", "reason": "node_missing", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            known = state.world.known_nodes if hasattr(state.world, "known_nodes") else state.world.known_contacts
+            intel = state.world.known_intel if hasattr(state.world, "known_intel") else {}
+            if action.node_id not in known and action.node_id not in intel:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    f"Route solve blocked: unknown contact {action.node_id}",
+                    data={"message_key": "boot_blocked", "reason": "unknown_contact", "node_id": action.node_id},
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -565,6 +579,79 @@ class Engine:
                 params={},
             )
 
+        if isinstance(action, RouteSolve):
+            system = state.ship.systems.get("sensors")
+            if not system or self._state_rank(system.state) < self._state_rank(SystemState.LIMITED):
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id="sensors"),
+                    "Route solve blocked: sensors offline",
+                    data={"message_key": "boot_blocked", "reason": "sensors_offline"},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if not system.service or system.service.service_name != "sensord" or not system.service.is_running:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id="sensors"),
+                    "Route solve blocked: sensord not running",
+                    data={"message_key": "boot_blocked", "reason": "sensord_not_running"},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            target = state.world.space.nodes.get(action.node_id)
+            if not target:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    f"Route solve blocked: node {action.node_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "node_missing", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            current_id = state.world.current_node_id
+            current = state.world.space.nodes.get(current_id)
+            if not current:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=current_id),
+                    f"Route solve blocked: current node {current_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "node_missing", "node_id": current_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            distance_ly = self._distance_between_nodes(state, current_id, action.node_id)
+            if distance_ly > state.ship.sensors_range_ly:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    f"Route solve blocked: target out of sensor range ({distance_ly:.2f}ly)",
+                    data={"message_key": "boot_blocked", "reason": "out_of_range", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            t = distance_ly / state.ship.sensors_range_ly if state.ship.sensors_range_ly > 0 else 1.0
+            t = max(0.0, min(1.0, t))
+            eta = Balance.ROUTE_SOLVE_MIN_S + (Balance.ROUTE_SOLVE_MAX_S - Balance.ROUTE_SOLVE_MIN_S) * t
+            return self._enqueue_job(
+                state,
+                JobType.ROUTE_SOLVE,
+                TargetRef(kind="world_node", id=action.node_id),
+                owner_id=None,
+                eta_s=eta,
+                params={"node_id": action.node_id, "from_id": current_id, "distance_ly": distance_ly},
+            )
+
         if isinstance(action, PowerShed):
             system = state.ship.systems.get(action.system_id)
             if not system:
@@ -731,7 +818,12 @@ class Engine:
                     Severity.WARN,
                     SourceRef(kind="ship", id=state.ship.ship_id),
                     f"Drone deploy blocked: ship sector {action.sector_id} not found",
-                    data={"message_key": "boot_blocked", "reason": "ship_sector_missing", "sector_id": action.sector_id},
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "ship_sector_missing",
+                        "sector_id": action.sector_id,
+                        "hint_key": "deploy_target_hint",
+                    },
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -2110,6 +2202,30 @@ class Engine:
             )
             return events
 
+        if job.job_type == JobType.ROUTE_SOLVE and job.target:
+            node_id = job.params.get("node_id", job.target.id)
+            from_id = job.params.get("from_id", state.world.current_node_id)
+            if add_known_link(state.world, from_id, node_id, bidirectional=True):
+                state.world.known_nodes.add(node_id)
+                state.world.known_contacts.add(node_id)
+            events.append(
+                self._make_event(
+                    state,
+                    EventType.JOB_COMPLETED,
+                    Severity.INFO,
+                    SourceRef(kind="world", id=node_id),
+                    f"Route solved: {from_id} -> {node_id}",
+                    data={
+                        "job_id": job.job_id,
+                        "job_type": job.job_type.value,
+                        "from_id": from_id,
+                        "node_id": node_id,
+                        "message_key": "job_completed_route",
+                    },
+                )
+            )
+            return events
+
         if job.job_type == JobType.INSTALL_MODULE and job.target:
             module_id = job.params.get("module_id")
             if module_id and module_id in state.ship.cargo_modules:
@@ -2267,22 +2383,35 @@ class Engine:
             drone.dose_rad += r_env * drone.shield_factor * dt
 
     def _update_drone_maintenance(self, state: GameState, dt: float) -> None:
+        for drone in state.ship.drones.values():
+            if drone.status == DroneStatus.DEPLOYED:
+                drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_IDLE_DRAIN_DEPLOYED_PER_S * dt)
         drone_bay = state.ship.systems.get("drone_bay")
         if not drone_bay or drone_bay.state == SystemState.OFFLINE:
             return
         if self._state_rank(drone_bay.state) < self._state_rank(SystemState.LIMITED):
             return
+        net_kw = state.ship.power.p_gen_kw - state.ship.power.p_load_kw
+        soc = (
+            state.ship.power.e_batt_kwh / state.ship.power.e_batt_max_kwh
+            if state.ship.power.e_batt_max_kwh > 0
+            else 0.0
+        )
+        charge_rate = 0.0
+        if net_kw >= Balance.DRONE_CHARGE_KW:
+            charge_rate = Balance.DRONE_BATTERY_CHARGE_PER_S
+        elif soc > 0.0 and net_kw >= Balance.DRONE_CHARGE_NET_MIN_KW:
+            charge_rate = Balance.DRONE_BATTERY_CHARGE_PER_S * Balance.DRONE_BATTERY_CHARGE_LOW_MULT
         for drone in state.ship.drones.values():
             if drone.status == DroneStatus.DOCKED:
                 # charge battery
-                drone.battery = min(1.0, drone.battery + Balance.DRONE_BATTERY_CHARGE_PER_S * dt)
+                if charge_rate > 0.0:
+                    drone.battery = min(1.0, drone.battery + charge_rate * dt)
                 # repair integrity slowly using scrap
                 if drone.integrity < 1.0 and state.ship.cargo_scrap > 0:
                     state.ship.cargo_scrap = max(0, state.ship.cargo_scrap - 1)
                     state.ship.manifest_dirty = True
                     drone.integrity = min(1.0, drone.integrity + Balance.DRONE_REPAIR_INTEGRITY_PER_SCRAP)
-            elif drone.status == DroneStatus.DEPLOYED:
-                drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_IDLE_DRAIN_DEPLOYED_PER_S * dt)
 
     def _update_drone_battery_alerts(self, state: GameState) -> list[Event]:
         events: list[Event] = []

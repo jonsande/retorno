@@ -108,6 +108,11 @@ class SalvageData(Action):
 
 
 @dataclass(slots=True)
+class RouteSolve(Action):
+    node_id: str
+
+
+@dataclass(slots=True)
 class CargoAudit(Action):
     pass
 

@@ -1,4 +1,4 @@
 nav
 - Muestra rutas conocidas desde el nodo actual.
-- Úsalo tras scan o intel import para ver dónde puedes viajar.
+- Úsalo tras scan, route o intel import para ver dónde puedes viajar.
 - Si no hay rutas, necesitas un handshake de relay o inteligencia de navegación.

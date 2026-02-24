@@ -7,6 +7,7 @@ import random
 import readline
 from retorno.core.engine import Engine
 from retorno.core.actions import Hibernate
+from retorno.core.actions import RouteSolve
 from retorno.runtime.loop import GameLoop
 from retorno.model.events import Event, EventType, Severity, SourceRef
 from retorno.model.jobs import JobStatus
@@ -37,6 +38,7 @@ def print_help() -> None:
         "  sectors | map | locate <system_id>\n"
         "\nNavegación:\n"
         "  dock <node_id> | travel <node_id> | travel abort | uplink\n"
+        "  route <node_id>\n"
         "  hibernate until_arrival | hibernate <años>\n"
         "\nSistemas / Energía:\n"
         "  diag <system_id> | boot <service_name>\n"
@@ -276,6 +278,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Action blocked: ship sector not found ({sector_id})",
             "es": "Acción bloqueada: sector de nave no encontrado ({sector_id})",
         },
+        "deploy_target_hint": {
+            "en": "Hint: valid targets are ship_sector IDs (use 'locate <system_id>') or world node IDs (use 'contacts', 'scan' or 'nav').",
+            "es": "Pista: los objetivos válidos son ship_sector (usa 'locate <system_id>') o nodos del mundo (usa 'contacts', 'scan' o 'nav').",
+        },
         "unknown_contact": {
             "en": "Action blocked: unknown contact ({node_id}). Use 'scan' or acquire navigation intel.",
             "es": "Acción bloqueada: contacto desconocido ({node_id}). Usa 'scan' o consigue inteligencia de navegación.",
@@ -295,6 +301,18 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "drone_not_at_node": {
             "en": "Action blocked: drone not at {node_id} (current {drone_loc})",
             "es": "Acción bloqueada: dron no está en {node_id} (actual {drone_loc})",
+        },
+        "sensors_offline": {
+            "en": "Action blocked: sensors offline (requires >= limited)",
+            "es": "Acción bloqueada: sensores fuera de línea (requiere >= limitado)",
+        },
+        "sensord_not_running": {
+            "en": "Action blocked: sensord not running. Try: boot sensord",
+            "es": "Acción bloqueada: sensord no está en ejecución. Prueba: boot sensord",
+        },
+        "out_of_range": {
+            "en": "Action blocked: target out of sensor range ({node_id})",
+            "es": "Acción bloqueada: objetivo fuera de rango de sensores ({node_id})",
         },
         "ship_not_docked": {
             "en": "Action blocked: ship not docked at {node_id}",
@@ -389,6 +407,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "job_completed_cargo_audit": {
             "en": "Cargo manifest updated",
             "es": "Manifiesto de bodega actualizado",
+        },
+        "job_completed_route": {
+            "en": "Route solved: {from_id} -> {node_id}",
+            "es": "Ruta calculada: {from_id} -> {node_id}",
         },
     }
     def _safe_format(tmpl: str, payload: dict) -> str:
@@ -516,6 +538,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                 print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
             except Exception:
                 print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
+            hint_key = e.data.get("hint_key", "")
+            if hint_key and hint_key in boot_blocked_reasons:
+                hint = boot_blocked_reasons[hint_key].get(locale, boot_blocked_reasons[hint_key]["en"])
+                print(f"[{origin_tag}] {hint}")
             continue
         if e.type == EventType.SIGNAL_DETECTED:
             locale = state.os.locale.value
@@ -900,7 +926,10 @@ def render_jobs(state) -> None:
 def render_drone_status(state) -> None:
     print("\n=== DRONES ===")
     for did, d in state.ship.drones.items():
-        print(f"- {did}: status={d.status.value} loc={d.location.kind}:{d.location.id} battery={d.battery:.2f} integrity={d.integrity:.2f} dose={d.dose_rad:.3f}")
+        print(
+            f"- drone_id={did} status={d.status.value} loc={d.location.kind}:{d.location.id} "
+            f"battery={d.battery:.2f} integrity={d.integrity:.2f} dose={d.dose_rad:.3f}"
+        )
 
 
 def render_inventory(state) -> None:
@@ -981,7 +1010,7 @@ def render_scan_results(state, node_ids: list[str]) -> None:
             print(f"- {cid}")
 
 
-def _scan_and_discover(state) -> tuple[list[str], list[str], list[str]]:
+def _scan_and_discover(state) -> tuple[list[str], list[str], list[str], str | None]:
     system = state.ship.systems.get("sensors")
     if not system or _state_rank(system.state) < _state_rank(SystemState.LIMITED):
         locale = state.os.locale.value
@@ -989,8 +1018,7 @@ def _scan_and_discover(state) -> tuple[list[str], list[str], list[str]]:
             "en": "scan: sensors offline (requires >= limited)",
             "es": "scan: sensores fuera de línea (requiere >= limitado)",
         }
-        print(msg.get(locale, msg["en"]))
-        return [], [], []
+        return [], [], [], msg.get(locale, msg["en"])
     current_id = state.world.current_node_id
     node = state.world.space.nodes.get(current_id)
     if node and node.kind == "transit":
@@ -999,8 +1027,7 @@ def _scan_and_discover(state) -> tuple[list[str], list[str], list[str]]:
             "en": "scan: sensors lock unavailable while adrift",
             "es": "scan: bloqueo de sensores no disponible en tránsito",
         }
-        print(msg.get(locale, msg["en"]))
-        return [], [], []
+        return [], [], [], msg.get(locale, msg["en"])
     if node:
         x, y, z = node.x_ly, node.y_ly, node.z_ly
     else:
@@ -1021,11 +1048,32 @@ def _scan_and_discover(state) -> tuple[list[str], list[str], list[str]]:
     discovered: list[str] = []
     handshakes: list[str] = []
     seen: list[str] = []
+    state_p = {
+        SystemState.NOMINAL: Balance.SENSORS_DETECT_P_NOMINAL,
+        SystemState.LIMITED: Balance.SENSORS_DETECT_P_LIMITED,
+        SystemState.DAMAGED: Balance.SENSORS_DETECT_P_DAMAGED,
+        SystemState.CRITICAL: Balance.SENSORS_DETECT_P_CRITICAL,
+    }.get(system.state, Balance.SENSORS_DETECT_P_CRITICAL)
+
+    def _chance_for(dist: float) -> float:
+        if r <= 0:
+            return 0.0
+        t = min(1.0, max(0.0, dist / r))
+        return Balance.SENSORS_DETECT_P_NEAR + (Balance.SENSORS_DETECT_P_FAR - Balance.SENSORS_DETECT_P_NEAR) * t
+
+    state.meta.rng_counter += 1
     for nid, n in state.world.space.nodes.items():
         dx = n.x_ly - x
         dy = n.y_ly - y
         dz = n.z_ly - z
-        if dx * dx + dy * dy + dz * dz <= r * r:
+        dist2 = dx * dx + dy * dy + dz * dz
+        if dist2 <= r * r:
+            dist = dist2 ** 0.5
+            p = max(0.0, min(1.0, _chance_for(dist) * state_p))
+            seed = _hash64(state.meta.rng_seed + state.meta.rng_counter, f"scan:{nid}:{int(state.clock.t)}")
+            rng = random.Random(seed)
+            if rng.random() > p:
+                continue
             seen.append(nid)
             is_new = nid not in state.world.known_nodes
             if is_new:
@@ -1043,9 +1091,8 @@ def _scan_and_discover(state) -> tuple[list[str], list[str], list[str]]:
                     source_ref=state.world.current_node_id,
                 )
             if n.kind in {"relay", "station", "waystation"}:
-                if add_known_link(state.world, current_id, nid, bidirectional=True):
-                    handshakes.append(nid)
-    return seen, discovered, handshakes
+                handshakes.append(nid)
+    return seen, discovered, handshakes, None
 
 
 def _hash64(seed: int, text: str) -> int:
@@ -1572,9 +1619,11 @@ def render_locate(state, system_id: str) -> None:
         return
     sector = state.ship.sectors.get(sys.sector_id)
     if sector:
-        print(f"{system_id} -> {sys.sector_id} ({sector.name})")
+        print(f"system_id: {system_id}")
+        print(f"ship_sector: {sys.sector_id} ({sector.name})")
     else:
-        print(f"{system_id} -> {sys.sector_id}")
+        print(f"system_id: {system_id}")
+        print(f"ship_sector: {sys.sector_id}")
 
 
 def render_nav(state) -> None:
@@ -1632,8 +1681,8 @@ def render_nav(state) -> None:
                 print(f"- {nid}")
         locale = state.os.locale.value
         hint = {
-            "en": "Try: scan, intel, uplink (at relay/waystation), or acquire intel.",
-            "es": "Prueba: scan, intel, uplink (en relay/waystation) o consigue inteligencia.",
+            "en": "Try: scan, route, intel, uplink (at relay/waystation), or acquire intel.",
+            "es": "Prueba: scan, route, intel, uplink (en relay/waystation) o consigue inteligencia.",
         }
         print(hint.get(locale, hint["en"]))
 
@@ -1926,15 +1975,20 @@ def _apply_salvage_loot(loop, state, events):
     return
 
 
-def _run_hibernate(loop, years: float) -> None:
+def _run_hibernate(loop, years: float, wake_on_low_battery: bool = False) -> None:
     total_s = max(0.0, years * Balance.YEAR_S)
     if total_s <= 0:
         print("hibernate: nothing to do (duration <= 0)")
         return
     events_to_render: list[tuple[str, Event]] = []
+    actual_years = years
+    start_t = 0.0
+    wake_t: float | None = None
+    wake_reason: str | None = None
     with loop.with_lock() as locked_state:
         prev_mode = locked_state.ship.op_mode
         prev_source = locked_state.ship.op_mode_source
+        start_t = locked_state.clock.t
         start_soc = locked_state.ship.power.e_batt_kwh / locked_state.ship.power.e_batt_max_kwh if locked_state.ship.power.e_batt_max_kwh else 0.0
         start_health = {sid: sys.health for sid, sys in locked_state.ship.systems.items() if "critical" in sys.tags}
     with loop.with_lock() as locked_state:
@@ -1952,12 +2006,30 @@ def _run_hibernate(loop, years: float) -> None:
     loop.set_auto_tick(False)
     remaining = total_s
     step_events: list[tuple[str, Event]] = []
+    woke_early = False
     while remaining > 0:
         step = Balance.HIBERNATE_CHUNK_S if remaining >= Balance.HIBERNATE_CHUNK_S else remaining
+        if wake_on_low_battery:
+            step = min(step, Balance.HIBERNATE_WAKE_CHECK_S)
         ev = loop.step(step)
         step_events.extend([("step", e) for e in ev])
+        if wake_on_low_battery:
+            for e in ev:
+                if e.type.value in Balance.HIBERNATE_WAKE_EVENT_TYPES:
+                    woke_early = True
+                    wake_t = e.t
+                    wake_reason = e.type.value
+                    break
         remaining -= step
+        if woke_early:
+            break
     with loop.with_lock() as locked_state:
+        if wake_on_low_battery and woke_early:
+            if wake_t is not None:
+                elapsed_s = max(0.0, wake_t - start_t)
+            else:
+                elapsed_s = total_s - remaining
+            actual_years = elapsed_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
         _emit_runtime_event(
             locked_state,
             events_to_render,
@@ -1965,8 +2037,8 @@ def _run_hibernate(loop, years: float) -> None:
             EventType.HIBERNATION_ENDED,
             Severity.INFO,
             SourceRef(kind="ship", id=locked_state.ship.ship_id),
-            f"Hibernation ended after {years:.2f} years",
-            data={"years": years},
+            f"Hibernation ended after {actual_years:.2f} years",
+            data={"years": actual_years},
         )
         end_soc = locked_state.ship.power.e_batt_kwh / locked_state.ship.power.e_batt_max_kwh if locked_state.ship.power.e_batt_max_kwh else 0.0
         end_health = {sid: sys.health for sid, sys in locked_state.ship.systems.items() if "critical" in sys.tags}
@@ -1979,8 +2051,21 @@ def _run_hibernate(loop, years: float) -> None:
     with loop.with_lock() as locked_state:
         if events_to_render:
             render_events(locked_state, events_to_render)
-        days = years * (Balance.YEAR_S / Balance.DAY_S)
-        print(f"Advanced time by {years:.2f} years ({days:.1f} days).")
+        if wake_on_low_battery and woke_early:
+            locale = locked_state.os.locale.value
+            if wake_reason == EventType.DRONE_LOW_BATTERY.value:
+                msg = {
+                    "en": "Hibernation interrupted: drone low battery",
+                    "es": "Hibernación interrumpida: batería baja en dron",
+                }
+            else:
+                msg = {
+                    "en": f"Hibernation interrupted: {wake_reason}",
+                    "es": f"Hibernación interrumpida: {wake_reason}",
+                }
+            print(msg.get(locale, msg["en"]))
+        days = actual_years * (Balance.YEAR_S / Balance.DAY_S)
+        print(f"Advanced time by {actual_years:.2f} years ({days:.1f} days).")
         # digest de degradación para críticos
         if start_health:
             print("Hibernate digest (critical systems):")
@@ -2001,6 +2086,39 @@ def _confirm_hibernate_non_cruise(state) -> bool:
     if locale == "es":
         return reply in {"s", "si", "sí", "y", "yes"}
     return reply in {"y", "yes"}
+
+
+def _confirm_hibernate_drones(state) -> tuple[bool, bool]:
+    deployed = [
+        d for d in state.ship.drones.values()
+        if d.status in {DroneStatus.DEPLOYED, DroneStatus.DISABLED}
+        and d.location.kind in {"world_node", "ship_sector"}
+    ]
+    if not deployed:
+        return True, False
+    locale = state.os.locale.value
+    drone_ids = ", ".join(d.drone_id for d in deployed)
+    msg = {
+        "en": f"WARNING: drones deployed ({drone_ids}) may drain batteries during hibernation. Continue? [y/N] ",
+        "es": f"ADVERTENCIA: drones desplegados ({drone_ids}) pueden agotar batería durante la hibernación. ¿Continuar? [s/N] ",
+    }.get(locale, "WARNING: drones deployed may drain batteries during hibernation. Continue? [y/N] ")
+    reply = input(msg).strip().lower()
+    if locale == "es":
+        ok = reply in {"s", "si", "sí", "y", "yes"}
+    else:
+        ok = reply in {"y", "yes"}
+    if not ok:
+        return False, False
+    msg2 = {
+        "en": "Wake if any drone reaches low battery threshold? [y/N] ",
+        "es": "¿Despertar si algún dron alcanza batería baja? [s/N] ",
+    }.get(locale, "Wake if any drone reaches low battery threshold? [y/N] ")
+    reply2 = input(msg2).strip().lower()
+    if locale == "es":
+        wake = reply2 in {"s", "si", "sí", "y", "yes"}
+    else:
+        wake = reply2 in {"y", "yes"}
+    return True, wake
 
 
 def render_about(state, system_id: str) -> None:
@@ -2144,6 +2262,7 @@ def main() -> None:
         "jobs",
         "power",
         "alerts",
+        "logs",
         "contacts",
         "scan",
         "sectors",
@@ -2154,6 +2273,7 @@ def main() -> None:
         "relay",
         "dock",
         "travel",
+        "route",
         "salvage",
         "diag",
         "boot",
@@ -2276,6 +2396,30 @@ def main() -> None:
                     candidates = [c for c in ["show", "import", "export", "all"] if c.startswith(text)] + [t for t in ["10", "20", "50"] if t.startswith(text)]
                 elif len(tokens) == 3 and tokens[1] == "show":
                     candidates = [i.intel_id for i in locked_state.world.intel if i.intel_id.startswith(text.upper())]
+                elif len(tokens) == 3 and tokens[1] in {"import", "export"}:
+                    path_text = token or text
+                    if "/" in path_text:
+                        dir_part, base_part = path_text.rsplit("/", 1)
+                        dir_path = normalize_path(dir_part or "/")
+                        prefix = base_part
+                    else:
+                        dir_path = "/"
+                        prefix = path_text
+                    try:
+                        entries = list_dir(locked_state.os.fs, dir_path, locked_state.os.access_level)
+                    except Exception:
+                        entries = []
+                    for name in entries:
+                        if not name.startswith(prefix):
+                            continue
+                        if "/" in path_text:
+                            if path_text.startswith("/"):
+                                full = normalize_path(f"{dir_path}/{name}")
+                            else:
+                                full = f"{dir_part}/{name}" if dir_part else name
+                            candidates.append(full)
+                        else:
+                            candidates.append(name)
             elif cmd == "shutdown":
                 if len(tokens) == 2:
                     candidates = [s for s in systems if s.startswith(text)]
@@ -2334,6 +2478,8 @@ def main() -> None:
                     candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
                 elif len(tokens) == 4 and tokens[1] == "move":
                     candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
+                elif len(tokens) == 4 and tokens[1] == "repair":
+                    candidates = [s for s in systems if s.startswith(text)]
                 elif len(tokens) == 3 and tokens[1] == "salvage":
                     candidates = [c for c in ["scrap", "module", "modules", "data"] if c.startswith(text)]
                 elif len(tokens) == 4 and tokens[1] == "salvage":
@@ -2347,6 +2493,8 @@ def main() -> None:
                     candidates = [d for d in drones if d.startswith(text)]
                 elif len(tokens) == 4:
                     candidates = [c for c in contacts if c.startswith(text)]
+            elif cmd == "route":
+                candidates = [c for c in contacts if c.startswith(text)]
             elif cmd == "config":
                 if len(tokens) == 2:
                     candidates = [c for c in ["set", "show"] if c.startswith(text)]
@@ -2359,34 +2507,6 @@ def main() -> None:
                     candidates = [c for c in ["inbox", "read"] if c.startswith(text)]
                 elif len(tokens) == 3 and tokens[1] == "read":
                     candidates = [c for c in ["latest"] if c.startswith(text)]
-            elif cmd == "intel":
-                if len(tokens) == 2:
-                    candidates = [c for c in ["import"] if c.startswith(text)]
-                elif len(tokens) == 3 and tokens[1] == "import":
-                    path_text = token or text
-                    if "/" in path_text:
-                        dir_part, base_part = path_text.rsplit("/", 1)
-                        dir_path = normalize_path(dir_part or "/")
-                        prefix = base_part
-                    else:
-                        dir_path = "/"
-                        prefix = path_text
-                    try:
-                        entries = list_dir(locked_state.os.fs, dir_path, locked_state.os.access_level)
-                    except Exception:
-                        entries = []
-                    for name in entries:
-                        if not name.startswith(prefix):
-                            continue
-                        if "/" in path_text:
-                            if path_text.startswith("/"):
-                                full = normalize_path(f"{dir_path}/{name}")
-                            else:
-                                full = f"{dir_part}/{name}" if dir_part else name
-                            candidates.append(full)
-                        else:
-                            candidates.append(name)
-
         if state_idx < len(candidates):
             return candidates[state_idx]
         return None
@@ -2523,12 +2643,12 @@ def main() -> None:
         if parsed == "SCAN":
             _drain_auto_events()
             with loop.with_lock() as locked_state:
-                seen, discovered, handshakes = _scan_and_discover(locked_state)
+                seen, discovered, handshakes, warn = _scan_and_discover(locked_state)
+                if warn:
+                    print(f"[WARN] {warn}")
                 render_scan_results(locked_state, seen)
                 if discovered:
                     print(f"(scan) new: {', '.join(sorted(discovered))}")
-                if handshakes:
-                    print(f"(nav) handshake established with {', '.join(sorted(set(handshakes)))}")
             continue
         if parsed == "INVENTORY":
             _drain_auto_events()
@@ -2569,6 +2689,16 @@ def main() -> None:
             _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_nav(locked_state)
+            continue
+        if isinstance(parsed, RouteSolve):
+            _drain_auto_events()
+            ev = loop.apply_action(parsed)
+            with loop.with_lock() as locked_state:
+                render_events(locked_state, ev)
+            auto_ev = loop.drain_events()
+            if auto_ev:
+                with loop.with_lock() as locked_state:
+                    render_events(locked_state, auto_ev)
             continue
         if parsed == "INTEL_LIST":
             _drain_auto_events()
@@ -2657,6 +2787,10 @@ def main() -> None:
             continue
         if isinstance(parsed, Hibernate):
             _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                ok, wake_on_low = _confirm_hibernate_drones(locked_state)
+                if not ok:
+                    continue
             if parsed.mode == "until_arrival":
                 with loop.with_lock() as locked_state:
                     if not locked_state.ship.in_transit:
@@ -2669,7 +2803,7 @@ def main() -> None:
                     years = remaining_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
             else:
                 years = parsed.years
-            _run_hibernate(loop, years)
+            _run_hibernate(loop, years, wake_on_low_battery=wake_on_low)
             continue
 
         # Acciones del motor

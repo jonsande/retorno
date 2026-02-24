@@ -18,6 +18,7 @@ class JobType(str, Enum):
     SALVAGE_SCRAP = "salvage_scrap"
     SALVAGE_MODULE = "salvage_module"
     SALVAGE_DATA = "salvage_data"
+    ROUTE_SOLVE = "route_solve"
     RECALL_DRONE = "recall_drone"
     CARGO_AUDIT = "cargo_audit"
 

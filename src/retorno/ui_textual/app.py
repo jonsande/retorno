@@ -16,6 +16,7 @@ from retorno.cli import repl
 from retorno.core.engine import Engine
 from retorno.core.actions import Hibernate
 from retorno.model.events import Severity
+from retorno.model.drones import DroneStatus
 from retorno.model.os import Locale, list_dir, normalize_path
 from retorno.runtime.loop import GameLoop
 from retorno.ui_textual import presenter
@@ -173,6 +174,9 @@ class RetornoTextualApp(App):
         self._pending_confirm_prompt = ""
         self._pending_confirm_locale = "en"
         self._pending_years: float = 0.0
+        self._pending_hibernate_parsed = None
+        self._pending_wake_on_low_battery: bool = False
+        self._pending_hibernate_requires_non_cruise: bool = False
         self._last_complete_key: str = ""
         self._last_complete_at: float = 0.0
         self._last_complete_candidates: list[str] = []
@@ -339,6 +343,7 @@ class RetornoTextualApp(App):
             "dock",
             "travel",
             "salvage",
+            "route",
             "drone",
             "repair",
             "inventory",
@@ -487,6 +492,8 @@ class RetornoTextualApp(App):
                 return [d for d in drones if d.startswith(text)]
             if len(tokens) == 4:
                 return [c for c in contacts if c.startswith(text)]
+        if cmd == "route":
+            return [c for c in contacts if c.startswith(text)]
         if cmd == "config":
             if len(tokens) == 2:
                 return [c for c in ["set", "show"] if c.startswith(text)]
@@ -544,7 +551,7 @@ class RetornoTextualApp(App):
         current_node = state.world.current_node_id
         out = []
         for d in state.ship.drones.values():
-            if d.status in {"deployed", "disabled"} and d.location.kind == "world_node":
+            if d.status in {DroneStatus.DEPLOYED, DroneStatus.DISABLED} and d.location.kind == "world_node":
                 out.append(d)
         if not out:
             return False
@@ -563,8 +570,8 @@ class RetornoTextualApp(App):
     def _confirm_travel_abort_needed(self, state) -> bool:
         locale = state.os.locale.value
         prompts = {
-            "en": "WARNING: aborting travel will return you to the origin node. Continue? [y/N]",
-            "es": "ADVERTENCIA: abortar el viaje te devuelve al nodo de origen. ¿Continuar? [s/N]",
+            "en": "WARNING: aborting travel. Continue? [y/N]",
+            "es": "ADVERTENCIA: abortar el viaje. ¿Continuar? [s/N]",
         }
         self._pending_confirm_action = "TRAVEL_ABORT"
         self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
@@ -583,6 +590,68 @@ class RetornoTextualApp(App):
         self._pending_confirm_locale = locale
         self._log_line(self._pending_confirm_prompt)
         return True
+
+    def _confirm_hibernate_drones_needed(self, state) -> bool:
+        deployed = [
+            d for d in state.ship.drones.values()
+            if d.status in {DroneStatus.DEPLOYED, DroneStatus.DISABLED}
+            and d.location.kind in {"world_node", "ship_sector"}
+        ]
+        if not deployed:
+            return False
+        locale = state.os.locale.value
+        drone_ids = ", ".join(d.drone_id for d in deployed)
+        prompts = {
+            "en": f"WARNING: drones deployed ({drone_ids}) may drain batteries during hibernation. Continue? [y/N]",
+            "es": f"ADVERTENCIA: drones desplegados ({drone_ids}) pueden agotar batería durante la hibernación. ¿Continuar? [s/N]",
+        }
+        self._pending_confirm_action = "HIBERNATE_DRONES"
+        self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
+        self._pending_confirm_locale = locale
+        self._log_line(self._pending_confirm_prompt)
+        return True
+
+    def _confirm_hibernate_wake_needed(self, state) -> None:
+        locale = state.os.locale.value
+        prompts = {
+            "en": "Wake if any drone reaches low battery threshold? [y/N]",
+            "es": "¿Despertar si algún dron alcanza batería baja? [s/N]",
+        }
+        self._pending_confirm_action = "HIBERNATE_WAKE"
+        self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
+        self._pending_confirm_locale = locale
+        self._log_line(self._pending_confirm_prompt)
+
+    def _continue_hibernate(self, parsed: Hibernate, wake_on_low_battery: bool) -> None:
+        try:
+            with self.loop.with_lock() as state:
+                if parsed.mode == "until_arrival":
+                    if not state.ship.in_transit:
+                        self._log_line("hibernate: not in transit")
+                        self._pending_hibernate_parsed = None
+                        return
+                    remaining_s = max(0.0, state.ship.arrival_t - state.clock.t)
+                    years = remaining_s / repl.Balance.YEAR_S if repl.Balance.YEAR_S else 0.0
+                    if state.ship.op_mode != "CRUISE":
+                        self._pending_years = years
+                        self._pending_wake_on_low_battery = wake_on_low_battery
+                        self._pending_hibernate_requires_non_cruise = True
+                        self._confirm_hibernate_non_cruise_needed(state)
+                        return
+                else:
+                    years = parsed.years
+            lines = presenter.build_command_output(
+                repl._run_hibernate,
+                self.loop,
+                years,
+                wake_on_low_battery=wake_on_low_battery,
+            )
+            self._log_lines(lines)
+        except Exception as e:
+            self._log_line(f"[ERROR] hibernate failed: {e}")
+        self._pending_hibernate_parsed = None
+        self._pending_hibernate_requires_non_cruise = False
+        self._pending_wake_on_low_battery = False
 
     def _set_log_content(self, widget: RichLog, lines: list[str], preserve_scroll: bool = False, follow_end: bool = False) -> None:
         scroll_y = widget.scroll_y if preserve_scroll else None
@@ -657,18 +726,46 @@ class RetornoTextualApp(App):
             action = self._pending_confirm_action
             self._pending_confirm_action = None
             self._pending_confirm_prompt = ""
+            if action == "HIBERNATE_WAKE":
+                wake = reply in yes
+                self._pending_wake_on_low_battery = wake
+                if self._pending_hibernate_requires_non_cruise:
+                    with self.loop.with_lock() as state:
+                        self._confirm_hibernate_non_cruise_needed(state)
+                    return
+                if self._pending_hibernate_parsed is not None:
+                    self._continue_hibernate(self._pending_hibernate_parsed, wake)
+                return
             if reply in yes:
                 if action == "TRAVEL_ABORT":
                     from retorno.core.actions import TravelAbort
                     self._log_line("> travel abort")
                     self._log_lines(self.presenter.build_command_output(self.loop.apply_action, TravelAbort()))
+                elif action == "HIBERNATE_DRONES":
+                    with self.loop.with_lock() as state:
+                        self._confirm_hibernate_wake_needed(state)
+                    return
                 elif action == "HIBERNATE_NON_CRUISE":
                     self._log_line("> hibernate until_arrival")
-                    self._log_lines(self.presenter.build_command_output(repl._run_hibernate, self.loop, self._pending_years))
+                    self._log_lines(
+                        self.presenter.build_command_output(
+                            repl._run_hibernate,
+                            self.loop,
+                            self._pending_years,
+                            wake_on_low_battery=self._pending_wake_on_low_battery,
+                        )
+                    )
+                    self._pending_hibernate_parsed = None
+                    self._pending_hibernate_requires_non_cruise = False
+                    self._pending_wake_on_low_battery = False
                 else:
                     self._log_line(f"> {action.__class__.__name__.lower()}")
                     self._log_lines(self.presenter.build_command_output(self.loop.apply_action, action))
             else:
+                if action in {"HIBERNATE_DRONES", "HIBERNATE_WAKE", "HIBERNATE_NON_CRUISE"}:
+                    self._pending_hibernate_parsed = None
+                    self._pending_hibernate_requires_non_cruise = False
+                    self._pending_wake_on_low_battery = False
                 self._log_line("(cancelled)")
             return
         if not self._history or self._history[-1] != text:
@@ -717,12 +814,12 @@ class RetornoTextualApp(App):
             return
         if parsed == "SCAN":
             with self.loop.with_lock() as state:
-                seen, discovered, handshakes = repl._scan_and_discover(state)
+                seen, discovered, handshakes, warn = repl._scan_and_discover(state)
+                if warn:
+                    self._log_line(f"[WARN] {warn}")
                 self._log_lines(presenter.build_command_output(repl.render_scan_results, state, seen))
                 if discovered:
                     self._log_line(f"(scan) new: {', '.join(sorted(discovered))}")
-                if handshakes:
-                    self._log_line(f"(nav) handshake established with {', '.join(sorted(set(handshakes)))}")
             return
         if parsed == "JOBS":
             with self.loop.with_lock() as state:
@@ -731,6 +828,18 @@ class RetornoTextualApp(App):
         if parsed == "NAV":
             with self.loop.with_lock() as state:
                 self._log_lines(presenter.build_command_output(repl.render_nav, state))
+            return
+        if isinstance(parsed, repl.RouteSolve):
+            ev = self.loop.apply_action(parsed)
+            if ev:
+                with self.loop.with_lock() as state:
+                    lines = presenter.format_event_lines(state, [("cmd", e) for e in ev])
+                self._log_lines(lines)
+            auto_ev = self.loop.drain_events()
+            if auto_ev:
+                with self.loop.with_lock() as state:
+                    lines = presenter.format_event_lines(state, auto_ev)
+                self._log_lines(lines)
             return
         if parsed == "UPLINK":
             with self.loop.with_lock() as state:
@@ -900,24 +1009,12 @@ class RetornoTextualApp(App):
         if isinstance(parsed, Hibernate):
             # Reuse CLI hibernate logic for now.
             self._drain_auto_to_log()
-            try:
-                with self.loop.with_lock() as state:
-                    if parsed.mode == "until_arrival":
-                        if not state.ship.in_transit:
-                            self._log_line("hibernate: not in transit")
-                            return
-                        if state.ship.op_mode != "CRUISE":
-                            self._pending_years = max(0.0, state.ship.arrival_t - state.clock.t) / repl.Balance.YEAR_S if repl.Balance.YEAR_S else 0.0
-                            self._confirm_hibernate_non_cruise_needed(state)
-                            return
-                        remaining_s = max(0.0, state.ship.arrival_t - state.clock.t)
-                        years = remaining_s / repl.Balance.YEAR_S if repl.Balance.YEAR_S else 0.0
-                    else:
-                        years = parsed.years
-                lines = presenter.build_command_output(repl._run_hibernate, self.loop, years)
-                self._log_lines(lines)
-            except Exception as e:
-                self._log_line(f"[ERROR] hibernate failed: {e}")
+            self._pending_hibernate_parsed = parsed
+            self._pending_hibernate_requires_non_cruise = False
+            with self.loop.with_lock() as state:
+                if self._confirm_hibernate_drones_needed(state):
+                    return
+            self._continue_hibernate(parsed, wake_on_low_battery=False)
             return
 
         if parsed.__class__.__name__ == "Status":
