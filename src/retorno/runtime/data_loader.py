@@ -55,3 +55,16 @@ def load_worldgen_templates() -> dict[str, dict]:
         if region:
             templates[region] = data
     return templates
+
+
+
+def load_arcs() -> list[dict]:
+    path = _DATA_ROOT / "arcs"
+    if not path.exists():
+        return []
+    arcs: list[dict] = []
+    for file in sorted(path.glob("*.json")):
+        with file.open("r", encoding="utf-8") as fh:
+            arcs.append(json.load(fh))
+    return arcs
+

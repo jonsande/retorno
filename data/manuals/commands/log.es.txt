@@ -1,0 +1,5 @@
+log
+- Copia líneas del log de comandos (panel de Textual).
+Uso: log copy [n]
+- copy: copia las últimas n líneas al portapapeles (por defecto: 50).
+- En la CLI (repl), copia líneas del registro de eventos recientes.

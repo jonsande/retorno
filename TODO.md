@@ -1,91 +1,105 @@
-NOTAS (limpiar)
-Por qué ship_1.json tiene node_id: RETORNO_SHIP
-Ese archivo usa el schema de “location” para almacenar fs_files del barco.
-El node_id ahí no se añade al mundo porque en bootstrap se ignora cualquier location cuyo node_id sea igual a state.ship.ship_id.
-Es decir: se usa solo como contenedor de archivos de la nave.
+========================
+=== TODO AND PROMPTS ===
+========================
 
-Si quieres, puedo refactorizar esto para que el fs_files de la nave esté en un archivo propio sin node_id, pero hoy el sistema de carga está pensado para “locations” y por eso aparece así.
+=== PROLOGUE ===
 
-SPOILERS!
+- [ ] La primera vez que se ejecuta el juego no debe fallar nunca el deploy!.
 
-Solución al puzzle/tutorial inicial:
 
-drone deploy! D1 PWR-A2
+=== DRONES ===
 
-Si falla...
-    drone reboot D1   (tantas veces como haga falta)
-    drone deploy! D1 PWR-A2
+- [ ] Necesitamos que se puedan recuperar (salvage) nuevos drones. Una sub-orden nueva: 'drone salvage drone' (que admita también el plural 'drone salvage drones'). Estoy incluye incluir tablas apropiadas en los hubs authored y correspondientes ajustes en la generación procedural del botín.
 
-drone repair D1 power_core
-drone repair D1 energy_distribution
-drone recall D1
-boot sensors
-scan
-dock ECHO_7
----
-drone deploy D1 ECHO_7
-drone salvage modules D1
-drone salvage scrap D1 30
-drone salvage modules D1
-cargo audit
-drone recall
-power plan audit
-travel DERELICT_A3
-hibernate until_arrival
 
-DEBUG
+=== NAVIGATION / ROUTES / WORLD GEN ===
 
-Instalar la UI de Textual:
-pip install -e .[ui]
+- [ ] Los viajes deben ser más peligrosos. Los de muchos años luz deben, por lo pronto, exponerte a mucha radiación. Esto limitará el ir pegando saltos por ahí a lo loco. Viajar a 40 años luz debería ser a costa de llegar con los sitemas hechos polvo.
+- [x] Al hacer scan, no se suponía que debía establecerse la distancia fina a los hubs con distancia de 0ly? No lo está reflejando el nav.
+- [ ] Actualizar manual dock! Tiene que aclarar que se puede hacer un dock cuando se está a "distancia fina".
+- [x] Indicar en listado nav qué lugares han sido visitados.
 
-Arrancar con UI Textual:
-python -m retorno.ui_textual.app
 
-Saltar prólogo:
-Iniciar con RETORNO_SCENARIO=sandbox python -m retorno.cli.repl
-Dentro del juego, se puede cambiar de escenario con:
-debug scenario prologue
-debug scenario sandbox
-debug scenario dev
+=== SYSTEMS ===
 
-- [ ] no debe crearse ruta conocida desde el nodo actual al hub ECHO_7 hasta que ECHO_7 no sea descubierto. En el momento en que se descubra ECHO_7, sí debe automáticamente crearse una ruta conocida también, pues se supone que ECHO_7 se encuentra en el mismo nodo de la nave del PJ.
+DRONE BAY
+- [ ] Necesitamos que drone_bay tenga una capacidad máxima para albergar drones.
 
-- [ ] Indicar en listado nav qué lugares han sido visitados.
+VITALS
+- [ ] La cámara de sarcófagos será un sistema independiente? o retocar life_support?
+- [ ] Hay que desarrollar una v0 de vitals. El usuario tiene también que mantener a su PJ. La hibernación debe tener su coste (y/o riesgos). También tiene que haber algún consumo de alimento, y un generador de oxígeno que requiera alguna forma de mantenimiento o combustible o...
 
-- [x] Operaciones de salvage y de repair deberían estar dentro del comando drone.
-- [x] La cantidad de scrap que se ordena recuperar con 'salvage' tiene que afectar al tiempo
-que se tarda en llevar a cabo la tarea.
-- [x] Establecer límite de scrap que se puede obtener de un derelict u objeto dockable.
-- [x] debería haber un límite de scrap y un máximo de módules encontrables (y que todo esto sea configurable en el json).
-- [x] Obtener scrap debería de hacerse con un dron (específico para las tareas de salvage),
-sin tener el cual (o sin estar operativo y desplegado en el nodo adecuado) no debe ser posible
-obtener scrap. 
-- [x] Ahora mismo tenemos algo llamado "inventario". Estoy hay que modificarlo. El inventario debería ser un sector de la nave del PJ. Muchas naves (la del PJ incluida) tienen que tener un sector de carga o almacén, es decir, una bodega. Esa bodega junto con su id debe aparecer al ejecutar el comando sectors. Por lo demás, por ahora el funcionamiento de ese "inventario" será igual que actualmente. 
-- [x] Otra cosa: el comando "inventory" debe conservarse, pero quiero modificar algo. Si se añade al inventario scrap nuevo o un módulo o lo que sea, no se verá reflejado en la información correspondiente del status ni en la información que genera el comando "inventory" hasta
-que no se ejecute el commando "inventory update". No obstante, en la información que imprime "status" y en la información que imprime "inventory" debe aparecer de algún modo la indicación de que hay cambios en bodega y que es necesario inventariar para actualizar la información. Ahora bien, la operación "inventory update" quiero ser un "job", un trabajo, con su  orrespondiente ETA. La idea es que al introducir ese comando se ejecute un trabajo de actualización del inventario o inventariado de lo que hay en la bodega, y que eso tarde un rato.
+=== COMMANDS ===
 
-- [ ] Los drones con poca batería deberían de volver solos al dock. De otro modo, hay que ver cómo controlar para que al viajar o hibernar no "mueran". Ahora mismo parece que si te los dejas fuera de su dock e hibernas no les pasa nada. Es como si hibernaran ellos también.
+- [x] Ahora mismo se informa del límite de scrap antes de llevar a cabo la operación de salvage si se ordena una cantidad mayor a la disponible. Esto no debería suceder. El jugador no debe saber antes de terminar el job de scrap cuál es el número total de scrap que hay en esa localización.
+- [x] Locate debe admitir node_id's, tal como lo indica el Hint del drone deploy (cuando no se le da un tarjet válido).
+- [ ] jobs debe admitir número de entradas que se quieren imprimir en pantalla, o filtros.
+- [x] El comando contacts debe imprimir también la distancia a la que se encuentra cada contacto y si hay o no ruta conocida.
 
-- [x] Con los sensors con health 1.00, al intentar encenderlos con "system on sensors" me ha salido este mensaje:
-[CMD] [WARN] boot_blocked :: System on blocked: system too damaged
+
+
+=== LORE ===
+
+- [ ] Dentro de la carpeta /lore, me interesa una carpeta llamada "singles", pensada para albergar documentos txt que serán de ser después "colocados" proceduralmente en el mundo.
+
+- [!] En el estado actual del juego, ¿cómo se están distribuyendo por el mundo los archivos txt y los packs? Cómo funciona corridor_01.json? Cómo funcionan los "arcs"Comprobar.
+
+- [ ] Pensándolo mejor, sí quiero failsafe para algunos arcos. O mejor dicho, quiero tener la opción. Quiero que sea configurable para cada arco y/o .......
+
+
+=== INTEL ===
+
+- [!] Sistema procedural para descubrir información de rutas a nodos conocidos pero sin ruta conocida. A través de uplink y a través de un flag específico en los txt. El caso es que ahora mismo los datos corruptos (información entre etiquetas [INTEL][/INTEL] no procesable) genera contactos (nodos) sin ruta. Los INTEL incrustados también pueden generar (esto hay que confirmarlo) contactos authored pero sin ruta. Además, el generador de contactos de uplink _discover_routes_via_uplink() puede generar contactos sin rutas (confirmarlo). Así que el caso es que se van generando por distintas vías contactos sin ruta, y tiene que diseñarse una manera procedural de conseguir intel de rutas a contactos existentes, para que todo marche. Empezar por preguntar a codex: Actualmente ¿de qué maneras se pueden averiguar rutas para contactos conocidos (contactos authored y contactos procedurales)?
+
+- [ ] Los incrustados [INTEL]...[/INTEL] no debe verlos el usuario.
+
+
+
+=== MODULES ===
+
+- [ ] Debe haber algún límite de módulos (para estimular los builds). Y algunos deberán tener penalizaciones además de bonificaciones.
+
+- [ ] Módulo que hace que los drones vuelvan automáticamente al dock (si es posible) cuando su batería cae a cierto nive.
+
+- [ ] Módulo instalable que permita automatizar ciertas tareas en tránsito (aunque el PJ esté hibernando). Por ejemplo, llevar a cabo un scan cada x tiempo (configurable por el jugador), y dar la opcion de deshibernar en caso de que se detecte algo nuevo.
+
+
+
+=== OTROS / SIN CATALOGAR ===
+
+- [x] El formato del tiempo de "unacked=" en alerts cuál es? Sólo en segundos? Me gustaría que siguiera el mismo formato que las ETA de los travels y los jobs.
+
+- [ ] Enterarse de cuales son las consecuencias de no atender una alerta crítica u otra (pues ahora mismo no lo tengo muy claro).
+
+- [ ] La cantidad inicial de scrap debe ser configurable desde balance.py.
+
+- [x] Ahora mismo, cuando se empieza el juego, se comienza como "location: UNKNOWN_00 (Unknown) [in orbit]". Esto me hace pensar que además de docked y in orbit hace falta un tercer estado, que sea ni 'docked' ni 'in orbit' (por ejemplo: cuando se cancela un viaje y la nave queda en un nodo temporal ¿en qué estado se encuentra?). Se supone que la nave RETORNO_ship al inicio del juego simplemente está "parada" en el espacio, no orbitando nada. Dime qué opinas de esto y si ves algún posible conflicto o error con lo que te planteo.
+
+- [x] Ahora mismo, al comienzo de juego, cuando el jugador consigue encender el sistema sensors se detecta una señal automáticamente (por cierto, ¿dónde se configura esto?):
+  [AUTO] [INFO] signal_detected :: Signal detected: ECHO_7
+Al introducir después el comando 'nav' se obtine esto:
+  === NAV ROUTES ===
+  (no known routes from UNKNOWN_00)
+  Nearby contacts without known route:
+  - Derelict A-3 (derelict) sector=S+004_-001_+000 id=DERELICT_A3 dist=45.06ly
+  - ECHO-7 Relay Station (station) sector=S+000_+000_+000 id=ECHO_7 dist=0.00ly
+  - Harbor-12 Waystation (station) sector=S+001_+000_+000 id=HARBOR_12 dist=12.65ly
+  Try: scan, route, intel, uplink (at relay/waystation), or acquire intel.
+Como se ve, ECHO_7 aparece entre los contactos conocidos pero sin ruta conocida. Por otra parte (corrígeme si me equivoco) la nave del jugador (RETORNO_SHIP) se encuentra a) en el mismo sector que ECHO_7, b) a una distancia de 0.00ly de HECHO_7, y c) no en órbita (in orbit) de ECHO_7 ni atracada (docked) en ECHO_7. Me gustaría entonces modificar algunas cosas (o asegurarse de que ya están implementadas, si fuera el caso). Me gustaría que cuando se cumplan esas tres condiciones [ a) la nave del jugador se encuentra en el mismo sector de un hub, b) ese hub está a 0.00ly de distancia, y c) la nave del jugador no está ni docked ni tampoco "in orbit" de ese hub], pase lo siguiente: si el hub figura entre las localizaciones conocidas pero sin ruta conocida, no se podrá viajar a esa ruta con 'travel' hasta que no se conozca ruta; se podrá averiguar/establecer la ruta y la distancia "fina" a ese hub con el comando 'route <node_id>'; una vez conocida la ruta, se calculará la distancia a ese hub ya no en años-luz sino en kilómetros (en caso de que el 'config set lang' sea 'es') o millas (en caso de que sea 'en'), y a partir de entonces el comando 'nav' reflejará la distancia a ese hub en esas unidades (siempre y cuando, insisto, el hub en cuestión esté en el mismo sector que la nave del jugaddor y a distancia 0.00ly); aunque no se use el comando 'route <node_id>', el comando 'scan' también servirá para hacer el cálculo fino de distancia (en km o millas) al hub (pero no servirá para averiguar/establecer ruta al hub, como sí hacía route); cómo calcular o decidir esa distancia te lo dejo a ti (puedes ser creativo, pero siempre prefiriendo las opciones más consistentes); en caso de que el jugador decida viajar a ese hub (y así entrar en su órbita), el ETA del viaje se calculará en función a esa distancia; llegar al destino significa entrar "in orbit" de ese hub (no docked), y quedarse a distancia de 0 (kilómetros/millas) de ese hub.
+Antes de implementar nada, dime qué opinas, si ves algún conflicto o problema potencial.
+
+- [ ] En el estado actual del juego, los sectores son considerados ellos mismos nodos? Se puede viajar a un sector aunque no se conozca ninguna localización/hub en él? Cuál es el nombre que reciben los sectores proceduralmente generados?
+
+
+- [-] Hay que mejorar la definición de "atasco" urgenemente. Pasar a una v1. No se trata de que se generen por arte de magia destinos. Hace falta comprobar detenidamente si el jugador tiene algún modo (aunque él no lo sepa) de lograr una localización (a través de uplink o scan o salvage data u otro).
 
 - [ ] Hay que modificar el comando "map". No es muy intuitivo. Podría ser algo como "ship sectors" o "map ship".
 
 - [ ] El comando travel devería ser el comando nav. Si se escribe sin parámetro, lista destinos y rutas, si con parámetro, funciona como travel.
 
+- [?] Al  hacer 'route <node_id>' a un node_id para el que ya conoces ruta,  no se debería iniciar el job. Debería salir un mensaje informando de que ya se conoce ruta a ese objetivo. Por otra parte, debería de haber un comando para cancelar jobs en curso.
 
-También quiero un módulo instalable que permita automatizar ciertas tareas en tránsito (aunque el PJ esté hibernando). Por ejemplo, llevar a cabo un scan cada x tiempo (configurable por el jugador), y dar la opcion de deshibernar en caso de que se detecte algo nuevo.
-
-Al  hacer 'route <node_id>' a un node_id para el que ya conoces ruta,  no se debería iniciar el job. Debería salir un mensaje informando de que ya se conoce ruta a ese objetivo. Por otra parte, debería de haber un comando para cancelar jobs en curso.
-
-- [ ] Al iniciar la hibernación, debería de salir un mensaje (localizado) diciendo algo así como "Iniciando secuencia de hibernación", y una serie de mensajes (meramente narrativos) diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la criogenización, y una cuenta atrás de 10 segundos. Después, debe limpiarse la pantalla de logs (y esto me recuerda que necesitamos un comando "clear" para limpiar pantalla), esperar 3 segundos e imprimirse una serie de mensajes diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la descriogenización, junto con un mensaje (que se repetirá siempre), advirtiendo de que hay un problema crítico y no es posible descriogenizar completamente al sujeto del sarcófago (es decir, al Personaje Jugador). El sarcófago del PJ debe tener un id, por cierto. 
-
-- [ ] El drone deploy admite como targer "power_core", "energy_distribution" o "sensors", además de ship_sector inexistentes:
->drone deploy! D1 chiquito
-[CMD] [INFO] job_queued :: J00005 deploy_drone target=ship_sector:chiquito ETA=6.0s (EMERGENCY)
-¿Cómo es posible? Entiendo que tampoco debería admitir "power_core" o "energy_distribution" o "sensors" como targets. Entiendo que esos no son ship_sectors sino sistemas. Entiendo que los sistemas están localizados en ship_sectors. Los ship_sectors sí deberían ser lugares apropiados para desplegar los drones. 
-
-- [ ] Necesitamos un comando para abortar lo que sea que esté haciendo el dron!!
+- [ ] Al iniciar la hibernación, debería de salir un mensaje (localizado) diciendo algo así como "Iniciando secuencia de hibernación", y una serie de mensajes (meramente narrativos) diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la criogenización, y una cuenta atrás de 10 segundos. Después, debe limpiarse la pantalla de logs, esperar 3 segundos e imprimirse una serie de mensajes diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la descriogenización, junto con un mensaje (que se repetirá siempre), advirtiendo de que hay un problema crítico y no es posible descriogenizar completamente al sujeto del sarcófago (es decir, al Personaje Jugador). El sarcófago del PJ debe tener un id, por cierto. 
 
 - [ ] Necesitamos una merjor organización del help.
 
@@ -93,19 +107,11 @@ Al  hacer 'route <node_id>' a un node_id para el que ya conoces ruta,  no se deb
 
 - [ ] Hay muchos mensajes (o partes de mensajes) que aparecen en español cuando el idioma de configuración es el inglés, y al revés, mensajes o partes de mensajes en inglés cuando deberían estar en español. Un ejemplo: estando la configuración en inglés, me ha salido este  mensaje: "ParseError: Subcomando power desconocido. Usa: power status | power plan cruise|normal | power shed/off <system_id> | power on <system_id>"
 
-- [ ] Comando scan detecta a la propia nave. Filtrar esto.
+
 
 - [ ] se puede usar el comando "scan" estando el servicio "datad" offline?
 
-- En el frontend Textual algunos comandos no se autocompletan. 
-
-- He hecho "uplink" y he obtenido esto:
-
-uplink_complete :: routes added: S+000_-001_+000:A8898C, S-001_+000_+000:7AE9F9, S-001_+000_-001:C06A70
-Log written to /logs/nav/uplink_ECHO_7_00012.txt
-
-Pero no parece que pueda acceder a /logs/nav/uplink_ECHO_7_00012.txt
-Dentro de /logs/ no está la carpeta /nav/
+- [?] En el frontend Textual algunos comandos no se autocompletan. 
 
 - [!] Al hibernar para viajar el "time" debería reflejar los años que han pasado desde que el PJ se despertó por primera vez. Necesitamos un reloj mejor. No vale sólo indicar segundos, pues el número es demasiado grando. Necesitamos un reloj que indique años luz, días, horas, minutos, segundos (o algo así; díme tú qué opinas).
 
@@ -117,202 +123,46 @@ Dentro de /logs/ no está la carpeta /nav/
 
 - [ ] También creo que tendría que aparecer en primer lugar el nombre de la hubicación (si la tiene), por ejemplo Relay-97 (relay) dist=1.30ly coord=S+000_-001_-001:02""
 
-- [x] Si un drone se encuentra fuera de la nave propia y se intenta "desdockear" la nave propia (por ejemplo para dockear en otra localización o para emprender un viaje), me gustaría que saliera un mensaje de alerta advirtiendo de que el drone en cuestión no está en la nave propia y pidiendo confirmación para abandonarlo.
 
 - [ ] dose es la dosis acumulada de radiación que ha recibido el dron (en rad). Se incrementa cada tick en función de la radiación ambiental (state.ship.radiation_env_rad_per_s) y el shield_factor del dron:
 drone.dose_rad += r_env * shield_factor * dt
 Ahora mismo es informativo (no afecta directamente a integridad/batería), pero lo usamos como base para futuras penalizaciones o fallos por exposición prolongada. Si quieres, puedo añadir un aviso cuando supere umbrales, o hacerlo afectar a la integridad.
 
-- [x] Quiero que me ayudes a diseñar y desarrollar el sistema de generación del "universo/mundo", es decir, los distintos plots (después habrá que diseñar cómo el jugador obtiene las id's de nuevas localizaciones a las que poder viajar, pues no quiero que tenga siempre disponibles todos los destinos, y además quiero que los destinos y sus contenidos se vayan generando proceduralmente). Me gustaría que el universo estuviera "organizado" o dividido. Ayúdame tú a esa organización, pero, por lo pronto, se me ocurre que podría ser algo como lo siguiente (pero hazme sugerencias o corrígeme si algo no es muy realista): el universo accesible al jugador será una galaxia de forma de espiral (la vía láctea, aun que el Jugador no tiene por qué saberlo al empezar el juego): la galaxia estará por lo pronto dividida en tres regiones: halo (zona más externa), el disco, y bulbo (zona central de la galaxia, donde la densidad de estrallas es mayor, y en cuyo centro se encuentra en agujero negro supermasivo Sagitario A*). Esas partes no serán plots; pero se me ocurre que ciertas localizaciones o plots sólo puedan generarse en una des estas regiones u otras, y que en cada una de las regiones apliquen ciertas condiciones (por ejemplo, que en los sectores pertenecientes al bulbo haya más radiación, o que puedan darse ciertos eventos especiales específicos de cada región). Aparte de esas tres regiones, cada región deberia estar dividida en... ¿sectores quizá? Qué me sugieres? Deberían dividirse también los sectores, o será complicarlo mucho? Suponiendo que no se dividan, entiendo que en cada uno de esos sectores habría world_plots, no? Esos world_plots podrían ser estaiones abandonadas, naves abandonadas (o no abandonadas), derelicts, planetas... Por otra parte, ahora que lo pienso, hará falta conectar unos sectores con otros, de forma que no se pueda llegar a cualquiera desde cualquiera. ¿O es una complicación innecesaria? Lo que sí tengo más claro es que no me gustaría que la nave pudiera scanear plots a mucha distancia. Quizá sólo los plots dentre de su sector (o la división más pequeña que decidamos). Aparte de eso, las nuevas localizaciones (es decir los plots en nuevos sectores) sólo se podrán descubrir obteniendo información por otros medios: por ejemplo accediedo a los mails de una nave o al registro de navegación o cosas así. Dame ideas también a este respecto.
 
-1. Por qué migrar también los manuales a JSON? Ventajas y desventajas?
-2. Sí, añade plantillas y generaión procedural por región, pero teniendo en cuenta la orden que te voy a dar más abajo (ver más abajo).
-3. A qué te refieres con hacer que *.json quede deprecado/eliminado?
-
-Implementar generación procedural del “mundo” (WorldGen v0) con:
-- Galaxia organizada por regiones (halo/disc/bulge) derivadas de coordenadas.
-- Sectores fijos (grid 2.5D) usados para generación lazy determinista.
-- Sitios (SpaceNode) generados por sector bajo demanda.
-- Scan por radio (ly), no por sector completo.
-- Descubrimiento de nuevos destinos por “intel” (nav fragments) además de scan.
-
-Decisiones v0:
-- Sector fijo: SECTOR_SIZE_LY = 10.0
-- 2.5D: coords x,y en ly; z existe pero pequeña (disco) o más dispersa (halo).
-- Scan radius inicial: ship.sensors_range_ly = 2.5 (módulos podrán aumentarlo más tarde).
-
-A) Modelos nuevos/extendidos
-
-1) WorldState
-Archivo: src/retorno/model/world.py
-- Añadir:
-  current_node_id: str
-  current_pos_ly: (x,y,z) o derivable del nodo actual
-  known_nodes: set[str] (node_ids conocidos)
-  known_intel: dict[str, dict] (opcional: metadata “known via intel”)
-  generated_sectors: set[str] (sector_ids generados)
-- Añadir función:
-  sector_id_for_pos(x,y,z) -> str (ej "S+001_-003_+000")
-  region_for_pos(x,y,z) -> "halo"|"disk"|"bulge"
-
-2) ShipState
-Archivo: src/retorno/model/ship.py
-- Añadir:
-  sensors_range_ly: float = 2.5
-
-3) SpaceNode
-Archivo: src/retorno/model/world.py (SpaceNode)
-- Asegurar coords:
-  x_ly,y_ly,z_ly
-  kind ("station","derelict","ship","relay", etc.)
-  region (opcional cache)
-  salvage_* ya existente
-
-B) Generador determinista lazy
-
-Crear: src/retorno/worldgen/generator.py
-- Función:
-  ensure_sector_generated(state: GameState, sector_id: str) -> None
-  - Si sector_id ya en state.world.generated_sectors: return
-  - Derivar seed_sector determinista:
-      seed = hash64(state.meta.rng_seed, sector_id)
-    (usar tu helper determinista existente)
-  - Generar N nodos según región:
-      disk: 2..5
-      halo: 0..2
-      bulge: 3..7
-  - Para cada nodo:
-      - coords aleatorias dentro del cubo del sector (x in [sx*L, (sx+1)*L), etc.)
-      - z dispersión por región (disk sigma 0.3; halo sigma 2.0; bulge sigma 0.8)
-      - kind por weights según región
-      - node_id determinista (p.ej f"{sector_id}:{i:02d}" o hash corto)
-      - name generado (p.ej "Relay-7", "Derelict A-3", etc.) determinista
-      - salvage_scrap_available y salvage_modules_available según kind/region (usando el mismo seed system)
-    Insertar en state.world.space.nodes (o estructura equivalente)
-
-- También generar 1 “hub” fijo al inicio (ECHO_7) en el sector inicial, si no existe.
-
-C) Scan por radio (no sector completo)
-
-Archivo: CLI handler scan (y/o Engine action)
-- Al ejecutar scan:
-  1) Obtener posición actual (coords del nodo actual)
-  2) Calcular sector_id actual y sectores vecinos a considerar:
-     - como scan_radius < sector_size, basta con sector actual
-     - si quieres robustez, incluir sectores adyacentes si el radio toca borde (optional)
-  3) ensure_sector_generated para los sectores relevantes
-  4) Filtrar nodos por distancia <= ship.sensors_range_ly
-  5) Mostrar solo esos nodos
-  6) Añadirlos a known_nodes (descubiertos por scan)
-
-D) Travel restringido a destinos conocidos
-- travel <node_id> debe requerir:
-  node_id en known_nodes OR en known_intel (descubierto por intel)
-- Si no, bloquear con hint:
-  "Unknown destination. Use scan or acquire navigation intel."
-
-E) Intel / nav fragments (v0 minimal)
-- Añadir un tipo de “intel” como archivo de datos en salvaged mails/logs:
-  por ejemplo: /data/nav/fragments/frag_0001.txt con contenido:
-    NODE: HARBOR_12
-  o:
-    COORD: x,y,z
-- Implementar comando:
-  intel import <path>
-  que lee el archivo desde FS y añade node_id (o sector) a known_intel y known_nodes.
-  (Si prefieres, integrar esto en `cat` cuando el path está bajo /data/nav/…)
-- v0 puede ser simple: cuando cat detecta línea "NODE:", auto-add.
-
-F) Región como bioma (solo datos por ahora)
-- Añadir a SpaceNode:
-  radiation_base (float) derivada de región
-- A futuro se usará para degradación/radiación.
-
-Aceptación:
-- El mundo no se genera entero, solo sectores escaneados/visitados.
-- scan solo muestra nodos dentro de sensors_range_ly.
-- travel solo permite a nodos conocidos.
-- Al importar intel (nav fragment), se añade un destino nuevo que antes no aparecía en scan.
-- Determinismo: con el mismo rng_seed, el mismo sector genera los mismos nodos.
-
-NOTA: No implementar habitaciones/decks todavía.
-
-
-- [ ] Diseñar el sistema de encontrar nuevos destinos. A nivel de sistema solar, tiene que ser posible detectar vía escáneres o algo así; a nivel de galaxia, quizá sólo a partir de información que se obtenga (cartas de navegación). Más allá de galaxia, no se sabe. El comando contacts/scan debe tener un alcance pequeño relativamente.
+- [-] Diseñar el sistema de encontrar nuevos destinos. A nivel de sistema solar, tiene que ser posible detectar vía escáneres o algo así; a nivel de galaxia, quizá sólo a partir de información que se obtenga (cartas de navegación). Más allá de galaxia, no se sabe. El comando contacts/scan debe tener un alcance pequeño relativamente.
 
 - [ ] Cómo se desconectan sistemas ahora mismo? Cómo se reduce carga de energía?
 
-- [ ] Se debería poder mover un dron desplegado a otro plot sin necesidad de llevarlo a dock antes y desplegar de nuevo.
-
-- [ ] Entiendo que el drone_bay se tiene que poder desconectar, para ahorrar energía.
-
 - [ ] Quiero que al arrancar el juego por primera vez se imprima un mensaje "técnico" diegético que dé a entender de un modo u otro que ha habido un error y que se está ejecutando una instrucción de emergencia de descriogenización del sarcófago; que no se ha podido completar satisfactoriamente la descriogenización de la persona que hay dentro (el personaje jugador) del <id_sarcófago> por un problema indeterminado en el sistema; que se procede a intentar poner al huesped en estado consciente para que pueda llevar a cabo operaciones a través de la terminal conectada a su cerebro. También se indicará que el reloj/calendario interno de la nave ha sufrido un fallo indeterminado o algo así y que todo ha sido puesto a 0 (buscar la manera técnica diegética de decir esto). Este mensaje se imprimirá al iniciar el juego, pero quedará también como mail, de forma que se podrá volver a leer, en su versión española si se cambia la configuración de idioma. También quiero que se generen otros 5 mails con un texto muy similar, pero refiriendo cada uno de ellos a un sarcófago diferente, e indicando que ha fallado la descriogenización, y que no se detectan constantes vitales en el huesped (los 5 mails serán iguales, sólo cambiará <id_sarcófago>, de modo que al leerlos se pueda deducir que todos los compañeros del Personaje Jugador han muerto). Antes de construir la instrucción para codex, constrúyeme una versión del mensaje, para que lo pulamos.
 
-- [ ] Algunos world_node, como las naves, las estaciones y los derelics tienen que tener plots ship_sector. O station_sector. Los planetas también tendrán que tener sectores (cuando hagamos planetas y drones capaces de desplegarse en ellos),
+- [ ] Algunos world_node, como las naves, las estaciones y los derelics tienen que tener ship_sector's. O station_sector's (habitaciones, vaya). Los planetas también tendrán que tener sectores (cuando hagamos planetas y drones capaces de desplegarse en ellos),
 
 - [ ] Implementar guardar/cargar juego (savegames).
 
-- [x] hay que crear manuales para /manuals/systems/power_core , security, life_support y los sistemas que faltan.
+- [ ] las baterías (de drones y de nave) deben también poder deteriorarse (por radiación u otros daños).
 
-- [ ] La cuestión de implementar Textual.
+- [ ] Aclarar cómo se crean nuevas naves, estaciones, etc.
 
-- [x] Las tareas de un mismo dron deberían ir en cola. Ahora mismo las hace simultáneamente. Si le mandas más de una antes de que acabe la anterior.
-
-- [x] Los drones deben perder batería al trabajar. Deben recargarse al atracar (dock). 
-
-- [ ] Su batería debe también poder deteriorarse (por radiación u otros daños).
-
-- [x] Un comando que liste los trabajos (jobs) en proceso o en cola.
-
-- [ ] Aclarar cómo se crean nuevas naves, estaciones, etc. Ahora mismo hay un json pero parece que se está haciendo desde bootstrap.
-
-- [ ] Ahora mismo tu status muestra P_load=4.20kW estando docked; eso sugiere que el docking 
-añade consumo o activa algo. Está bien, pero ojo con el prólogo: podrías querer que dock 
-reduzca carga (porque apagas motores) o que cambie perfil. No lo toques ahora; solo para 
-tenerlo en mente.
-
-- [x] repair debería consumir algo. Como mínimo scrap. (La nave inicial debe por tanto empezar con una cantidad de scrap).
+- [ ] Ahora mismo tu status muestra P_load=4.20kW estando docked; eso sugiere que el docking añade consumo o activa algo. Está bien, pero ojo con el prólogo: podrías querer que dock reduzca carga (porque apagas motores) o que cambie perfil. No lo toques ahora; solo para tenerlo en mente.
 
 - [ ] boot sensord no está devolviendo ningún mensaje, creo.
 
 - [ ] [Esto quedó pendiente de hacer] Si quieres, también podemos añadir un mail automático al primer módulo encontrado (lore + “esto se instala con install <id>”), pero lo dejo para después de que el loop funcione.
 
-
-
-Cuándo tendría interés desactivar el auto-CRUISE (más adelante)
-
-Cuando implementes al menos una de estas cosas:
-
-eventos de ruta que solo detectas si sensores están activos
-
-amenazas que requieren security online
-
-trabajos en tránsito (reparación, auditoría, análisis) que consumen carga pero te ahorran tiempo al llegar
-
-viaje corto (días) dentro del mismo “vecindario” donde no hibernas
-
-En ese momento, NORMAL deja de ser “castigo” y pasa a ser una opción táctica.
+- [ ] Generación automática de mails al comienzo de la partida, para aprender cosas e introducirse.
 
 
 
-=========== USER INTERFACE ===========
+=== USER INTERFACE ===
+
 TEXTUAL
-
-Alternar foco del panel:  alt+j/k
-Scroll arriba/abajo en panel activo: k/j
-Comandos textual: ctrl+p
-
 - [ ] El panel status debería poder modificarse por otro.
 - [ ] Los paneles, excepto header, botton, comandos y logs deberían poder activarse desactivarse, para tener más espacio para logs.
+- [ ] Colores. Y archivo de configuración de colores, para poder configurar paletas.
 
-- [x] cuando se arranca el juego, debería por defecto estar activo el panel en el que se introducen órdenes. Ahora mismo no está funcionando así.
-- [x] Me gustaría darle a la interfaz Textual un aspecto mucho más parecido a como se vería con Curses. Quiero además que el color de fondo sea igual en todos los paneles. No quiero que se dibujen líneas de contorno en los paneles.
-- [DESCARTADO] El panel de JOBS y de ALERTS deben tener scroll ambos. Pero no quiero ninguna barra de scroll (ocupa demasiado espacio en pantalla); prefiero, si es posible, que cuando el texto no entra en la caja del panel aparezca un pequeño símbolo de flecha hacia abajo (o algo así) en la parte inferior derecha del panel, indicando así que hay más texto que no se está biendo y que está disponible la posibilidad de hacer scroll para verlo.
-- [X] El contenido de los paneles fijos de la interfaz Textual es el mismo que el que se imprime al introducir el comando correspondiente (por ejemplo, en el panel status se observa exactamente lo mismo que se imprime cuando se escribe "status"). Esto me gustaría modificarlo. Es decir: por razones de diseño y espacio, quiero que lo que se ve en cada uno de los paneles pueda ser diferente a lo que se imprime al introducir un comando. En el panel status, por ejemplo, no quiero que se vea la línea de "time", ni de "location", ni de "power", ni de "inventory". Sólo quiero que aparezcan las líneas que refieren a los sistemas (core_os, life_support, etc.). Es posible?
 
-- [x] en el header no quiero que ponga "mode=" sino "ship_mode="
 
-=========== Versión 2 ============
+=== VERSIÓN II ===
 
 transponders/items como fuente de intel (muy fácil ahora que tienes inventory/modules)
 
@@ -327,8 +177,6 @@ data_core. Ahora mismo data_core sirve para habilitar operaciones de auditoría 
 Servicio asociado: datad (se debe bootear para auditorías).
 
 Fuera de eso, todavía no tiene funciones “de gameplay” adicionales (p. ej. análisis avanzado, logs, descifrado). Es el lugar previsto para futuro contenido de datos/registro, pero hoy su uso principal es permitir la auditoría del inventario.
-
-
 
 economía
 

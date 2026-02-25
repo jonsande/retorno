@@ -79,12 +79,8 @@ def ensure_sector_generated(state: GameState, sector_id: str) -> None:
         z_sigma = float(tmpl.get("z_sigma", 0.3))
         z = z0 + rng.gauss(0.0, z_sigma)
         kind = _weighted_choice(rng, tmpl.get("kind_weights", {}))
-        node_id = f"{sector_id}:{rng.getrandbits(24):06X}"
-        while node_id in state.world.space.nodes:
-            node_id = f"{sector_id}:{rng.getrandbits(24):06X}"
-        if node_id in state.world.space.nodes:
-            continue
-        name = _generate_name(rng, kind)
+        node_id = _generate_node_id(state, kind, rng)
+        name = _name_from_node_id(node_id, kind)
         node = SpaceNode(
             node_id=node_id,
             name=name,
@@ -179,6 +175,72 @@ def _generate_links_for_sector(state: GameState, sector_id: str, rng: random.Ran
     for neighbor in neighbors[:2]:
         hub.links.add(neighbor.node_id)
         neighbor.links.add(hub.node_id)
+
+
+_GREEK_SUFFIXES = [
+    "ALFA",
+    "BETA",
+    "GAMMA",
+    "DELTA",
+    "EPSILON",
+    "ZETA",
+    "ETA",
+    "THETA",
+    "IOTA",
+    "KAPPA",
+    "LAMBDA",
+    "MU",
+    "NU",
+    "XI",
+    "OMICRON",
+    "PI",
+    "RHO",
+    "SIGMA",
+    "TAU",
+    "UPSILON",
+    "PHI",
+    "CHI",
+    "PSI",
+    "OMEGA",
+]
+
+
+def _generate_node_id(state: GameState, kind: str, rng: random.Random) -> str:
+    if kind == "ship":
+        prefix = "WRECK"
+    else:
+        prefix = (kind or "node").upper()
+    while True:
+        base = f"{prefix}_{rng.getrandbits(24):06X}"
+        if base not in state.world.space.nodes:
+            return base
+        for suffix in _GREEK_SUFFIXES:
+            candidate = f"{base}_{suffix}"
+            if candidate not in state.world.space.nodes:
+                return candidate
+
+
+def _name_from_node_id(node_id: str, kind: str) -> str:
+    parts = node_id.split("_")
+    if not parts:
+        return _generate_name(random.Random(0), kind)
+    prefix = parts[0]
+    if prefix == "WRECK":
+        name_prefix = "Wreck"
+    elif prefix == "DERELICT":
+        name_prefix = "Derelict"
+    elif prefix == "STATION":
+        name_prefix = "Station"
+    elif prefix == "RELAY":
+        name_prefix = "Relay"
+    elif prefix == "WAYSTATION":
+        name_prefix = "Waystation"
+    elif prefix == "NODE":
+        name_prefix = "Node"
+    else:
+        name_prefix = prefix.title()
+    suffix = " ".join(parts[1:]) if len(parts) > 1 else ""
+    return f"{name_prefix} {suffix}".strip()
 
 
 def _pick_modules(

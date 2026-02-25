@@ -180,10 +180,11 @@ class RetornoTextualApp(App):
         self._last_complete_key: str = ""
         self._last_complete_at: float = 0.0
         self._last_complete_candidates: list[str] = []
+        self._log_buffer: list[str] = []
         super().__init__()
 
     def compose(self) -> ComposeResult:
-        yield Static(id="header")
+        yield Static(id="header", markup=False)
         with Horizontal(id="main"):
             yield RichLog(id="status", wrap=True, highlight=False, min_width=0)
             with Vertical(id="right"):
@@ -326,6 +327,7 @@ class RetornoTextualApp(App):
         candidates: list[str] = []
         base_commands = [
             "help",
+            "clear",
             "status",
             "jobs",
             "alerts",
@@ -357,6 +359,7 @@ class RetornoTextualApp(App):
             "debug",
             "power",
             "logs",
+            "log",
             "exit",
             "quit",
         ]
@@ -426,6 +429,9 @@ class RetornoTextualApp(App):
                 return [c for c in ["cancel"] if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "cancel":
                 return [jid for jid in state.jobs.active_job_ids if jid.startswith(text)]
+        if cmd == "log":
+            if len(tokens) == 2:
+                return [c for c in ["copy"] if c.startswith(text)]
         if cmd == "debug":
             if len(tokens) == 2:
                 return [c for c in ["on", "off", "status", "scenario"] if c.startswith(text)]
@@ -550,6 +556,9 @@ class RetornoTextualApp(App):
         if not line:
             return
         self.query_one("#log", RichLog).write(line)
+        self._log_buffer.append(line)
+        if len(self._log_buffer) > 2000:
+            self._log_buffer = self._log_buffer[-2000:]
 
     def _log_lines(self, lines: list[str]) -> None:
         for line in lines:
@@ -794,6 +803,10 @@ class RetornoTextualApp(App):
         if parsed == "HELP":
             self.action_help()
             return
+        if parsed == "CLEAR":
+            self.query_one("#log", RichLog).clear()
+            self._log_buffer.clear()
+            return
 
         # Informational commands (drain AUTO first to avoid mixing)
         info_tokens = {
@@ -866,6 +879,28 @@ class RetornoTextualApp(App):
         if parsed == "LOGS":
             with self.loop.with_lock() as state:
                 self._log_lines(presenter.build_command_output(repl.render_logs, state))
+            return
+        if isinstance(parsed, tuple) and parsed[0] == "LOG_COPY":
+            amount = parsed[1]
+            if amount is None:
+                amount = min(50, len(self._log_buffer))
+            slice_lines = self._log_buffer[-amount:] if amount else []
+            content = "\n".join(slice_lines)
+            ok = repl._copy_to_clipboard(content)
+            locale = self.loop.state.os.locale.value
+            if ok:
+                msg = {
+                    "en": f"(log) copied {len(slice_lines)} lines to clipboard",
+                    "es": f"(log) copiadas {len(slice_lines)} líneas al portapapeles",
+                }
+                self._log_line(msg.get(locale, msg["en"]))
+            else:
+                path = repl._write_log_copy_file(content)
+                msg = {
+                    "en": f"(log) clipboard unavailable; wrote {len(slice_lines)} lines to {path}",
+                    "es": f"(log) portapapeles no disponible; escrito {len(slice_lines)} líneas en {path}",
+                }
+                self._log_line(msg.get(locale, msg["en"]))
             return
         if parsed == "INVENTORY":
             with self.loop.with_lock() as state:
@@ -978,6 +1013,25 @@ class RetornoTextualApp(App):
                 self.loop.start()
                 self._log_line("DEBUG mode disabled")
                 return
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_ARCS":
+            with self.loop.with_lock() as state:
+                if not state.os.debug_enabled:
+                    self._log_line("debug arcs: available only in DEBUG mode. Use: debug on")
+                    return
+                self._log_lines(presenter.build_command_output(repl.render_debug_arcs, state))
+            return
+
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SEED":
+            with self.loop.with_lock() as state:
+                if not state.os.debug_enabled:
+                    self._log_line("debug seed: available only in DEBUG mode. Use: debug on")
+                    return
+                seed = parsed[1]
+                state.meta.rng_seed = seed
+                state.meta.rng_counter = 0
+                self.loop._rng = random.Random(seed)
+                self._log_line(f"Seed set to {seed}")
+            return
 
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SCENARIO":
             scenario = parsed[1]

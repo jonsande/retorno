@@ -20,6 +20,11 @@ intel show <intel_id>
 intel import <path>
 - Importa inteligencia de navegación desde un archivo.
 - Marcadores soportados: NODE:, LINK:, SECTOR:, COORD:
+- Bloques opcionales:
+  [INTEL] ... [/INTEL]
+  - Si el bloque contiene un LINK, se importa como ruta.
+  - Si contiene un node_id, name o id de sector, se añade el nodo authored correspondiente como contacto conocido.
+  - La intel corrupta puede no resolverse o generar un nuevo contacto hub.
 - Archivos en /data/nav, /mail o /logs pueden auto‑importar al hacer cat.
 
 intel export <path>

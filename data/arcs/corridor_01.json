@@ -1,0 +1,42 @@
+{
+  "arc_id": "corridor_01",
+  "primary_intel": {
+    "id": "corridor_01_to_archive",
+    "category": "lore_intel",
+    "kind": "link",
+    "line": "LINK: HARBOR_12 -> ARCHIVE_01",
+    "preferred_sources": ["mail", "log"],
+    "confidence": 0.70
+  },
+  "intel_categories": {
+    "lore_intel": ["corridor_01_to_archive"],
+    "mobility_intel": []
+  },
+  "secondary_lore_docs": [
+    {
+      "id": "corridor_01_lore_01",
+      "path_template": "/logs/lore/corridor_note_01.{lang}.txt",
+      "tone": "routine",
+      "content_ref_en": "lore/packs/corridor_01/corridor_note_01.en.txt",
+      "content_ref_es": "lore/packs/corridor_01/corridor_note_01.es.txt"
+    },
+    {
+      "id": "corridor_01_lore_02",
+      "path_template": "/mail/inbox/02xx.corridor.{lang}.txt",
+      "content_ref_en": "lore/packs/corridor_01/corridor_mail_02.en.txt",
+      "content_ref_es": "lore/packs/corridor_01/corridor_mail_02.es.txt"
+    }
+  ],
+  "placement_rules": {
+    "primary": {
+      "candidates": ["procedural_station", "procedural_relay", "procedural_derelict", "harbor_12"],
+      "max_hops_from_start": 3,
+      "require_kind_any": ["station", "relay", "derelict"],
+      "avoid_node_ids": ["ARCHIVE_01"]
+    },
+    "secondary": {
+      "candidates": ["procedural_station", "procedural_derelict"],
+      "count": 2
+    }
+  }
+}

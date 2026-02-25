@@ -13,4 +13,8 @@ Se encontró una breve anotación de operador incrustada en el payload de un paq
 
 “Los mapas de ruta están desactualizados. No perdáis tiempo persiguiendo lo ruidoso. Si una estación responde, usadla. Harbor-12 todavía responde (por ahora). Si llegas tarde, sigue las tablas del corredor. Si llegas pronto, no esperes.”
 
+[INTEL]
+HARBOR_12
+[/INTEL]
+
 Fin del informe recuperado.

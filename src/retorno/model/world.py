@@ -62,6 +62,12 @@ class WorldState:
     current_pos_ly: tuple[float, float, float] = (0.0, 0.0, 0.0)
     rng_seed: int = 0
     salvage_tip_nodes: set[str] = field(default_factory=set)
+    arc_placements: dict[str, dict] = field(default_factory=dict)
+    mobility_failsafe_count: int = 0
+    mobility_no_new_uplink_count: int = 0
+    mobility_hints: list[dict] = field(default_factory=list)
+    visited_nodes: set[str] = field(default_factory=set)
+    fine_ranges_km: dict[str, float] = field(default_factory=dict)
 
 
 SECTOR_SIZE_LY = 10.0

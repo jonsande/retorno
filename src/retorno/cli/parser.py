@@ -49,6 +49,8 @@ def parse_command(line: str):
 
     if cmd == "help":
         return "HELP"
+    if cmd == "clear":
+        return "CLEAR"
 
     if cmd == "contacts":
         return "CONTACTS"
@@ -81,6 +83,22 @@ def parse_command(line: str):
 
     if cmd == "logs":
         return "LOGS"
+    if cmd == "log":
+        if len(args) == 0:
+            raise ParseError("Uso: log copy [n]")
+        if len(args) == 1 and args[0] == "copy":
+            return ("LOG_COPY", None)
+        if len(args) == 1 and args[0].startswith("copy") and args[0][4:].isdigit():
+            return ("LOG_COPY", int(args[0][4:]))
+        if len(args) == 2 and args[0] == "copy":
+            try:
+                amount = int(args[1])
+            except ValueError as e:
+                raise ParseError("log copy: [n] debe ser entero") from e
+            if amount <= 0:
+                raise ParseError("log copy: [n] debe ser > 0")
+            return ("LOG_COPY", amount)
+        raise ParseError("Uso: log copy [n]")
 
     if cmd == "wait":
         if len(args) != 1:
@@ -96,8 +114,16 @@ def parse_command(line: str):
     if cmd == "debug":
         if len(args) == 2 and args[0] == "scenario" and args[1] in {"prologue", "sandbox", "dev"}:
             return ("DEBUG_SCENARIO", args[1])
+        if len(args) == 2 and args[0] == "seed":
+            try:
+                seed = int(args[1])
+            except ValueError as e:
+                raise ParseError("debug seed: <n> debe ser entero") from e
+            return ("DEBUG_SEED", seed)
+        if len(args) == 1 and args[0] in {"arcs", "placement"}:
+            return ("DEBUG_ARCS", None)
         if len(args) != 1 or args[0] not in {"on", "off", "status"}:
-            raise ParseError("Uso: debug on|off|status | debug scenario prologue|sandbox|dev")
+            raise ParseError("Uso: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs")
         return ("DEBUG", args[0])
 
     if cmd == "dock":

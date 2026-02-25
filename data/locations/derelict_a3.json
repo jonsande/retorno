@@ -1,12 +1,12 @@
 {
   "node": {
     "node_id": "DERELICT_A3",
-    "name": "Derelict A-3",
+    "name": "Derelict A3",
     "kind": "derelict",
     "radiation_rad_per_s": 0.003,
     "x_ly": 45.0,
     "y_ly": -2.0,
     "z_ly": 1.0
   },
-  "known_on_start": true
+  "known_on_start": false
 }

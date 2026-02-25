@@ -1,0 +1,5 @@
+log
+- Copies lines from the command log (Textual panel).
+Usage: log copy [n]
+- copy: copy the last n lines to the clipboard (default: 50).
+- In the CLI (repl), this copies recent event log lines.

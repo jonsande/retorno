@@ -13,4 +13,8 @@ A short operator annotation was found embedded in a routing packet payload. The 
 
 “Route maps are stale. Don’t waste time chasing the loud stuff. If a station answers, use it. Harbor-12 is still answering (for now). If you’re late, follow the corridor tables. If you’re early, don’t wait.”
 
+[INTEL]
+HARBOR_12
+[/INTEL]
+
 End of recovered cache report.

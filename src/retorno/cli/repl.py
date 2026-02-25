@@ -5,13 +5,17 @@ import os
 import math
 import random
 import readline
+import subprocess
+import shutil
+import sys
+from pathlib import Path
 from retorno.core.engine import Engine
 from retorno.core.actions import Hibernate
 from retorno.core.actions import RouteSolve
 from retorno.runtime.loop import GameLoop
 from retorno.model.events import Event, EventType, Severity, SourceRef
 from retorno.model.jobs import JobStatus
-from retorno.runtime.data_loader import load_modules
+from retorno.runtime.data_loader import load_modules, load_arcs, load_locations
 from retorno.config.balance import Balance
 from retorno.model.systems import SystemState
 from retorno.model.drones import DroneStatus
@@ -25,7 +29,7 @@ from retorno.util.timefmt import format_elapsed_long
 def print_help() -> None:
     print(
         "\nComandos (resumen):\n"
-        "  help | exit | quit\n"
+        "  help | clear | exit | quit\n"
         "\nFS / Manuales / Correo:\n"
         "  ls [path] | cat <path>\n"
         "  man <topic> | about <system_id>\n"
@@ -33,7 +37,7 @@ def print_help() -> None:
         "  intel | intel show <intel_id> | intel import <path> | intel export <path>\n"
         "  config set lang <en|es> | config show\n"
         "\nInformación:\n"
-        "  status | jobs | job cancel <job_id> | nav | alerts | alerts explain <alert_key> | logs\n"
+        "  status | jobs | job cancel <job_id> | nav | alerts | alerts explain <alert_key> | logs | log copy [n]\n"
         "  contacts | scan\n"
         "  sectors | map | locate <system_id>\n"
         "\nNavegación:\n"
@@ -59,7 +63,7 @@ def print_help() -> None:
         "  install <module_id> | modules\n"
         "\nDebug:\n"
         "  wait <segundos> (DEBUG only)\n"
-        "  debug on|off|status | debug scenario prologue|sandbox|dev\n"
+        "  debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs\n"
         "\nSugerencias:\n"
         "  ls /manuals/commands\n"
         "  man navigation\n"
@@ -75,6 +79,16 @@ class SafeDict(dict):
 def _inventory_view(ship):
     # Returns manifest view plus dirty flag.
     return ship.manifest_scrap, list(ship.manifest_modules), ship.manifest_dirty
+
+
+def _orbit_status_label(state, current_loc: str) -> str:
+    locale = state.os.locale.value
+    labels = {
+        "en": {"docked": "docked", "orbit": "in orbit", "adrift": "adrift"},
+        "es": {"docked": "acoplado", "orbit": "en órbita", "adrift": "a la deriva"},
+    }
+    key = state.ship.orbit_status(state.world, current_loc)
+    return labels.get(locale, labels["en"]).get(key, key)
 
 
 def _build_event_payload(e) -> dict:
@@ -99,6 +113,28 @@ def _build_event_payload(e) -> dict:
     return payload
 
 
+def _mark_arc_discovered(state, left: str, right: str) -> None:
+    for arc in load_arcs():
+        primary = arc.get("primary_intel", {})
+        line = primary.get("line", "")
+        if "->" not in line:
+            continue
+        try:
+            expected_left, expected_right = [p.strip() for p in line.split(":", 1)[1].split("->", 1)]
+        except Exception:
+            continue
+        if left == expected_left and right == expected_right:
+            arc_id = arc.get("arc_id", "")
+            if not arc_id:
+                continue
+            arc_state = state.world.arc_placements.setdefault(arc_id, {})
+            discovered = arc_state.get("discovered")
+            if not isinstance(discovered, set):
+                discovered = set(discovered or [])
+            discovered.add(primary.get("id", "primary"))
+            arc_state["discovered"] = discovered
+
+
 def _has_unlock(state, command_key: str) -> bool:
     modules = load_modules()
     for mod_id in state.ship.installed_modules:
@@ -113,12 +149,12 @@ def render_events(state, events, origin_override: str | None = None) -> None:
     if not events:
         return
     job_queued_templates = {
-        "en": "[{sev}] job_queued :: {job_id} {job_type} target={kind}:{tid} ETA={eta_s}s{emergency}",
-        "es": "[{sev}] job_queued :: {job_id} {job_type} objetivo={kind}:{tid} ETA={eta_s}s{emergency}",
+        "en": "[{sev}] job_queued :: {job_id} {job_type} target={kind}:{tid} ETA={eta}{emergency}",
+        "es": "[{sev}] job_queued :: {job_id} {job_type} objetivo={kind}:{tid} ETA={eta}{emergency}",
     }
     salvage_job_queued_templates = {
-        "en": "[{sev}] job_queued :: {job_id} salvage_scrap requested={requested} available={available} will_recover={effective} ETA={eta_s}s",
-        "es": "[{sev}] job_queued :: {job_id} salvage_scrap pedido={requested} disponible={available} recupera={effective} ETA={eta_s}s",
+        "en": "[{sev}] job_queued :: {job_id} salvage_scrap requested={requested} ETA={eta}",
+        "es": "[{sev}] job_queued :: {job_id} salvage_scrap pedido={requested} ETA={eta}",
     }
     system_state_templates = {
         "en": "[{sev}] system_state_changed :: {system_id}: {from_state} -> {to_state} (cause={cause}, health={health})",
@@ -168,8 +204,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
     }
     travel_templates = {
         "travel_started": {
-            "en": "[{sev}] travel_started :: To {to} dist={distance_ly:.2f}ly ETA={eta_years:.2f}y (hint: travel abort)",
-            "es": "[{sev}] travel_started :: A {to} dist={distance_ly:.2f}ly ETA={eta_years:.2f}a (pista: travel abort)",
+            "en": "[{sev}] travel_started :: To {to} dist={distance_ly:.2f}ly ETA={eta} (hint: travel abort)",
+            "es": "[{sev}] travel_started :: A {to} dist={distance_ly:.2f}ly ETA={eta} (pista: travel abort)",
         },
         "arrived": {
             "en": "[{sev}] arrived :: Arrived at {to} (from {from})",
@@ -442,6 +478,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Route solved: {from_id} -> {node_id}",
             "es": "Ruta calculada: {from_id} -> {node_id}",
         },
+        "route_refined": {
+            "en": "Route refined: fine range fixed for {node_id}",
+            "es": "Ruta afinada: distancia fina fijada para {node_id}",
+        },
         "job_cancelled": {
             "en": "Job cancelled: {job_id}",
             "es": "Trabajo cancelado: {job_id}",
@@ -478,16 +518,20 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                 tmpl = salvage_job_queued_templates.get(locale, salvage_job_queued_templates["en"])
             else:
                 tmpl = job_queued_templates.get(locale, job_queued_templates["en"])
+            eta_val = eta_s
+            if isinstance(eta_s, (int, float)) or (isinstance(eta_s, str) and eta_s.replace(".", "", 1).isdigit()):
+                try:
+                    eta_val = _format_eta_short(float(eta_s), locale)
+                except Exception:
+                    eta_val = eta_s
             payload.update({
                 "job_id": job_id,
                 "job_type": job_type,
                 "kind": kind,
                 "tid": tid,
-                "eta_s": eta_s,
+                "eta": eta_val,
                 "emergency": emergency,
                 "requested": e.data.get("requested", "?"),
-                "available": e.data.get("available", "?"),
-                "effective": e.data.get("effective", "?"),
             })
             try:
                 print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
@@ -635,8 +679,27 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                 "from": e.data.get("from", "?"),
                 "distance_ly": e.data.get("distance_ly", 0.0),
                 "eta_years": e.data.get("eta_years", 0.0),
+                "eta": _format_eta_short((e.data.get("eta_years", 0.0) or 0.0) * Balance.YEAR_S, locale),
                 "years": e.data.get("years", 0.0),
             })
+            if e.type == EventType.TRAVEL_STARTED and e.data.get("local"):
+                km = e.data.get("distance_km") or 0.0
+                eta_s = e.data.get("eta_s") or 0.0
+                if locale == "en":
+                    dist_txt = f"{_format_large_distance(km * 0.621371)}mi"
+                else:
+                    dist_txt = f"{_format_large_distance(km)}km"
+                eta_h = eta_s / 3600.0
+                msg = {
+                    "en": f"[{{sev}}] travel_started :: To {{to}} dist={dist_txt} ETA={_format_eta_short(eta_s, 'en')} (hint: travel abort)",
+                    "es": f"[{{sev}}] travel_started :: A {{to}} dist={dist_txt} ETA={_format_eta_short(eta_s, 'es')} (pista: travel abort)",
+                }
+                tmpl_local = msg.get(locale, msg["en"])
+                try:
+                    print(f"[{origin_tag}] " + _safe_format(tmpl_local, payload))
+                except Exception:
+                    print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
+                continue
             if tmpl:
                 try:
                     print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
@@ -814,23 +877,52 @@ def render_status(state) -> None:
     node_name = node.name if node else current_loc
     if ship.in_transit:
         remaining_s = max(0.0, ship.arrival_t - state.clock.t)
-        remaining_years = remaining_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
-        remaining_days = remaining_s / Balance.DAY_S if Balance.DAY_S else 0.0
-        print(f"location: en route to {ship.transit_to} (from {ship.transit_from}) ETA={remaining_years:.2f}y ({remaining_days:.1f}d)")
-        dist_total = getattr(ship, "last_travel_distance_ly", 0.0) or 0.0
         total_s = max(0.0, ship.arrival_t - ship.transit_start_t)
-        if total_s > 0:
-            remaining_ly = dist_total * (remaining_s / total_s)
+        if getattr(ship, "last_travel_is_local", False):
+            locale = state.os.locale.value
+            dist_total_km = getattr(ship, "last_travel_distance_km", 0.0) or 0.0
+            if total_s > 0:
+                remaining_km = dist_total_km * (remaining_s / total_s)
+            else:
+                remaining_km = dist_total_km
+            if locale == "en":
+                dist_total = dist_total_km * 0.621371
+                remaining = remaining_km * 0.621371
+                unit = "mi"
+            else:
+                dist_total = dist_total_km
+                remaining = remaining_km
+                unit = "km"
+            remaining_hours = remaining_s / 3600.0
+            print(
+                f"location: en route to {ship.transit_to} (from {ship.transit_from}) "
+                f"ETA={_format_eta_short(remaining_s, locale)}"
+            )
+            print(
+                f"transit: {ship.transit_from} -> {ship.transit_to}  "
+                f"dist_total={dist_total:.0f}{unit}  remaining={remaining:.0f}{unit}  "
+                f"ETA={_format_eta_short(remaining_s, locale)}"
+            )
         else:
-            remaining_ly = dist_total
-        print(
-            f"transit: {ship.transit_from} -> {ship.transit_to}  "
-            f"dist_total={dist_total:.2f}ly  remaining={remaining_ly:.2f}ly  "
-            f"ETA={remaining_years:.2f}y ({remaining_days:.1f}d)"
-        )
+            remaining_years = remaining_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
+            remaining_days = remaining_s / Balance.DAY_S if Balance.DAY_S else 0.0
+            print(
+                f"location: en route to {ship.transit_to} (from {ship.transit_from}) "
+                f"ETA={_format_eta_short(remaining_s, locale)}"
+            )
+            dist_total = getattr(ship, "last_travel_distance_ly", 0.0) or 0.0
+            if total_s > 0:
+                remaining_ly = dist_total * (remaining_s / total_s)
+            else:
+                remaining_ly = dist_total
+            print(
+                f"transit: {ship.transit_from} -> {ship.transit_to}  "
+                f"dist_total={dist_total:.2f}ly  remaining={remaining_ly:.2f}ly  "
+                f"ETA={_format_eta_short(remaining_s, locale)}"
+            )
     else:
-        docked = "docked" if ship.docked_node_id == current_loc else "in orbit"
-        print(f"location: {current_loc} ({node_name}) [{docked}]")
+        status_label = _orbit_status_label(state, current_loc)
+        print(f"location: {current_loc} ({node_name}) [{status_label}]")
         if state.world.active_tmp_node_id == current_loc:
             tmp_from = state.world.active_tmp_from or "?"
             tmp_to = state.world.active_tmp_to or "?"
@@ -937,7 +1029,7 @@ def render_alerts(state) -> None:
     sev_rank = {"critical": 0, "warn": 1, "info": 2}
     active.sort(key=lambda a: (sev_rank.get(a.severity.value, 9), -a.last_seen_t))
     for a in active:
-        print(f"- {a.severity.value.upper():8s} {a.alert_key:24s} unacked={a.unacked_s}s")
+        print(f"- {a.severity.value.upper():8s} {a.alert_key:24s} unacked={_format_eta_short(a.unacked_s, locale)}")
 
 
 def render_logs(state, limit: int = 15) -> None:
@@ -971,7 +1063,7 @@ def render_jobs(state) -> None:
 
     def _format_job(job):
         target = f"{job.target.kind}:{job.target.id}" if job.target else "-"
-        eta = f"{max(0, int(job.eta_s))}s" if job.status in {JobStatus.QUEUED, JobStatus.RUNNING} else "-"
+        eta = _format_eta_short(job.eta_s, locale) if job.status in {JobStatus.QUEUED, JobStatus.RUNNING} else "-"
         owner = job.owner_id or "-"
         emergency = " EMERGENCY" if job.params.get("emergency") else ""
         wait_note = ""
@@ -1043,6 +1135,41 @@ def render_modules_catalog(state) -> None:
         if desc:
             print(f"  {desc}")
 
+
+def render_debug_arcs(state) -> None:
+    print("\n=== DEBUG ARCS ===")
+    arcs = load_arcs()
+    if not arcs:
+        print("(none)")
+    else:
+        placements = state.world.arc_placements
+        for arc in arcs:
+            arc_id = arc.get("arc_id", "?")
+            st = placements.get(arc_id, {})
+            primary = st.get("primary", {})
+            secondary = st.get("secondary", {})
+            counters = st.get("counters", {})
+            print(f"- {arc_id}:")
+            if primary.get("placed"):
+                print(f"  primary: {primary.get('node_id')} path={primary.get('path')}")
+            else:
+                print("  primary: (unplaced)")
+            if secondary:
+                for doc_id, info in secondary.items():
+                    print(f"  secondary: {doc_id} -> {info.get('node_id')} path={info.get('path')}")
+            else:
+                print("  secondary: (none)")
+            if counters:
+                print(f"  counters: {counters}")
+    print(f"- mobility_failsafe_count: {state.world.mobility_failsafe_count}")
+    print(f"- mobility_no_new_uplink_count: {state.world.mobility_no_new_uplink_count}")
+    if state.world.mobility_hints:
+        for hint in state.world.mobility_hints[-5:]:
+            print(
+                f"  mobility_hint: {hint.get('from')} -> {hint.get('to')} "
+                f"conf={hint.get('confidence')} source={hint.get('source_kind')}"
+            )
+
 def render_contacts(state) -> None:
     system = state.ship.systems.get("sensors")
     if not system or _state_rank(system.state) < _state_rank(SystemState.LIMITED):
@@ -1068,13 +1195,39 @@ def render_contacts(state) -> None:
     if not known:
         print("(no signals detected)")
         return
+    current = state.world.space.nodes.get(current_id)
+    if current:
+        x, y, z = current.x_ly, current.y_ly, current.z_ly
+    else:
+        x, y, z = state.world.current_pos_ly
+    routes = state.world.known_links.get(current_id, set())
     for cid in sorted(known):
         node = state.world.space.nodes.get(cid)
         if node:
             sector = ""
             if node.node_id.startswith("S"):
                 sector = f" sector={node.node_id.split(':', 1)[0]}"
-            print(f"- {node.name} ({node.kind}){sector} id={cid}")
+            dx = node.x_ly - x
+            dy = node.y_ly - y
+            dz = node.z_ly - z
+            dist = (dx * dx + dy * dy + dz * dz) ** 0.5
+            if node.node_id in state.world.fine_ranges_km and dist <= Balance.LOCAL_TRAVEL_RADIUS_LY:
+                km = state.world.fine_ranges_km.get(node.node_id, 0.0)
+                locale = state.os.locale.value
+                if locale == "en":
+                    dist_txt = f"{_format_large_distance(km * 0.621371)}mi"
+                else:
+                    dist_txt = f"{_format_large_distance(km)}km"
+            else:
+                if dist < 0.1:
+                    dist_txt = f"{dist:.4f}ly"
+                elif dist < 1.0:
+                    dist_txt = f"{dist:.3f}ly"
+                else:
+                    dist_txt = f"{dist:.2f}ly"
+            visited = "visited" if cid in state.world.visited_nodes else "unvisited"
+            route_flag = "route" if cid in routes else "no_route"
+            print(f"- {node.name} ({node.kind}){sector} id={cid} dist={dist_txt} {route_flag} {visited}")
         else:
             print(f"- {cid}")
 
@@ -1134,7 +1287,6 @@ def _scan_and_discover(state) -> tuple[list[str], list[str], list[str], list[str
     handshakes: list[str] = []
     seen: list[str] = []
     route_msgs: list[str] = []
-    route_links: list[tuple[str, str]] = []
     state_p = {
         SystemState.NOMINAL: Balance.SENSORS_DETECT_P_NOMINAL,
         SystemState.LIMITED: Balance.SENSORS_DETECT_P_LIMITED,
@@ -1177,39 +1329,25 @@ def _scan_and_discover(state) -> tuple[list[str], list[str], list[str], list[str
                     source_kind="scan",
                     source_ref=state.world.current_node_id,
                 )
-            if dist2 == 0.0 and n.is_hub and state.world.current_node_id != nid:
-                if add_known_link(state.world, state.world.current_node_id, nid, bidirectional=True):
+            if (
+                dist2 <= Balance.LOCAL_TRAVEL_RADIUS_LY ** 2
+                and n.kind in {"relay", "station", "waystation", "ship", "derelict"}
+                and state.world.current_node_id != nid
+            ):
+                fine_km = _maybe_set_fine_range(state, state.world.current_node_id, nid)
+                if fine_km is not None:
                     locale = state.os.locale.value
+                    if locale == "en":
+                        dist_txt = f"{_format_large_distance(fine_km * 0.621371)}mi"
+                    else:
+                        dist_txt = f"{_format_large_distance(fine_km)}km"
                     msg = {
-                        "en": f"[INFO] (scan) route solved: {state.world.current_node_id} -> {nid}",
-                        "es": f"[INFO] (scan) ruta resuelta: {state.world.current_node_id} -> {nid}",
+                        "en": f"[INFO] (scan) fine range fixed: {nid} ({dist_txt})",
+                        "es": f"[INFO] (scan) distancia fina fijada: {nid} ({dist_txt})",
                     }
                     route_msgs.append(msg.get(locale, msg["en"]))
-                    route_links.append((state.world.current_node_id, nid))
-                    record_intel(
-                        state.world,
-                        t=state.clock.t,
-                        kind="link",
-                        from_id=state.world.current_node_id,
-                        to_id=nid,
-                        confidence=0.6,
-                        source_kind="scan",
-                        source_ref=state.world.current_node_id,
-                    )
             if n.kind in {"relay", "station", "waystation"}:
                 handshakes.append(nid)
-    if route_links:
-        if "/logs/nav" not in state.os.fs:
-            state.os.fs["/logs/nav"] = FSNode(path="/logs/nav", node_type=FSNodeType.DIR, access=AccessLevel.ENG)
-        seq = state.events.next_event_seq
-        log_path = f"/logs/nav/scan_{state.world.current_node_id}_{seq:05d}.txt"
-        log_content = "".join(f"LINK: {left} -> {right}\n" for left, right in route_links)
-        state.os.fs[log_path] = FSNode(
-            path=log_path,
-            node_type=FSNodeType.FILE,
-            content=log_content,
-            access=AccessLevel.ENG,
-        )
     return seen, discovered, handshakes, route_msgs, None
 
 
@@ -1219,6 +1357,43 @@ def _hash64(seed: int, text: str) -> int:
     h.update(str(seed).encode("utf-8"))
     h.update(text.encode("utf-8"))
     return int.from_bytes(h.digest(), "big", signed=False)
+
+
+def _format_large_distance(value: float) -> str:
+    if value >= 1_000_000:
+        return f"{value / 1_000_000:.2f}M"
+    if value >= 1_000:
+        return f"{value / 1_000:.2f}k"
+    return f"{value:.0f}"
+
+
+def _compute_fine_range_km(state, from_id: str, to_id: str) -> float:
+    a, b = sorted([from_id, to_id])
+    seed = _hash64(state.meta.rng_seed, f"fine:{a}:{b}")
+    t = (seed % 10_000) / 10_000.0
+    return Balance.LOCAL_TRAVEL_MIN_KM + (Balance.LOCAL_TRAVEL_MAX_KM - Balance.LOCAL_TRAVEL_MIN_KM) * t
+
+
+def _maybe_set_fine_range(state, from_id: str, to_id: str) -> float | None:
+    if to_id in state.world.fine_ranges_km:
+        return None
+    from_node = state.world.space.nodes.get(from_id)
+    to_node = state.world.space.nodes.get(to_id)
+    if not from_node or not to_node:
+        return None
+    if sector_id_for_pos(from_node.x_ly, from_node.y_ly, from_node.z_ly) != sector_id_for_pos(
+        to_node.x_ly, to_node.y_ly, to_node.z_ly
+    ):
+        return None
+    dx = to_node.x_ly - from_node.x_ly
+    dy = to_node.y_ly - from_node.y_ly
+    dz = to_node.z_ly - from_node.z_ly
+    dist_ly = (dx * dx + dy * dy + dz * dz) ** 0.5
+    if dist_ly > Balance.LOCAL_TRAVEL_RADIUS_LY:
+        return None
+    fine_km = _compute_fine_range_km(state, from_id, to_id)
+    state.world.fine_ranges_km[to_id] = fine_km
+    return fine_km
 
 
 def _state_rank(state: SystemState) -> int:
@@ -1234,6 +1409,23 @@ def _state_rank(state: SystemState) -> int:
 
 
 def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> list[str]:
+    """Return up to max_new new route destinations discovered via uplink.
+
+    Selection uses weighted candidates in this order (unless an authored uplink_table is provided):
+    1) Known contacts without routes (hubs favored: station/waystation/relay weight=10,
+       ships/derelicts weight=2).
+    2) Hubs in the same sector (weight=6).
+    3) Hubs in neighboring sectors (weight=5), generating neighbor sectors if needed.
+    4) Extra derelicts (weight=1).
+
+    Additional rules:
+    - Never add self-links.
+    - Prefer (guarantee) one visible hub without a route if available.
+    - Adds links bidirectionally and updates known_nodes/known_contacts.
+    - If the current authored hub defines uplink_table, select those authored hubs first
+      (min_authored..max_authored) using their weights, then fill remaining slots normally.
+    - Returns the list of newly added destination node_ids.
+    """
     if max_new <= 0:
         return []
     node = state.world.space.nodes.get(current_id)
@@ -1257,6 +1449,74 @@ def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> lis
         prev = candidates.get(nid, 0)
         if weight > prev:
             candidates[nid] = weight
+
+    added: list[str] = []
+
+    # 0) Optional authored uplink table (only for authored hubs).
+    uplink_cfg = None
+    for loc in load_locations():
+        node_cfg = loc.get("node", {})
+        if node_cfg.get("node_id") == current_id:
+            uplink_cfg = loc.get("uplink_table")
+            break
+    if uplink_cfg and isinstance(uplink_cfg, dict):
+        authored_pool = uplink_cfg.get("authored_candidates") or []
+        min_auth = int(uplink_cfg.get("min_authored", 0) or 0)
+        max_auth = int(uplink_cfg.get("max_authored", 0) or 0)
+        if max_auth < min_auth:
+            max_auth = min_auth
+        if max_auth > max_new:
+            max_auth = max_new
+        # Build weighted list of valid authored hubs.
+        authored_weights: list[tuple[str, int]] = []
+        authored_ids = _authored_node_ids()
+        for entry in authored_pool:
+            node_id = entry.get("node_id") if isinstance(entry, dict) else None
+            weight = int(entry.get("weight", 1)) if isinstance(entry, dict) else 1
+            if not node_id or node_id == current_id or node_id in routes:
+                continue
+            if node_id not in authored_ids:
+                continue
+            if node_id not in state.world.space.nodes:
+                continue
+            authored_weights.append((node_id, max(1, weight)))
+        if authored_weights and max_auth > 0:
+            seed = _hash64(state.meta.rng_seed + state.meta.rng_counter, f"uplink_table:{current_id}")
+            state.meta.rng_counter += 1
+            rng = random.Random(seed)
+            pool = list(authored_weights)
+            picks: list[str] = []
+            while pool and len(picks) < max_auth:
+                total = sum(w for _, w in pool)
+                if total <= 0:
+                    break
+                roll = rng.uniform(0, total)
+                upto = 0.0
+                picked_index = 0
+                for i, (_, weight) in enumerate(pool):
+                    upto += weight
+                    if roll <= upto:
+                        picked_index = i
+                        break
+                dest, _weight = pool.pop(picked_index)
+                if dest in picks:
+                    continue
+                picks.append(dest)
+            # Ensure at least min_authored if possible.
+            if min_auth > 0 and len(picks) < min_auth:
+                for dest, _weight in pool:
+                    if dest in picks:
+                        continue
+                    picks.append(dest)
+                    if len(picks) >= min_auth:
+                        break
+            for dest in picks:
+                if add_known_link(state.world, current_id, dest, bidirectional=True):
+                    state.world.known_nodes.add(dest)
+                    state.world.known_contacts.add(dest)
+                    added.append(dest)
+        if state.os.debug_enabled and authored_pool:
+            print(f"[DEBUG] uplink_table applied: {current_id} -> {', '.join(added) if added else '(none)'}")
 
     # 1) Known contacts without routes (weighted by kind).
     for nid in state.world.known_nodes:
@@ -1296,14 +1556,14 @@ def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> lis
         if n.kind == "derelict":
             _add_candidate(nid, 1)
 
-    if not candidates:
+    if not candidates and added:
+        return added
+    if not candidates and not added:
         return []
 
     seed = _hash64(state.meta.rng_seed + state.meta.rng_counter, current_id)
     state.meta.rng_counter += 1
     rng = random.Random(seed)
-
-    added: list[str] = []
 
     # Guarantee one visible hub without a route if available.
     visible_hubs = []
@@ -1317,7 +1577,7 @@ def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> lis
             dz = n.z_ly - z
             dist = dx * dx + dy * dy + dz * dz
             visible_hubs.append((dist, nid))
-    if visible_hubs:
+    if visible_hubs and len(added) < max_new:
         visible_hubs.sort()
         picked = visible_hubs[0][1]
         if add_known_link(state.world, current_id, picked, bidirectional=True):
@@ -1350,9 +1610,149 @@ def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> lis
     return added
 
 
+def _authored_node_ids() -> set[str]:
+    node_ids: set[str] = set()
+    for loc in load_locations():
+        node_cfg = loc.get("node", {})
+        node_id = node_cfg.get("node_id")
+        if node_id:
+            node_ids.add(node_id)
+    return node_ids
+
+
+def _known_routes_to_unvisited(state, current_id: str) -> list[str]:
+    routes = state.world.known_links.get(current_id, set())
+    return [nid for nid in routes if nid not in state.world.visited_nodes]
+
+def _has_global_unvisited_route_within_range(state) -> bool:
+    current_id = state.world.current_node_id
+    current = state.world.space.nodes.get(current_id)
+    if not current:
+        return False
+    max_dist = Balance.MOBILITY_FAILSAFE_MAX_DIST_LY
+    for from_id, tos in state.world.known_links.items():
+        for to_id in tos:
+            if to_id in state.world.visited_nodes:
+                continue
+            dest = state.world.space.nodes.get(to_id)
+            if not dest:
+                continue
+            dx = dest.x_ly - current.x_ly
+            dy = dest.y_ly - current.y_ly
+            dz = dest.z_ly - current.z_ly
+            dist = (dx * dx + dy * dy + dz * dz) ** 0.5
+            if dist <= max_dist:
+                return True
+    return False
+
+
+def _pick_mobility_failsafe_target(state) -> str | None:
+    current_id = state.world.current_node_id
+    current = state.world.space.nodes.get(current_id)
+    if not current:
+        return None
+    authored = _authored_node_ids()
+    known = state.world.known_links.get(current_id, set())
+    max_dist = Balance.MOBILITY_FAILSAFE_MAX_DIST_LY
+
+    def _candidates() -> list[tuple[float, str]]:
+        found: list[tuple[float, str]] = []
+        for node in state.world.space.nodes.values():
+            if node.node_id == current_id or node.node_id in authored:
+                continue
+            if node.kind not in {"relay", "station", "waystation"}:
+                continue
+            if node.node_id in known:
+                continue
+            dx = node.x_ly - current.x_ly
+            dy = node.y_ly - current.y_ly
+            dz = node.z_ly - current.z_ly
+            dist = (dx * dx + dy * dy + dz * dz) ** 0.5
+            if dist <= max_dist:
+                found.append((dist, node.node_id))
+        return found
+
+    candidates = _candidates()
+    if not candidates:
+        sector_id = sector_id_for_pos(current.x_ly, current.y_ly, current.z_ly)
+        try:
+            _, sx, sy, sz = sector_id[1:].split("_")
+            sx_i = int(sx)
+            sy_i = int(sy)
+            sz_i = int(sz)
+        except Exception:
+            sx_i = sy_i = sz_i = 0
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                if dx == 0 and dy == 0:
+                    continue
+                neighbor_id = f"S{sx_i+dx:+04d}_{sy_i+dy:+04d}_{sz_i:+04d}"
+                ensure_sector_generated(state, neighbor_id)
+        candidates = _candidates()
+    if not candidates:
+        return None
+    candidates.sort()
+    return candidates[0][1]
+
+
+def _apply_mobility_failsafe(state, added: list[str]) -> str | None:
+    dest = _pick_mobility_failsafe_target(state)
+    if not dest:
+        return None
+    current_id = state.world.current_node_id
+    if not add_known_link(state.world, current_id, dest, bidirectional=True):
+        return None
+    state.world.known_nodes.add(dest)
+    state.world.known_contacts.add(dest)
+    confidence = 0.45
+    record_intel(
+        state.world,
+        t=state.clock.t,
+        kind="link",
+        from_id=current_id,
+        to_id=dest,
+        confidence=confidence,
+        source_kind="signal",
+        source_ref=current_id,
+        note="weak bearing / degraded table",
+    )
+    state.world.mobility_failsafe_count += 1
+    state.world.mobility_hints.append(
+        {
+            "t": state.clock.t,
+            "from": current_id,
+            "to": dest,
+            "confidence": confidence,
+            "source_kind": "signal",
+        }
+    )
+    if dest not in added:
+        added.append(dest)
+    locale = state.os.locale.value
+    msg = {
+        "en": f"signal_detected :: weak bearing to {dest}",
+        "es": f"signal_detected :: señal débil hacia {dest}",
+    }
+    print(msg.get(locale, msg["en"]))
+    events_out: list[tuple[str, Event]] = []
+    _emit_runtime_event(
+        state,
+        events_out,
+        "cmd",
+        EventType.SIGNAL_DETECTED,
+        Severity.INFO,
+        SourceRef(kind="world", id=dest),
+        msg.get(locale, msg["en"]),
+        data={"from": current_id, "to": dest, "confidence": confidence},
+    )
+    return dest
+
+
 def _uplink_blocked_reason(state) -> str | None:
     if state.ship.in_transit:
         return "in_transit"
+    if state.ship.docked_node_id != state.world.current_node_id:
+        return "not_docked"
     node = state.world.space.nodes.get(state.world.current_node_id)
     if not node or node.kind not in {"relay", "station", "waystation"}:
         return "not_relay"
@@ -1378,6 +1778,7 @@ def _handle_uplink(state) -> None:
     blocked = {
         "en": {
             "in_transit": "Uplink blocked: ship in transit.",
+            "not_docked": "Uplink blocked: ship not docked.",
             "not_relay": "Uplink blocked: current node is not a relay/waystation/station.",
             "missing_data_core": "Uplink blocked: data_core missing.",
             "data_core_shed": "Uplink blocked: data_core offline (CRUISE plan may have shed it). Try: power plan normal; boot datad",
@@ -1388,6 +1789,7 @@ def _handle_uplink(state) -> None:
         },
         "es": {
             "in_transit": "Uplink bloqueado: nave en tránsito.",
+            "not_docked": "Uplink bloqueado: nave no está docked.",
             "not_relay": "Uplink bloqueado: el nodo actual no es relay/waystation/estación.",
             "missing_data_core": "Uplink bloqueado: falta data_core.",
             "data_core_shed": "Uplink bloqueado: data_core offline (CRUISE puede haberlo apagado). Prueba: power plan normal; boot datad",
@@ -1402,7 +1804,22 @@ def _handle_uplink(state) -> None:
         return
     added = _discover_routes_via_uplink(state, state.world.current_node_id, max_new=3)
     if added:
+        state.world.mobility_no_new_uplink_count = 0
+    else:
+        state.world.mobility_no_new_uplink_count += 1
+
+    stuck = not _has_global_unvisited_route_within_range(state)
+    signal_added: set[str] = set()
+    if not added and (stuck or state.world.mobility_no_new_uplink_count >= Balance.UPLINK_FAILSAFE_N):
+        dest = _apply_mobility_failsafe(state, added)
+        if dest:
+            signal_added.add(dest)
+            state.world.mobility_no_new_uplink_count = 0
+
+    if added:
         for nid in added:
+            if nid in signal_added:
+                continue
             record_intel(
                 state.world,
                 t=state.clock.t,
@@ -1414,7 +1831,7 @@ def _handle_uplink(state) -> None:
                 source_ref=state.world.current_node_id,
             )
     if "/logs/nav" not in state.os.fs:
-        state.os.fs["/logs/nav"] = FSNode(path="/logs/nav", node_type=FSNodeType.DIR, access=AccessLevel.ENG)
+        state.os.fs["/logs/nav"] = FSNode(path="/logs/nav", node_type=FSNodeType.DIR, access=AccessLevel.GUEST)
     seq = state.events.next_event_seq
     log_path = f"/logs/nav/uplink_{state.world.current_node_id}_{seq:05d}.txt"
     log_content = "".join(f"LINK: {nid}\n" for nid in added)
@@ -1422,7 +1839,7 @@ def _handle_uplink(state) -> None:
         path=log_path,
         node_type=FSNodeType.FILE,
         content=log_content,
-        access=AccessLevel.ENG,
+        access=AccessLevel.GUEST,
     )
     if added:
         msg = {
@@ -1475,6 +1892,204 @@ def _is_intel_path(path: str) -> bool:
         return "/data/nav/" in path or "/mail/" in path or "/logs/" in path
     return False
 
+def _extract_intel_blocks(text: str) -> list[str]:
+    blocks: list[str] = []
+    start_tag = "[INTEL]"
+    end_tag = "[/INTEL]"
+    idx = 0
+    while True:
+        start = text.find(start_tag, idx)
+        if start < 0:
+            break
+        end = text.find(end_tag, start + len(start_tag))
+        if end < 0:
+            break
+        content = text[start + len(start_tag):end].strip()
+        if content:
+            blocks.append(content)
+        idx = end + len(end_tag)
+    return blocks
+
+
+def _resolve_authored_matches(state, token: str) -> list[str]:
+    token_norm = token.strip()
+    if not token_norm:
+        return []
+    authored_ids = _authored_node_ids()
+    node_id_matches: list[str] = []
+    name_matches: list[str] = []
+    sector_matches: list[str] = []
+    for loc in load_locations():
+        node_cfg = loc.get("node", {})
+        node_id = node_cfg.get("node_id")
+        if not node_id or node_id not in authored_ids:
+            continue
+        if node_id == token_norm:
+            node_id_matches.append(node_id)
+            continue
+        name = node_cfg.get("name", "")
+        if name and name.lower() == token_norm.lower():
+            name_matches.append(node_id)
+            continue
+        try:
+            x = float(node_cfg.get("x_ly", 0.0))
+            y = float(node_cfg.get("y_ly", 0.0))
+            z = float(node_cfg.get("z_ly", 0.0))
+        except Exception:
+            x = y = z = 0.0
+        sector_id = sector_id_for_pos(x, y, z)
+        if sector_id == token_norm:
+            sector_matches.append(node_id)
+            continue
+    if node_id_matches:
+        return node_id_matches[:1]
+    if sector_matches:
+        return sector_matches
+    if name_matches:
+        if len(name_matches) > 1 and state.os.debug_enabled:
+            print(f"[DEBUG] intel name collision for '{token_norm}': {', '.join(name_matches)}")
+        if len(name_matches) == 1:
+            return name_matches
+        current = state.world.space.nodes.get(state.world.current_node_id)
+        if current:
+            name_matches.sort(
+                key=lambda nid: (
+                    (state.world.space.nodes.get(nid).x_ly - current.x_ly) ** 2
+                    + (state.world.space.nodes.get(nid).y_ly - current.y_ly) ** 2
+                    + (state.world.space.nodes.get(nid).z_ly - current.z_ly) ** 2
+                )
+                if state.world.space.nodes.get(nid)
+                else float("inf")
+            )
+        return name_matches[:1]
+    return []
+
+
+def _spawn_corrupt_intel_contact(state, source_path: str) -> str | None:
+    current = state.world.space.nodes.get(state.world.current_node_id)
+    if not current:
+        return None
+    radius = Balance.INTEL_CORRUPT_SPAWN_RADIUS_LY
+    seed = _hash64(state.meta.rng_seed + state.meta.rng_counter, f"intel_corrupt:{source_path}:{int(state.clock.t)}")
+    state.meta.rng_counter += 1
+    rng = random.Random(seed)
+    # Try to find an unknown hub within radius.
+    for _ in range(32):
+        dx = rng.uniform(-radius, radius)
+        dy = rng.uniform(-radius, radius)
+        dz = rng.uniform(-radius, radius)
+        x = current.x_ly + dx
+        y = current.y_ly + dy
+        z = current.z_ly + dz
+        sector_id = sector_id_for_pos(x, y, z)
+        if sector_id not in state.world.generated_sectors:
+            ensure_sector_generated(state, sector_id)
+        hubs = [
+            n
+            for n in state.world.space.nodes.values()
+            if n.is_hub and sector_id_for_pos(n.x_ly, n.y_ly, n.z_ly) == sector_id
+        ]
+        hubs = [h for h in hubs if h.node_id not in state.world.known_contacts]
+        if not hubs:
+            continue
+        hubs.sort(key=lambda n: n.node_id)
+        node_id = hubs[0].node_id
+        break
+    else:
+        return None
+    state.world.known_nodes.add(node_id)
+    state.world.known_contacts.add(node_id)
+    record_intel(
+        state.world,
+        t=state.clock.t,
+        kind="node",
+        to_id=node_id,
+        confidence=0.4,
+        source_kind="intel_corrupt",
+        source_ref=source_path,
+        note="corrupt intel salvage",
+    )
+    return node_id
+
+
+def _process_intel_token(state, token: str, source_path: str, messages: list[str]) -> None:
+    token = token.strip()
+    if not token:
+        return
+    # LINK inside token
+    for raw in token.splitlines():
+        line = raw.strip()
+        if line.upper().startswith("LINK:"):
+            payload = line.split(":", 1)[1].strip()
+            if "->" in payload:
+                left, right = [p.strip() for p in payload.split("->", 1)]
+                if left and right:
+                    for nid in (left, right):
+                        if nid.startswith("S") and ":" in nid:
+                            sector_id = nid.split(":", 1)[0]
+                            ensure_sector_generated(state, sector_id)
+                    if add_known_link(state.world, left, right, bidirectional=True):
+                        _mark_arc_discovered(state, left, right)
+                        state.world.known_nodes.add(left)
+                        state.world.known_nodes.add(right)
+                        state.world.known_contacts.add(left)
+                        state.world.known_contacts.add(right)
+                        source_kind, confidence, source_ref = _infer_intel_source(source_path)
+                        record_intel(
+                            state.world,
+                            t=state.clock.t,
+                            kind="link",
+                            from_id=left,
+                            to_id=right,
+                            confidence=confidence,
+                            source_kind=source_kind,
+                            source_ref=source_ref,
+                        )
+                        messages.append(f"(intel) route added: {left} -> {right}")
+            return
+
+    # Non-link token: try authored matches.
+    matches = _resolve_authored_matches(state, token)
+    if matches:
+        for node_id in matches:
+            if node_id not in state.world.known_nodes:
+                state.world.known_nodes.add(node_id)
+                state.world.known_contacts.add(node_id)
+                source_kind, confidence, source_ref = _infer_intel_source(source_path)
+                record_intel(
+                    state.world,
+                    t=state.clock.t,
+                    kind="node",
+                    to_id=node_id,
+                    confidence=confidence,
+                    source_kind=source_kind,
+                    source_ref=source_ref,
+                )
+                messages.append(f"(intel) node known: {node_id}")
+        return
+
+    # Corrupt intel handling.
+    rng = random.Random(_hash64(state.meta.rng_seed + state.meta.rng_counter, f"intel_corrupt_roll:{source_path}:{token}"))
+    state.meta.rng_counter += 1
+    if rng.random() < Balance.INTEL_CORRUPT_P_FAIL:
+        locale = state.os.locale.value
+        msg = {
+            "en": "(intel) corrupt data: unable to recover",
+            "es": "(intel) datos corruptos: no se pudo recuperar",
+        }
+        print(msg.get(locale, msg["en"]))
+        return
+    node_id = _spawn_corrupt_intel_contact(state, source_path)
+    if node_id:
+        messages.append(f"(intel) node known: {node_id}")
+    else:
+        locale = state.os.locale.value
+        msg = {
+            "en": "(intel) corrupt data: no usable intel found",
+            "es": "(intel) datos corruptos: no se pudo recuperar",
+        }
+        print(msg.get(locale, msg["en"]))
+
 def _handle_intel_import(state, path: str) -> None:
     try:
         content = read_file(state.os.fs, path, state.os.access_level)
@@ -1487,10 +2102,17 @@ def _handle_intel_import(state, path: str) -> None:
 
     source_kind, confidence, source_ref = _infer_intel_source(path)
     added_msgs: list[str] = []
+    blocks = _extract_intel_blocks(content)
+    for block in blocks:
+        _process_intel_token(state, block, path, added_msgs)
     for raw in content.splitlines():
         line = raw.strip()
         if not line:
             continue
+        if blocks:
+            # Skip legacy parsing when INTEL blocks are present, except for explicit LINK/NODE/SECTOR/COORD lines.
+            if not (line.upper().startswith("LINK:") or line.upper().startswith("NODE:") or line.upper().startswith("SECTOR:") or line.upper().startswith("COORD:")):
+                continue
         if line.upper().startswith("NODE:"):
             node_id = line.split(":", 1)[1].strip()
             if not node_id:
@@ -1535,7 +2157,16 @@ def _handle_intel_import(state, path: str) -> None:
             if "->" in payload:
                 left, right = [p.strip() for p in payload.split("->", 1)]
                 if left and right:
+                    for nid in (left, right):
+                        if nid.startswith("S") and ":" in nid:
+                            sector_id = nid.split(":", 1)[0]
+                            ensure_sector_generated(state, sector_id)
                     if add_known_link(state.world, left, right, bidirectional=True):
+                        _mark_arc_discovered(state, left, right)
+                        state.world.known_nodes.add(left)
+                        state.world.known_nodes.add(right)
+                        state.world.known_contacts.add(left)
+                        state.world.known_contacts.add(right)
                         record_intel(
                             state.world,
                             t=state.clock.t,
@@ -1551,7 +2182,15 @@ def _handle_intel_import(state, path: str) -> None:
                 to_id = payload
                 if to_id:
                     from_id = state.world.current_node_id
+                    if to_id.startswith("S") and ":" in to_id:
+                        sector_id = to_id.split(":", 1)[0]
+                        ensure_sector_generated(state, sector_id)
                     if add_known_link(state.world, from_id, to_id, bidirectional=True):
+                        _mark_arc_discovered(state, from_id, to_id)
+                        state.world.known_nodes.add(from_id)
+                        state.world.known_nodes.add(to_id)
+                        state.world.known_contacts.add(from_id)
+                        state.world.known_contacts.add(to_id)
                         record_intel(
                             state.world,
                             t=state.clock.t,
@@ -1610,10 +2249,16 @@ def _handle_intel_import(state, path: str) -> None:
 def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str]:
     source_kind, confidence, source_ref = _infer_intel_source(source_path)
     added_msgs: list[str] = []
+    blocks = _extract_intel_blocks(text)
+    for block in blocks:
+        _process_intel_token(state, block, source_path, added_msgs)
     for raw in text.splitlines():
         line = raw.strip()
         if not line:
             continue
+        if blocks:
+            if not (line.upper().startswith("LINK:") or line.upper().startswith("NODE:") or line.upper().startswith("SECTOR:") or line.upper().startswith("COORD:")):
+                continue
         if line.upper().startswith("NODE:"):
             node_id = line.split(":", 1)[1].strip()
             if node_id:
@@ -1653,7 +2298,16 @@ def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str
             if "->" in payload:
                 left, right = [p.strip() for p in payload.split("->", 1)]
                 if left and right:
+                    for nid in (left, right):
+                        if nid.startswith("S") and ":" in nid:
+                            sector_id = nid.split(":", 1)[0]
+                            ensure_sector_generated(state, sector_id)
                     if add_known_link(state.world, left, right, bidirectional=True):
+                        _mark_arc_discovered(state, left, right)
+                        state.world.known_nodes.add(left)
+                        state.world.known_nodes.add(right)
+                        state.world.known_contacts.add(left)
+                        state.world.known_contacts.add(right)
                         record_intel(
                             state.world,
                             t=state.clock.t,
@@ -1669,7 +2323,15 @@ def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str
                 to_id = payload
                 if to_id:
                     from_id = state.world.current_node_id
+                    if to_id.startswith("S") and ":" in to_id:
+                        sector_id = to_id.split(":", 1)[0]
+                        ensure_sector_generated(state, sector_id)
                     if add_known_link(state.world, from_id, to_id, bidirectional=True):
+                        _mark_arc_discovered(state, from_id, to_id)
+                        state.world.known_nodes.add(from_id)
+                        state.world.known_nodes.add(to_id)
+                        state.world.known_contacts.add(from_id)
+                        state.world.known_contacts.add(to_id)
                         record_intel(
                             state.world,
                             t=state.clock.t,
@@ -1732,16 +2394,24 @@ def render_sectors(state) -> None:
 
 def render_locate(state, system_id: str) -> None:
     sys = state.ship.systems.get(system_id)
-    if not sys:
-        print("(locate) system_id no encontrado")
+    if sys:
+        sector = state.ship.sectors.get(sys.sector_id)
+        if sector:
+            print(f"system_id: {system_id}")
+            print(f"ship_sector: {sys.sector_id} ({sector.name})")
+        else:
+            print(f"system_id: {system_id}")
+            print(f"ship_sector: {sys.sector_id}")
         return
-    sector = state.ship.sectors.get(sys.sector_id)
-    if sector:
-        print(f"system_id: {system_id}")
-        print(f"ship_sector: {sys.sector_id} ({sector.name})")
-    else:
-        print(f"system_id: {system_id}")
-        print(f"ship_sector: {sys.sector_id}")
+    node = state.world.space.nodes.get(system_id)
+    if not node:
+        print("(locate) system_id/node_id no encontrado")
+        return
+    sector_id = sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly)
+    print(f"node_id: {system_id}")
+    print(f"name: {node.name}")
+    print(f"sector: {sector_id}")
+    print(f"coords: {node.x_ly:.2f}, {node.y_ly:.2f}, {node.z_ly:.2f}")
 
 
 def render_nav(state) -> None:
@@ -1755,21 +2425,41 @@ def render_nav(state) -> None:
     }
     current = state.world.space.nodes.get(current_id)
     cx, cy, cz = (current.x_ly, current.y_ly, current.z_ly) if current else state.world.current_pos_ly
+    def _format_dist(node) -> str:
+        dx = node.x_ly - cx
+        dy = node.y_ly - cy
+        dz = node.z_ly - cz
+        dist = (dx * dx + dy * dy + dz * dz) ** 0.5
+        same_sector = sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly) == sector_id_for_pos(cx, cy, cz)
+        if (
+            same_sector
+            and dist <= Balance.LOCAL_TRAVEL_RADIUS_LY
+            and node.node_id in state.world.fine_ranges_km
+        ):
+            km = state.world.fine_ranges_km.get(node.node_id, 0.0)
+            locale = state.os.locale.value
+            if locale == "en":
+                miles = km * 0.621371
+                return f"{_format_large_distance(miles)}mi"
+            return f"{_format_large_distance(km)}km"
+        if dist < 0.1:
+            return f"{dist:.4f}ly"
+        if dist < 1.0:
+            return f"{dist:.3f}ly"
+        return f"{dist:.2f}ly"
+
     if routes:
         print(f"Known routes from {current_id}:")
         for nid in sorted(routes):
             node = state.world.space.nodes.get(nid)
             if node:
-                dx = node.x_ly - cx
-                dy = node.y_ly - cy
-                dz = node.z_ly - cz
-                dist = (dx * dx + dy * dy + dz * dz) ** 0.5
                 if node.node_id.startswith("S"):
                     sector_id = node.node_id.split(":", 1)[0]
                 else:
                     sector_id = sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly)
                 sector = f" sector={sector_id}"
-                print(f"- {node.name} ({node.kind}){sector} id={nid} dist={dist:.2f}ly")
+                visited = "visited" if nid in state.world.visited_nodes else "unvisited"
+                print(f"- {node.name} ({node.kind}){sector} id={nid} dist={_format_dist(node)} {visited}")
             else:
                 print(f"- id={nid}")
     else:
@@ -1785,16 +2475,13 @@ def render_nav(state) -> None:
         for nid in sorted(nearby):
             node = state.world.space.nodes.get(nid)
             if node:
-                dx = node.x_ly - cx
-                dy = node.y_ly - cy
-                dz = node.z_ly - cz
-                dist = (dx * dx + dy * dy + dz * dz) ** 0.5
                 if node.node_id.startswith("S"):
                     sector_id = node.node_id.split(":", 1)[0]
                 else:
                     sector_id = sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly)
                 sector = f" sector={sector_id}"
-                print(f"- {node.name} ({node.kind}){sector} id={nid} dist={dist:.2f}ly")
+                visited = "visited" if nid in state.world.visited_nodes else "unvisited"
+                print(f"- {node.name} ({node.kind}){sector} id={nid} dist={_format_dist(node)} {visited}")
             else:
                 print(f"- {nid}")
         locale = state.os.locale.value
@@ -1816,11 +2503,119 @@ def _format_age_short(seconds: float) -> str:
     return f"{int(seconds)}s"
 
 
+def _format_eta_short(seconds: float, locale: str = "en") -> str:
+    seconds = max(0.0, seconds)
+    unit = {
+        "en": {"s": "s", "m": "m", "h": "h", "d": "d", "y": "y"},
+        "es": {"s": "s", "m": "m", "h": "h", "d": "d", "y": "a"},
+    }.get(locale, {"s": "s", "m": "m", "h": "h", "d": "d", "y": "y"})
+    if seconds < 60:
+        return f"{int(seconds)}{unit['s']}"
+    if seconds < 3600:
+        mins = int(seconds // 60)
+        secs = int(seconds % 60)
+        return f"{mins}{unit['m']} {secs}{unit['s']}"
+    if seconds < 86400:
+        hours = int(seconds // 3600)
+        mins = int((seconds % 3600) // 60)
+        return f"{hours}{unit['h']} {mins}{unit['m']}"
+    if seconds < Balance.YEAR_S:
+        days = int(seconds // 86400)
+        hours = int((seconds % 86400) // 3600)
+        mins = int((seconds % 3600) // 60)
+        return f"{days}{unit['d']} {hours}{unit['h']} {mins}{unit['m']}"
+    return f"{seconds / Balance.YEAR_S:.2f}{unit['y']}"
+
+
+_LOG_BUFFER: list[str] = []
+
+
+class _TeeStdout:
+    def __init__(self, stream, buffer: list[str], max_lines: int = 2000) -> None:
+        self._stream = stream
+        self._buffer = buffer
+        self._max_lines = max_lines
+        self._partial = ""
+
+    def write(self, s: str) -> int:
+        if not s:
+            return 0
+        self._stream.write(s)
+        self._partial += s
+        while "\n" in self._partial:
+            line, self._partial = self._partial.split("\n", 1)
+            if line:
+                self._buffer.append(line)
+                if len(self._buffer) > self._max_lines:
+                    del self._buffer[:-self._max_lines]
+        return len(s)
+
+    def flush(self) -> None:
+        self._stream.flush()
+
+
+def _copy_to_clipboard(text: str) -> bool:
+    try:
+        import pyperclip
+        pyperclip.copy(text)
+        return True
+    except Exception:
+        pass
+    for cmd in (["wl-copy"], ["xclip", "-selection", "clipboard"], ["pbcopy"]):
+        if not shutil.which(cmd[0]):
+            continue
+        try:
+            proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+            proc.communicate(text.encode("utf-8"))
+            return proc.returncode == 0
+        except Exception:
+            continue
+    return False
+
+
+def _write_log_copy_file(content: str) -> str:
+    root = Path(__file__).resolve().parents[3]
+    path = root / "log_copy.txt"
+    path.write_text(content, encoding="utf-8")
+    return str(path)
+
+
+def _handle_log_copy(state, amount: int | None) -> None:
+    locale = state.os.locale.value
+    lines = list(_LOG_BUFFER)
+    if amount is None:
+        amount = min(50, len(lines))
+    if amount <= 0:
+        amount = 0
+    slice_lines = lines[-amount:] if amount else []
+    content = "\n".join(slice_lines)
+    ok = _copy_to_clipboard(content)
+    if ok:
+        msg = {
+            "en": f"(log) copied {len(slice_lines)} lines to clipboard",
+            "es": f"(log) copiadas {len(slice_lines)} líneas al portapapeles",
+        }
+        print(msg.get(locale, msg["en"]))
+    else:
+        path = _write_log_copy_file(content)
+        msg = {
+            "en": f"(log) clipboard unavailable; wrote {len(slice_lines)} lines to {path}",
+            "es": f"(log) portapapeles no disponible; escrito {len(slice_lines)} líneas en {path}",
+        }
+        print(msg.get(locale, msg["en"]))
+
+
 def render_intel_list(state, limit: int | None = 20) -> None:
     print("\n=== INTEL ===")
     items = list(state.world.intel)
     if not items:
         print("(no intel)")
+        locale = state.os.locale.value
+        hint = {
+            "en": "Try: intel import <path> | intel show <intel_id> | man intel",
+            "es": "Prueba: intel import <path> | intel show <intel_id> | man intel",
+        }
+        print(hint.get(locale, hint["en"]))
         return
     items.sort(key=lambda i: i.t)
     if limit is not None:
@@ -1847,6 +2642,12 @@ def render_intel_list(state, limit: int | None = 20) -> None:
                 source = source[:17] + "..."
         age = _format_age_short(now - item.t)
         print(f"{item.intel_id:<6} {item.kind:<6} {what:<28} {item.confidence:>4.2f}  {source:<20} {age:>4}")
+    locale = state.os.locale.value
+    hint = {
+        "en": "Try: intel import <path> | intel show <intel_id> | man intel",
+        "es": "Prueba: intel import <path> | intel show <intel_id> | man intel",
+    }
+    print(hint.get(locale, hint["en"]))
 
 
 def render_intel_show(state, intel_id: str) -> None:
@@ -2305,9 +3106,15 @@ def render_alert_explain(state, alert_key: str) -> None:
     print(f"\n=== ALERT EXPLAIN: {alert_key} ===")
     if alert:
         if alert.is_active:
-            print(f"Severity: {alert.severity.value}   Active: True   Unacked while active: {alert.unacked_s}s")
+            print(
+                f"Severity: {alert.severity.value}   Active: True   "
+                f"Unacked while active: {_format_eta_short(alert.unacked_s, state.os.locale.value)}"
+            )
         else:
-            print(f"Severity: {alert.severity.value}   Active: False (cleared)   Unacked while active: {alert.unacked_s}s")
+            print(
+                f"Severity: {alert.severity.value}   Active: False (cleared)   "
+                f"Unacked while active: {_format_eta_short(alert.unacked_s, state.os.locale.value)}"
+            )
     else:
         print("Severity: unknown   Active: unknown   Unacked: unknown")
 
@@ -2353,6 +3160,9 @@ def render_alert_explain(state, alert_key: str) -> None:
 def main() -> None:
     from retorno.cli.parser import ParseError, parse_command
 
+    if not isinstance(sys.stdout, _TeeStdout):
+        sys.stdout = _TeeStdout(sys.stdout, _LOG_BUFFER)
+
     engine = Engine()
     scenario = os.environ.get("RETORNO_SCENARIO", "prologue").lower()
     if scenario in {"sandbox", "dev"}:
@@ -2369,6 +3179,7 @@ def main() -> None:
 
     base_commands = [
         "help",
+        "clear",
         "ls",
         "cat",
         "man",
@@ -2381,6 +3192,7 @@ def main() -> None:
         "power",
         "alerts",
         "logs",
+        "log",
         "contacts",
         "scan",
         "sectors",
@@ -2479,19 +3291,29 @@ def main() -> None:
             elif cmd == "dock":
                 candidates = [c for c in contacts if c.startswith(text)]
             elif cmd == "travel":
-                name_matches = []
-                for nid in contacts:
-                    node = locked_state.world.space.nodes.get(nid)
-                    if node and node.name.lower().startswith(text.lower()):
-                        name_matches.append(node.name)
-                sector_matches = []
-                for nid in contacts:
-                    node = locked_state.world.space.nodes.get(nid)
-                    if node and node.node_id.startswith("S"):
-                        sector_label = f"sector={node.node_id}"
-                        if sector_label.startswith(text):
-                            sector_matches.append(sector_label)
-                candidates = [c for c in contacts if c.startswith(text)] + name_matches + sector_matches
+                def _travel_targets(prefix: str) -> list[str]:
+                    name_matches = []
+                    for nid in contacts:
+                        node = locked_state.world.space.nodes.get(nid)
+                        if node and node.name.lower().startswith(prefix.lower()):
+                            name_matches.append(node.name)
+                    sector_matches = []
+                    for nid in contacts:
+                        node = locked_state.world.space.nodes.get(nid)
+                        if node and node.node_id.startswith("S"):
+                            sector_label = f"sector={node.node_id}"
+                            if sector_label.startswith(prefix):
+                                sector_matches.append(sector_label)
+                    return [c for c in contacts if c.startswith(prefix)] + name_matches + sector_matches
+
+                if len(tokens) == 2:
+                    base_opts = ["abort", "--no-cruise"]
+                    candidates = [c for c in base_opts if c.startswith(text)]
+                    candidates += _travel_targets(text)
+                elif len(tokens) == 3 and tokens[1] == "--no-cruise":
+                    candidates = _travel_targets(text)
+                else:
+                    candidates = _travel_targets(text)
             elif cmd == "power":
                 if len(tokens) == 2:
                     candidates = [c for c in ["status", "shed", "off", "on", "plan"] if c.startswith(text)]
@@ -2501,7 +3323,7 @@ def main() -> None:
                     candidates = [c for c in ["cruise", "normal"] if c.startswith(text)]
             elif cmd == "debug":
                 if len(tokens) == 2:
-                    candidates = [c for c in ["on", "off", "status", "scenario"] if c.startswith(text)]
+                    candidates = [c for c in ["on", "off", "status", "scenario", "seed"] if c.startswith(text)]
                 elif len(tokens) == 3 and tokens[1] == "scenario":
                     candidates = [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
             elif cmd == "install":
@@ -2517,6 +3339,9 @@ def main() -> None:
                     candidates = [c for c in ["cancel"] if c.startswith(text)]
                 elif len(tokens) == 3 and tokens[1] == "cancel":
                     candidates = [jid for jid in locked_state.jobs.active_job_ids if jid.startswith(text)]
+            elif cmd == "log":
+                if len(tokens) == 2:
+                    candidates = [c for c in ["copy"] if c.startswith(text)]
             elif cmd == "intel":
                 if len(tokens) == 2:
                     candidates = [c for c in ["show", "import", "export", "all"] if c.startswith(text)] + [t for t in ["10", "20", "50"] if t.startswith(text)]
@@ -2685,6 +3510,9 @@ def main() -> None:
             _drain_auto_events()
             print_help()
             continue
+        if parsed == "CLEAR":
+            print("\033[2J\033[H", end="")
+            continue
         if parsed == "CONFIG_SHOW":
             with loop.with_lock() as locked_state:
                 print(f"language: {locked_state.os.locale.value}")
@@ -2728,6 +3556,24 @@ def main() -> None:
                 loop.start()
                 print("DEBUG mode disabled")
                 continue
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_ARCS":
+            with loop.with_lock() as locked_state:
+                if not locked_state.os.debug_enabled:
+                    print("debug arcs: available only in DEBUG mode. Use: debug on")
+                    continue
+                render_debug_arcs(locked_state)
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SEED":
+            with loop.with_lock() as locked_state:
+                if not locked_state.os.debug_enabled:
+                    print("debug seed: available only in DEBUG mode. Use: debug on")
+                    continue
+                seed = parsed[1]
+                locked_state.meta.rng_seed = seed
+                locked_state.meta.rng_counter = 0
+                loop._rng = random.Random(seed)
+                print(f"Seed set to {seed}")
+            continue
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SCENARIO":
             scenario = parsed[1]
             loop.set_auto_tick(False)
@@ -2807,6 +3653,11 @@ def main() -> None:
             _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_logs(locked_state)
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "LOG_COPY":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                _handle_log_copy(locked_state, parsed[1])
             continue
         if parsed == "JOBS":
             _drain_auto_events()

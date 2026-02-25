@@ -1,0 +1,8 @@
+DE: Operaciones de red
+ASUNTO: Mantenimiento de corredor
+
+Si ves repeticiones obsoletas, no las sigas.
+Solo dejamos un corredor con algo de integridad.
+
+NAV:
+... volcado intermitente ...

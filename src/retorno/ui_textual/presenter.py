@@ -29,13 +29,14 @@ def build_header(state) -> str:
     mode = "DEBUG" if state.os.debug_enabled else "NORMAL"
     if ship.in_transit:
         remaining_s = max(0.0, ship.arrival_t - state.clock.t)
-        remaining_years = remaining_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
-        loc = f"en route to {ship.transit_to} (ETA {remaining_years:.2f}y)"
+        eta = repl._format_eta_short(remaining_s, state.os.locale.value)
+        loc = f"en route to {ship.transit_to} (ETA {eta})"
     else:
         loc_id = state.world.current_node_id
         node = state.world.space.nodes.get(loc_id)
         node_name = node.name if node else loc_id
-        loc = f"{loc_id} ({node_name})"
+        status_label = repl._orbit_status_label(state, loc_id)
+        loc = f"{loc_id} ({node_name}) [{status_label}]"
     elapsed = format_elapsed_short(state.clock.t, include_seconds=True)
     return f"{elapsed} | ship_mode={mode} | {loc}"
 

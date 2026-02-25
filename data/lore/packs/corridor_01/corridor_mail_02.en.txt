@@ -1,0 +1,8 @@
+FROM: Network Ops
+SUBJ: Corridor maintenance
+
+If you are seeing stale repeats, do not chase them.
+We left only one corridor with any integrity left.
+
+NAV:
+... intermittent dump ...

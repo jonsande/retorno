@@ -3,6 +3,7 @@
     "node_id": "CURL_12",
     "name": "CURL-12 Waystation",
     "kind": "station",
+    "is_hub": true,
     "radiation_rad_per_s": 0.001,
     "x_ly": 12.0,
     "y_ly": 43.0,

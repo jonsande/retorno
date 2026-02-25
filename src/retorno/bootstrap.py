@@ -175,7 +175,7 @@ def create_initial_state_prologue() -> GameState:
             shield_factor=0.9,
         )
     }
-    state.ship.cargo_scrap = 40
+    state.ship.cargo_scrap = Balance.STARTING_SCRAP
 
     state.ship.sectors = {
         "DRN-BAY": ShipSector(sector_id="DRN-BAY", name="Drone Bay", tags={"bay"}),
@@ -186,6 +186,7 @@ def create_initial_state_prologue() -> GameState:
 
     state.world.current_node_id = "UNKNOWN_00"
     state.ship.current_node_id = state.world.current_node_id
+    state.world.visited_nodes.add(state.world.current_node_id)
     rng = random.Random(state.meta.rng_seed)
     modules = load_modules()
     module_ids = list(modules.keys())
@@ -248,6 +249,7 @@ def create_initial_state_sandbox() -> GameState:
     state.ship.op_mode = "NORMAL"
     state.ship.current_node_id = "ECHO_7"
     state.world.current_node_id = "ECHO_7"
+    state.world.visited_nodes.add(state.world.current_node_id)
     node = state.world.space.nodes.get("ECHO_7")
     if node:
         state.world.current_pos_ly = (node.x_ly, node.y_ly, node.z_ly)
@@ -257,7 +259,7 @@ def create_initial_state_sandbox() -> GameState:
     state.world.known_nodes.update({"ECHO_7", "HARBOR_12", "DERELICT_A3"})
 
     # Give some cargo for testing
-    state.ship.cargo_scrap = max(state.ship.cargo_scrap, 20)
+    state.ship.cargo_scrap = max(state.ship.cargo_scrap, Balance.STARTING_SCRAP)
     state.ship.manifest_dirty = True
 
     return state
@@ -313,6 +315,10 @@ def _bootstrap_locations(state: GameState, rng: random.Random, module_ids: list[
                 y_ly=float(node_cfg.get("y_ly", 0.0)),
                 z_ly=float(node_cfg.get("z_ly", 0.0)),
             )
+            if "is_hub" in node_cfg:
+                node.is_hub = bool(node_cfg.get("is_hub"))
+            else:
+                node.is_hub = node.kind in {"relay", "station", "waystation", "ship", "derelict"}
             node.region = region_for_pos(node.x_ly, node.y_ly, node.z_ly)
             node.radiation_base = float(node_cfg.get("radiation_base", 0.0))
             salvage_cfg = loc.get("salvage") or {}
@@ -327,7 +333,10 @@ def _bootstrap_locations(state: GameState, rng: random.Random, module_ids: list[
             state.world.known_contacts.add(node_id)
             state.world.known_nodes.add(node_id)
 
-        # Optional filesystem files (mails/logs) attached to location data
+        # Optional filesystem files (mails/logs) attached to location data.
+        # Only load files that belong to the player ship location at bootstrap.
+        if node_cfg.get("node_id") != state.ship.ship_id:
+            continue
         fs_files = loc.get("fs_files", [])
         for file_cfg in fs_files:
             path = file_cfg.get("path")

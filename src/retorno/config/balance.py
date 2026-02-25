@@ -2,6 +2,7 @@ from __future__ import annotations
 
 
 class Balance:
+    DEFAULT_RNG_SEED = 36892
     DAY_S = 86400.0
     YEAR_S = 365.0 * DAY_S
     HIBERNATE_CHUNK_S = 7 * DAY_S
@@ -82,7 +83,20 @@ class Balance:
 
     # Route solving
     ROUTE_SOLVE_MIN_S = 100.0
-    ROUTE_SOLVE_MAX_S = 1800.0
+    ROUTE_SOLVE_MAX_S = 6800.0
+    UPLINK_FAILSAFE_N = 2
+    # If no new routes to unvisited nodes exist within this distance from the current node,
+    # the mobility failsafe may trigger (after N uplinks with no new routes).
+    MOBILITY_FAILSAFE_MAX_DIST_LY = 20.0
+    INTEL_CORRUPT_P_FAIL = 0.50
+    INTEL_CORRUPT_SPAWN_RADIUS_LY = 40.0
+    
+    # Local (low scale) movement
+    LOCAL_TRAVEL_SPEED_KM_S = 20.0
+    LOCAL_TRAVEL_RADIUS_LY = 0.01
+    LOCAL_TRAVEL_MIN_KM = 200.0
+    LOCAL_TRAVEL_MAX_KM = 50000.0
+    STARTING_SCRAP = 64
 
     # Drone battery/integrity maintenance
     DRONE_BATTERY_DRAIN_DEPLOY = 0.06

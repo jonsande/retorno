@@ -54,6 +54,8 @@ class ShipState:
     transit_start_t: float = 0.0
     cruise_speed_ly_per_year: float = 1.0
     last_travel_distance_ly: float = 0.0
+    last_travel_distance_km: float = 0.0
+    last_travel_is_local: bool = False
     transit_prev_op_mode: str = ""
     transit_prev_op_mode_source: str = ""
     docked_node_id: str | None = None
@@ -87,6 +89,16 @@ class ShipState:
 
     inventory: Inventory = field(default_factory=Inventory)
     sensors_range_ly: float = Balance.SENSORS_RANGE_LY
+
+    def orbit_status(self, world: "SpaceGraph | object", current_node_id: str) -> str:
+        """Return 'docked', 'orbit', or 'adrift' based on ship + world state."""
+        if self.docked_node_id == current_node_id:
+            return "docked"
+        node = getattr(world, "space", world).nodes.get(current_node_id) if hasattr(world, "space") else world.nodes.get(current_node_id)
+        active_tmp = getattr(world, "active_tmp_node_id", None)
+        if not node or node.kind == "transit" or current_node_id == "UNKNOWN_00" or active_tmp == current_node_id:
+            return "adrift"
+        return "orbit"
 
 
 @dataclass(slots=True)

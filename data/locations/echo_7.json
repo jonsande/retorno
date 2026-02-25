@@ -3,6 +3,7 @@
     "node_id": "ECHO_7",
     "name": "ECHO-7 Relay Station",
     "kind": "station",
+    "is_hub": true,
     "radiation_rad_per_s": 0.002,
     "x_ly": 0.0,
     "y_ly": 0.0,
@@ -31,6 +32,11 @@
       "path": "/logs/echo_cache.es.txt",
       "access": "GUEST",
       "content_ref": "lore/echo_7/logs/echo_cache.es.txt"
+    },
+    {
+      "path": "/logs/echo_fragment_0002.txt",
+      "access": "GUEST",
+      "content_ref": "lore/echo_7/logs/echo_fragment.txt"
     }
   ]
 }

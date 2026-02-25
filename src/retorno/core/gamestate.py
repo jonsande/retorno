@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from retorno.config.balance import Balance
+
 from retorno.model.events import EventManagerState
 from retorno.model.jobs import JobManagerState
 from retorno.model.ship import ShipState
@@ -12,7 +14,7 @@ from retorno.model.world import WorldState
 @dataclass(slots=True)
 class MetaState:
     save_version: int = 1
-    rng_seed: int = 12345
+    rng_seed: int = Balance.DEFAULT_RNG_SEED
     rng_counter: int = 0
     prologue_complete: bool = False
 

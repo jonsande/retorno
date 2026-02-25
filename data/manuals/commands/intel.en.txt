@@ -20,6 +20,11 @@ intel show <intel_id>
 intel import <path>
 - Imports navigation intel from a file.
 - Supported markers: NODE:, LINK:, SECTOR:, COORD:
+- Optional blocks:
+  [INTEL] ... [/INTEL]
+  - If the block contains a LINK, it is imported as a route.
+  - If it contains a node_id, name, or sector id, the matching authored node is added as a known contact.
+  - Corrupt intel may fail to resolve or yield a new (unknown) hub contact.
 - Files under /data/nav, /mail or /logs may auto-import on cat.
 
 intel export <path>

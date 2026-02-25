@@ -1,0 +1,8 @@
+> debug arcs
+=== DEBUG ARCS ===
+- corridor_01:
+  primary: (unplaced)
+  secondary: (none)
+- mobility_failsafe_count: 0
+- mobility_no_new_uplink_count: 0
+> log copy 8

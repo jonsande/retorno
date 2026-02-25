@@ -5,6 +5,7 @@ import hashlib
 from typing import Iterable
 import difflib
 import math
+from pathlib import Path
 
 from retorno.core.actions import (
     Action,
@@ -37,8 +38,8 @@ from retorno.core.gamestate import GameState
 from retorno.model.drones import DroneLocation, DroneStatus
 from retorno.model.events import AlertState, Event, EventManagerState, EventType, Severity, SourceRef
 from retorno.model.jobs import Job, JobManagerState, JobStatus, JobType, RiskProfile, TargetRef
-from retorno.model.world import add_known_link, SpaceNode
-from retorno.runtime.data_loader import load_locations, load_modules
+from retorno.model.world import add_known_link, SpaceNode, sector_id_for_pos
+from retorno.runtime.data_loader import load_locations, load_modules, load_arcs
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path, mount_files
 from retorno.model.systems import Dependency, ShipSystem, SystemState
 from retorno.config.balance import Balance
@@ -67,6 +68,8 @@ class Engine:
             node = state.world.space.nodes.get(state.world.current_node_id)
             if node:
                 state.world.current_pos_ly = (node.x_ly, node.y_ly, node.z_ly)
+                if node.kind != "transit":
+                    state.world.visited_nodes.add(node.node_id)
             self._clear_tmp_node(state)
             events.append(
                 self._make_event(
@@ -221,15 +224,37 @@ class Engine:
                 self._record_event(state.events, event)
                 return [event]
             distance_ly = self._distance_between_nodes(state, current_id, action.node_id)
-            speed = max(0.001, state.ship.cruise_speed_ly_per_year)
-            years = distance_ly / speed
-            travel_s = years * Balance.YEAR_S
+            fine_km = state.world.fine_ranges_km.get(action.node_id)
+            same_sector = False
+            from_node = state.world.space.nodes.get(current_id)
+            to_node = state.world.space.nodes.get(action.node_id)
+            if from_node and to_node:
+                same_sector = sector_id_for_pos(from_node.x_ly, from_node.y_ly, from_node.z_ly) == sector_id_for_pos(
+                    to_node.x_ly, to_node.y_ly, to_node.z_ly
+                )
+                if fine_km is None and same_sector and distance_ly <= Balance.LOCAL_TRAVEL_RADIUS_LY:
+                    fine_km = self._compute_fine_range_km(state, current_id, action.node_id)
+                    state.world.fine_ranges_km[action.node_id] = fine_km
+            is_local = bool(
+                fine_km is not None
+                and same_sector
+                and distance_ly <= Balance.LOCAL_TRAVEL_RADIUS_LY
+            )
+            if is_local:
+                travel_s = fine_km / max(0.1, Balance.LOCAL_TRAVEL_SPEED_KM_S)
+                years = travel_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
+            else:
+                speed = max(0.001, state.ship.cruise_speed_ly_per_year)
+                years = distance_ly / speed
+                travel_s = years * Balance.YEAR_S
             state.ship.in_transit = True
             state.ship.transit_from = current_id
             state.ship.transit_to = action.node_id
             state.ship.arrival_t = state.clock.t + travel_s
             state.ship.transit_start_t = state.clock.t
             state.ship.last_travel_distance_ly = distance_ly
+            state.ship.last_travel_distance_km = fine_km or 0.0
+            state.ship.last_travel_is_local = is_local
             state.ship.transit_prev_op_mode = state.ship.op_mode
             state.ship.transit_prev_op_mode_source = state.ship.op_mode_source
             state.ship.docked_node_id = None
@@ -284,6 +309,9 @@ class Engine:
                     "distance_ly": distance_ly,
                     "eta_years": years,
                     "arrival_t": state.ship.arrival_t,
+                    "local": is_local,
+                    "distance_km": fine_km,
+                    "eta_s": travel_s,
                 },
             )
             self._record_event(state.events, event)
@@ -653,6 +681,24 @@ class Engine:
         if isinstance(action, RouteSolve):
             current_id = state.world.current_node_id
             if action.node_id in state.world.known_links.get(current_id, set()):
+                fine_km = self._maybe_set_fine_range(state, current_id, action.node_id)
+                if fine_km is not None:
+                    event = self._make_event(
+                        state,
+                        EventType.JOB_COMPLETED,
+                        Severity.INFO,
+                        SourceRef(kind="world", id=action.node_id),
+                        f"Route refined: fine range fixed for {action.node_id}",
+                        data={
+                            "job_id": "-",
+                            "job_type": "route_refine",
+                            "node_id": action.node_id,
+                            "distance_km": fine_km,
+                            "message_key": "route_refined",
+                        },
+                    )
+                    self._record_event(state.events, event)
+                    return [event]
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
@@ -1823,6 +1869,220 @@ class Engine:
                 return list(loc.get("fs_files") or [])
         return []
 
+    def _is_location_node(self, node_id: str) -> bool:
+        for loc in load_locations():
+            node_cfg = loc.get("node", {})
+            if node_cfg.get("node_id") == node_id:
+                return True
+        return False
+
+    def _get_arc_state(self, state: GameState, arc_id: str) -> dict:
+        arc_state = state.world.arc_placements.get(arc_id)
+        if not arc_state:
+            arc_state = {
+                "primary": {"placed": False, "node_id": None, "path": None, "source": None},
+                "secondary": {},  # doc_id -> {node_id, path}
+                "counters": {"uplink_attempts": 0, "procedural_candidates": 0},
+                "discovered": set(),
+            }
+            state.world.arc_placements[arc_id] = arc_state
+        if not isinstance(arc_state.get("discovered"), set):
+            arc_state["discovered"] = set(arc_state.get("discovered") or [])
+        return arc_state
+
+    def _hash64(self, seed: int, text: str) -> int:
+        h = hashlib.blake2b(digest_size=8)
+        h.update(str(seed).encode("utf-8"))
+        h.update(text.encode("utf-8"))
+        return int.from_bytes(h.digest(), "big", signed=False)
+
+    def _compute_fine_range_km(self, state: GameState, from_id: str, to_id: str) -> float:
+        a, b = sorted([from_id, to_id])
+        seed = self._hash64(state.meta.rng_seed, f"fine:{a}:{b}")
+        t = (seed % 10_000) / 10_000.0
+        return Balance.LOCAL_TRAVEL_MIN_KM + (Balance.LOCAL_TRAVEL_MAX_KM - Balance.LOCAL_TRAVEL_MIN_KM) * t
+
+    def _maybe_set_fine_range(self, state: GameState, from_id: str, to_id: str) -> float | None:
+        if to_id in state.world.fine_ranges_km:
+            return None
+        from_node = state.world.space.nodes.get(from_id)
+        to_node = state.world.space.nodes.get(to_id)
+        if not from_node or not to_node:
+            return None
+        if sector_id_for_pos(from_node.x_ly, from_node.y_ly, from_node.z_ly) != sector_id_for_pos(
+            to_node.x_ly, to_node.y_ly, to_node.z_ly
+        ):
+            return None
+        dist_ly = self._distance_between_nodes(state, from_id, to_id)
+        if dist_ly > Balance.LOCAL_TRAVEL_RADIUS_LY:
+            return None
+        fine_km = self._compute_fine_range_km(state, from_id, to_id)
+        state.world.fine_ranges_km[to_id] = fine_km
+        return fine_km
+
+    def _hop_distance_from_start(self, state: GameState, target_id: str, max_hops: int) -> int | None:
+        start_id = "UNKNOWN_00" if "UNKNOWN_00" in state.world.space.nodes else state.world.current_node_id
+        if start_id not in state.world.space.nodes or target_id not in state.world.space.nodes:
+            return None
+        visited = {start_id}
+        queue = [(start_id, 0)]
+        while queue:
+            nid, dist = queue.pop(0)
+            if nid == target_id:
+                return dist
+            if dist >= max_hops:
+                continue
+            node = state.world.space.nodes.get(nid)
+            if not node:
+                continue
+            for nxt in node.links:
+                if nxt in visited:
+                    continue
+                if nxt not in state.world.space.nodes:
+                    continue
+                visited.add(nxt)
+                queue.append((nxt, dist + 1))
+        return None
+
+    def _maybe_inject_arc_content(
+        self,
+        state: GameState,
+        node_id: str,
+        node: SpaceNode | None,
+        base_files: list[dict],
+        is_procedural: bool,
+    ) -> list[dict]:
+        files = list(base_files)
+        existing_paths = {f.get("path") for f in files}
+        arcs = load_arcs()
+        if not arcs or not node:
+            return files
+        for arc in arcs:
+            arc_id = arc.get("arc_id")
+            if not arc_id:
+                continue
+            arc_state = self._get_arc_state(state, arc_id)
+            primary = arc.get("primary_intel", {})
+            category = primary.get("category", "lore_intel")
+            if category not in {"lore_intel", ""}:
+                continue
+            rules = arc.get("placement_rules", {}).get("primary", {})
+            avoid_ids = set(rules.get("avoid_node_ids", []))
+            require_kinds = set(rules.get("require_kind_any", []))
+            max_hops = int(rules.get("max_hops_from_start", 0) or 0)
+            candidates = set(rules.get("candidates", []))
+            is_candidate = False
+            if node_id in avoid_ids:
+                is_candidate = False
+            elif node_id == "HARBOR_12" and "harbor_12" in candidates:
+                is_candidate = True
+            elif is_procedural:
+                if node.kind == "station" and "procedural_station" in candidates:
+                    is_candidate = True
+                if node.kind == "relay" and "procedural_relay" in candidates:
+                    is_candidate = True
+                if node.kind == "derelict" and "procedural_derelict" in candidates:
+                    is_candidate = True
+            if require_kinds and node.kind not in require_kinds:
+                is_candidate = False
+            if is_candidate and max_hops > 0:
+                hop = self._hop_distance_from_start(state, node_id, max_hops)
+                if hop is None:
+                    start = state.world.space.nodes.get("UNKNOWN_00")
+                    if start:
+                        dx = node.x_ly - start.x_ly
+                        dy = node.y_ly - start.y_ly
+                        dz = node.z_ly - start.z_ly
+                        if (dx * dx + dy * dy + dz * dz) ** 0.5 > 20.0:
+                            is_candidate = False
+                elif hop > max_hops:
+                    is_candidate = False
+
+            primary_state = arc_state["primary"]
+            if primary_state.get("placed") and primary_state.get("node_id") == node_id:
+                path = primary_state.get("path")
+                content = primary_state.get("content")
+                if path and path not in existing_paths and content:
+                    files.append({"path": path, "access": AccessLevel.GUEST.value, "content": content})
+                    existing_paths.add(path)
+            elif is_candidate and not primary_state.get("placed"):
+                if is_procedural:
+                    arc_state["counters"]["procedural_candidates"] += 1
+                seed = self._hash64(state.meta.rng_seed, f"arc:{arc_id}:{node_id}:primary")
+                rng = random.Random(seed)
+                chance = 0.25
+                if rng.random() < chance:
+                    pref_sources = primary.get("preferred_sources", ["mail", "log"])
+                    source = rng.choice(pref_sources) if pref_sources else "log"
+                    if source == "mail":
+                        suffix = seed % 100
+                        path = f"/mail/inbox/02{suffix:02d}.corridor.{state.os.locale.value}.txt"
+                        content = (
+                            "FROM: Network Ops\n"
+                            "SUBJ: Corridor attachment\n\n"
+                            "NAV:\n"
+                            "[NAV ATTACHMENT BEGIN]\n"
+                            f"{primary.get('line')}\n"
+                            "[NAV ATTACHMENT END]\n"
+                        )
+                    else:
+                        path = f"/logs/lore/corridor_01.{state.os.locale.value}.txt"
+                        content = (
+                            "CORRIDOR LOG // attachment\n\n"
+                            "[NAV ATTACHMENT BEGIN]\n"
+                            f"{primary.get('line')}\n"
+                            "[NAV ATTACHMENT END]\n"
+                        )
+                    files.append({"path": path, "access": AccessLevel.GUEST.value, "content": content})
+                    existing_paths.add(path)
+                    primary_state.update({"placed": True, "node_id": node_id, "path": path, "source": source, "content": content})
+
+            sec_rules = arc.get("placement_rules", {}).get("secondary", {})
+            sec_candidates = set(sec_rules.get("candidates", []))
+            sec_count = int(sec_rules.get("count", 0) or 0)
+            if is_procedural and sec_count > 0:
+                sec_is_candidate = False
+                if node.kind == "station" and "procedural_station" in sec_candidates:
+                    sec_is_candidate = True
+                if node.kind == "derelict" and "procedural_derelict" in sec_candidates:
+                    sec_is_candidate = True
+                if sec_is_candidate:
+                    placed_count = len(arc_state["secondary"])
+                    for doc in arc.get("secondary_lore_docs", []):
+                        doc_id = doc.get("id")
+                        if not doc_id or placed_count >= sec_count:
+                            break
+                        if doc_id in arc_state["secondary"]:
+                            continue
+                        seed = self._hash64(state.meta.rng_seed, f"arc:{arc_id}:{node_id}:{doc_id}")
+                        rng = random.Random(seed)
+                        if rng.random() < 0.30:
+                            lang = state.os.locale.value
+                            template = doc.get("path_template", "")
+                            path = template.replace("{lang}", lang)
+                            if "02xx" in path:
+                                path = path.replace("02xx", f"02{seed % 100:02d}")
+                            content_ref = doc.get(f"content_ref_{lang}") or doc.get("content_ref_en")
+                            content = ""
+                            if content_ref:
+                                try:
+                                    content = (Path(__file__).resolve().parents[3] / "data" / content_ref).read_text(encoding="utf-8")
+                                except Exception:
+                                    content = ""
+                            if path and path not in existing_paths:
+                                files.append({"path": path, "access": AccessLevel.GUEST.value, "content": content})
+                                existing_paths.add(path)
+                                arc_state["secondary"][doc_id] = {"node_id": node_id, "path": path, "content": content}
+                                placed_count += 1
+                    for doc_id, info in arc_state["secondary"].items():
+                        if info.get("node_id") == node_id:
+                            path = info.get("path")
+                            content = info.get("content")
+                            if path and path not in existing_paths and content:
+                                files.append({"path": path, "access": AccessLevel.GUEST.value, "content": content})
+                                existing_paths.add(path)
+        return files
+
     def _procedural_fs_files(self, state: GameState, node) -> list[dict]:
         h = hashlib.blake2b(digest_size=8)
         h.update(str(state.meta.rng_seed).encode("utf-8"))
@@ -2132,6 +2392,8 @@ class Engine:
             node = state.world.space.nodes.get(job.target.id)
             if node:
                 state.world.current_pos_ly = (node.x_ly, node.y_ly, node.z_ly)
+                if node.kind != "transit":
+                    state.world.visited_nodes.add(node.node_id)
             if state.world.active_tmp_node_id and job.target.id != state.world.active_tmp_node_id:
                 self._clear_tmp_node(state)
             events.append(
@@ -2275,8 +2537,11 @@ class Engine:
             node_id = job.params.get("node_id", job.target.id)
             node = state.world.space.nodes.get(node_id)
             files = self._location_fs_files(node_id)
-            if not files and node:
+            is_location = self._is_location_node(node_id)
+            is_procedural = not is_location
+            if not files and node and is_procedural:
                 files = self._procedural_fs_files(state, node)
+            files = self._maybe_inject_arc_content(state, node_id, node, files, is_procedural)
             mount_root = normalize_path(f"/remote/{node_id}")
             if "/remote" not in state.os.fs:
                 state.os.fs["/remote"] = FSNode(path="/remote", node_type=FSNodeType.DIR, access=AccessLevel.GUEST)
@@ -2309,6 +2574,7 @@ class Engine:
             if add_known_link(state.world, from_id, node_id, bidirectional=True):
                 state.world.known_nodes.add(node_id)
                 state.world.known_contacts.add(node_id)
+            self._maybe_set_fine_range(state, from_id, node_id)
             events.append(
                 self._make_event(
                     state,
