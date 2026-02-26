@@ -1,0 +1,3 @@
+SIGNAL // NAV WHISPER 02
+
+"Vectors don't match the star map. Someone corrected them by hand."

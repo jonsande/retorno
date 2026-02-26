@@ -68,6 +68,20 @@ class WorldState:
     mobility_hints: list[dict] = field(default_factory=list)
     visited_nodes: set[str] = field(default_factory=set)
     fine_ranges_km: dict[str, float] = field(default_factory=dict)
+    lore: "LoreSchedulerState" = field(default_factory=lambda: LoreSchedulerState())
+
+
+@dataclass(slots=True)
+class LoreSchedulerState:
+    delivered: set[str] = field(default_factory=set)
+    counters: dict[str, int] = field(default_factory=lambda: {
+        "uplink_count": 0,
+        "dock_count": 0,
+        "salvage_data_count": 0,
+        "signal_count": 0,
+    })
+    last_delivery_t: float = 0.0
+    delivery_log: list[str] = field(default_factory=list)
 
 
 SECTOR_SIZE_LY = 10.0

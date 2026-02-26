@@ -1,0 +1,3 @@
+OPS BRIEF // 03
+
+Routine check: high-latency relays, reroute as needed.

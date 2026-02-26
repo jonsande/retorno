@@ -6,7 +6,21 @@
     "kind": "link",
     "line": "LINK: HARBOR_12 -> ARCHIVE_01",
     "preferred_sources": ["mail", "log"],
-    "confidence": 0.70
+    "confidence": 0.70,
+    "force": true,
+    "force_policy": "deadline",
+    "force_deadline": {
+      "max_uplinks": 4,
+      "max_docks": 3
+    },
+    "allowed_channels": ["uplink_only", "station_broadcast", "salvage_data"],
+    "constraints": {
+      "min_year": 0.2,
+      "max_year": 8.0,
+      "min_dist_ly": 2.0,
+      "max_dist_ly": 25.0,
+      "regions_any": ["bulge", "disk"]
+    }
   },
   "intel_categories": {
     "lore_intel": ["corridor_01_to_archive"],
@@ -15,16 +29,29 @@
   "secondary_lore_docs": [
     {
       "id": "corridor_01_lore_01",
-      "path_template": "/logs/lore/corridor_note_01.{lang}.txt",
+      "path_template": "/logs/records/corridor_note_01.{lang}.txt",
       "tone": "routine",
       "content_ref_en": "lore/packs/corridor_01/corridor_note_01.en.txt",
-      "content_ref_es": "lore/packs/corridor_01/corridor_note_01.es.txt"
+      "content_ref_es": "lore/packs/corridor_01/corridor_note_01.es.txt",
+      "force": false,
+      "allowed_channels": ["salvage_data", "ship_os_mail", "captured_signal", "station_broadcast"],
+      "constraints": {
+        "min_year": 0.1,
+        "max_year": 10.0,
+        "max_dist_ly": 30.0
+      }
     },
     {
       "id": "corridor_01_lore_02",
       "path_template": "/mail/inbox/02xx.corridor.{lang}.txt",
       "content_ref_en": "lore/packs/corridor_01/corridor_mail_02.en.txt",
-      "content_ref_es": "lore/packs/corridor_01/corridor_mail_02.es.txt"
+      "content_ref_es": "lore/packs/corridor_01/corridor_mail_02.es.txt",
+      "force": false,
+      "allowed_channels": ["salvage_data", "ship_os_mail", "captured_signal", "station_broadcast"],
+      "constraints": {
+        "min_year": 0.3,
+        "regions_any": ["disk", "halo"]
+      }
     }
   ],
   "placement_rules": {

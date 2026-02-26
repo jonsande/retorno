@@ -1,0 +1,19 @@
+{
+  "node": {
+    "node_id": "VEIL_GARDEN",
+    "name": "Veil Garden",
+    "kind": "station",
+    "radiation_rad_per_s": 0.0008,
+    "x_ly": -4.2,
+    "y_ly": 12.3,
+    "z_ly": 0.4
+  },
+  "known_on_start": false,
+  "salvage": {
+    "scrap_min": 12,
+    "scrap_max": 22,
+    "modules_min": 0,
+    "modules_max": 1,
+    "modules_pool": "tech"
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "arc_id": "example_unforced",
+  "primary_intel": {
+    "id": "glasshollow_trace",
+    "kind": "link",
+    "line": "LINK: HARBOR_12 -> GLASSHOLLOW",
+    "confidence": 0.55,
+    "force": false,
+    "allowed_channels": ["salvage_data", "captured_signal", "station_broadcast"],
+    "constraints": {
+      "min_year": 0.3,
+      "max_dist_ly": 30.0,
+      "regions_any": ["disk", "halo"]
+    }
+  },
+  "secondary_lore_docs": [
+    {
+      "id": "drift_manifest",
+      "path_template": "/logs/records/drift_manifest.{lang}.txt",
+      "content_ref_en": "lore/packs/example_unforced/drift_manifest.en.txt",
+      "content_ref_es": "lore/packs/example_unforced/drift_manifest.es.txt",
+      "force": false,
+      "constraints": {
+        "min_year": 0.2,
+        "max_year": 8.0
+      }
+    },
+    {
+      "id": "pilot_note",
+      "path_template": "/mail/inbox/02xx.pilot_note.{lang}.txt",
+      "content_ref_en": "lore/packs/example_unforced/pilot_note.en.txt",
+      "content_ref_es": "lore/packs/example_unforced/pilot_note.es.txt",
+      "force": false,
+      "constraints": {
+        "min_year": 0.4,
+        "max_dist_ly": 40.0
+      }
+    },
+    {
+      "id": "cargo_tag",
+      "path_template": "/logs/field/cargo_tag.{lang}.txt",
+      "content_ref_en": "lore/packs/example_unforced/cargo_tag.en.txt",
+      "content_ref_es": "lore/packs/example_unforced/cargo_tag.es.txt",
+      "force": false,
+      "constraints": {
+        "regions_any": ["bulge", "disk"]
+      }
+    },
+    {
+      "id": "maintenance_excerpt",
+      "path_template": "/logs/records/maintenance_excerpt.{lang}.txt",
+      "content_ref_en": "lore/packs/example_unforced/maintenance_excerpt.en.txt",
+      "content_ref_es": "lore/packs/example_unforced/maintenance_excerpt.es.txt",
+      "force": false,
+      "constraints": {
+        "max_year": 6.0
+      }
+    }
+  ],
+  "placement_rules": {
+    "primary": {
+      "candidates": ["procedural_station", "procedural_relay", "procedural_derelict"],
+      "max_hops_from_start": 4,
+      "require_kind_any": ["station", "relay", "derelict"],
+      "avoid_node_ids": ["GLASSHOLLOW"]
+    },
+    "secondary": {
+      "candidates": ["procedural_station", "procedural_derelict"],
+      "count": 4
+    }
+  }
+}

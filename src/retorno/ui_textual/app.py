@@ -1020,6 +1020,13 @@ class RetornoTextualApp(App):
                     return
                 self._log_lines(presenter.build_command_output(repl.render_debug_arcs, state))
             return
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_LORE":
+            with self.loop.with_lock() as state:
+                if not state.os.debug_enabled:
+                    self._log_line("debug lore: available only in DEBUG mode. Use: debug on")
+                    return
+                self._log_lines(presenter.build_command_output(repl.render_debug_lore, state))
+            return
 
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SEED":
             with self.loop.with_lock() as state:

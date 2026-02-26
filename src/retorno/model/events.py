@@ -40,6 +40,9 @@ class EventType(str, Enum):
     SERVICE_ALREADY_RUNNING = "service_already_running"
     UPLINK_COMPLETE = "uplink_complete"
     DATA_SALVAGED = "data_salvaged"
+    MAIL_RECEIVED = "mail_received"
+    SIGNAL_CAPTURED = "signal_captured"
+    BROADCAST_RECEIVED = "broadcast_received"
 
 
 @dataclass(slots=True)

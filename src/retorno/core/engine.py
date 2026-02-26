@@ -35,10 +35,11 @@ from retorno.core.actions import (
     JobCancel,
 )
 from retorno.core.gamestate import GameState
+from retorno.core.lore import LoreContext, maybe_deliver_lore
 from retorno.model.drones import DroneLocation, DroneStatus
 from retorno.model.events import AlertState, Event, EventManagerState, EventType, Severity, SourceRef
 from retorno.model.jobs import Job, JobManagerState, JobStatus, JobType, RiskProfile, TargetRef
-from retorno.model.world import add_known_link, SpaceNode, sector_id_for_pos
+from retorno.model.world import add_known_link, SpaceNode, sector_id_for_pos, region_for_pos
 from retorno.runtime.data_loader import load_locations, load_modules, load_arcs
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path, mount_files
 from retorno.model.systems import Dependency, ShipSystem, SystemState
@@ -1999,12 +2000,16 @@ class Engine:
                     is_candidate = False
 
             primary_state = arc_state["primary"]
+            primary_id = primary.get("id", "primary")
+            primary_key = f"{arc_id}:{primary_id}"
             if primary_state.get("placed") and primary_state.get("node_id") == node_id:
                 path = primary_state.get("path")
                 content = primary_state.get("content")
                 if path and path not in existing_paths and content:
                     files.append({"path": path, "access": AccessLevel.GUEST.value, "content": content})
                     existing_paths.add(path)
+                if primary_key not in state.world.lore.delivered:
+                    state.world.lore.delivered.add(primary_key)
             elif is_candidate and not primary_state.get("placed"):
                 if is_procedural:
                     arc_state["counters"]["procedural_candidates"] += 1
@@ -2026,7 +2031,7 @@ class Engine:
                             "[NAV ATTACHMENT END]\n"
                         )
                     else:
-                        path = f"/logs/lore/corridor_01.{state.os.locale.value}.txt"
+                        path = f"/logs/records/corridor_01.{state.os.locale.value}.txt"
                         content = (
                             "CORRIDOR LOG // attachment\n\n"
                             "[NAV ATTACHMENT BEGIN]\n"
@@ -2036,6 +2041,8 @@ class Engine:
                     files.append({"path": path, "access": AccessLevel.GUEST.value, "content": content})
                     existing_paths.add(path)
                     primary_state.update({"placed": True, "node_id": node_id, "path": path, "source": source, "content": content})
+                    if primary_key not in state.world.lore.delivered:
+                        state.world.lore.delivered.add(primary_key)
 
             sec_rules = arc.get("placement_rules", {}).get("secondary", {})
             sec_candidates = set(sec_rules.get("candidates", []))
@@ -2074,6 +2081,9 @@ class Engine:
                                 existing_paths.add(path)
                                 arc_state["secondary"][doc_id] = {"node_id": node_id, "path": path, "content": content}
                                 placed_count += 1
+                                sec_key = f"{arc_id}:{doc_id}"
+                                if sec_key not in state.world.lore.delivered:
+                                    state.world.lore.delivered.add(sec_key)
                     for doc_id, info in arc_state["secondary"].items():
                         if info.get("node_id") == node_id:
                             path = info.get("path")
@@ -2081,6 +2091,9 @@ class Engine:
                             if path and path not in existing_paths and content:
                                 files.append({"path": path, "access": AccessLevel.GUEST.value, "content": content})
                                 existing_paths.add(path)
+                            sec_key = f"{arc_id}:{doc_id}"
+                            if sec_key not in state.world.lore.delivered:
+                                state.world.lore.delivered.add(sec_key)
         return files
 
     def _procedural_fs_files(self, state: GameState, node) -> list[dict]:
@@ -2134,6 +2147,17 @@ class Engine:
             _add(f"/data/nav/fragments/frag_{frag_id}.txt", link_line)
 
         return files
+
+    def _build_lore_context(self, state: GameState, node_id: str) -> LoreContext:
+        node = state.world.space.nodes.get(node_id)
+        if node:
+            region = node.region or region_for_pos(node.x_ly, node.y_ly, node.z_ly)
+            dist = math.sqrt(node.x_ly * node.x_ly + node.y_ly * node.y_ly + node.z_ly * node.z_ly)
+        else:
+            region = ""
+            dist = 0.0
+        year = state.clock.t / Balance.YEAR_S if Balance.YEAR_S else 0.0
+        return LoreContext(node_id=node_id, region=region, dist_from_origin_ly=dist, year_since_wake=year)
 
     def _clear_tmp_node(self, state: GameState) -> None:
         tmp_id = state.world.active_tmp_node_id
@@ -2411,6 +2435,9 @@ class Engine:
                     },
                 )
             )
+            lore_ctx = self._build_lore_context(state, job.target.id)
+            lore_result = maybe_deliver_lore(state, "dock", lore_ctx)
+            events.extend(lore_result.events)
             return events
 
         if job.job_type == JobType.SALVAGE_SCRAP and job.target:
@@ -2542,6 +2569,9 @@ class Engine:
             if not files and node and is_procedural:
                 files = self._procedural_fs_files(state, node)
             files = self._maybe_inject_arc_content(state, node_id, node, files, is_procedural)
+            lore_ctx = self._build_lore_context(state, node_id)
+            lore_result = maybe_deliver_lore(state, "salvage_data", lore_ctx)
+            files.extend(lore_result.files)
             mount_root = normalize_path(f"/remote/{node_id}")
             if "/remote" not in state.os.fs:
                 state.os.fs["/remote"] = FSNode(path="/remote", node_type=FSNodeType.DIR, access=AccessLevel.GUEST)
@@ -2566,6 +2596,7 @@ class Engine:
                     data={"node_id": node_id, "files_count": count, "mount_root": mount_root, "tip": tip},
                 )
             )
+            events.extend(lore_result.events)
             return events
 
         if job.job_type == JobType.ROUTE_SOLVE and job.target:

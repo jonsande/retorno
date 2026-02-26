@@ -1,0 +1,3 @@
+STATION BROADCAST // 05
+
+Public service: keep transponder active while within the approach corridor.

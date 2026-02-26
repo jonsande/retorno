@@ -1,0 +1,3 @@
+EXTRACTO DE MANTENIMIENTO
+
+Parche de campo aplicado. La resonancia persiste a 0.3 Hz.

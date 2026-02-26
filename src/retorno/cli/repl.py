@@ -10,6 +10,7 @@ import shutil
 import sys
 from pathlib import Path
 from retorno.core.engine import Engine
+from retorno.core.lore import LoreContext, maybe_deliver_lore
 from retorno.core.actions import Hibernate
 from retorno.core.actions import RouteSolve
 from retorno.runtime.loop import GameLoop
@@ -63,7 +64,7 @@ def print_help() -> None:
         "  install <module_id> | modules\n"
         "\nDebug:\n"
         "  wait <segundos> (DEBUG only)\n"
-        "  debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs\n"
+        "  debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore\n"
         "\nSugerencias:\n"
         "  ls /manuals/commands\n"
         "  man navigation\n"
@@ -1170,6 +1171,57 @@ def render_debug_arcs(state) -> None:
                 f"conf={hint.get('confidence')} source={hint.get('source_kind')}"
             )
 
+def render_debug_lore(state) -> None:
+    print("\n=== DEBUG LORE ===")
+    delivered = sorted(state.world.lore.delivered)
+    print(f"- delivered_count: {len(delivered)}")
+    if delivered:
+        for item in delivered[-10:]:
+            print(f"  delivered: {item}")
+        if len(delivered) > 10:
+            print("  ...")
+    counters = state.world.lore.counters
+    print(f"- counters: {counters}")
+    print(f"- last_delivery_t: {state.world.lore.last_delivery_t:.1f}s")
+    pending = []
+    arcs = load_arcs()
+    for arc in arcs:
+        arc_id = arc.get("arc_id", "?")
+        primary = arc.get("primary_intel", {})
+        pieces = []
+        if primary:
+            pieces.append(primary)
+        for doc in arc.get("secondary_lore_docs", []) or []:
+            pieces.append(doc)
+        for piece in pieces:
+            if not piece.get("force"):
+                continue
+            policy = piece.get("force_policy", "none")
+            if policy == "none":
+                continue
+            pid = piece.get("id") or "primary"
+            key = f"{arc_id}:{pid}"
+            if key in state.world.lore.delivered:
+                continue
+            pending.append(
+                {
+                    "key": key,
+                    "policy": policy,
+                    "deadline": piece.get("force_deadline"),
+                    "allowed": piece.get("allowed_channels"),
+                    "constraints": piece.get("constraints"),
+                }
+            )
+    if pending:
+        print("- forced_pending:")
+        for item in pending:
+            print(
+                f"  {item['key']} policy={item['policy']} "
+                f"deadline={item['deadline']} allowed={item['allowed']} constraints={item['constraints']}"
+            )
+    else:
+        print("- forced_pending: (none)")
+
 def render_contacts(state) -> None:
     system = state.ship.systems.get("sensors")
     if not system or _state_rank(system.state) < _state_rank(SystemState.LIMITED):
@@ -1852,6 +1904,27 @@ def _handle_uplink(state) -> None:
             "es": "uplink_complete :: no se encontraron rutas nuevas",
         }
     print(msg.get(locale, msg["en"]))
+    node = state.world.space.nodes.get(state.world.current_node_id)
+    if node:
+        region = node.region or region_for_pos(node.x_ly, node.y_ly, node.z_ly)
+        dist = math.sqrt(node.x_ly * node.x_ly + node.y_ly * node.y_ly + node.z_ly * node.z_ly)
+    else:
+        region = ""
+        dist = 0.0
+    year = state.clock.t / Balance.YEAR_S if Balance.YEAR_S else 0.0
+    lore_ctx = LoreContext(
+        node_id=state.world.current_node_id,
+        region=region,
+        dist_from_origin_ly=dist,
+        year_since_wake=year,
+    )
+    lore_result = maybe_deliver_lore(state, "uplink", lore_ctx)
+    if lore_result.events:
+        render_events(state, [("cmd", e) for e in lore_result.events])
+        for e in lore_result.events:
+            state.events.recent.append(e)
+        if len(state.events.recent) > 50:
+            state.events.recent = state.events.recent[-50:]
     events_out: list[tuple[str, Event]] = []
     _emit_runtime_event(
         state,
@@ -3562,6 +3635,13 @@ def main() -> None:
                     print("debug arcs: available only in DEBUG mode. Use: debug on")
                     continue
                 render_debug_arcs(locked_state)
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_LORE":
+            with loop.with_lock() as locked_state:
+                if not locked_state.os.debug_enabled:
+                    print("debug lore: available only in DEBUG mode. Use: debug on")
+                    continue
+                render_debug_lore(locked_state)
             continue
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SEED":
             with loop.with_lock() as locked_state:

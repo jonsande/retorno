@@ -1,0 +1,79 @@
+[
+  {
+    "single_id": "sig_echo_fragment_01",
+    "weight": 1.0,
+    "channels": ["captured_signal", "ship_os_mail", "salvage_data"],
+    "constraints": {},
+    "files": [
+      {
+        "path_template": "/logs/signals/echo_fragment_01.{lang}.txt",
+        "content_ref_en": "lore/singles/echo_fragment_01.en.txt",
+        "content_ref_es": "lore/singles/echo_fragment_01.es.txt"
+      }
+    ]
+  },
+  {
+    "single_id": "sig_nav_whisper_02",
+    "weight": 0.6,
+    "channels": ["captured_signal"],
+    "constraints": {
+      "min_year": 0.2,
+      "max_dist_ly": 20.0
+    },
+    "files": [
+      {
+        "path_template": "/logs/signals/nav_whisper_02.{lang}.txt",
+        "content_ref_en": "lore/singles/nav_whisper_02.en.txt",
+        "content_ref_es": "lore/singles/nav_whisper_02.es.txt"
+      }
+    ]
+  },
+  {
+    "single_id": "mail_ops_brief_03",
+    "weight": 0.35,
+    "channels": ["ship_os_mail"],
+    "constraints": {
+      "min_year": 0.1,
+      "regions_any": ["disk", "halo"]
+    },
+    "files": [
+      {
+        "path_template": "/mail/inbox/ops_brief_03.{lang}.txt",
+        "content_ref_en": "lore/singles/ops_brief_03.en.txt",
+        "content_ref_es": "lore/singles/ops_brief_03.es.txt"
+      }
+    ]
+  },
+  {
+    "single_id": "salvage_fieldnote_04",
+    "weight": 0.8,
+    "channels": ["salvage_data"],
+    "constraints": {
+      "min_dist_ly": 5.0,
+      "max_year": 6.0
+    },
+    "files": [
+      {
+        "path_template": "/logs/field/fieldnote_04.{lang}.txt",
+        "content_ref_en": "lore/singles/fieldnote_04.en.txt",
+        "content_ref_es": "lore/singles/fieldnote_04.es.txt"
+      }
+    ]
+  },
+  {
+    "single_id": "broadcast_notice_05",
+    "weight": 0.4,
+    "channels": ["station_broadcast"],
+    "constraints": {
+      "max_dist_ly": 25.0,
+      "regions_any": ["bulge", "disk"]
+    },
+    "files": [
+      {
+        "path_template": "/logs/broadcasts/notice_05.{lang}.txt",
+        "content_ref_en": "lore/singles/notice_05.en.txt",
+        "content_ref_es": "lore/singles/notice_05.es.txt"
+      }
+    ]
+  }
+]

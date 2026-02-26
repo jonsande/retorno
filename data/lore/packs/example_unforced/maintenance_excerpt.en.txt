@@ -1,0 +1,3 @@
+MAINTENANCE EXCERPT
+
+Field patch applied. Resonance persists at 0.3 Hz.

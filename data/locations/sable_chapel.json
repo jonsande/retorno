@@ -1,0 +1,19 @@
+{
+  "node": {
+    "node_id": "SABLE_CHAPEL",
+    "name": "Sable Chapel",
+    "kind": "waystation",
+    "radiation_rad_per_s": 0.0015,
+    "x_ly": 18.0,
+    "y_ly": -3.5,
+    "z_ly": 1.5
+  },
+  "known_on_start": false,
+  "salvage": {
+    "scrap_min": 6,
+    "scrap_max": 16,
+    "modules_min": 0,
+    "modules_max": 0,
+    "modules_pool": "common"
+  }
+}

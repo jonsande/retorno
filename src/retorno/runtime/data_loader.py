@@ -68,3 +68,13 @@ def load_arcs() -> list[dict]:
             arcs.append(json.load(fh))
     return arcs
 
+
+def load_singles() -> list[dict]:
+    path = _DATA_ROOT / "lore" / "singles" / "index.json"
+    if not path.exists():
+        return []
+    with path.open("r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    if isinstance(data, list):
+        return data
+    return []

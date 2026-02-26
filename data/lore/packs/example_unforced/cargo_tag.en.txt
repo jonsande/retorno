@@ -1,0 +1,5 @@
+CARGO TAG
+
+Item: glass coil
+Status: sealed
+Destination: unknown

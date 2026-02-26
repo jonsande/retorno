@@ -14,6 +14,9 @@
 
 === NAVIGATION / ROUTES / WORLD GEN ===
 
+- [ ] En las naves, estaciones, etc. visitadas se genera algo de scrap con el tiempo. Esto responde a la idea de que las estaciones, naves, etc. van deteriorándose y siempre es posible recuperar de ellas algo nuevo. También preveo algún módulo que permita desmantelar estaciones, algo que llevaría mucho tiempo hacer, pero que produciría mucho scrap.
+- [ ] ¡Las estaciones, naves, etc. deben deteriorarse y y acabar desapareciendo con el tiempo! Todo rastro humano debe ir desapareciendo, teniendo en cuenta que una estación o nave abandonada difícilmente puede sobrevivir millones de años en el universo. Para una versión 3 o 4 del juego, se puede quizá diseñar un evento que haga que (alguna especie desconocida o resto de vida humana) vuelva a fabricar estaciones, naves, navegar por el espacio, etc. 
+- [ ] Alguna forma de generar el grafo del mundo en el estado actual, bien sea con fines de debug o con fines de que pueda en un futuro desarrollarse un módulo instalable que permita visualizarlo en pantalla del juego.
 - [ ] Los viajes deben ser más peligrosos. Los de muchos años luz deben, por lo pronto, exponerte a mucha radiación. Esto limitará el ir pegando saltos por ahí a lo loco. Viajar a 40 años luz debería ser a costa de llegar con los sitemas hechos polvo.
 - [x] Al hacer scan, no se suponía que debía establecerse la distancia fina a los hubs con distancia de 0ly? No lo está reflejando el nav.
 - [ ] Actualizar manual dock! Tiene que aclarar que se puede hacer un dock cuando se está a "distancia fina".
@@ -40,16 +43,57 @@ VITALS
 
 === LORE ===
 
-- [ ] Dentro de la carpeta /lore, me interesa una carpeta llamada "singles", pensada para albergar documentos txt que serán de ser después "colocados" proceduralmente en el mundo.
+- [x] En el Virtual File Sistem no debe usarse ningún directorio llamado "lore". No es muy diegético. Por ejemplo, en el example_unforced encontramos esto:
+  "path_template": "/logs/lore/example_unforced_note.{lang}.txt"
+Hay que buscar una solución más diegética a esto. La información de lore que reciba el jugador debe almacenarse en su FS de un modo coherente y claro, pero sin ninguna referencia a la palabra "lore".
+
+- [x] Dentro de la carpeta /lore, me interesa una carpeta llamada "singles", pensada para albergar documentos txt que serán de ser después "colocados" proceduralmente en el mundo.
 
 - [!] En el estado actual del juego, ¿cómo se están distribuyendo por el mundo los archivos txt y los packs? Cómo funciona corridor_01.json? Cómo funcionan los "arcs"Comprobar.
 
-- [ ] Pensándolo mejor, sí quiero failsafe para algunos arcos. O mejor dicho, quiero tener la opción. Quiero que sea configurable para cada arco y/o .......
+- [ ] Manual del comando mail. Perfeccionar comando mail.
+
+- [x] Pensándolo mejor, sí quiero failsafe para algunos arcos. O mejor dicho, quiero tener la opción. Quiero que sea configurable para cada arco y/o .......
+
+- [!] Ideas para “formas de aparecer”. Además de las ya planteadas (salvage data, uplink, recibir mensaje automático o no automático, captar mensaje perdido en el espacio):
+  
+  - Recovered attachment: al cargo audit aparece “found unindexed attachment; run cargo audit again to decode” (bonito para tu “manifest stale”).
+
+  - Salvage de caja negra. [DESCARTADO por ahora]
+  
+  - OS digest: cada X años de hibernación, el OS genera un “digest” (no lore garantizado; solo resumen + a veces un fragmento).
+
+  - Ghost beacon: al entrar en bulbo/halo se disparan señales con baja confianza.
+
+  - Corrupted route table: produce SECTOR: en vez de LINK: (intel parcial).
+
+  - Dron (recuperado) que al desplegarlo (deploy) por primera vez produce un mensaje pregrabado (al estilo de R2D2).
+
+  - Información que se obtiene sólo al desmantelar un dron.
 
 
 === INTEL ===
 
 - [!] Sistema procedural para descubrir información de rutas a nodos conocidos pero sin ruta conocida. A través de uplink y a través de un flag específico en los txt. El caso es que ahora mismo los datos corruptos (información entre etiquetas [INTEL][/INTEL] no procesable) genera contactos (nodos) sin ruta. Los INTEL incrustados también pueden generar (esto hay que confirmarlo) contactos authored pero sin ruta. Además, el generador de contactos de uplink _discover_routes_via_uplink() puede generar contactos sin rutas (confirmarlo). Así que el caso es que se van generando por distintas vías contactos sin ruta, y tiene que diseñarse una manera procedural de conseguir intel de rutas a contactos existentes, para que todo marche. Empezar por preguntar a codex: Actualmente ¿de qué maneras se pueden averiguar rutas para contactos conocidos (contactos authored y contactos procedurales)?
+
+==> PROMPT: Quiero desarrollar un sistema failsafe de gestión de nodos "colgados" o "muertos". No sé si actualmente existe ya en el juego algo parecido. Por "nodos colgados" o "nodos muertos" (indistintamente) entiendo aquellos contactos o nodos (sectores, stations, waystations, ships, o cualquier localización) que cumplen las siguientes condiciones: 1) son conocidos por el Personaje-Jugador (o sea que aparecen listados en el output del comando 'contacts' o 'nav'); 2) no se conoce ruta hacia ellos; 3) no existe actualmente una localización conocida (y con ruta) desde la cuál ese o esos nodos sin ruta queden a una distancia menor al radio de los sensores (en estado "nominal"), de forma que es estrictamente imposible para el jugador conseguir una ruta hacia ese o esos nodos por medio del comando 'route' desde ninguna posición; 4) no existe actualmente (bien porque no va a generarse proceduralmente nunca, bien porque no se ha generado proceduralmente aún) ningún documento extraible mediante "salvage data" o "uplink" u otro capaz de proporcionarle al jugador la ruta (link) hacia ellos. (Valorar si hace falta añadir alguna condición más o corregir alguna de las propuestas.)
+El sistema de gestion de "nodos colgados" o "nodos muertos" debe llevar un registro de los nodos que se encuentra "colgados" o "muertos" en todo momento, e ir registrando el tiempo que permanecen colgados o muertos (es decir, llevar un control de durante cuánto tiempo, interno del juego, no tiempo real, siguen cumpliendo todas las condiciones para seguir considerándose colgados o muertos). A partir de cierto tiempo (configurable desde el balance.py), debe dispararse alguna estrategia (preferiblemente indirecta [ver más abajo]) para lograr que dejen de estar muertos o colgados. Las estrategias que se me ocurren podrían ser estas: 
+
+a) Estrategias directas
+- Injectar, en algún nodo no visitado, información (recuperable por alguna de las distintas vías de obtención de información) que proporcione la ruta al nodo muerto.
+
+b) Estrategias indirectas
+- Injectar, en algún nodo aún no visitado, información (recuperable mediante salvage data, uplink, captured signal, station_broadcast, u otras formas de obtención de información aún no desarrolladas pero que me gustaría que desarrollaremos pronto) de una ruta a alguna localización desde la cual sí sea posible calcular ruta (con el comando "route") hasta el nodo muerto.
+- Injectar, en una localización procedural generada ad hoc, información (recuperable por alguna de las distintas vías de obtención de información) de la ruta al nodo muerto, y generar a su vez, en algún otro nodo ya existente pero aún no visitado, información (recuperable de algún modo) de la ruta que lleva a ese primer nodo generado ad hoc.
+
+Deben siempre preferirse las estrategias indirectas a las directas. Si por alguna razón no se consigue aplicar con éxito alguna de las estrategias indirectas, se usará una estrategia directa.
+
+A la hora de planificar cómo desarrollar todo esto, een en cuenta que en breve me gustaría diseñar nuevas formas de obtención de información. Es decir, que nos interesa poder añadir hacia atrás esas nuevas formas tanto en el failsafe de nodos muertos como en aquellas lógicas procedurales del juego que dependen o hacen uso de uno u otro modo de los modos de generación/colocación de información. Por ejemplo, en breve me gustaría desarrollar tres nuevas formas de "recuperar" información: 1) Recovered attachment: al hacer "cargo audit" aparece “found unindexed attachment; run cargo audit again to decode”; 2) Dron recuperado (mediante un futuro comando "drone salvage drone") que al desplegarlo (deploy) por primera vez produce un mensaje pregrabado; 3) Información que se obtiene/descubre al desmantelar un dron (mediante un futuro comando "drone dismantle", o algo así, que permite reducir a scrap un dron).
+
+Si consideras que es preferible desarrollar e implementar primero estas nuevas formas de obtención de información, antes de desarrollar el failsafe de nodos muertos, dímelo.
+
+Como regla general: antes de implementar nada, valora la propuesta, su viabilidad y dime posibles conflictos o problemas que podría producir. Tengamos también en cuenta que nos interesa siempre la robustez y la escalabilidad. Queremos aprovechar siempre las herramientas ya disponibles (si son adecuadas) e introducir los cambios mínimos (a no ser que haya alguna buena razón para obrar de otro modo).
+
 
 - [ ] Los incrustados [INTEL]...[/INTEL] no debe verlos el usuario.
 
@@ -66,6 +110,12 @@ VITALS
 
 
 === OTROS / SIN CATALOGAR ===
+
+- [ ] no sé si está funcionando bien el auto cruise, pues aunque ha subido el net a positivo, veo que todos los sistemas están activos.
+
+- [ ] En el output despues de hibernate until_arrival, el tiempo de "sleeping for" y "woke up after" debería escalarse. Sin han sido unos días, no tiene sentido que ponga 0.00y.
+
+- [ ] Cuando se intenta dockear estando lejos sale el mensaje "action blocked: not at ECHO_7". Quizá debería decir "Not in ECHO_7 orbit" o algo así.
 
 - [x] El formato del tiempo de "unacked=" en alerts cuál es? Sólo en segundos? Me gustaría que siguiera el mismo formato que las ETA de los travels y los jobs.
 
@@ -156,9 +206,13 @@ Ahora mismo es informativo (no afecta directamente a integridad/batería), pero 
 === USER INTERFACE ===
 
 TEXTUAL
+- [!] Cuando al emprender un viaje se pone el ship_status automáticamente en cruise, no cambia en el panel head. De todas formas, no sé si está funcionando bien el auto cruise, pues aunque ha subido el net a positivo, veo que todos los sistemas están activos. 
+- [ ] Auto completado del system_id en el comando drone repair <drone_id> <system_id> no funciona.
 - [ ] El panel status debería poder modificarse por otro.
 - [ ] Los paneles, excepto header, botton, comandos y logs deberían poder activarse desactivarse, para tener más espacio para logs.
 - [ ] Colores. Y archivo de configuración de colores, para poder configurar paletas.
+  - Que cuando cambie a mejor algo del status se ponga verde, y rojo cuando a peor.
+  - Tag de advertencias naranja. Info en azul.
 
 
 

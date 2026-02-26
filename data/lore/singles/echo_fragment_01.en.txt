@@ -1,0 +1,5 @@
+SIGNAL FRAGMENT // ECHO
+
+Carrier degraded. Packet loss 47%.
+
+"If you can read this, the corridor still exists. Not for long."
