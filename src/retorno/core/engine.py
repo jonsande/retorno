@@ -36,6 +36,7 @@ from retorno.core.actions import (
 )
 from retorno.core.gamestate import GameState
 from retorno.core.lore import LoreContext, maybe_deliver_lore
+from retorno.core.deadnodes import evaluate_dead_nodes
 from retorno.model.drones import DroneLocation, DroneStatus
 from retorno.model.events import AlertState, Event, EventManagerState, EventType, Severity, SourceRef
 from retorno.model.jobs import Job, JobManagerState, JobStatus, JobType, RiskProfile, TargetRef
@@ -2438,6 +2439,7 @@ class Engine:
             lore_ctx = self._build_lore_context(state, job.target.id)
             lore_result = maybe_deliver_lore(state, "dock", lore_ctx)
             events.extend(lore_result.events)
+            events.extend(evaluate_dead_nodes(state, "dock", debug=state.os.debug_enabled))
             return events
 
         if job.job_type == JobType.SALVAGE_SCRAP and job.target:
@@ -2597,6 +2599,7 @@ class Engine:
                 )
             )
             events.extend(lore_result.events)
+            events.extend(evaluate_dead_nodes(state, "salvage_data", debug=state.os.debug_enabled))
             return events
 
         if job.job_type == JobType.ROUTE_SOLVE and job.target:
@@ -2622,6 +2625,7 @@ class Engine:
                     },
                 )
             )
+            events.extend(evaluate_dead_nodes(state, "route", debug=state.os.debug_enabled))
             return events
 
         if job.job_type == JobType.INSTALL_MODULE and job.target:

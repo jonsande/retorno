@@ -69,6 +69,8 @@ class WorldState:
     visited_nodes: set[str] = field(default_factory=set)
     fine_ranges_km: dict[str, float] = field(default_factory=dict)
     lore: "LoreSchedulerState" = field(default_factory=lambda: LoreSchedulerState())
+    dead_nodes: dict[str, "DeadNodeState"] = field(default_factory=dict)
+    deadnode_log: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -82,6 +84,21 @@ class LoreSchedulerState:
     })
     last_delivery_t: float = 0.0
     delivery_log: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class DeadNodeState:
+    stuck_since_t: float | None = None
+    dead_since_t: float | None = None
+    stuck_since_uplinks: int = 0
+    dead_since_uplinks: int = 0
+    stuck_threshold_uplinks: int = 0
+    dead_threshold_uplinks: int = 0
+    stuck_threshold_years: float = 0.0
+    dead_threshold_years: float = 0.0
+    attempts: int = 0
+    last_action_t: float = 0.0
+    bridge_node_id: str | None = None
 
 
 SECTOR_SIZE_LY = 10.0

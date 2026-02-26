@@ -108,6 +108,22 @@ class Balance:
     INTEL_CORRUPT_P_FAIL = 0.50
     # Max radius (ly) when spawning a procedural hub from corrupt intel.
     INTEL_CORRUPT_SPAWN_RADIUS_LY = 40.0
+    # Dead-node failsafe toggle.
+    DEADNODE_FAILSAFE_ENABLED = True
+    # Stuck thresholds (randomized per node within these ranges).
+    DEADNODE_STUCK_UPLINKS_MIN = 10
+    DEADNODE_STUCK_UPLINKS_MAX = 15
+    DEADNODE_STUCK_YEARS_MIN = 25.0
+    DEADNODE_STUCK_YEARS_MAX = 35.0
+    # Dead thresholds (randomized per node within these ranges).
+    DEADNODE_DEAD_UPLINKS_MIN = 20
+    DEADNODE_DEAD_UPLINKS_MAX = 30
+    DEADNODE_DEAD_YEARS_MIN = 50.0
+    DEADNODE_DEAD_YEARS_MAX = 100.0
+    # Cooldown between failsafe actions (years).
+    DEADNODE_ACTION_COOLDOWN_YEARS = 5.0
+    # Max indirect attempts before falling back to direct strategy.
+    DEADNODE_MAX_INDIRECT_ATTEMPTS = 2
 
     # Lore singles: base probability per eligible trigger that a single will be attempted.
     # This is checked before weights are applied. Higher values = more frequent singles

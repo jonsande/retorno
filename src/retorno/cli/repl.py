@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 from retorno.core.engine import Engine
 from retorno.core.lore import LoreContext, maybe_deliver_lore
+from retorno.core.deadnodes import evaluate_dead_nodes
 from retorno.core.actions import Hibernate
 from retorno.core.actions import RouteSolve
 from retorno.runtime.loop import GameLoop
@@ -64,7 +65,7 @@ def print_help() -> None:
         "  install <module_id> | modules\n"
         "\nDebug:\n"
         "  wait <segundos> (DEBUG only)\n"
-        "  debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore\n"
+        "  debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes\n"
         "\nSugerencias:\n"
         "  ls /manuals/commands\n"
         "  man navigation\n"
@@ -1221,6 +1222,41 @@ def render_debug_lore(state) -> None:
             )
     else:
         print("- forced_pending: (none)")
+    if state.world.dead_nodes:
+        print("- dead_nodes:")
+        for node_id, st in state.world.dead_nodes.items():
+            print(
+                f"  {node_id} stuck_uplinks={st.stuck_threshold_uplinks} "
+                f"dead_uplinks={st.dead_threshold_uplinks} "
+                f"stuck_years={st.stuck_threshold_years:.1f} "
+                f"dead_years={st.dead_threshold_years:.1f} "
+                f"attempts={st.attempts} bridge={st.bridge_node_id}"
+            )
+    if state.world.deadnode_log:
+        print("- deadnode_log:")
+        for line in state.world.deadnode_log[-10:]:
+            print(f"  {line}")
+
+
+def render_debug_deadnodes(state) -> None:
+    print("\n=== DEBUG DEADNODES ===")
+    if not state.world.dead_nodes:
+        print("(none)")
+        return
+    for node_id, st in state.world.dead_nodes.items():
+        print(
+            f"- {node_id}: "
+            f"stuck_uplinks={st.stuck_threshold_uplinks} "
+            f"dead_uplinks={st.dead_threshold_uplinks} "
+            f"stuck_years={st.stuck_threshold_years:.1f} "
+            f"dead_years={st.dead_threshold_years:.1f} "
+            f"attempts={st.attempts} "
+            f"bridge={st.bridge_node_id}"
+        )
+    if state.world.deadnode_log:
+        print("log:")
+        for line in state.world.deadnode_log[-10:]:
+            print(f"- {line}")
 
 def render_contacts(state) -> None:
     system = state.ship.systems.get("sensors")
@@ -1922,6 +1958,13 @@ def _handle_uplink(state) -> None:
     if lore_result.events:
         render_events(state, [("cmd", e) for e in lore_result.events])
         for e in lore_result.events:
+            state.events.recent.append(e)
+        if len(state.events.recent) > 50:
+            state.events.recent = state.events.recent[-50:]
+    dead_events = evaluate_dead_nodes(state, "uplink", debug=state.os.debug_enabled)
+    if dead_events:
+        render_events(state, [("cmd", e) for e in dead_events])
+        for e in dead_events:
             state.events.recent.append(e)
         if len(state.events.recent) > 50:
             state.events.recent = state.events.recent[-50:]
@@ -3643,6 +3686,13 @@ def main() -> None:
                     continue
                 render_debug_lore(locked_state)
             continue
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_DEADNODES":
+            with loop.with_lock() as locked_state:
+                if not locked_state.os.debug_enabled:
+                    print("debug deadnodes: available only in DEBUG mode. Use: debug on")
+                    continue
+                render_debug_deadnodes(locked_state)
+            continue
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SEED":
             with loop.with_lock() as locked_state:
                 if not locked_state.os.debug_enabled:
@@ -3703,6 +3753,13 @@ def main() -> None:
                     print(line)
                 if discovered:
                     print(f"(scan) new: {', '.join(sorted(discovered))}")
+                dead_events = evaluate_dead_nodes(locked_state, "scan", debug=locked_state.os.debug_enabled)
+                if dead_events:
+                    render_events(locked_state, [("cmd", e) for e in dead_events])
+                    for e in dead_events:
+                        locked_state.events.recent.append(e)
+                    if len(locked_state.events.recent) > 50:
+                        locked_state.events.recent = locked_state.events.recent[-50:]
             continue
         if parsed == "INVENTORY":
             _drain_auto_events()

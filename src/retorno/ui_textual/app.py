@@ -1027,6 +1027,13 @@ class RetornoTextualApp(App):
                     return
                 self._log_lines(presenter.build_command_output(repl.render_debug_lore, state))
             return
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_DEADNODES":
+            with self.loop.with_lock() as state:
+                if not state.os.debug_enabled:
+                    self._log_line("debug deadnodes: available only in DEBUG mode. Use: debug on")
+                    return
+                self._log_lines(presenter.build_command_output(repl.render_debug_deadnodes, state))
+            return
 
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SEED":
             with self.loop.with_lock() as state:

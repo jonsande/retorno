@@ -74,28 +74,9 @@ Hay que buscar una solución más diegética a esto. La información de lore que
 
 === INTEL ===
 
-- [!] Sistema procedural para descubrir información de rutas a nodos conocidos pero sin ruta conocida. A través de uplink y a través de un flag específico en los txt. El caso es que ahora mismo los datos corruptos (información entre etiquetas [INTEL][/INTEL] no procesable) genera contactos (nodos) sin ruta. Los INTEL incrustados también pueden generar (esto hay que confirmarlo) contactos authored pero sin ruta. Además, el generador de contactos de uplink _discover_routes_via_uplink() puede generar contactos sin rutas (confirmarlo). Así que el caso es que se van generando por distintas vías contactos sin ruta, y tiene que diseñarse una manera procedural de conseguir intel de rutas a contactos existentes, para que todo marche. Empezar por preguntar a codex: Actualmente ¿de qué maneras se pueden averiguar rutas para contactos conocidos (contactos authored y contactos procedurales)?
-
-==> PROMPT: Quiero desarrollar un sistema failsafe de gestión de nodos "colgados" o "muertos". No sé si actualmente existe ya en el juego algo parecido. Por "nodos colgados" o "nodos muertos" (indistintamente) entiendo aquellos contactos o nodos (sectores, stations, waystations, ships, o cualquier localización) que cumplen las siguientes condiciones: 1) son conocidos por el Personaje-Jugador (o sea que aparecen listados en el output del comando 'contacts' o 'nav'); 2) no se conoce ruta hacia ellos; 3) no existe actualmente una localización conocida (y con ruta) desde la cuál ese o esos nodos sin ruta queden a una distancia menor al radio de los sensores (en estado "nominal"), de forma que es estrictamente imposible para el jugador conseguir una ruta hacia ese o esos nodos por medio del comando 'route' desde ninguna posición; 4) no existe actualmente (bien porque no va a generarse proceduralmente nunca, bien porque no se ha generado proceduralmente aún) ningún documento extraible mediante "salvage data" o "uplink" u otro capaz de proporcionarle al jugador la ruta (link) hacia ellos. (Valorar si hace falta añadir alguna condición más o corregir alguna de las propuestas.)
-El sistema de gestion de "nodos colgados" o "nodos muertos" debe llevar un registro de los nodos que se encuentra "colgados" o "muertos" en todo momento, e ir registrando el tiempo que permanecen colgados o muertos (es decir, llevar un control de durante cuánto tiempo, interno del juego, no tiempo real, siguen cumpliendo todas las condiciones para seguir considerándose colgados o muertos). A partir de cierto tiempo (configurable desde el balance.py), debe dispararse alguna estrategia (preferiblemente indirecta [ver más abajo]) para lograr que dejen de estar muertos o colgados. Las estrategias que se me ocurren podrían ser estas: 
-
-a) Estrategias directas
-- Injectar, en algún nodo no visitado, información (recuperable por alguna de las distintas vías de obtención de información) que proporcione la ruta al nodo muerto.
-
-b) Estrategias indirectas
-- Injectar, en algún nodo aún no visitado, información (recuperable mediante salvage data, uplink, captured signal, station_broadcast, u otras formas de obtención de información aún no desarrolladas pero que me gustaría que desarrollaremos pronto) de una ruta a alguna localización desde la cual sí sea posible calcular ruta (con el comando "route") hasta el nodo muerto.
-- Injectar, en una localización procedural generada ad hoc, información (recuperable por alguna de las distintas vías de obtención de información) de la ruta al nodo muerto, y generar a su vez, en algún otro nodo ya existente pero aún no visitado, información (recuperable de algún modo) de la ruta que lleva a ese primer nodo generado ad hoc.
-
-Deben siempre preferirse las estrategias indirectas a las directas. Si por alguna razón no se consigue aplicar con éxito alguna de las estrategias indirectas, se usará una estrategia directa.
-
-A la hora de planificar cómo desarrollar todo esto, een en cuenta que en breve me gustaría diseñar nuevas formas de obtención de información. Es decir, que nos interesa poder añadir hacia atrás esas nuevas formas tanto en el failsafe de nodos muertos como en aquellas lógicas procedurales del juego que dependen o hacen uso de uno u otro modo de los modos de generación/colocación de información. Por ejemplo, en breve me gustaría desarrollar tres nuevas formas de "recuperar" información: 1) Recovered attachment: al hacer "cargo audit" aparece “found unindexed attachment; run cargo audit again to decode”; 2) Dron recuperado (mediante un futuro comando "drone salvage drone") que al desplegarlo (deploy) por primera vez produce un mensaje pregrabado; 3) Información que se obtiene/descubre al desmantelar un dron (mediante un futuro comando "drone dismantle", o algo así, que permite reducir a scrap un dron).
-
-Si consideras que es preferible desarrollar e implementar primero estas nuevas formas de obtención de información, antes de desarrollar el failsafe de nodos muertos, dímelo.
-
-Como regla general: antes de implementar nada, valora la propuesta, su viabilidad y dime posibles conflictos o problemas que podría producir. Tengamos también en cuenta que nos interesa siempre la robustez y la escalabilidad. Queremos aprovechar siempre las herramientas ya disponibles (si son adecuadas) e introducir los cambios mínimos (a no ser que haya alguna buena razón para obrar de otro modo).
-
-
 - [ ] Los incrustados [INTEL]...[/INTEL] no debe verlos el usuario.
+
+- [ ] Tres nuevas formas de "recuperar" información (intel y lore): 1) Recovered attachment: al hacer "cargo audit" aparece “found unindexed attachment; run cargo audit again to decode”; 2) Dron recuperado (mediante un futuro comando "drone salvage drone") que al desplegarlo (deploy) por primera vez produce un mensaje pregrabado; 3) Información que se obtiene/descubre al desmantelar un dron (mediante un futuro comando "drone dismantle", o algo así, que permite reducir a scrap un dron).
 
 
 
@@ -110,6 +91,8 @@ Como regla general: antes de implementar nada, valora la propuesta, su viabilida
 
 
 === OTROS / SIN CATALOGAR ===
+
+- [ ]
 
 - [ ] no sé si está funcionando bien el auto cruise, pues aunque ha subido el net a positivo, veo que todos los sistemas están activos.
 

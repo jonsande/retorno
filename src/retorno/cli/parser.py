@@ -124,8 +124,10 @@ def parse_command(line: str):
             return ("DEBUG_ARCS", None)
         if len(args) == 1 and args[0] == "lore":
             return ("DEBUG_LORE", None)
+        if len(args) == 1 and args[0] == "deadnodes":
+            return ("DEBUG_DEADNODES", None)
         if len(args) != 1 or args[0] not in {"on", "off", "status"}:
-            raise ParseError("Uso: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore")
+            raise ParseError("Uso: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes")
         return ("DEBUG", args[0])
 
     if cmd == "dock":
