@@ -1,0 +1,10 @@
+FROM: Autonomous Systems
+SUBJ: Emergency Decryo Report -- Sarcophagus-06
+
+Autonomous recovery protocol executed.
+
+Decryo sequence failed to complete.
+Host status: NON-VIABLE.
+No vital signs detected.
+
+-- Ship OS

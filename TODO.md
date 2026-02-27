@@ -94,6 +94,24 @@ Hay que buscar una solución más diegética a esto. La información de lore que
   - [ ] 2) Dron recuperado (mediante un futuro comando "drone salvage drone") que al desplegarlo (deploy) por primera vez produce un mensaje pregrabado; 
   - [ ] 3) Información que se obtiene/descubre al desmantelar un dron (mediante un futuro comando "drone dismantle", o algo así, que permite reducir a scrap un dron).
 
+- [ ] Sistema de escalado de privilegios. Actualmente sólo se tiene acceso a archivos con un nivel de acceso de GUEST. No sé cuántos niveles hay actualmente definidos, pero me interesa que haya estos: GUEST, ENG, MED, OPS, SEC. Tenemos entonces que desarrollar formas diegéticas de elevar el acceso por distintos medios:
+  - [ ] 0) Versión 0 muy simple pero funcional (MVP): comandos "auth status" "auth recover eng", "auth recover med". Requisitos: data_core >= LIMITED, datad running, opcional: securityd para MED (o al revés). Efecto: job de x segundos o minutos que, al completarse, añade ENG o MED a auth_levels. Resultado narrativo: empiezas en GUEST; puedes leer el mail del PJ; más tarde recuperas ENG; entonces ves los logs de los otros sarcófagos
+  - [ ] 1) Boot de servicios + self-tests: La más natural para tu juego ahora mismo. Ejemplo: cuando data_core está operativo y datad corriendo, puedes ejecutar:
+    auth probe
+    auth recover eng
+    auth recover med
+  Y eso hace un job. Requerirá tiempo y energía, y, si sale bien, añade ENG o MED (pero quizá hay que limitar esto a la nave/station en la que se está docked, o a la propia nave; de forma que a esos comandos habría que añadires un id, como por ejemplo ECHO_7 o RETORNO_SHIP).
+  Justificación diegética: estás restaurando tablas de permisos/certificados desde caché local.
+  - [ ] 2) Salvage de credenciales desde nodos remoto (muy buena para la experiencia de exploración del Jugador): ejemplo: en un hospital ship o una estación técnica encuentras:
+    med_override.token
+    eng_cert.fragment
+  Al extraerlos: auth import /remote/.../med_override.token
+  obtienes acceso MED en ese hospital ship. [Esto convierte los permisos en parte del loop de exploración.]
+  - [ ] 3) Módulos instalables: secure_coprocessor, legacy_auth_bridge, med_console_patch. Al instalar uno, desbloqueas cierno nivel o reduces dificultad de recuperación. [Esto da progresión material.]
+  - [ ] 4) Acceso contextual/temporal (muy interesante, pero para más adelante): 
+    a dockear en cierta station, recibes acceso temporal (ENG session token valid while docked), o sólo durante un timpo (contador atrás); o tras un uplink en un relay.
+
+Esto da variedad, pero no lo haría aún como primer sistema. 
 
 
 === MODULES ===
@@ -161,13 +179,13 @@ Antes de implementar nada, dime qué opinas, si ves algún conflicto o problema 
 
 - [?] En el frontend Textual algunos comandos no se autocompletan. 
 
-- [!] Al hibernar para viajar el "time" debería reflejar los años que han pasado desde que el PJ se despertó por primera vez. Necesitamos un reloj mejor. No vale sólo indicar segundos, pues el número es demasiado grando. Necesitamos un reloj que indique años luz, días, horas, minutos, segundos (o algo así; díme tú qué opinas).
+- [x] Al hibernar para viajar el "time" debería reflejar los años que han pasado desde que el PJ se despertó por primera vez. Necesitamos un reloj mejor. No vale sólo indicar segundos, pues el número es demasiado grando. Necesitamos un reloj que indique años luz, días, horas, minutos, segundos (o algo así; díme tú qué opinas).
 
 - [ ] Ahora mismo los manuals se han generado con un tono "diegético". Me gustaría ver cómo sería la versión más "técnica", pues chatgpt y codex me la han propuesto varias veces pero siempre la he rechazado sin llegar a ver cómo sería.
 
 - [x] El comando "travel" hay que cambiarlo quizá por "navigate" (o algo primero como "trazar ruta" y después "navigate").
 
-- [!] Ahora mismo si queremos viajar a "S+000_-001_-001:02: Relay-97 (relay) dist=1.30ly" hace falta introducir "travel S+000_-001_-001:0". Me gustaría que también se pudiera introducit "travel Realy-97" simplemente, y que el autocompletado funcionara. Y por cierto: ¿qué quiere decir "000_-001_-001:02"? ¿Son unas coordenadas? Si es así, creo que estaría bien indicar de algún modo que esa numeración son unas coordenadas. 
+- [-] Ahora mismo si queremos viajar a "S+000_-001_-001:02: Relay-97 (relay) dist=1.30ly" hace falta introducir "travel S+000_-001_-001:0". Me gustaría que también se pudiera introducit "travel Realy-97" simplemente, y que el autocompletado funcionara. Y por cierto: ¿qué quiere decir "000_-001_-001:02"? ¿Son unas coordenadas? Si es así, creo que estaría bien indicar de algún modo que esa numeración son unas coordenadas. 
 
 - [ ] También creo que tendría que aparecer en primer lugar el nombre de la hubicación (si la tiene), por ejemplo Relay-97 (relay) dist=1.30ly coord=S+000_-001_-001:02""
 
@@ -179,9 +197,7 @@ Ahora mismo es informativo (no afecta directamente a integridad/batería), pero 
 
 - [-] Diseñar el sistema de encontrar nuevos destinos. A nivel de sistema solar, tiene que ser posible detectar vía escáneres o algo así; a nivel de galaxia, quizá sólo a partir de información que se obtenga (cartas de navegación). Más allá de galaxia, no se sabe. El comando contacts/scan debe tener un alcance pequeño relativamente.
 
-- [ ] Cómo se desconectan sistemas ahora mismo? Cómo se reduce carga de energía?
-
-- [ ] Quiero que al arrancar el juego por primera vez se imprima un mensaje "técnico" diegético que dé a entender de un modo u otro que ha habido un error y que se está ejecutando una instrucción de emergencia de descriogenización del sarcófago; que no se ha podido completar satisfactoriamente la descriogenización de la persona que hay dentro (el personaje jugador) del <id_sarcófago> por un problema indeterminado en el sistema; que se procede a intentar poner al huesped en estado consciente para que pueda llevar a cabo operaciones a través de la terminal conectada a su cerebro. También se indicará que el reloj/calendario interno de la nave ha sufrido un fallo indeterminado o algo así y que todo ha sido puesto a 0 (buscar la manera técnica diegética de decir esto). Este mensaje se imprimirá al iniciar el juego, pero quedará también como mail, de forma que se podrá volver a leer, en su versión española si se cambia la configuración de idioma. También quiero que se generen otros 5 mails con un texto muy similar, pero refiriendo cada uno de ellos a un sarcófago diferente, e indicando que ha fallado la descriogenización, y que no se detectan constantes vitales en el huesped (los 5 mails serán iguales, sólo cambiará <id_sarcófago>, de modo que al leerlos se pueda deducir que todos los compañeros del Personaje Jugador han muerto). Antes de construir la instrucción para codex, constrúyeme una versión del mensaje, para que lo pulamos.
+- [x] Quiero que al arrancar el juego por primera vez se impriman una serie de mensajes "técnicos" diegéticos que dén a entender de un modo u otro que ha habido un error y que se está ejecutando una instrucción de emergencia de descriogenización del sarcófago número 5. Después una serie de mensajes técnicos diegéticos delas operaciones que se estarían llevando para la descriogenización; llegando un punto en que se produzca un mensaje que venga de algún modo a decir que no se ha podido completar satisfactoriamente la descriogenización de la persona que hay dentro (el personaje jugador) del <id_sarcófago> por un problema indeterminado en el sistema; que las constantes vitales del huesped son normales y que se procede a intentar poner al huesped en estado consciente para que pueda llevar a cabo operaciones manuales a través de la terminal conectada a su cerebro (quiero una forma técnica diegética de decir esto, que suene creíble y con terminología técnica). También se indicará que el reloj/calendario interno de la nave ha sufrido un fallo indeterminado o algo así y que todo ha sido puesto a 0 (buscar la manera técnica diegética de decir esto). Me gustaría que entre mensaje y mensaje se produjera una pausa de unos 3 segundos (configurable). También me gustaría, si es posible, un efecto tipewriting al imprimir cada mensaje (activable o desactivable desde balance.py). Estos mensajes se imprimirán al iniciar un nuevo juego, pero quedará también como mail (localizado). También quiero que se generen otros 5 mails con un texto muy similar, pero refiriendo cada uno de ellos a un sarcófago diferente (sarcófago 1, 2, 3, 4, y 6), e indicando que ha fallado la descriogenización, y que no se detectan constantes vitales en el huesped (los 5 mails serán iguales, sólo cambiará <id_sarcófago>, de modo que al leerlos se pueda deducir que todos los compañeros del Personaje Jugador han muerto). Antes de construir la instrucción para codex, constrúyeme una versión del mensaje, para que lo pulamos. Dime también si algo de lo que te planteo puede generar algún conflicto o problema.
 
 - [ ] Algunos world_node, como las naves, las estaciones y los derelics tienen que tener ship_sector's. O station_sector's (habitaciones, vaya). Los planetas también tendrán que tener sectores (cuando hagamos planetas y drones capaces de desplegarse en ellos),
 

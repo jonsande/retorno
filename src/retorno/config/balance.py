@@ -8,6 +8,12 @@ class Balance:
     HIBERNATE_CHUNK_S = 7 * DAY_S
     HIBERNATE_WAKE_CHECK_S = 1 * 60 * 60
     HIBERNATE_WAKE_EVENT_TYPES = {"drone_low_battery"}
+    # Startup sequence (new game only)
+    STARTUP_SEQUENCE_ENABLED = True
+    STARTUP_SEQUENCE_LINE_DELAY_S = 2.0
+    STARTUP_SEQUENCE_TYPEWRITER = False
+    STARTUP_SEQUENCE_TYPEWRITER_CPS = 195
+    STARTUP_SEQUENCE_SKIPPABLE = True
 
     # Power/alerts
     BUS_INSTABILITY_AFTER_S = 120

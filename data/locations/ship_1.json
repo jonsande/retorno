@@ -11,29 +11,69 @@
   "known_on_start": true,
   "fs_files": [
     {
-      "path": "/mail/inbox/0000.notice.txt",
+      "path": "/mail/inbox/sarcophagus_05_emergency.en.txt",
       "access": "GUEST",
-      "content": "EN: Language can be changed with: config set lang en|es\nES: El idioma se puede cambiar con: config set lang en|es\n"
+      "content_ref": "lore/startup/mail_sarcophagus_05_emergency.en.txt"
     },
     {
-      "path": "/mail/inbox/0001.en.txt",
+      "path": "/mail/inbox/sarcophagus_05_emergency.es.txt",
       "access": "GUEST",
-      "content": "FROM: Autonomous Systems\nSUBJ: Emergency Wake Event\n\nWake condition triggered by power instability.\n\nPrimary distribution grid integrity below nominal thresholds.\nCore output fluctuating.\n\nEmergency maintenance protocols available to conscious operator.\n\nRecommended actions:\n - review system diagnostics\n - assess maintenance drone availability\n - stabilize signal infrastructure\n\nWarning: cascading failures possible if instability persists.\n\n— Ship OS\n"
+      "content_ref": "lore/startup/mail_sarcophagus_05_emergency.es.txt"
     },
     {
-      "path": "/mail/inbox/0001.es.txt",
+      "path": "/mail/inbox/sarcophagus_01_log.en.txt",
       "access": "GUEST",
-      "content": "FROM: Autonomous Systems\nSUBJ: Emergency Wake Event\n\nCondición de despertar activada por inestabilidad de energía.\n\nIntegridad de la red de distribución primaria bajo umbrales nominales.\nLa salida del núcleo fluctúa.\n\nProtocolos de mantenimiento de emergencia disponibles para el operador consciente.\n\nAcciones recomendadas:\n - revisar diagnósticos del sistema\n - evaluar disponibilidad de drones de mantenimiento\n - estabilizar la infraestructura de señal\n\nAdvertencia: fallas en cascada posibles si la inestabilidad persiste.\n\n— Ship OS\n"
+      "content_ref": "lore/startup/mail_sarcophagus_01_log.en.txt"
+    },
+    {
+      "path": "/mail/inbox/sarcophagus_01_log.es.txt",
+      "access": "GUEST",
+      "content_ref": "lore/startup/mail_sarcophagus_01_log.es.txt"
+    },
+    {
+      "path": "/mail/inbox/sarcophagus_02_log.en.txt",
+      "access": "GUEST",
+      "content_ref": "lore/startup/mail_sarcophagus_02_log.en.txt"
+    },
+    {
+      "path": "/mail/inbox/sarcophagus_02_log.es.txt",
+      "access": "GUEST",
+      "content_ref": "lore/startup/mail_sarcophagus_02_log.es.txt"
+    },
+    {
+      "path": "/mail/inbox/sarcophagus_03_log.en.txt",
+      "access": "GUEST",
+      "content_ref": "lore/startup/mail_sarcophagus_03_log.en.txt"
+    },
+    {
+      "path": "/mail/inbox/sarcophagus_03_log.es.txt",
+      "access": "GUEST",
+      "content_ref": "lore/startup/mail_sarcophagus_03_log.es.txt"
+    },
+    {
+      "path": "/mail/inbox/sarcophagus_04_log.en.txt",
+      "access": "GUEST",
+      "content_ref": "lore/startup/mail_sarcophagus_04_log.en.txt"
+    },
+    {
+      "path": "/mail/inbox/sarcophagus_04_log.es.txt",
+      "access": "GUEST",
+      "content_ref": "lore/startup/mail_sarcophagus_04_log.es.txt"
+    },
+    {
+      "path": "/mail/inbox/sarcophagus_06_log.en.txt",
+      "access": "GUEST",
+      "content_ref": "lore/startup/mail_sarcophagus_06_log.en.txt"
+    },
+    {
+      "path": "/mail/inbox/sarcophagus_06_log.es.txt",
+      "access": "GUEST",
+      "content_ref": "lore/startup/mail_sarcophagus_06_log.es.txt"
     },
     {
       "path": "/logs/boot.log",
       "access": "ENG",
       "content": "BOOT TRACE\ncore_os: ok\npower_core: degraded\nenergy_distribution: damaged\nsensors: offline\ndrone_bay: nominal\n"
-    },
-    {
-      "path": "/data/nav/fragments/frag_0001.txt",
-      "access": "GUEST",
-      "content": "LINK: ECHO_7 -> HARBOR_12\n"
     }
   ]
 }

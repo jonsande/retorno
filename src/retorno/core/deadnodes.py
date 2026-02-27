@@ -5,7 +5,7 @@ import random
 
 from retorno.config.balance import Balance
 from retorno.model.events import Event, EventType, Severity, SourceRef
-from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path
+from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path, register_mail
 from retorno.model.world import DeadNodeState, SpaceNode
 from retorno.worldgen.generator import _generate_node_id, _name_from_node_id
 
@@ -123,6 +123,7 @@ def _write_local_intel(state, channel: str, content: str) -> tuple[str, Event]:
     _ensure_dir(state.os.fs, "/mail/inbox")
     path = normalize_path(f"/mail/inbox/{seq:04d}.{state.os.locale.value}.txt")
     state.os.fs[path] = FSNode(path=path, node_type=FSNodeType.FILE, content=content, access=AccessLevel.GUEST)
+    register_mail(state.os, path, state.clock.t)
     msg = {
         "en": f"mail_received :: New internal memo queued: {path}",
         "es": f"mail_received :: Nuevo memo interno en cola: {path}",

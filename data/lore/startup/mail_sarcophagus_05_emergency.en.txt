@@ -1,0 +1,18 @@
+FROM: Autonomous Systems
+SUBJ: Emergency Decryo Report -- Sarcophagus-05
+
+Wake scheduling failed due to chronometry fault.
+Autonomous recovery protocol executed.
+
+Decryo sequence completed only partially.
+Motor recovery could not be completed (indeterminate system fault).
+
+Host vitals: nominal.
+Conscious Interface Recovery Protocol (CIRP) engaged.
+Neural terminal link: ONLINE.
+Manual operations required.
+
+Timebase fault detected.
+Chronology reinitialized to Year 1 / Day 1 / 00:00:00.
+
+-- Ship OS

@@ -1,0 +1,10 @@
+FROM: Autonomous Systems
+SUBJ: Informe de descriogenización de emergencia -- Sarcophagus-01
+
+Se ejecutó el protocolo autónomo de recuperación.
+
+La descriogenización no pudo completarse.
+Estado del huésped: NO VIABLE.
+No se detectan constantes vitales.
+
+-- Ship OS

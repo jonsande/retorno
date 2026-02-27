@@ -1,0 +1,18 @@
+FROM: Autonomous Systems
+SUBJ: Informe de descriogenización de emergencia -- Sarcophagus-05
+
+La programación de despertar falló por un fallo de cronometraje.
+Se ejecutó el protocolo autónomo de recuperación.
+
+La descriogenización se completó solo parcialmente.
+No se pudo completar la recuperación motora (fallo del sistema indeterminado).
+
+Constantes vitales del huésped: nominales.
+Conscious Interface Recovery Protocol (CIRP) activado.
+Enlace de terminal neural: EN LÍNEA.
+Operaciones manuales requeridas.
+
+Fallo de base temporal detectado.
+Cronología reinicializada a Year 1 / Day 1 / 00:00:00.
+
+-- Ship OS

@@ -35,6 +35,9 @@ class OSState:
     locale: Locale = Locale.EN
     debug_enabled: bool = False
     fs: dict[str, FSNode] = field(default_factory=dict)
+    mail_received_t: dict[str, float] = field(default_factory=dict)
+    mail_received_seq: int = 0
+    mail_received_seq_map: dict[str, int] = field(default_factory=dict)
 
 
 def normalize_path(path: str) -> str:
@@ -48,6 +51,28 @@ def normalize_path(path: str) -> str:
     if len(path) > 1 and path.endswith("/"):
         path = path[:-1]
     return path
+
+
+def _mail_base_id(path: str) -> str | None:
+    path = normalize_path(path)
+    if not path.startswith("/mail/inbox/") or not path.endswith(".txt"):
+        return None
+    name = path.rsplit("/", 1)[-1]
+    base = name[:-4]
+    if base.endswith(".en") or base.endswith(".es"):
+        base = base[:-3]
+    return base or None
+
+
+def register_mail(os_state: OSState, path: str, t: float) -> None:
+    base = _mail_base_id(path)
+    if not base:
+        return
+    if base not in os_state.mail_received_seq_map:
+        os_state.mail_received_seq += 1
+        os_state.mail_received_seq_map[base] = os_state.mail_received_seq
+    if base not in os_state.mail_received_t:
+        os_state.mail_received_t[base] = float(t)
 
 
 def _has_access(node: FSNode, access_level: AccessLevel) -> bool:

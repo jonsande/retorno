@@ -5,9 +5,13 @@ import os
 import math
 import random
 import readline
+import select
 import subprocess
 import shutil
 import sys
+import termios
+import time
+import tty
 from pathlib import Path
 from retorno.core.engine import Engine
 from retorno.core.lore import LoreContext, maybe_deliver_lore
@@ -18,6 +22,7 @@ from retorno.runtime.loop import GameLoop
 from retorno.model.events import Event, EventType, Severity, SourceRef
 from retorno.model.jobs import JobStatus
 from retorno.runtime.data_loader import load_modules, load_arcs, load_locations
+from retorno.runtime.startup import load_startup_sequence_lines
 from retorno.config.balance import Balance
 from retorno.model.systems import SystemState
 from retorno.model.drones import DroneStatus
@@ -27,6 +32,116 @@ from retorno.model.world import SpaceNode, region_for_pos
 from retorno.worldgen.generator import ensure_sector_generated
 from retorno.util.timefmt import format_elapsed_long
 
+
+def _maybe_run_startup_sequence(locale: str) -> None:
+    if not Balance.STARTUP_SEQUENCE_ENABLED:
+        return
+    lines = load_startup_sequence_lines(locale)
+    if not lines:
+        return
+    print("\033[2J\033[H", end="")
+    _play_startup_sequence(lines)
+    _print_startup_tips(locale)
+
+
+def _print_startup_tips(locale: str) -> None:
+    tips = {
+        "en": [
+            "\n[INFO] new mail detected.",
+            "Tip: use 'mail inbox' to list messages.",
+            "Tip: use 'mail read <id|latest>' or 'cat <path>' to read.",
+            "Tip: if you still don't remember the command instructions, manuals are under /manuals (try: ls /manuals/commands, man <topic>).",
+            "Tip: use 'config set lang' to change ship_os languaje",
+            "Tip: use 'help' to see available commands.",
+        ],
+        "es": [
+            "\n[INFO]: se han recibido mensajes nuevos.",
+            "Tip: usa 'mail inbox' para listarlos.",
+            "Tip: usa 'mail read <id|latest>' o 'cat <path> para leer.",
+            "Tip: si aún no recuerda la instrucción de operaciones, los manuales están en /manuals (prueba: ls /manuals/commands, man <tema>).",
+            "Tip: introduce 'config set lang' para cambiar el idioma de ship_os",
+            "Tip: usa 'help' para ver los comandos disponibles.",
+            
+        ],
+    }
+    for line in tips.get(locale, tips["en"]):
+        print(line)
+
+
+def _play_startup_sequence(lines: list[str]) -> None:
+    typewriter = Balance.STARTUP_SEQUENCE_TYPEWRITER
+    cps = max(1, int(Balance.STARTUP_SEQUENCE_TYPEWRITER_CPS))
+    line_delay_s = max(0.0, float(Balance.STARTUP_SEQUENCE_LINE_DELAY_S))
+    skippable = Balance.STARTUP_SEQUENCE_SKIPPABLE and sys.stdin.isatty()
+    skip = False
+
+    def _check_skip_escape() -> bool:
+        if not skippable:
+            return False
+        try:
+            ready, _, _ = select.select([sys.stdin], [], [], 0)
+        except Exception:
+            return False
+        if not ready:
+            return False
+        try:
+            ch = sys.stdin.read(1)
+        except Exception:
+            return False
+        return ch == "\x1b"
+
+    def _sleep_with_skip(seconds: float) -> bool:
+        end = time.time() + seconds
+        while time.time() < end:
+            if _check_skip_escape():
+                return True
+            time.sleep(0.05)
+        return False
+
+    def _write_line(line: str) -> bool:
+        nonlocal skip
+        if typewriter:
+            for ch in line:
+                if _check_skip_escape():
+                    skip = True
+                    return True
+                sys.stdout.write(ch)
+                sys.stdout.flush()
+                time.sleep(1.0 / cps)
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+        else:
+            if _check_skip_escape():
+                skip = True
+                return True
+            print(line)
+        return False
+
+    if skippable:
+        fd = sys.stdin.fileno()
+        try:
+            old = termios.tcgetattr(fd)
+            tty.setcbreak(fd)
+        except Exception:
+            skippable = False
+            old = None
+    else:
+        old = None
+
+    try:
+        for line in lines:
+            if skip:
+                break
+            if _write_line(line):
+                break
+            if line_delay_s > 0.0 and _sleep_with_skip(line_delay_s):
+                break
+    finally:
+        if skippable and old is not None:
+            try:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old)
+            except Exception:
+                pass
 
 def print_help(locale: str = "en") -> None:
     help_text = {
@@ -3059,7 +3174,7 @@ def render_mailbox(state, box: str) -> None:
 def _latest_mail_id(state, box: str) -> str | None:
     path = f"/mail/{box}"
     entries = list_dir(state.os.fs, path, state.os.access_level)
-    ids: set[str] = set()
+    base_ids: set[str] = set()
     for name in entries:
         if not name.endswith(".txt"):
             continue
@@ -3068,11 +3183,20 @@ def _latest_mail_id(state, box: str) -> str | None:
         base = name[:-4]
         if base.endswith(".en") or base.endswith(".es"):
             base = base[:-3]
-        if base.isdigit():
-            ids.add(base)
-    if not ids:
+        if base:
+            base_ids.add(base)
+    if not base_ids:
         return None
-    return sorted(ids)[-1]
+    best = None
+    best_key = None
+    for base in base_ids:
+        t = state.os.mail_received_t.get(base, -1.0)
+        seq = state.os.mail_received_seq_map.get(base, -1)
+        key = (t, seq, base)
+        if best_key is None or key > best_key:
+            best_key = key
+            best = base
+    return best
 
 
 def _list_mail_ids(state, box: str) -> list[str]:
@@ -3411,6 +3535,7 @@ def main() -> None:
         state = create_initial_state_prologue()
     loop = GameLoop(engine, state, tick_s=1.0)
     loop.step(1.0)
+    _maybe_run_startup_sequence(state.os.locale.value)
     if not state.os.debug_enabled:
         loop.set_auto_tick(True)
         loop.start()
@@ -3751,8 +3876,8 @@ def main() -> None:
                 _apply_salvage_loot(loop, locked_state, auto_ev)
                 render_events(locked_state, auto_ev)
 
-    print("RETORNO (prologue)")
-    print("Tip: cat /mail/inbox/0000.notice.txt")
+    # print("RETORNO (prologue)")
+    # print("\nTip: cat /mail/inbox/0000.notice.txt")
     with loop.with_lock() as locked_state:
         render_status(locked_state)
         render_alerts(locked_state)

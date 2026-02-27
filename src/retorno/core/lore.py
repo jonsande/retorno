@@ -6,7 +6,7 @@ from pathlib import Path
 
 from retorno.config.balance import Balance
 from retorno.model.events import Event, EventType, Severity, SourceRef
-from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path
+from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path, register_mail
 from retorno.model.world import add_known_link, record_intel, sector_id_for_pos
 from retorno.runtime.data_loader import load_arcs, load_singles
 
@@ -47,6 +47,7 @@ def deliver_ship_mail(state, content_ref: str, lang: str) -> str:
     path = normalize_path(f"/mail/inbox/{seq:04d}.{lang}.txt")
     content = _content_from_ref(content_ref)
     state.os.fs[path] = FSNode(path=path, node_type=FSNodeType.FILE, content=content, access=AccessLevel.GUEST)
+    register_mail(state.os, path, state.clock.t)
     return path
 
 

@@ -1,0 +1,15 @@
+[core_os] integridad de calendario de despertar: FALLO (desincronía de cronometraje)
+PROTOCOLO AUTÓNOMO DE RECUPERACIÓN activado
+Escaneo de bóveda criogénica... ok
+OBJETIVO seleccionado: Sarcophagus-05
+Secuencia de descriogenización: INICIO (perfil de emergencia)
+Gradiente térmico estabilizado
+Descongelación neuroquímica: PARCIAL
+Recuperación de vías motoras: FALLO (fallo del sistema indeterminado)
+Constantes vitales del huésped: nominales
+Conscious Interface Recovery Protocol (CIRP): ARMADO
+Enlace de terminal neural: EN LÍNEA
+Operaciones manuales requeridas
+Fallo de base temporal detectado: reloj interno inválido
+Cronología reinicializada: Year 1 / Day 1 / 00:00:00
+Esperando entrada del operador

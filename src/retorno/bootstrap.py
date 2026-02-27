@@ -4,7 +4,7 @@ from retorno.core.gamestate import GameState
 from retorno.model.drones import DroneLocation, DroneState, DroneStatus
 from retorno.model.events import AlertState, Event, EventType, Severity, SourceRef
 from retorno.model.ship import PowerNetworkState, ShipSector
-from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, normalize_path
+from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, normalize_path, register_mail
 from retorno.model.systems import Dependency, ServiceState, ShipSystem, SystemState
 from retorno.model.world import SpaceNode, region_for_pos, sector_id_for_pos, add_known_link
 from retorno.worldgen.generator import ensure_sector_generated
@@ -346,6 +346,7 @@ def _bootstrap_locations(state: GameState, rng: random.Random, module_ids: list[
             access = _access_level(file_cfg.get("access", "GUEST"))
             norm = normalize_path(path)
             state.os.fs[norm] = FSNode(path=norm, node_type=FSNodeType.FILE, content=content, access=access)
+            register_mail(state.os, norm, state.clock.t)
 
 
 def _bootstrap_alerts(state: GameState) -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import random
 import time
@@ -15,10 +16,12 @@ from retorno.cli.parser import ParseError, parse_command, format_parse_error
 from retorno.cli import repl
 from retorno.core.engine import Engine
 from retorno.core.actions import Hibernate
+from retorno.config.balance import Balance
 from retorno.model.events import Severity
 from retorno.model.drones import DroneStatus
 from retorno.model.os import Locale, list_dir, normalize_path
 from retorno.runtime.loop import GameLoop
+from retorno.runtime.startup import load_startup_sequence_lines
 from retorno.ui_textual import presenter
 
 
@@ -146,10 +149,19 @@ class RetornoTextualApp(App):
         # Binding("f1", "help", "Help"),
         Binding("ctrl+l", "clear_log", "Clear log"),
         Binding("tab", "complete", "Complete", priority=True),
+        Binding("alt+1", "toggle_status", "Toggle status", priority=True),
+        Binding("alt+2", "toggle_alerts", "Toggle alerts", priority=True),
+        Binding("alt+3", "toggle_jobs", "Toggle jobs", priority=True),
+        Binding("alt+0", "toggle_panels", "Toggle panels", priority=True),
+        Binding("f2", "toggle_status", "Toggle status", priority=True),
+        Binding("f3", "toggle_alerts", "Toggle alerts", priority=True),
+        Binding("f4", "toggle_jobs", "Toggle jobs", priority=True),
+        Binding("f5", "toggle_panels", "Toggle panels", priority=True),
         Binding("alt+j", "focus_next", "Next panel", priority=True),
         Binding("alt+k", "focus_previous", "Prev panel", priority=True),
         Binding("k", "scroll_up", "Scroll up", priority=True),
         Binding("j", "scroll_down", "Scroll down", priority=True),
+        Binding("escape", "startup_skip", "", priority=True, show=False),
         #Binding("ctrl+n", "focus_next", "Next panel"),
         # Binding("pageup", "scroll_up", "Scroll up"),
         # Binding("pagedown", "scroll_down", "Scroll down"),
@@ -181,6 +193,13 @@ class RetornoTextualApp(App):
         self._last_complete_at: float = 0.0
         self._last_complete_candidates: list[str] = []
         self._log_buffer: list[str] = []
+        self._startup_sequence_running = False
+        self._startup_sequence_skip = False
+        self._panel_visible = {
+            "status": True,
+            "alerts": True,
+            "jobs": True,
+        }
         super().__init__()
 
     def compose(self) -> ComposeResult:
@@ -209,8 +228,102 @@ class RetornoTextualApp(App):
         self.query_one("#status", RichLog).auto_scroll = False
         self.set_interval(0.25, self.refresh_panels)
         self.refresh_panels()
+        self._apply_panel_layout()
         # Ensure input is focused on start.
         self.call_later(lambda: self.query_one("#input", Input).focus())
+        self.call_after_refresh(self._start_startup_sequence)
+
+    def _start_startup_sequence(self) -> None:
+        if not Balance.STARTUP_SEQUENCE_ENABLED:
+            return
+        if self._startup_sequence_running:
+            return
+        asyncio.create_task(self._run_startup_sequence())
+
+    async def _run_startup_sequence(self) -> None:
+        self._startup_sequence_running = True
+        self._startup_sequence_skip = False
+        locale = self.loop.state.os.locale.value
+        lines = load_startup_sequence_lines(locale)
+        if not lines:
+            self._startup_sequence_running = False
+            return
+        typewriter = Balance.STARTUP_SEQUENCE_TYPEWRITER
+        cps = max(1, int(Balance.STARTUP_SEQUENCE_TYPEWRITER_CPS))
+        line_delay_s = max(0.0, float(Balance.STARTUP_SEQUENCE_LINE_DELAY_S))
+        base_lines = list(self._log_buffer)
+        rendered_lines: list[str] = []
+        log = self.query_one("#log", RichLog)
+        skip_index: int | None = None
+
+        async def _sleep_with_skip(seconds: float) -> bool:
+            end = time.time() + seconds
+            while time.time() < end:
+                if self._startup_sequence_skip and Balance.STARTUP_SEQUENCE_SKIPPABLE:
+                    return True
+                await asyncio.sleep(0.05)
+            return False
+
+        def _render_snapshot(current_line: str | None) -> None:
+            log.clear()
+            for line in base_lines:
+                log.write(line)
+            for line in rendered_lines:
+                log.write(line)
+            if current_line is not None:
+                log.write(current_line)
+
+        for idx, line in enumerate(lines):
+            if self._startup_sequence_skip and Balance.STARTUP_SEQUENCE_SKIPPABLE:
+                skip_index = idx
+                break
+            if typewriter:
+                current = ""
+                for ch in line:
+                    if self._startup_sequence_skip and Balance.STARTUP_SEQUENCE_SKIPPABLE:
+                        skip_index = idx
+                        break
+                    current += ch
+                    _render_snapshot(current)
+                    await asyncio.sleep(1.0 / cps)
+                if self._startup_sequence_skip and Balance.STARTUP_SEQUENCE_SKIPPABLE:
+                    if skip_index is None:
+                        skip_index = idx
+                    break
+                rendered_lines.append(line)
+                _render_snapshot(None)
+            else:
+                rendered_lines.append(line)
+                _render_snapshot(None)
+            self._log_buffer.append(line)
+            if len(self._log_buffer) > 2000:
+                self._log_buffer = self._log_buffer[-2000:]
+            if line_delay_s > 0.0 and await _sleep_with_skip(line_delay_s):
+                skip_index = idx + 1
+                break
+
+        if skip_index is not None and Balance.STARTUP_SEQUENCE_SKIPPABLE:
+            remaining = lines[skip_index:]
+            if remaining:
+                rendered_lines.extend(remaining)
+                for line in remaining:
+                    self._log_buffer.append(line)
+                if len(self._log_buffer) > 2000:
+                    self._log_buffer = self._log_buffer[-2000:]
+                _render_snapshot(None)
+
+        self._startup_sequence_running = False
+        self._log_lines(self._startup_tips(locale))
+        self._drain_auto_to_log()
+        self.refresh_panels()
+        self.call_later(lambda: self.query_one("#input", Input).focus())
+
+    def action_startup_skip(self) -> None:
+        if not self._startup_sequence_running:
+            return
+        if not Balance.STARTUP_SEQUENCE_SKIPPABLE:
+            return
+        self._startup_sequence_skip = True
 
     def on_key(self, event: events.Key) -> None:
         if event.key == "pageup":
@@ -230,6 +343,46 @@ class RetornoTextualApp(App):
     def action_help(self) -> None:
         with self.loop.with_lock() as state:
             self._log_lines(presenter.build_help_lines(state))
+
+    def action_toggle_status(self) -> None:
+        self._panel_visible["status"] = not self._panel_visible["status"]
+        self._apply_panel_layout()
+
+    def action_toggle_alerts(self) -> None:
+        self._panel_visible["alerts"] = not self._panel_visible["alerts"]
+        self._apply_panel_layout()
+
+    def action_toggle_jobs(self) -> None:
+        self._panel_visible["jobs"] = not self._panel_visible["jobs"]
+        self._apply_panel_layout()
+
+    def action_toggle_panels(self) -> None:
+        any_visible = any(self._panel_visible.values())
+        next_state = not any_visible
+        for key in self._panel_visible:
+            self._panel_visible[key] = next_state
+        self._apply_panel_layout()
+
+    def _apply_panel_layout(self) -> None:
+        status_widget = self.query_one("#status", RichLog)
+        alerts_widget = self.query_one("#alerts", RichLog)
+        jobs_widget = self.query_one("#jobs", RichLog)
+        right_widget = self.query_one("#right", Vertical)
+        main_widget = self.query_one("#main", Horizontal)
+        log_widget = self.query_one("#log", RichLog)
+
+        status_widget.display = self._panel_visible["status"]
+        alerts_widget.display = self._panel_visible["alerts"]
+        jobs_widget.display = self._panel_visible["jobs"]
+        right_widget.display = self._panel_visible["alerts"] or self._panel_visible["jobs"]
+        main_widget.display = self._panel_visible["status"] or right_widget.display
+
+        if not main_widget.display:
+            log_widget.styles.height = "1fr"
+            log_widget.styles.margin = (0, 0)
+        else:
+            log_widget.styles.height = 12
+            log_widget.styles.margin = (1, 0)
 
     def action_history_prev(self) -> None:
         input_widget = self.query_one("#input", Input)
@@ -739,32 +892,58 @@ class RetornoTextualApp(App):
             power_lines = presenter.build_power_lines(state)
         self.query_one("#header", Static).update(header)
         status_widget = self.query_one("#status", RichLog)
-        self._set_log_content(
-            status_widget,
-            status_lines,
-            preserve_scroll=True,
-            follow_end=False,
-        )
+        if status_widget.display:
+            self._set_log_content(
+                status_widget,
+                status_lines,
+                preserve_scroll=True,
+                follow_end=False,
+            )
         alerts_widget = self.query_one("#alerts", RichLog)
         jobs_widget = self.query_one("#jobs", RichLog)
-        self._set_log_content(
-            alerts_widget,
-            alerts_lines,
-            preserve_scroll=(self.focused is alerts_widget),
-            follow_end=(self.focused is not alerts_widget),
-        )
-        self._set_log_content(
-            jobs_widget,
-            jobs_lines,
-            preserve_scroll=(self.focused is jobs_widget),
-            follow_end=(self.focused is not jobs_widget),
-        )
+        if alerts_widget.display:
+            self._set_log_content(
+                alerts_widget,
+                alerts_lines,
+                preserve_scroll=(self.focused is alerts_widget),
+                follow_end=(self.focused is not alerts_widget),
+            )
+        if jobs_widget.display:
+            self._set_log_content(
+                jobs_widget,
+                jobs_lines,
+                preserve_scroll=(self.focused is jobs_widget),
+                follow_end=(self.focused is not jobs_widget),
+            )
         self.query_one("#power", Static).update("\n".join(power_lines))
+        if self._startup_sequence_running:
+            return
         auto_events = self.loop.drain_events()
         if auto_events:
             with self.loop.with_lock() as state:
                 lines = presenter.format_event_lines(state, auto_events)
             self._log_lines(lines)
+
+    def _startup_tips(self, locale: str) -> list[str]:
+        tips = {
+            "en": [
+                "\n[INFO] new mail detected.",
+                "Tip: use 'mail inbox' to list messages.",
+                "Tip: use 'mail read <id|latest>' or 'cat <path>' to read.",
+                "Tip: if you still don't remember the command instructions, manuals are under /manuals (try: ls /manuals/commands, man <topic>).",
+                "Tip: use 'config set lang' to change ship_os languaje",
+                "Tip: use 'help' to see available commands.",
+            ],
+            "es": [
+                "\n[INFO] new mail detected.",
+                "Tip: use 'mail inbox' to list messages.",
+                "Tip: use 'mail read <id|latest>' or 'cat <path>' to read.",
+                "Tip: if you still don't remember the command instructions, manuals are under /manuals (try: ls /manuals/commands, man <topic>).",
+                "Tip: use 'config set lang' to change ship_os languaje",
+                "Tip: use 'help' to see available commands.",
+            ],
+        }
+        return tips.get(locale, tips["en"])
 
     def _drain_auto_to_log(self) -> None:
         auto_events = self.loop.drain_events()
