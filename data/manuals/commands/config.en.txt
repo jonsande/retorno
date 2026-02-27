@@ -1,0 +1,4 @@
+config show
+config set lang <en|es>
+- Shows or sets configuration options.
+- Use lang to switch UI language.

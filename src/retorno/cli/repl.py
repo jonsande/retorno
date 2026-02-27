@@ -28,49 +28,93 @@ from retorno.worldgen.generator import ensure_sector_generated
 from retorno.util.timefmt import format_elapsed_long
 
 
-def print_help() -> None:
-    print(
-        "\nComandos (resumen):\n"
-        "  help | clear | exit | quit\n"
-        "\nFS / Manuales / Correo:\n"
-        "  ls [path] | cat <path>\n"
-        "  man <topic> | about <system_id>\n"
-        "  mail [inbox] | mail read <id>\n"
-        "  intel | intel show <intel_id> | intel import <path> | intel export <path>\n"
-        "  config set lang <en|es> | config show\n"
-        "\nInformación:\n"
-        "  status | jobs | job cancel <job_id> | nav | alerts | alerts explain <alert_key> | logs | log copy [n]\n"
-        "  contacts | scan\n"
-        "  sectors | map | locate <system_id>\n"
-        "\nNavegación:\n"
-        "  dock <node_id> | travel <node_id> | travel abort | uplink\n"
-        "  route <node_id>\n"
-        "  hibernate until_arrival | hibernate <años>\n"
-        "\nSistemas / Energía:\n"
-        "  diag <system_id> | boot <service_name>\n"
-        "  system off <system_id> | system on <system_id>\n"
-        "  power status | power plan cruise|normal | power shed/off/on <system_id>\n"
-        "  repair <system_id> --selftest\n"
-        "\nDrones:\n"
-        "  drone status\n"
-        "  drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>\n"
-        "  drone move <drone_id> <target_id>\n"
-        "  drone repair <drone_id> <system_id>\n"
-        "  drone salvage scrap <drone_id> <node_id> <amount>\n"
-        "  drone salvage module <drone_id> [node_id]\n"
-        "  drone salvage data <drone_id> <node_id>\n"
-        "  drone reboot <drone_id> | drone recall <drone_id>\n"
-        "\nBodega / Módulos:\n"
-        "  inventory | cargo | cargo audit | inventory audit\n"
-        "  install <module_id> | modules\n"
-        "\nDebug:\n"
-        "  wait <segundos> (DEBUG only)\n"
-        "  debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes\n"
-        "\nSugerencias:\n"
-        "  ls /manuals/commands\n"
-        "  man navigation\n"
-        "  cat /mail/inbox/0001.txt\n"
-    )
+def print_help(locale: str = "en") -> None:
+    help_text = {
+        "en": (
+            "\nCommands (summary):\n"
+            "  help | clear | exit | quit\n"
+            "\nFS / Manuals / Mail:\n"
+            "  ls [path] | cat <path>\n"
+            "  man <topic> | about <system_id>\n"
+            "  mail inbox | mail read <id|latest>\n"
+            "  intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>\n"
+            "  config set lang <en|es> | config show\n"
+            "\nInfo:\n"
+            "  status | jobs | jobs <amount> | jobs all | job cancel <job_id> | alerts | alerts explain <alert_key> | logs | log copy [n]\n"
+            "  contacts | scan\n"
+            "  sectors | map | locate <system_id>\n"
+            "\nNavigation:\n"
+            "  nav routes\n"
+            "  dock <node_id> | nav <node_id|name> | nav --no-cruise <dest> | nav abort | uplink\n"
+            "  route <node_id>\n"
+            "  hibernate until_arrival | hibernate <years>\n"
+            "\nSystems / Power:\n"
+            "  diag <system_id> | boot <service_name>\n"
+            "  power status | power plan cruise|normal | power on <system_id> | power off <system_id>\n"
+            "  repair <system_id> --selftest\n"
+            "\nDrones:\n"
+            "  drone status\n"
+            "  drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>\n"
+            "  drone move <drone_id> <target_id>\n"
+            "  drone repair <drone_id> <system_id>\n"
+            "  drone salvage scrap <drone_id> <node_id> <amount>\n"
+            "  drone salvage module <drone_id> [node_id]\n"
+            "  drone salvage data <drone_id> <node_id>\n"
+            "  drone reboot <drone_id> | drone recall <drone_id>\n"
+            "\nCargo / Modules:\n"
+            "  cargo | cargo audit\n"
+            "  install <module_id> | modules\n"
+            "\nHints:\n"
+            "  ls /manuals/commands\n"
+            "  man navigation\n"
+            "  cat /mail/inbox/0001.txt\n"
+        ),
+        "es": (
+            "\nComandos (resumen):\n"
+            "  help | clear | exit | quit\n"
+            "\nFS / Manuales / Correo:\n"
+            "  ls [path] | cat <path>\n"
+            "  man <topic> | about <system_id>\n"
+            "  mail inbox | mail read <id|latest>\n"
+            "  intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>\n"
+            "  config set lang <en|es> | config show\n"
+            "\nInformación:\n"
+            "  status | jobs | jobs <amount> | jobs all | job cancel <job_id> | alerts | alerts explain <alert_key> | logs | log copy [n]\n"
+            "  contacts | scan\n"
+            "  sectors | map | locate <system_id>\n"
+            "\nNavegación:\n"
+            "  nav routes\n"
+            "  dock <node_id> | nav <node_id|name> | nav --no-cruise <dest> | nav abort | uplink\n"
+            "  route <node_id>\n"
+            "  hibernate until_arrival | hibernate <años>\n"
+            "\nSistemas / Energía:\n"
+            "  diag <system_id> | boot <service_name>\n"
+            "  power status | power plan cruise|normal | power on <system_id> | power off <system_id>\n"
+            "  repair <system_id> --selftest\n"
+            "\nDrones:\n"
+            "  drone status\n"
+            "  drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>\n"
+            "  drone move <drone_id> <target_id>\n"
+            "  drone repair <drone_id> <system_id>\n"
+            "  drone salvage scrap <drone_id> <node_id> <amount>\n"
+            "  drone salvage module <drone_id> [node_id]\n"
+            "  drone salvage data <drone_id> <node_id>\n"
+            "  drone reboot <drone_id> | drone recall <drone_id>\n"
+            "\nBodega / Módulos:\n"
+            "  cargo | cargo audit\n"
+            "  install <module_id> | modules\n"
+            "\nSugerencias:\n"
+            "  ls /manuals/commands\n"
+            "  man navigation\n"
+            "  cat /mail/inbox/0001.txt\n"
+        ),
+    }.get(locale)
+    if help_text is None:
+        help_text = (
+            "\nCommands (summary):\n"
+            "  help | clear | exit | quit\n"
+        )
+    print(help_text)
 
 
 class SafeDict(dict):
@@ -206,8 +250,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
     }
     travel_templates = {
         "travel_started": {
-            "en": "[{sev}] travel_started :: To {to} dist={distance_ly:.2f}ly ETA={eta} (hint: travel abort)",
-            "es": "[{sev}] travel_started :: A {to} dist={distance_ly:.2f}ly ETA={eta} (pista: travel abort)",
+            "en": "[{sev}] travel_started :: To {to} dist={distance_ly:.2f}ly ETA={eta} (hint: nav abort)",
+            "es": "[{sev}] travel_started :: A {to} dist={distance_ly:.2f}ly ETA={eta} (pista: nav abort)",
         },
         "arrived": {
             "en": "[{sev}] arrived :: Arrived at {to} (from {from})",
@@ -218,12 +262,12 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "es": "[{sev}] travel_aborted :: Viaje abortado",
         },
         "hibernation_started": {
-            "en": "[{sev}] hibernation_started :: Sleeping for {years:.2f}y",
-            "es": "[{sev}] hibernation_started :: Hibernando durante {years:.2f}a",
+            "en": "[{sev}] hibernation_started :: Sleeping for {duration}",
+            "es": "[{sev}] hibernation_started :: Hibernando durante {duration}",
         },
         "hibernation_ended": {
-            "en": "[{sev}] hibernation_ended :: Woke up after {years:.2f}y",
-            "es": "[{sev}] hibernation_ended :: Despertaste tras {years:.2f}a",
+            "en": "[{sev}] hibernation_ended :: Woke up after {duration}",
+            "es": "[{sev}] hibernation_ended :: Despertaste tras {duration}",
         },
     }
     power_alert_templates = {
@@ -338,9 +382,13 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Action blocked: unknown contact ({node_id}). Use 'scan' or acquire navigation intel.",
             "es": "Acción bloqueada: contacto desconocido ({node_id}). Usa 'scan' o consigue inteligencia de navegación.",
         },
+        "dock_not_allowed": {
+            "en": "Action blocked: docking not allowed at {node_id}",
+            "es": "Acción bloqueada: no se puede acoplar en {node_id}",
+        },
         "no_route": {
-            "en": "Action blocked: no known route to {node_id}. Try: nav, uplink (at relay/waystation), or acquire intel.",
-            "es": "Acción bloqueada: no hay ruta conocida a {node_id}. Prueba: nav, uplink (en relay/waystation) o consigue inteligencia.",
+            "en": "Action blocked: no known route to {node_id}. Try: route <node_id> (if in range), or acquire intel at other hubs.",
+            "es": "Acción bloqueada: no hay ruta conocida a {node_id}. Prueba: route <node_id> (si está en rango) o consigue intel en otros hubs.",
         },
         "invalid_amount": {
             "en": "Action blocked: invalid amount",
@@ -423,8 +471,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "es": "Acción bloqueada: no estás en tránsito",
         },
         "not_at_node": {
-            "en": "Action blocked: not at {node_id}",
-            "es": "Acción bloqueada: no estás en {node_id}",
+            "en": "Action blocked: not in {node_id} orbit",
+            "es": "Acción bloqueada: no en órbita de {node_id}",
         },
         "route_known": {
             "en": "Route already known to {node_id}.",
@@ -683,6 +731,7 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                 "eta_years": e.data.get("eta_years", 0.0),
                 "eta": _format_eta_short((e.data.get("eta_years", 0.0) or 0.0) * Balance.YEAR_S, locale),
                 "years": e.data.get("years", 0.0),
+                "duration": _format_eta_short((e.data.get("years", 0.0) or 0.0) * Balance.YEAR_S, locale),
             })
             if e.type == EventType.TRAVEL_STARTED and e.data.get("local"):
                 km = e.data.get("distance_km") or 0.0
@@ -693,8 +742,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                     dist_txt = f"{_format_large_distance(km)}km"
                 eta_h = eta_s / 3600.0
                 msg = {
-                    "en": f"[{{sev}}] travel_started :: To {{to}} dist={dist_txt} ETA={_format_eta_short(eta_s, 'en')} (hint: travel abort)",
-                    "es": f"[{{sev}}] travel_started :: A {{to}} dist={dist_txt} ETA={_format_eta_short(eta_s, 'es')} (pista: travel abort)",
+                    "en": f"[{{sev}}] travel_started :: To {{to}} dist={dist_txt} ETA={_format_eta_short(eta_s, 'en')} (hint: nav abort)",
+                    "es": f"[{{sev}}] travel_started :: A {{to}} dist={dist_txt} ETA={_format_eta_short(eta_s, 'es')} (pista: nav abort)",
                 }
                 tmpl_local = msg.get(locale, msg["en"])
                 try:
@@ -715,8 +764,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             key = e.data.get("message_key", "")
             templates = {
                 "travel_profile_auto": {
-                    "en": "[{sev}] travel_profile_set :: Travel profile set: CRUISE (auto). Use 'travel --no-cruise <dest>' to override.",
-                    "es": "[{sev}] travel_profile_set :: Perfil de viaje: CRUISE (auto). Usa 'travel --no-cruise <dest>' para anular.",
+                    "en": "[{sev}] travel_profile_set :: Travel profile set: CRUISE (auto). Use 'nav --no-cruise <dest>' to override.",
+                    "es": "[{sev}] travel_profile_set :: Perfil de viaje: CRUISE (auto). Usa 'nav --no-cruise <dest>' para anular.",
                 },
                 "travel_profile_manual": {
                     "en": "[{sev}] travel_profile_set :: Travel override: CRUISE disabled. Increased wear expected.",
@@ -1002,7 +1051,7 @@ def render_diag(state, system_id: str) -> None:
     print(f"priority: {sys.priority}")
     print(f"forced_offline: {sys.forced_offline}")
     if sys.forced_offline:
-        print("notes: manually powered down (power shed/shutdown).")
+        print("notes: manually powered down (power off/shutdown).")
     if sys.dependencies:
         print("dependencies:")
         for d in sys.dependencies:
@@ -1036,11 +1085,13 @@ def render_alerts(state) -> None:
 
 def render_logs(state, limit: int = 15) -> None:
     print("\n=== EVENTS (recent) ===")
+    locale = state.os.locale.value
     for e in state.events.recent[-limit:]:
-        print(f"- t={e.t:6d} [{e.severity.value.upper():8s}] {e.type.value}: {e.message}")
+        t_fmt = _format_eta_short(float(e.t), locale)
+        print(f"- t={t_fmt:>8s} [{e.severity.value.upper():8s}] {e.type.value}: {e.message}")
 
 
-def render_jobs(state) -> None:
+def render_jobs(state, limit: int | None = 5) -> None:
     print("\n=== JOBS ===")
     jobs_state = state.jobs
     active_jobs = []
@@ -1088,7 +1139,15 @@ def render_jobs(state) -> None:
     ]
     if history:
         print("Recent complete/failed:")
-        for job in sorted(history, key=lambda j: j.job_id, reverse=True)[:5]:
+        def _job_sort_key(job):
+            try:
+                return int(job.job_id[1:]) if job.job_id.startswith("J") else int(job.job_id)
+            except Exception:
+                return 0
+        history_sorted = sorted(history, key=_job_sort_key, reverse=True)
+        if limit is not None:
+            history_sorted = history_sorted[:limit]
+        for job in history_sorted:
             print(_format_job(job))
 
 
@@ -1118,6 +1177,33 @@ def render_inventory(state) -> None:
         print("modules: (none)")
     if dirty:
         print("(cargo changes pending; run 'cargo audit' to refresh)")
+
+
+def render_modules_installed(state) -> None:
+    print("\n=== MODULES (installed) ===")
+    installed = list(state.ship.installed_modules or [])
+    if not installed:
+        print("(none)")
+        locale = state.os.locale.value
+        hint = {
+            "en": "Hint: if you have a module, you can install it with: install <module_id>",
+            "es": "Pista: si tienes un módulo, puedes instalarlo con: install <module_id>",
+        }
+        print(hint.get(locale, hint["en"]))
+        return
+    counts: dict[str, int] = {}
+    for mid in installed:
+        counts[mid] = counts.get(mid, 0) + 1
+    modules = load_modules()
+    locale = state.os.locale.value
+    for mid, count in sorted(counts.items()):
+        info = modules.get(mid, {})
+        name = info.get("name", mid)
+        desc = info.get("desc_es") if locale == "es" else info.get("desc_en")
+        suffix = f" x{count}" if count > 1 else ""
+        print(f"- {mid}: {name}{suffix}")
+        if desc:
+            print(f"  {desc}")
 
 
 def render_modules_catalog(state) -> None:
@@ -1869,7 +1955,7 @@ def _handle_uplink(state) -> None:
             "not_docked": "Uplink blocked: ship not docked.",
             "not_relay": "Uplink blocked: current node is not a relay/waystation/station.",
             "missing_data_core": "Uplink blocked: data_core missing.",
-            "data_core_shed": "Uplink blocked: data_core offline (CRUISE plan may have shed it). Try: power plan normal; boot datad",
+            "data_core_shed": "Uplink blocked: data_core offline. Try: power on data_core; boot datad",
             "data_core_offline": "Uplink blocked: data_core offline.",
             "datad_not_installed": "Uplink blocked: datad not installed.",
             "datad_not_running": "Uplink blocked: datad not running. Try: boot datad",
@@ -1880,7 +1966,7 @@ def _handle_uplink(state) -> None:
             "not_docked": "Uplink bloqueado: nave no está docked.",
             "not_relay": "Uplink bloqueado: el nodo actual no es relay/waystation/estación.",
             "missing_data_core": "Uplink bloqueado: falta data_core.",
-            "data_core_shed": "Uplink bloqueado: data_core offline (CRUISE puede haberlo apagado). Prueba: power plan normal; boot datad",
+            "data_core_shed": "Uplink bloqueado: data_core offline. Prueba: power on data_core; boot datad",
             "data_core_offline": "Uplink bloqueado: data_core offline.",
             "datad_not_installed": "Uplink bloqueado: datad no instalado.",
             "datad_not_running": "Uplink bloqueado: datad no está en ejecución. Prueba: boot datad",
@@ -2669,6 +2755,22 @@ class _TeeStdout:
     def flush(self) -> None:
         self._stream.flush()
 
+    def isatty(self) -> bool:
+        try:
+            return self._stream.isatty()
+        except Exception:
+            return False
+
+    def fileno(self) -> int:
+        return self._stream.fileno()
+
+    @property
+    def encoding(self):
+        return getattr(self._stream, "encoding", None)
+
+    def __getattr__(self, name: str):
+        return getattr(self._stream, name)
+
 
 def _copy_to_clipboard(text: str) -> bool:
     try:
@@ -2973,6 +3075,22 @@ def _latest_mail_id(state, box: str) -> str | None:
     return sorted(ids)[-1]
 
 
+def _list_mail_ids(state, box: str) -> list[str]:
+    path = f"/mail/{box}"
+    try:
+        entries = list_dir(state.os.fs, path, state.os.access_level)
+    except Exception:
+        return []
+    ids = []
+    for name in entries:
+        if not name.endswith(".txt"):
+            continue
+        if name.endswith(".notice.txt"):
+            continue
+        ids.append(name[:-4])
+    return sorted(set(ids))
+
+
 def render_mail_read(state, mail_id: str) -> None:
     base = mail_id
     if mail_id == "latest":
@@ -3274,10 +3392,16 @@ def render_alert_explain(state, alert_key: str) -> None:
             print(f"- time_since_first_seen={elapsed}s")
 
 def main() -> None:
-    from retorno.cli.parser import ParseError, parse_command
+    from retorno.cli.parser import ParseError, parse_command, format_parse_error
 
     if not isinstance(sys.stdout, _TeeStdout):
         sys.stdout = _TeeStdout(sys.stdout, _LOG_BUFFER)
+    if os.environ.get("RETORNO_DEBUG_COMPLETER", "").strip().lower() in {"1", "true", "yes"}:
+        try:
+            if hasattr(sys.stdout, "isatty") and not sys.stdout.isatty():
+                sys.stderr.write("[DEBUG] stdout is not a TTY; readline may disable completion/history\n")
+        except Exception:
+            pass
 
     engine = Engine()
     scenario = os.environ.get("RETORNO_SCENARIO", "prologue").lower()
@@ -3315,6 +3439,7 @@ def main() -> None:
         "map",
         "locate",
         "nav",
+        "navigation",
         "uplink",
         "relay",
         "dock",
@@ -3339,131 +3464,49 @@ def main() -> None:
         "quit",
     ]
 
+    debug_completer = os.environ.get("RETORNO_DEBUG_COMPLETER", "").strip().lower() in {"1", "true", "yes"}
+
     def _completer(text: str, state_idx: int) -> str | None:
-        buf = readline.get_line_buffer()
-        tokens = buf.split()
-        if buf.endswith(" "):
-            tokens.append("")
-        token = ""
-        if buf and not buf.endswith(" ") and tokens:
-            token = tokens[-1]
-        if not tokens:
-            candidates = [c for c in base_commands if c.startswith(text)]
-        else:
-            cmd = tokens[0]
-            candidates = []
-            with loop.with_lock() as locked_state:
-                systems = list(locked_state.ship.systems.keys())
-                drones = list(locked_state.ship.drones.keys())
-                sectors = list(locked_state.ship.sectors.keys())
-                contacts = sorted(
-                    locked_state.world.known_nodes if hasattr(locked_state.world, "known_nodes") and locked_state.world.known_nodes else locked_state.world.known_contacts
-                )
-                modules = list(set(locked_state.ship.cargo_modules))
-                services = []
-                for sys in locked_state.ship.systems.values():
-                    if sys.service and sys.service.is_installed:
-                        services.append(sys.service.service_name)
-                fs_paths = list(locked_state.os.fs.keys())
-
-            if len(tokens) == 1:
+        try:
+            buf = readline.get_line_buffer()
+            tokens = buf.split()
+            if buf.endswith(" "):
+                tokens.append("")
+            token = ""
+            if buf and not buf.endswith(" ") and tokens:
+                token = tokens[-1]
+            if not tokens:
                 candidates = [c for c in base_commands if c.startswith(text)]
-            elif cmd == "diag" or cmd == "about" or cmd == "locate":
-                candidates = [s for s in systems if s.startswith(text)]
-            elif cmd == "boot":
-                candidates = [s for s in services if s.startswith(text)]
-            elif cmd in {"ls", "cat"}:
-                path_text = token or text
-                if "/" in path_text:
-                    dir_part, base_part = path_text.rsplit("/", 1)
-                    dir_path = normalize_path(dir_part or "/")
-                    prefix = base_part
-                else:
-                    dir_path = "/"
-                    prefix = path_text
-                try:
-                    entries = list_dir(locked_state.os.fs, dir_path, locked_state.os.access_level)
-                except Exception:
-                    entries = []
-                for name in entries:
-                    if not name.startswith(prefix):
-                        continue
-                    if "/" in path_text:
-                        if path_text.startswith("/"):
-                            full = normalize_path(f"{dir_path}/{name}")
-                        else:
-                            full = f"{dir_part}/{name}" if dir_part else name
-                        candidates.append(full)
-                    else:
-                        candidates.append(name)
-            elif cmd == "repair":
-                if len(tokens) == 2:
-                    candidates = [d for d in drones if d.startswith(text)] + [s for s in systems if s.startswith(text)]
-                elif len(tokens) == 3:
-                    if tokens[1] in systems:
-                        candidates = [c for c in ["--selftest"] if c.startswith(text)]
-                    else:
-                        candidates = [s for s in systems if s.startswith(text)]
-            elif cmd == "dock":
-                candidates = [c for c in contacts if c.startswith(text)]
-            elif cmd == "travel":
-                def _travel_targets(prefix: str) -> list[str]:
-                    name_matches = []
-                    for nid in contacts:
-                        node = locked_state.world.space.nodes.get(nid)
-                        if node and node.name.lower().startswith(prefix.lower()):
-                            name_matches.append(node.name)
-                    sector_matches = []
-                    for nid in contacts:
-                        node = locked_state.world.space.nodes.get(nid)
-                        if node and node.node_id.startswith("S"):
-                            sector_label = f"sector={node.node_id}"
-                            if sector_label.startswith(prefix):
-                                sector_matches.append(sector_label)
-                    return [c for c in contacts if c.startswith(prefix)] + name_matches + sector_matches
+            else:
+                cmd = tokens[0]
+                candidates = []
+                with loop.with_lock() as locked_state:
+                    systems = list(locked_state.ship.systems.keys())
+                    drones = list(locked_state.ship.drones.keys())
+                    sectors = [s for s in locked_state.ship.sectors.keys() if s != "UNKNOWN_00"]
+                    contacts = sorted(
+                        c
+                        for c in (
+                            locked_state.world.known_nodes
+                            if hasattr(locked_state.world, "known_nodes") and locked_state.world.known_nodes
+                            else locked_state.world.known_contacts
+                        )
+                        if c != "UNKNOWN_00"
+                    )
+                    modules = list(set(locked_state.ship.cargo_modules))
+                    services = []
+                    for sys in locked_state.ship.systems.values():
+                        if sys.service and sys.service.is_installed:
+                            services.append(sys.service.service_name)
+                    fs_paths = list(locked_state.os.fs.keys())
 
-                if len(tokens) == 2:
-                    base_opts = ["abort", "--no-cruise"]
-                    candidates = [c for c in base_opts if c.startswith(text)]
-                    candidates += _travel_targets(text)
-                elif len(tokens) == 3 and tokens[1] == "--no-cruise":
-                    candidates = _travel_targets(text)
-                else:
-                    candidates = _travel_targets(text)
-            elif cmd == "power":
-                if len(tokens) == 2:
-                    candidates = [c for c in ["status", "shed", "off", "on", "plan"] if c.startswith(text)]
-                elif len(tokens) == 3 and tokens[1] in {"shed", "off", "on"}:
+                if len(tokens) == 1:
+                    candidates = [c for c in base_commands if c.startswith(text)]
+                elif cmd == "diag" or cmd == "about" or cmd == "locate":
                     candidates = [s for s in systems if s.startswith(text)]
-                elif len(tokens) == 3 and tokens[1] == "plan":
-                    candidates = [c for c in ["cruise", "normal"] if c.startswith(text)]
-            elif cmd == "debug":
-                if len(tokens) == 2:
-                    candidates = [c for c in ["on", "off", "status", "scenario", "seed"] if c.startswith(text)]
-                elif len(tokens) == 3 and tokens[1] == "scenario":
-                    candidates = [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
-            elif cmd == "install":
-                candidates = [m for m in modules if m.startswith(text)]
-            elif cmd == "inventory":
-                if len(tokens) == 2:
-                    candidates = [c for c in ["audit"] if c.startswith(text)]
-            elif cmd == "cargo":
-                if len(tokens) == 2:
-                    candidates = [c for c in ["audit"] if c.startswith(text)]
-            elif cmd == "job":
-                if len(tokens) == 2:
-                    candidates = [c for c in ["cancel"] if c.startswith(text)]
-                elif len(tokens) == 3 and tokens[1] == "cancel":
-                    candidates = [jid for jid in locked_state.jobs.active_job_ids if jid.startswith(text)]
-            elif cmd == "log":
-                if len(tokens) == 2:
-                    candidates = [c for c in ["copy"] if c.startswith(text)]
-            elif cmd == "intel":
-                if len(tokens) == 2:
-                    candidates = [c for c in ["show", "import", "export", "all"] if c.startswith(text)] + [t for t in ["10", "20", "50"] if t.startswith(text)]
-                elif len(tokens) == 3 and tokens[1] == "show":
-                    candidates = [i.intel_id for i in locked_state.world.intel if i.intel_id.startswith(text.upper())]
-                elif len(tokens) == 3 and tokens[1] in {"import", "export"}:
+                elif cmd == "boot":
+                    candidates = [s for s in services if s.startswith(text)]
+                elif cmd in {"ls", "cat"}:
                     path_text = token or text
                     if "/" in path_text:
                         dir_part, base_part = path_text.rsplit("/", 1)
@@ -3487,100 +3530,219 @@ def main() -> None:
                             candidates.append(full)
                         else:
                             candidates.append(name)
-            elif cmd == "shutdown":
-                if len(tokens) == 2:
-                    candidates = [s for s in systems if s.startswith(text)]
-            elif cmd == "system":
-                if len(tokens) == 2:
-                    candidates = [c for c in ["off", "on"] if c.startswith(text)]
-                elif len(tokens) == 3 and tokens[1] in {"off", "on"}:
-                    candidates = [s for s in systems if s.startswith(text)]
-            elif cmd == "hibernate":
-                if len(tokens) == 2:
-                    candidates = [c for c in ["until_arrival"] if c.startswith(text)]
-            elif cmd == "man":
-                topics: set[str] = set()
-                for path in fs_paths:
-                    if path.startswith("/manuals/commands/") or path.startswith("/manuals/systems/") or path.startswith("/manuals/alerts/") or path.startswith("/manuals/modules/"):
-                        name = path.rsplit("/", 1)[-1]
-                        if name.endswith(".txt"):
-                            name = name[:-4]
-                        if name.endswith(".en") or name.endswith(".es"):
-                            name = name[:-3]
-                        topics.add(name)
-                candidates = [t for t in sorted(topics) if t.startswith(text)]
-            elif cmd == "about":
-                topics = set(systems)
-                topics.update(locked_state.events.alerts.keys())
-                for path in fs_paths:
-                    if path.startswith("/manuals/modules/"):
-                        name = path.rsplit("/", 1)[-1]
-                        if name.endswith(".txt"):
-                            name = name[:-4]
-                        if name.endswith(".en") or name.endswith(".es"):
-                            name = name[:-3]
-                        topics.add(name)
-                candidates = [t for t in sorted(topics) if t.startswith(text)]
-            elif cmd == "alerts":
-                if len(tokens) == 2:
-                    candidates = [c for c in ["explain"] if c.startswith(text)]
-                elif len(tokens) == 3 and tokens[1] == "explain":
-                    candidates = [k for k in locked_state.events.alerts.keys() if k.startswith(text)]
-            elif cmd == "nav":
-                candidates = []
-            elif cmd == "uplink":
-                candidates = []
-            elif cmd == "relay":
-                if len(tokens) == 2:
-                    candidates = [c for c in ["uplink"] if c.startswith(text)]
-            elif cmd == "drone":
-                if len(tokens) == 2:
-                    candidates = [
-                        c for c in ["status", "deploy", "deploy!", "move", "reboot", "recall", "repair", "salvage"]
-                        if c.startswith(text)
-                    ]
-                elif len(tokens) == 3 and tokens[1] in {"deploy", "deploy!", "reboot", "recall", "repair", "move"}:
-                    candidates = [d for d in drones if d.startswith(text)]
-                elif len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
-                    candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
-                elif len(tokens) == 4 and tokens[1] == "move":
-                    candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
-                elif len(tokens) == 4 and tokens[1] == "repair":
-                    candidates = [s for s in systems if s.startswith(text)]
-                elif len(tokens) == 3 and tokens[1] == "salvage":
-                    candidates = [c for c in ["scrap", "module", "modules", "data"] if c.startswith(text)]
-                elif len(tokens) == 4 and tokens[1] == "salvage":
-                    candidates = [d for d in drones if d.startswith(text)]
-                elif len(tokens) == 5 and tokens[1] == "salvage":
+                elif cmd == "repair":
+                    if len(tokens) == 2:
+                        candidates = [d for d in drones if d.startswith(text)] + [s for s in systems if s.startswith(text)]
+                    elif len(tokens) == 3:
+                        if tokens[1] in systems:
+                            candidates = [c for c in ["--selftest"] if c.startswith(text)]
+                        else:
+                            candidates = [s for s in systems if s.startswith(text)]
+                elif cmd == "dock":
                     candidates = [c for c in contacts if c.startswith(text)]
-            elif cmd == "salvage":
-                if len(tokens) == 2:
-                    candidates = [c for c in ["scrap", "module", "modules", "data"] if c.startswith(text)]
-                elif len(tokens) == 3:
-                    candidates = [d for d in drones if d.startswith(text)]
-                elif len(tokens) == 4:
-                    candidates = [c for c in contacts if c.startswith(text)]
-            elif cmd == "route":
-                candidates = [c for c in contacts if c.startswith(text)]
-            elif cmd == "config":
-                if len(tokens) == 2:
-                    candidates = [c for c in ["set", "show"] if c.startswith(text)]
-                elif len(tokens) == 3 and tokens[1] == "set":
-                    candidates = [c for c in ["lang"] if c.startswith(text)]
-                elif len(tokens) == 4 and tokens[1] == "set" and tokens[2] == "lang":
-                    candidates = [c for c in ["en", "es"] if c.startswith(text)]
-            elif cmd == "mail":
-                if len(tokens) == 2:
-                    candidates = [c for c in ["inbox", "read"] if c.startswith(text)]
-                elif len(tokens) == 3 and tokens[1] == "read":
-                    candidates = [c for c in ["latest"] if c.startswith(text)]
-        if state_idx < len(candidates):
-            return candidates[state_idx]
-        return None
+                elif cmd in {"nav", "navigation", "travel"}:
+                    def _travel_targets(prefix: str) -> list[str]:
+                        name_matches = []
+                        for nid in contacts:
+                            node = locked_state.world.space.nodes.get(nid)
+                            if node and node.name.lower().startswith(prefix.lower()):
+                                name_matches.append(node.name)
+                        sector_matches = []
+                        for nid in contacts:
+                            node = locked_state.world.space.nodes.get(nid)
+                            if node and node.node_id.startswith("S"):
+                                sector_label = f"sector={node.node_id}"
+                                if sector_label.startswith(prefix):
+                                    sector_matches.append(sector_label)
+                        return [c for c in contacts if c.startswith(prefix)] + name_matches + sector_matches
 
+                    if len(tokens) == 2:
+                        base_opts = ["abort", "--no-cruise"]
+                        if cmd in {"nav", "navigation"}:
+                            base_opts = ["routes"] + base_opts
+                        candidates = [c for c in base_opts if c.startswith(text)]
+                        candidates += _travel_targets(text)
+                    elif len(tokens) == 3 and tokens[1] == "--no-cruise":
+                        candidates = _travel_targets(text)
+                    else:
+                        candidates = _travel_targets(text)
+                elif cmd == "power":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["status", "plan", "on", "off"] if c.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] in {"off", "on"}:
+                        candidates = [s for s in systems if s.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "plan":
+                        candidates = [c for c in ["cruise", "normal"] if c.startswith(text)]
+                elif cmd == "debug":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "modules"] if c.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "scenario":
+                        candidates = [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
+                elif cmd == "install":
+                    candidates = [m for m in modules if m.startswith(text)]
+                elif cmd == "inventory":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["audit"] if c.startswith(text)]
+                elif cmd == "cargo":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["audit"] if c.startswith(text)]
+                elif cmd == "job":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["cancel"] if c.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "cancel":
+                        candidates = [jid for jid in locked_state.jobs.active_job_ids if jid.startswith(text)]
+                elif cmd == "log":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["copy"] if c.startswith(text)]
+                elif cmd == "jobs":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["all", "5", "10", "20", "50"] if c.startswith(text)]
+                elif cmd == "intel":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["show", "import", "export", "all"] if c.startswith(text)] + [t for t in ["10", "20", "50"] if t.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "show":
+                        candidates = [i.intel_id for i in locked_state.world.intel if i.intel_id.startswith(text.upper())]
+                    elif len(tokens) == 3 and tokens[1] in {"import", "export"}:
+                        path_text = token or text
+                        if "/" in path_text:
+                            dir_part, base_part = path_text.rsplit("/", 1)
+                            dir_path = normalize_path(dir_part or "/")
+                            prefix = base_part
+                        else:
+                            dir_path = "/"
+                            prefix = path_text
+                        try:
+                            entries = list_dir(locked_state.os.fs, dir_path, locked_state.os.access_level)
+                        except Exception:
+                            entries = []
+                        for name in entries:
+                            if not name.startswith(prefix):
+                                continue
+                            if "/" in path_text:
+                                if path_text.startswith("/"):
+                                    full = normalize_path(f"{dir_path}/{name}")
+                                else:
+                                    full = f"{dir_part}/{name}" if dir_part else name
+                                candidates.append(full)
+                            else:
+                                candidates.append(name)
+                elif cmd == "shutdown":
+                    if len(tokens) == 2:
+                        candidates = [s for s in systems if s.startswith(text)]
+                elif cmd == "system":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["off", "on"] if c.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] in {"off", "on"}:
+                        candidates = [s for s in systems if s.startswith(text)]
+                elif cmd == "hibernate":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["until_arrival"] if c.startswith(text)]
+                elif cmd == "man":
+                    topics: set[str] = set()
+                    for path in fs_paths:
+                        if path.startswith("/manuals/commands/") or path.startswith("/manuals/systems/") or path.startswith("/manuals/alerts/") or path.startswith("/manuals/modules/"):
+                            name = path.rsplit("/", 1)[-1]
+                            if name.endswith(".txt"):
+                                name = name[:-4]
+                            if name.endswith(".en") or name.endswith(".es"):
+                                name = name[:-3]
+                            topics.add(name)
+                    candidates = [t for t in sorted(topics) if t.startswith(text)]
+                elif cmd == "about":
+                    topics = set(systems)
+                    topics.update(locked_state.events.alerts.keys())
+                    for path in fs_paths:
+                        if path.startswith("/manuals/modules/"):
+                            name = path.rsplit("/", 1)[-1]
+                            if name.endswith(".txt"):
+                                name = name[:-4]
+                            if name.endswith(".en") or name.endswith(".es"):
+                                name = name[:-3]
+                            topics.add(name)
+                    candidates = [t for t in sorted(topics) if t.startswith(text)]
+                elif cmd == "alerts":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["explain"] if c.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "explain":
+                        candidates = [k for k in locked_state.events.alerts.keys() if k.startswith(text)]
+                elif cmd == "uplink":
+                    candidates = []
+                elif cmd == "relay":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["uplink"] if c.startswith(text)]
+                elif cmd == "drone":
+                    if len(tokens) == 2:
+                        candidates = [
+                            c for c in ["status", "deploy", "deploy!", "move", "reboot", "recall", "repair", "salvage"]
+                            if c.startswith(text)
+                        ]
+                    elif len(tokens) == 3 and tokens[1] in {"deploy", "deploy!", "reboot", "recall", "repair", "move"}:
+                        candidates = [d for d in drones if d.startswith(text)]
+                    elif len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
+                        candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
+                    elif len(tokens) == 4 and tokens[1] == "move":
+                        candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
+                    elif len(tokens) == 4 and tokens[1] == "repair":
+                        candidates = [s for s in systems if s.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "salvage":
+                        candidates = [c for c in ["scrap", "module", "modules", "data"] if c.startswith(text)]
+                    elif len(tokens) == 4 and tokens[1] == "salvage":
+                        candidates = [d for d in drones if d.startswith(text)]
+                    elif len(tokens) == 5 and tokens[1] == "salvage":
+                        candidates = [c for c in contacts if c.startswith(text)]
+                elif cmd == "salvage":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["scrap", "module", "modules", "data"] if c.startswith(text)]
+                    elif len(tokens) == 3:
+                        candidates = [d for d in drones if d.startswith(text)]
+                    elif len(tokens) == 4:
+                        candidates = [c for c in contacts if c.startswith(text)]
+                elif cmd == "route":
+                    candidates = [c for c in contacts if c.startswith(text)]
+                elif cmd == "config":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["set", "show"] if c.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "set":
+                        candidates = [c for c in ["lang"] if c.startswith(text)]
+                    elif len(tokens) == 4 and tokens[1] == "set" and tokens[2] == "lang":
+                        candidates = [c for c in ["en", "es"] if c.startswith(text)]
+                elif cmd == "mail":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["inbox", "read"] if c.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "read":
+                        mail_ids = _list_mail_ids(locked_state, "inbox")
+                        candidates = [c for c in ["latest"] + mail_ids if c.startswith(text)]
+            if debug_completer and state_idx == 0:
+                try:
+                    sys.stderr.write(f"[DEBUG] completer call text='{text}' tokens={tokens} candidates={len(candidates)}\n")
+                except Exception:
+                    pass
+            if state_idx < len(candidates):
+                return candidates[state_idx]
+            return None
+        except Exception as e:
+            try:
+                with loop.with_lock() as locked_state:
+                    if locked_state.os.debug_enabled:
+                        sys.stderr.write(f"[DEBUG] completer error: {e}\\n")
+            except Exception:
+                pass
+            return None
+
+    # Minimal readline setup (matches the previously working behavior).
     readline.set_completer_delims(" \t\n")
     readline.set_completer(_completer)
-    readline.parse_and_bind("tab: complete")
+    if "libedit" in (readline.__doc__ or "").lower():
+        readline.parse_and_bind("bind ^I rl_complete")
+    else:
+        readline.parse_and_bind("tab: complete")
+    if debug_completer and hasattr(readline, "get_completer_delims"):
+        try:
+            sys.stderr.write(
+                f"[DEBUG] completer set={readline.get_completer() is not None} delims='{readline.get_completer_delims()}'\n"
+            )
+        except Exception:
+            pass
 
     def _drain_auto_events() -> None:
         auto_ev = loop.drain_events()
@@ -3606,7 +3768,9 @@ def main() -> None:
         try:
             parsed = parse_command(line)
         except ParseError as e:
-            print(f"ParseError: {e.message}")
+            with loop.with_lock() as locked_state:
+                locale = locked_state.os.locale.value
+            print(f"ParseError: {format_parse_error(e, locale)}")
             continue
 
         if parsed is None:
@@ -3624,7 +3788,9 @@ def main() -> None:
             break
         if parsed == "HELP":
             _drain_auto_events()
-            print_help()
+            with loop.with_lock() as locked_state:
+                locale = locked_state.os.locale.value
+            print_help(locale)
             continue
         if parsed == "CLEAR":
             print("\033[2J\033[H", end="")
@@ -3692,6 +3858,13 @@ def main() -> None:
                     print("debug deadnodes: available only in DEBUG mode. Use: debug on")
                     continue
                 render_debug_deadnodes(locked_state)
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_MODULES":
+            with loop.with_lock() as locked_state:
+                if not locked_state.os.debug_enabled:
+                    print("debug modules: available only in DEBUG mode. Use: debug on")
+                    continue
+                render_modules_catalog(locked_state)
             continue
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SEED":
             with loop.with_lock() as locked_state:
@@ -3769,7 +3942,7 @@ def main() -> None:
         if parsed == "MODULES":
             _drain_auto_events()
             with loop.with_lock() as locked_state:
-                render_modules_catalog(locked_state)
+                render_modules_installed(locked_state)
             continue
         if parsed == "SECTORS":
             _drain_auto_events()
@@ -3800,6 +3973,12 @@ def main() -> None:
             _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_jobs(locked_state)
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "JOBS":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                limit = None if parsed[1] == "all" else int(parsed[1])
+                render_jobs(locked_state, limit=limit)
             continue
         if parsed == "NAV":
             _drain_auto_events()
@@ -3945,6 +4124,17 @@ def main() -> None:
         with loop.with_lock() as locked_state:
             _apply_salvage_loot(loop, locked_state, ev)
             render_events(locked_state, ev)
+            if parsed.__class__.__name__ == "Travel":
+                for _, event in ev:
+                    if event.type == EventType.TRAVEL_STARTED:
+                        locale = locked_state.os.locale.value
+                        dest = event.data.get("to", parsed.node_id)
+                        msg = {
+                            "en": f"(nav) confirmed: en route to {dest}",
+                            "es": f"(nav) confirmado: rumbo a {dest}",
+                        }
+                        print(msg.get(locale, msg["en"]))
+                        break
         auto_ev = loop.drain_events()
         if auto_ev:
             with loop.with_lock() as locked_state:

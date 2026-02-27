@@ -1,0 +1,3 @@
+logs
+- Shows recent event log entries.
+- Use log copy [n] to copy recent lines.

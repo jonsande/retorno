@@ -26,7 +26,10 @@ def build_header(state) -> str:
     ship = state.ship
     p = ship.power
     soc = (p.e_batt_kwh / p.e_batt_max_kwh) if p.e_batt_max_kwh else 0.0
-    mode = "DEBUG" if state.os.debug_enabled else "NORMAL"
+    mode = ship.op_mode
+    if ship.op_mode == "CRUISE":
+        source = ship.op_mode_source or "manual"
+        mode = f"{ship.op_mode} ({source})"
     if ship.in_transit:
         remaining_s = max(0.0, ship.arrival_t - state.clock.t)
         eta = repl._format_eta_short(remaining_s, state.os.locale.value)
@@ -102,8 +105,9 @@ def build_jobs_lines(state) -> list[str]:
     return filtered
 
 
-def build_help_lines() -> list[str]:
-    return _capture_output(repl.print_help)
+def build_help_lines(state) -> list[str]:
+    locale = state.os.locale.value
+    return _capture_output(repl.print_help, locale)
 
 
 def build_command_output(func, *args, **kwargs) -> list[str]:

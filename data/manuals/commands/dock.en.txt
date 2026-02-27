@@ -1,3 +1,8 @@
 dock <node_id>
 - Dock the ship at a node.
-- Must be a known contact.
+- Requirements:
+- You must not be in transit.
+- You must already be at the target node (in orbit).
+- The target must be a known contact.
+- Docking may be disallowed at some nodes (e.g., origin).
+- Docking queues a job; check status with jobs.

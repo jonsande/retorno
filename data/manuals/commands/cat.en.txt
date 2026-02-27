@@ -1,0 +1,3 @@
+cat <path>
+- Shows file contents.
+- If a localized file exists, it is preferred automatically.

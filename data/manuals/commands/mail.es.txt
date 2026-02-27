@@ -1,0 +1,6 @@
+mail inbox
+mail read <id|latest>
+- Lista el contenido de la bandeja de entrada.
+- mail read <id> abre un mensaje concreto (usa ids de mail inbox o ls /mail/inbox).
+- mail read latest abre el mensaje más reciente.
+- Si existe versión localizada, se prefiere automáticamente.

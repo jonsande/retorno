@@ -34,10 +34,10 @@ net = P_gen - P_load
 headroom = P_discharge_max - max(0, P_load - P_gen)
 - Si el margen es pequeño, estás cerca del brownout.
 
-Protocolo mínimo de estabilización
-1) Reduce consumo: apaga primero sistemas no críticos (power shed).
-2) Restaura distribución: repara energy_distribution (estabilidad).
-3) Restaura generación: repara power_core (suministro sostenido).
-4) Recupera SoC: deja que la batería se recargue antes de operar o viajar.
+Protocolo mínimo de estabilizaciónS
+1) Restaura distribución: repara energy_distribution (estabilidad).
+2) Restaura generación: repara power_core (suministro sostenido).
+3) Reduce consumo: apaga primero sistemas no críticos (usa el comando "power off").
+4) Recupera SoC (State of Charge): deja que la batería se recargue antes de operar o viajar.
 
 Nota: En perfiles de CRUISE/hibernación, la nave solo puede sobrevivir largos periodos si Q se mantiene estable y la carga queda por debajo de la generación.

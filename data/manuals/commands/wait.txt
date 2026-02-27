@@ -1,3 +1,0 @@
-wait <segundos>
-- Avanza el tiempo del simulador.
-- Útil para completar jobs.

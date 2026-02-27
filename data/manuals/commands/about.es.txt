@@ -1,0 +1,2 @@
+about <system_id>
+- Muestra una descripción breve de un sistema, módulo o alerta.

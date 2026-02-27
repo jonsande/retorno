@@ -1,9 +1,10 @@
 travel <node_id|name>
 travel --no-cruise <dest>
 travel abort
+- Alias of nav. Prefer: nav <dest> | nav --no-cruise <dest> | nav abort.
 - Start interstellar transit to the target node.
-- By default, travel auto‑sets CRUISE for efficiency.
+- By default, travel auto-sets CRUISE for efficiency.
 - Use --no-cruise to keep the current mode (advanced; higher wear).
 - travel abort cancels the current transit and returns to the origin.
-- Shows ETA in years; ship goes in‑transit until arrival.
+- Shows ETA in years; ship goes in-transit until arrival.
 - Operational commands are blocked during transit.

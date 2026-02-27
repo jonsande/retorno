@@ -1,0 +1,11 @@
+debug on|off|status
+debug scenario prologue|sandbox|dev
+debug seed <n>
+debug arcs
+debug lore
+debug deadnodes
+debug modules
+- Enables or disables DEBUG mode (pauses/resumes auto-tick).
+- scenario resets the world to a preset.
+- seed sets the RNG seed.
+- arcs/lore/deadnodes/modules provide debug listings.

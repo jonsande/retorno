@@ -1,4 +1,8 @@
 jobs
+jobs <amount>
+jobs all
 - Muestra trabajos en cola/ejecución y recientes.
+- jobs <amount> limita el número de entradas completadas/fallidas.
+- jobs all muestra todas las entradas completadas/fallidas.
 - Columnas: id estado tipo objetivo ETA owner.
 - Usa: job cancel <job_id> para cancelar un trabajo activo.

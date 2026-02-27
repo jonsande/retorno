@@ -1,0 +1,2 @@
+diag <system_id>
+- Muestra diagnósticos detallados de un sistema de la nave.

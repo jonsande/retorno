@@ -1,5 +1,12 @@
-nav
-- Muestra rutas conocidas desde el nodo actual.
+nav routes
+nav <node_id|name>
+nav --no-cruise <dest>
+nav abort
+navigation <...> (alias)
+- nav routes: muestra rutas conocidas desde el nodo actual.
+- nav <dest>: inicia tránsito interestelar a un nodo conocido o nombre de contacto.
+- nav --no-cruise <dest>: viaja sin activar CRUISE (avanzado; mayor desgaste).
+- nav abort: cancela el tránsito actual y regresa al origen.
 - Las rutas se obtienen con: uplink (relay/waystation), route, intel import (logs/fragmentos), o scan si hay un hub co‑ubicado con tu posición actual.
-- Úsalo tras scan, route, uplink o intel import para ver dónde puedes viajar.
 - Si no hay rutas, consigue inteligencia de navegación o intenta uplink/route.
+- travel sigue aceptado como alias de nav.

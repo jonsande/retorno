@@ -1,5 +1,12 @@
-nav
-- Shows known routes from the current node.
-- Routes can be obtained via: uplink (relay/waystation), route, intel import (nav logs/fragments), or scan if a hub is co-located with your current position.
-- Use after scan, route, uplink, or intel import to see where travel is possible.
+nav routes
+nav <node_id|name>
+nav --no-cruise <dest>
+nav abort
+navigation <...> (alias)
+- nav routes: show known routes from the current node.
+- nav <dest>: start interstellar transit to a known node or contact name.
+- nav --no-cruise <dest>: travel without auto-setting CRUISE (advanced; higher wear).
+- nav abort: cancel the current transit and return to the origin.
+- Routes are obtained via: uplink (relay/waystation), route, intel import (nav logs/fragments), or scan if a hub is co-located with your current position.
 - If no routes appear, acquire navigation intel or attempt uplink/route.
+- travel remains accepted as an alias for nav.

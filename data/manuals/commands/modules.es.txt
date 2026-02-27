@@ -1,3 +1,4 @@
 modules
-- Lista módulos disponibles.
-- Úsalo para ver opciones de instalación.
+- Lista sólo los módulos instalados.
+- Si no hay ninguno, instala uno con: install <module_id>
+- El catálogo completo está disponible con: debug modules

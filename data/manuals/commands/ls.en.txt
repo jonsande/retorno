@@ -1,0 +1,3 @@
+ls [<path>]
+- Lists directory contents.
+- Default path is /.

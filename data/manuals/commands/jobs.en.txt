@@ -1,4 +1,8 @@
 jobs
+jobs <amount>
+jobs all
 - Shows queued/running jobs and recent results.
+- jobs <amount> limits the number of completed/failed entries shown.
+- jobs all shows all completed/failed entries.
 - Columns: id status type target ETA owner.
 - Use: job cancel <job_id> to cancel an active job.

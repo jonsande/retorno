@@ -1,6 +1,7 @@
 travel <node_id|name>
 travel --no-cruise <dest>
 travel abort
+- Alias de nav. Preferir: nav <dest> | nav --no-cruise <dest> | nav abort.
 - Inicia tránsito interestelar al nodo destino.
 - Por defecto, travel activa CRUISE automáticamente.
 - Usa --no-cruise para mantener el modo actual (avanzado; mayor desgaste).

@@ -1,0 +1,4 @@
+config show
+config set lang <en|es>
+- Muestra o ajusta opciones de configuración.
+- Usa lang para cambiar el idioma.

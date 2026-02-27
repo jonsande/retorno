@@ -1,0 +1,3 @@
+logs
+- Muestra entradas recientes del registro de eventos.
+- Usa log copy [n] para copiar líneas recientes.

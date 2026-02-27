@@ -1,0 +1,3 @@
+cat <path>
+- Muestra el contenido de un archivo.
+- Si existe versión localizada, se prefiere automáticamente.

@@ -1,5 +1,3 @@
 system on <system_id>
 system off <system_id>
-- Toggles manual power state for a subsystem.
-- 'off' forces the system offline (no load).
-- 'on' clears the manual lock; state follows health.
+- Alias for power on/off.

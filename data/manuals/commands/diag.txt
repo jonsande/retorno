@@ -1,3 +1,0 @@
-diag <system_id>
-- Diagnóstico técnico del sistema.
-- Verifica dependencias y servicio.

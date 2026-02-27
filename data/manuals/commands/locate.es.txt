@@ -1,0 +1,2 @@
+locate <system_id>
+- Muestra el sector de la nave o coordenadas de un sistema o nodo.

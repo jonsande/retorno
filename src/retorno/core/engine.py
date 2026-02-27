@@ -214,7 +214,7 @@ class Engine:
                 self._record_event(state.events, event)
                 return [event]
             links = state.world.known_links.get(current_id, set()) if hasattr(state.world, "known_links") else set()
-            if links and action.node_id not in links:
+            if action.node_id not in links:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
@@ -267,12 +267,35 @@ class Engine:
             if not action.no_cruise:
                 state.ship.op_mode = "CRUISE"
                 state.ship.op_mode_source = "auto"
+                # Apply the cruise power plan behavior (auto-shed systems).
+                targets = ["sensors", "security", "data_core", "drone_bay"]
+                for sid in targets:
+                    sys = state.ship.systems.get(sid)
+                    if not sys:
+                        continue
+                    old_state = sys.state
+                    sys.forced_offline = True
+                    if sys.state != SystemState.OFFLINE:
+                        sys.state = SystemState.OFFLINE
+                        if sys.service:
+                            sys.service.is_running = False
+                        self._record_event(
+                            state.events,
+                            self._make_event(
+                                state,
+                                EventType.SYSTEM_STATE_CHANGED,
+                                Severity.WARN,
+                                SourceRef(kind="ship_system", id=sys.system_id),
+                                f"Power plan cruise: {sys.system_id} -> OFFLINE",
+                                data={"from": old_state.value, "to": sys.state.value, "cause": "manual_shed"},
+                            ),
+                        )
                 profile = self._make_event(
                     state,
                     EventType.TRAVEL_PROFILE_SET,
                     Severity.INFO,
                     SourceRef(kind="ship", id=state.ship.ship_id),
-                    "Travel profile set: CRUISE (auto). Use 'travel --no-cruise <dest>' to override.",
+                    "Travel profile set: CRUISE (auto). Use 'nav --no-cruise <dest>' to override.",
                     data={"message_key": "travel_profile_auto"},
                 )
                 self._record_event(state.events, profile)
@@ -294,7 +317,7 @@ class Engine:
                         EventType.BOOT_BLOCKED,
                         Severity.WARN,
                         SourceRef(kind="ship", id=state.ship.ship_id),
-                        "Travel initiated in NORMAL mode. Consider 'power plan cruise' for long trips.",
+                        "Travel initiated in NORMAL mode. Consider CRUISE for long trips.",
                         data={"message_key": "travel_warn", "mode": state.ship.op_mode, "eta_years": years},
                     )
                     self._record_event(state.events, warn2)
@@ -499,6 +522,17 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
+            if node.kind == "origin":
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    f"Dock blocked: docking not allowed at {action.node_id}",
+                    data={"message_key": "boot_blocked", "reason": "dock_not_allowed", "node_id": action.node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
             known = state.world.known_nodes if hasattr(state.world, "known_nodes") else state.world.known_contacts
             intel = state.world.known_intel if hasattr(state.world, "known_intel") else {}
             if action.node_id != state.world.current_node_id and action.node_id not in known and action.node_id not in intel:
@@ -591,7 +625,7 @@ class Engine:
                     EventType.BOOT_BLOCKED,
                     Severity.WARN,
                     SourceRef(kind="ship_system", id=system.system_id),
-                    "Cargo audit blocked: data_core offline (CRUISE plan may have shed it). Try: power plan normal",
+                    "Cargo audit blocked: data_core offline. Try: power on data_core",
                     data={"message_key": "boot_blocked", "reason": "cargo_audit_blocked"},
                 )
                 self._record_event(state.events, event)
@@ -3004,7 +3038,7 @@ class Engine:
         params: dict,
         risk: RiskProfile | None = None,
     ) -> list[Event]:
-        job_id = f"J{state.jobs.next_job_seq:05d}"
+        job_id = f"J{state.jobs.next_job_seq}"
         state.jobs.next_job_seq += 1
         job = Job(
             job_id=job_id,

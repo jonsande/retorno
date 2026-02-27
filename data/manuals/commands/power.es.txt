@@ -1,0 +1,8 @@
+power status
+power plan cruise|normal
+power on <system_id>
+power off <system_id>
+- Muestra el estado de la red de energía.
+- plan ajusta el plan CRUISE o NORMAL.
+- on/off cambia manualmente la energía de un subsistema.
+- Pista: lee /manuals/concepts/power.es.txt

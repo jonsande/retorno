@@ -1,0 +1,2 @@
+about <system_id>
+- Shows a short description of a system, module, or alert key.

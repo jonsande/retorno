@@ -1,0 +1,2 @@
+locate <system_id>
+- Shows the ship sector or world coordinates for a system or node.

@@ -1,3 +1,8 @@
 dock <node_id>
-- Acopla la nave al nodo.
-- Debe ser contacto conocido.
+- Acopla la nave a un nodo.
+- Requisitos:
+- No debes estar en tránsito.
+- Debes estar ya en el nodo objetivo (en órbita).
+- El objetivo debe ser un contacto conocido.
+- En algunos nodos no se permite el acoplamiento (p. ej., origen).
+- El acoplamiento encola un trabajo; revisa con jobs.

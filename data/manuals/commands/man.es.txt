@@ -1,0 +1,3 @@
+man <comando>
+- Muestra el manual de un comando, sistema, módulo o alerta.
+- Usa: ls /manuals/commands para ver manuales disponibles.

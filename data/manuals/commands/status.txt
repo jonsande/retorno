@@ -1,3 +1,0 @@
-status
-- Muestra energía, sistemas y reloj.
-- Úsalo tras wait para ver cambios.

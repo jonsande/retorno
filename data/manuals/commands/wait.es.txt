@@ -1,0 +1,3 @@
+wait <segundos>
+- Avanza el tiempo un número de segundos.
+- Disponible solo en modo DEBUG.

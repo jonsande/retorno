@@ -1,5 +1,3 @@
 system on <system_id>
 system off <system_id>
-- Cambia el estado manual de energía de un subsistema.
-- 'off' fuerza el sistema a offline (sin carga).
-- 'on' libera el bloqueo manual; el estado sigue la salud.
+- Alias de power on/off.

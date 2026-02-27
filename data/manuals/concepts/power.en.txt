@@ -35,7 +35,7 @@ headroom = P_discharge_max - max(0, P_load - P_gen)
 - If headroom is small, you are close to brownout.
 
 Recommended stabilization protocol (minimal)
-1) Reduce load: power shed non-critical systems first.
+1) Reduce load: power off non-critical systems first.
 2) Restore distribution: repair energy_distribution (grid stability).
 3) Restore generation: repair power_core (sustained supply).
 4) Recover SoC: let batteries recharge before long operations or travel.

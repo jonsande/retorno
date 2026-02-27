@@ -1,0 +1,3 @@
+job cancel <job_id>
+- Cancels an active job by id.
+- Use jobs to list active job ids.

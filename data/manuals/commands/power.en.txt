@@ -1,0 +1,8 @@
+power status
+power plan cruise|normal
+power on <system_id>
+power off <system_id>
+- Shows power network status.
+- plan sets CRUISE or NORMAL power plan.
+- on/off toggles manual power for a subsystem.
+- Hint: read /manuals/concepts/power.en.txt

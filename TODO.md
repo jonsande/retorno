@@ -2,6 +2,7 @@
 === TODO AND PROMPTS ===
 ========================
 
+
 === PROLOGUE ===
 
 - [ ] La primera vez que se ejecuta el juego no debe fallar nunca el deploy!.
@@ -11,6 +12,10 @@
 
 - [ ] Necesitamos que se puedan recuperar (salvage) nuevos drones. Una sub-orden nueva: 'drone salvage drone' (que admita también el plural 'drone salvage drones'). Estoy incluye incluir tablas apropiadas en los hubs authored y correspondientes ajustes en la generación procedural del botín.
 
+- [ ] La orden "drone deploy <drone_id> <sector_id>" debería volver a admitir <system_id>, como hacía antes, pero generando un mensaque de que el drone se está desplegando en el sector_id en que se encuentra el system_id solicitado.
+
+- [ ] Hace falta meter hints sobre cómo averiguar el id de los drones y de los system_id (por ejemplo en el error de "repair", en el man de drone, o en el error de drone repair). Mencionar en ese hint que siempre se puede pulsar dos veces TAB para que te liste las opciones que se pueden introducir (y, por tanto, averiguar directamente los id's que hacen falta)
+
 
 === NAVIGATION / ROUTES / WORLD GEN ===
 
@@ -19,7 +24,7 @@
 - [ ] Alguna forma de generar el grafo del mundo en el estado actual, bien sea con fines de debug o con fines de que pueda en un futuro desarrollarse un módulo instalable que permita visualizarlo en pantalla del juego.
 - [ ] Los viajes deben ser más peligrosos. Los de muchos años luz deben, por lo pronto, exponerte a mucha radiación. Esto limitará el ir pegando saltos por ahí a lo loco. Viajar a 40 años luz debería ser a costa de llegar con los sitemas hechos polvo.
 - [x] Al hacer scan, no se suponía que debía establecerse la distancia fina a los hubs con distancia de 0ly? No lo está reflejando el nav.
-- [ ] Actualizar manual dock! Tiene que aclarar que se puede hacer un dock cuando se está a "distancia fina".
+- [x] Actualizar manual dock! Tiene que aclarar que se puede hacer un dock cuando se está a "distancia fina".
 - [x] Indicar en listado nav qué lugares han sido visitados.
 
 
@@ -32,11 +37,19 @@ VITALS
 - [ ] La cámara de sarcófagos será un sistema independiente? o retocar life_support?
 - [ ] Hay que desarrollar una v0 de vitals. El usuario tiene también que mantener a su PJ. La hibernación debe tener su coste (y/o riesgos). También tiene que haber algún consumo de alimento, y un generador de oxígeno que requiera alguna forma de mantenimiento o combustible o...
 
+- [ ] Debe haber un límite de scrap que se puede tener. O un límite de volumen. Medir las cosas por volumen.
+
 === COMMANDS ===
+
+- [x] Simplificar comandos 'nav' y 'travel'. Me inclino por sustituir el comando "travel <node_id|name>", "travel --no-cruise <dest>" y "travel abort" por "nav <node_id|name>", "nav --no-cruise <dest>" y "nav abort". Además, 'nav' debe ser un alias de 'navigation' (o sea, que funcione tanto escribir 'nav' como 'navigation'). El comando 'nav' actual, sin parámetros, lo sustituiremos por "nav routes" (o sea, que el comando "nav routes" hará lo que actualmente el comando "nav"). Después de implementar estos cambios hay que actualizar los manuales (localizados) en consecuencia, y el help. Por otra parte, si el usuario introduce el comando "nav" a secas, se debe imprimir un típico mensaje ParseError explicando el uso del comando.
+
+- [x] Los ParseError no parecen estar localizados. Con en lang configurado en inglés salen mensajes como este:
+ParseError: Uso: travel <node_id|name> | travel --no-cruise <dest> | travel abort
+La palabra "uso" es español. Hay que localizar estos mensajes de error. Aprovechar para revisar que estén bien localizados otros mensajes de error, advertencias y hints.
 
 - [x] Ahora mismo se informa del límite de scrap antes de llevar a cabo la operación de salvage si se ordena una cantidad mayor a la disponible. Esto no debería suceder. El jugador no debe saber antes de terminar el job de scrap cuál es el número total de scrap que hay en esa localización.
 - [x] Locate debe admitir node_id's, tal como lo indica el Hint del drone deploy (cuando no se le da un tarjet válido).
-- [ ] jobs debe admitir número de entradas que se quieren imprimir en pantalla, o filtros.
+- [x] jobs debe admitir número de entradas que se quieren imprimir en pantalla, o filtros.
 - [x] El comando contacts debe imprimir también la distancia a la que se encuentra cada contacto y si hay o no ruta conocida.
 
 
@@ -49,9 +62,9 @@ Hay que buscar una solución más diegética a esto. La información de lore que
 
 - [x] Dentro de la carpeta /lore, me interesa una carpeta llamada "singles", pensada para albergar documentos txt que serán de ser después "colocados" proceduralmente en el mundo.
 
-- [!] En el estado actual del juego, ¿cómo se están distribuyendo por el mundo los archivos txt y los packs? Cómo funciona corridor_01.json? Cómo funcionan los "arcs"Comprobar.
+- [x] Manual del comando mail. 
 
-- [ ] Manual del comando mail. Perfeccionar comando mail.
+- [x] Perfeccionar comando mail.
 
 - [x] Pensándolo mejor, sí quiero failsafe para algunos arcos. O mejor dicho, quiero tener la opción. Quiero que sea configurable para cada arco y/o .......
 
@@ -76,7 +89,10 @@ Hay que buscar una solución más diegética a esto. La información de lore que
 
 - [ ] Los incrustados [INTEL]...[/INTEL] no debe verlos el usuario.
 
-- [ ] Tres nuevas formas de "recuperar" información (intel y lore): 1) Recovered attachment: al hacer "cargo audit" aparece “found unindexed attachment; run cargo audit again to decode”; 2) Dron recuperado (mediante un futuro comando "drone salvage drone") que al desplegarlo (deploy) por primera vez produce un mensaje pregrabado; 3) Información que se obtiene/descubre al desmantelar un dron (mediante un futuro comando "drone dismantle", o algo así, que permite reducir a scrap un dron).
+- [ ] Tres nuevas formas de "recuperar" información (intel y lore): 
+  - [ ] 1) Recovered attachment: al hacer "cargo audit" aparece “found unindexed attachment; run cargo audit again to decode”; 
+  - [ ] 2) Dron recuperado (mediante un futuro comando "drone salvage drone") que al desplegarlo (deploy) por primera vez produce un mensaje pregrabado; 
+  - [ ] 3) Información que se obtiene/descubre al desmantelar un dron (mediante un futuro comando "drone dismantle", o algo así, que permite reducir a scrap un dron).
 
 
 
@@ -92,19 +108,21 @@ Hay que buscar una solución más diegética a esto. La información de lore que
 
 === OTROS / SIN CATALOGAR ===
 
+- [x] Parece que se ha estropeado el autocomplete!
+
 - [ ]
 
-- [ ] no sé si está funcionando bien el auto cruise, pues aunque ha subido el net a positivo, veo que todos los sistemas están activos.
+- [x] no sé si está funcionando bien el auto cruise, pues aunque ha subido el net a positivo, veo que todos los sistemas están activos.
 
-- [ ] En el output despues de hibernate until_arrival, el tiempo de "sleeping for" y "woke up after" debería escalarse. Sin han sido unos días, no tiene sentido que ponga 0.00y.
+- [x] En el output despues de hibernate until_arrival, el tiempo de "sleeping for" y "woke up after" debería escalarse. Sin han sido unos días, no tiene sentido que ponga 0.00y. Me gustaría usar aquí los mismos formatos que usamos para las ETA de los travels y los jobs.
 
-- [ ] Cuando se intenta dockear estando lejos sale el mensaje "action blocked: not at ECHO_7". Quizá debería decir "Not in ECHO_7 orbit" o algo así.
+- [x] Cuando se intenta dockear estando lejos sale el mensaje "action blocked: not at ECHO_7". Quizá debería decir "Not in ECHO_7 orbit" o algo así.
 
 - [x] El formato del tiempo de "unacked=" en alerts cuál es? Sólo en segundos? Me gustaría que siguiera el mismo formato que las ETA de los travels y los jobs.
 
 - [ ] Enterarse de cuales son las consecuencias de no atender una alerta crítica u otra (pues ahora mismo no lo tengo muy claro).
 
-- [ ] La cantidad inicial de scrap debe ser configurable desde balance.py.
+- [x] La cantidad inicial de scrap debe ser configurable desde balance.py.
 
 - [x] Ahora mismo, cuando se empieza el juego, se comienza como "location: UNKNOWN_00 (Unknown) [in orbit]". Esto me hace pensar que además de docked y in orbit hace falta un tercer estado, que sea ni 'docked' ni 'in orbit' (por ejemplo: cuando se cancela un viaje y la nave queda en un nodo temporal ¿en qué estado se encuentra?). Se supone que la nave RETORNO_ship al inicio del juego simplemente está "parada" en el espacio, no orbitando nada. Dime qué opinas de esto y si ves algún posible conflicto o error con lo que te planteo.
 
@@ -121,14 +139,11 @@ Al introducir después el comando 'nav' se obtine esto:
 Como se ve, ECHO_7 aparece entre los contactos conocidos pero sin ruta conocida. Por otra parte (corrígeme si me equivoco) la nave del jugador (RETORNO_SHIP) se encuentra a) en el mismo sector que ECHO_7, b) a una distancia de 0.00ly de HECHO_7, y c) no en órbita (in orbit) de ECHO_7 ni atracada (docked) en ECHO_7. Me gustaría entonces modificar algunas cosas (o asegurarse de que ya están implementadas, si fuera el caso). Me gustaría que cuando se cumplan esas tres condiciones [ a) la nave del jugador se encuentra en el mismo sector de un hub, b) ese hub está a 0.00ly de distancia, y c) la nave del jugador no está ni docked ni tampoco "in orbit" de ese hub], pase lo siguiente: si el hub figura entre las localizaciones conocidas pero sin ruta conocida, no se podrá viajar a esa ruta con 'travel' hasta que no se conozca ruta; se podrá averiguar/establecer la ruta y la distancia "fina" a ese hub con el comando 'route <node_id>'; una vez conocida la ruta, se calculará la distancia a ese hub ya no en años-luz sino en kilómetros (en caso de que el 'config set lang' sea 'es') o millas (en caso de que sea 'en'), y a partir de entonces el comando 'nav' reflejará la distancia a ese hub en esas unidades (siempre y cuando, insisto, el hub en cuestión esté en el mismo sector que la nave del jugaddor y a distancia 0.00ly); aunque no se use el comando 'route <node_id>', el comando 'scan' también servirá para hacer el cálculo fino de distancia (en km o millas) al hub (pero no servirá para averiguar/establecer ruta al hub, como sí hacía route); cómo calcular o decidir esa distancia te lo dejo a ti (puedes ser creativo, pero siempre prefiriendo las opciones más consistentes); en caso de que el jugador decida viajar a ese hub (y así entrar en su órbita), el ETA del viaje se calculará en función a esa distancia; llegar al destino significa entrar "in orbit" de ese hub (no docked), y quedarse a distancia de 0 (kilómetros/millas) de ese hub.
 Antes de implementar nada, dime qué opinas, si ves algún conflicto o problema potencial.
 
-- [ ] En el estado actual del juego, los sectores son considerados ellos mismos nodos? Se puede viajar a un sector aunque no se conozca ninguna localización/hub en él? Cuál es el nombre que reciben los sectores proceduralmente generados?
-
-
 - [-] Hay que mejorar la definición de "atasco" urgenemente. Pasar a una v1. No se trata de que se generen por arte de magia destinos. Hace falta comprobar detenidamente si el jugador tiene algún modo (aunque él no lo sepa) de lograr una localización (a través de uplink o scan o salvage data u otro).
 
 - [ ] Hay que modificar el comando "map". No es muy intuitivo. Podría ser algo como "ship sectors" o "map ship".
 
-- [ ] El comando travel devería ser el comando nav. Si se escribe sin parámetro, lista destinos y rutas, si con parámetro, funciona como travel.
+- [x] El comando travel devería ser el comando nav. Si se escribe sin parámetro, lista destinos y rutas, si con parámetro, funciona como travel.
 
 - [?] Al  hacer 'route <node_id>' a un node_id para el que ya conoces ruta,  no se debería iniciar el job. Debería salir un mensaje informando de que ya se conoce ruta a ese objetivo. Por otra parte, debería de haber un comando para cancelar jobs en curso.
 
@@ -136,7 +151,7 @@ Antes de implementar nada, dime qué opinas, si ves algún conflicto o problema 
 
 - [ ] Necesitamos una merjor organización del help.
 
-- [ ] Los jobs se numeran como J00001, J00002, etc. No me gusta esto. Implica que el límite está en 99999 jobs. Preveo que el jugador vaya a llevar a cabo más jobs que esos. No hay otra manera de identificar los jobs?
+- [x] Los jobs se numeran como J00001, J00002, etc. No me gusta esto. Implica que el límite está en 99999 jobs. Preveo que el jugador vaya a llevar a cabo más jobs que esos. No hay otra manera de identificar los jobs?
 
 - [ ] Hay muchos mensajes (o partes de mensajes) que aparecen en español cuando el idioma de configuración es el inglés, y al revés, mensajes o partes de mensajes en inglés cuando deberían estar en español. Un ejemplo: estando la configuración en inglés, me ha salido este  mensaje: "ParseError: Subcomando power desconocido. Usa: power status | power plan cruise|normal | power shed/off <system_id> | power on <system_id>"
 
@@ -150,7 +165,7 @@ Antes de implementar nada, dime qué opinas, si ves algún conflicto o problema 
 
 - [ ] Ahora mismo los manuals se han generado con un tono "diegético". Me gustaría ver cómo sería la versión más "técnica", pues chatgpt y codex me la han propuesto varias veces pero siempre la he rechazado sin llegar a ver cómo sería.
 
-- [ ] El comando "travel" hay que cambiarlo quizá por "navigate" (o algo primero como "trazar ruta" y después "navigate").
+- [x] El comando "travel" hay que cambiarlo quizá por "navigate" (o algo primero como "trazar ruta" y después "navigate").
 
 - [!] Ahora mismo si queremos viajar a "S+000_-001_-001:02: Relay-97 (relay) dist=1.30ly" hace falta introducir "travel S+000_-001_-001:0". Me gustaría que también se pudiera introducit "travel Realy-97" simplemente, y que el autocompletado funcionara. Y por cierto: ¿qué quiere decir "000_-001_-001:02"? ¿Son unas coordenadas? Si es así, creo que estaría bien indicar de algún modo que esa numeración son unas coordenadas. 
 
@@ -190,9 +205,9 @@ Ahora mismo es informativo (no afecta directamente a integridad/batería), pero 
 
 TEXTUAL
 - [!] Cuando al emprender un viaje se pone el ship_status automáticamente en cruise, no cambia en el panel head. De todas formas, no sé si está funcionando bien el auto cruise, pues aunque ha subido el net a positivo, veo que todos los sistemas están activos. 
-- [ ] Auto completado del system_id en el comando drone repair <drone_id> <system_id> no funciona.
+- [x] Auto completado del system_id en el comando drone repair <drone_id> <system_id> no funciona.
 - [ ] El panel status debería poder modificarse por otro.
-- [ ] Los paneles, excepto header, botton, comandos y logs deberían poder activarse desactivarse, para tener más espacio para logs.
+- [!] Los paneles, excepto header, botton, comandos y logs deberían poder activarse desactivarse, para tener más espacio para logs. Mediate atajos de teclado.
 - [ ] Colores. Y archivo de configuración de colores, para poder configurar paletas.
   - Que cuando cambie a mejor algo del status se ponga verde, y rojo cuando a peor.
   - Tag de advertencias naranja. Info en azul.

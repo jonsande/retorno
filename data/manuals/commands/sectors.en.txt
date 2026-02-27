@@ -1,0 +1,2 @@
+sectors
+- Lists ship sectors and their tags.

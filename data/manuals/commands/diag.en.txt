@@ -1,0 +1,2 @@
+diag <system_id>
+- Shows detailed diagnostics for a ship system.

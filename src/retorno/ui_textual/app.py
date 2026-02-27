@@ -11,7 +11,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Static, Input, RichLog
 
 from retorno.bootstrap import create_initial_state_prologue, create_initial_state_sandbox
-from retorno.cli.parser import ParseError, parse_command
+from retorno.cli.parser import ParseError, parse_command, format_parse_error
 from retorno.cli import repl
 from retorno.core.engine import Engine
 from retorno.core.actions import Hibernate
@@ -228,7 +228,8 @@ class RetornoTextualApp(App):
         self.query_one("#log", RichLog).clear()
 
     def action_help(self) -> None:
-        self._log_lines(presenter.build_help_lines())
+        with self.loop.with_lock() as state:
+            self._log_lines(presenter.build_help_lines(state))
 
     def action_history_prev(self) -> None:
         input_widget = self.query_one("#input", Input)
@@ -345,6 +346,8 @@ class RetornoTextualApp(App):
             "map",
             "locate",
             "dock",
+            "nav",
+            "navigation",
             "travel",
             "salvage",
             "route",
@@ -354,6 +357,7 @@ class RetornoTextualApp(App):
             "cargo",
             "boot",
             "job",
+            "system",
             "hibernate",
             "wait",
             "debug",
@@ -366,8 +370,14 @@ class RetornoTextualApp(App):
 
         systems = list(state.ship.systems.keys())
         drones = list(state.ship.drones.keys())
-        sectors = list(state.ship.sectors.keys())
-        contacts = sorted(state.world.known_nodes if hasattr(state.world, "known_nodes") and state.world.known_nodes else state.world.known_contacts)
+        sectors = [s for s in state.ship.sectors.keys() if s != "UNKNOWN_00"]
+        contacts = sorted(
+            c
+            for c in (
+                state.world.known_nodes if hasattr(state.world, "known_nodes") and state.world.known_nodes else state.world.known_contacts
+            )
+            if c != "UNKNOWN_00"
+        )
         modules = list(set(state.ship.cargo_modules))
         services = []
         for sys in state.ship.systems.values():
@@ -415,15 +425,44 @@ class RetornoTextualApp(App):
                 if tokens[1] in systems:
                     return [c for c in ["--selftest"] if c.startswith(text)]
                 return [s for s in systems if s.startswith(text)]
-        if cmd in {"dock", "travel"}:
+        if cmd in {"dock"}:
             return [c for c in contacts if c.startswith(text)]
+        if cmd in {"nav", "navigation", "travel"}:
+            def _travel_targets(prefix: str) -> list[str]:
+                name_matches = []
+                for nid in contacts:
+                    node = state.world.space.nodes.get(nid)
+                    if node and node.name.lower().startswith(prefix.lower()):
+                        name_matches.append(node.name)
+                sector_matches = []
+                for nid in contacts:
+                    node = state.world.space.nodes.get(nid)
+                    if node and node.node_id.startswith("S"):
+                        sector_label = f"sector={node.node_id}"
+                        if sector_label.startswith(prefix):
+                            sector_matches.append(sector_label)
+                return [c for c in contacts if c.startswith(prefix)] + name_matches + sector_matches
+
+            if len(tokens) == 2:
+                base_opts = ["abort", "--no-cruise"]
+                if cmd in {"nav", "navigation"}:
+                    base_opts = ["routes"] + base_opts
+                return [c for c in base_opts if c.startswith(text)] + _travel_targets(text)
+            if len(tokens) == 3 and tokens[1] == "--no-cruise":
+                return _travel_targets(text)
+            return _travel_targets(text)
         if cmd == "power":
             if len(tokens) == 2:
-                return [c for c in ["status", "shed", "off", "on", "plan"] if c.startswith(text)]
-            if len(tokens) == 3 and tokens[1] in {"shed", "off", "on"}:
+                return [c for c in ["status", "plan", "on", "off"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] in {"off", "on"}:
                 return [s for s in systems if s.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "plan":
                 return [c for c in ["cruise", "normal"] if c.startswith(text)]
+        if cmd == "system":
+            if len(tokens) == 2:
+                return [c for c in ["off", "on"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] in {"off", "on"}:
+                return [s for s in systems if s.startswith(text)]
         if cmd == "job":
             if len(tokens) == 2:
                 return [c for c in ["cancel"] if c.startswith(text)]
@@ -432,9 +471,12 @@ class RetornoTextualApp(App):
         if cmd == "log":
             if len(tokens) == 2:
                 return [c for c in ["copy"] if c.startswith(text)]
+        if cmd == "jobs":
+            if len(tokens) == 2:
+                return [c for c in ["all", "5", "10", "20", "50"] if c.startswith(text)]
         if cmd == "debug":
             if len(tokens) == 2:
-                return [c for c in ["on", "off", "status", "scenario"] if c.startswith(text)]
+                return [c for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "modules"] if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "scenario":
                 return [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
         if cmd == "install":
@@ -493,6 +535,8 @@ class RetornoTextualApp(App):
                 return [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "move":
                 return [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
+            if len(tokens) == 4 and tokens[1] == "repair":
+                return [s for s in systems if s.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "salvage":
                 return [c for c in ["scrap", "module", "modules", "data"] if c.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "salvage":
@@ -519,7 +563,8 @@ class RetornoTextualApp(App):
             if len(tokens) == 2:
                 return [c for c in ["inbox", "read"] if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "read":
-                return [c for c in ["latest"] if c.startswith(text)]
+                mail_ids = repl._list_mail_ids(state, "inbox")
+                return [c for c in ["latest"] + mail_ids if c.startswith(text)]
         if cmd == "intel":
             if len(tokens) == 2:
                 return [c for c in ["show", "import", "export", "all"] if c.startswith(text)] + [t for t in ["10", "20", "50"] if t.startswith(text)]
@@ -756,7 +801,7 @@ class RetornoTextualApp(App):
             if reply in yes:
                 if action == "TRAVEL_ABORT":
                     from retorno.core.actions import TravelAbort
-                    self._log_line("> travel abort")
+                    self._log_line("> nav abort")
                     self._log_lines(presenter.build_command_output(self.loop.apply_action, TravelAbort()))
                 elif action == "HIBERNATE_DRONES":
                     with self.loop.with_lock() as state:
@@ -793,7 +838,8 @@ class RetornoTextualApp(App):
         try:
             parsed = parse_command(text)
         except ParseError as e:
-            self._log_line(f"[ERROR] {e.message}")
+            locale = self.loop.state.os.locale.value
+            self._log_line(f"[ERROR] {format_parse_error(e, locale)}")
             return
         if parsed is None:
             return
@@ -825,7 +871,7 @@ class RetornoTextualApp(App):
             "CONFIG_SHOW",
         }
         if (isinstance(parsed, str) and parsed in info_tokens) or (
-            isinstance(parsed, tuple) and parsed[0] in {"LS", "CAT", "ABOUT", "MAN", "LOCATE", "ALERTS_EXPLAIN", "MAIL_LIST", "MAIL_READ"}
+            isinstance(parsed, tuple) and parsed[0] in {"LS", "CAT", "ABOUT", "MAN", "LOCATE", "ALERTS_EXPLAIN", "MAIL_LIST", "MAIL_READ", "JOBS", "DEBUG_MODULES"}
         ):
             self._drain_auto_to_log()
 
@@ -847,6 +893,11 @@ class RetornoTextualApp(App):
         if parsed == "JOBS":
             with self.loop.with_lock() as state:
                 self._log_lines(presenter.build_command_output(repl.render_jobs, state))
+            return
+        if isinstance(parsed, tuple) and parsed[0] == "JOBS":
+            with self.loop.with_lock() as state:
+                limit = None if parsed[1] == "all" else int(parsed[1])
+                self._log_lines(presenter.build_command_output(repl.render_jobs, state, limit=limit))
             return
         if parsed == "NAV":
             with self.loop.with_lock() as state:
@@ -908,7 +959,7 @@ class RetornoTextualApp(App):
             return
         if parsed == "MODULES":
             with self.loop.with_lock() as state:
-                self._log_lines(presenter.build_command_output(repl.render_modules_catalog, state))
+                self._log_lines(presenter.build_command_output(repl.render_modules_installed, state))
             return
         if parsed == "SECTORS":
             with self.loop.with_lock() as state:
@@ -1034,6 +1085,13 @@ class RetornoTextualApp(App):
                     return
                 self._log_lines(presenter.build_command_output(repl.render_debug_deadnodes, state))
             return
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_MODULES":
+            with self.loop.with_lock() as state:
+                if not state.os.debug_enabled:
+                    self._log_line("debug modules: available only in DEBUG mode. Use: debug on")
+                    return
+                self._log_lines(presenter.build_command_output(repl.render_modules_catalog, state))
+            return
 
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SEED":
             with self.loop.with_lock() as state:
@@ -1111,6 +1169,16 @@ class RetornoTextualApp(App):
         if ev:
             with self.loop.with_lock() as state:
                 lines = presenter.format_event_lines(state, [("cmd", e) for e in ev])
+                if parsed.__class__.__name__ == "Travel":
+                    for e in ev:
+                        if e.type == "travel_started" or e.type == repl.EventType.TRAVEL_STARTED:
+                            dest = e.data.get("to", getattr(parsed, "node_id", "?"))
+                            msg = {
+                                "en": f"(nav) confirmed: en route to {dest}",
+                                "es": f"(nav) confirmado: rumbo a {dest}",
+                            }
+                            lines.append(msg.get(state.os.locale.value, msg["en"]))
+                            break
             self._log_lines(lines)
         else:
             # No immediate events; still ok.

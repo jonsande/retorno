@@ -1,0 +1,2 @@
+status
+- Shows ship status, power, systems, and installed modules.

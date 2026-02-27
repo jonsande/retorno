@@ -1,3 +1,4 @@
 modules
-- Lists available module definitions.
-- Use to inspect install options.
+- Lists installed modules only.
+- If none are installed, install one with: install <module_id>
+- Full module catalog is available via: debug modules

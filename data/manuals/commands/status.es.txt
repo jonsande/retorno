@@ -1,0 +1,2 @@
+status
+- Muestra el estado de la nave, energía, sistemas y módulos instalados.
