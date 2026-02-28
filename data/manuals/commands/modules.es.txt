@@ -1,4 +1,6 @@
 modules
 - Lista sólo los módulos instalados.
-- Si no hay ninguno, instala uno con: install <module_id>
+- Alias: module
+- Si no hay ninguno, instala uno con: module install <module_id>
+- Inspecciona un módulo con: module inspect <module_id>
 - El catálogo completo está disponible con: debug modules

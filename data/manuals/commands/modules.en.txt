@@ -1,4 +1,6 @@
 modules
 - Lists installed modules only.
-- If none are installed, install one with: install <module_id>
+- Alias: module
+- If none are installed, install one with: module install <module_id>
+- Inspect a module with: module inspect <module_id>
 - Full module catalog is available via: debug modules

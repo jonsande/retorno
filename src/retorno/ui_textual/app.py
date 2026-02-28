@@ -488,6 +488,7 @@ class RetornoTextualApp(App):
             "diag",
             "about",
             "man",
+            "auth",
             "config",
             "mail",
             "intel",
@@ -517,6 +518,9 @@ class RetornoTextualApp(App):
             "power",
             "logs",
             "log",
+            "install",
+            "module",
+            "modules",
             "exit",
             "quit",
         ]
@@ -531,7 +535,7 @@ class RetornoTextualApp(App):
             )
             if c != "UNKNOWN_00"
         )
-        modules = list(set(state.ship.cargo_modules))
+        modules = list(set(state.ship.cargo_modules or state.ship.manifest_modules))
         services = []
         for sys in state.ship.systems.values():
             if sys.service and sys.service.is_installed:
@@ -556,7 +560,7 @@ class RetornoTextualApp(App):
                 dir_path = "/"
                 prefix = path_text
             try:
-                entries = list_dir(state.os.fs, dir_path, state.os.access_level)
+                entries = list_dir(state.os.fs, dir_path)
             except Exception:
                 entries = []
             for name in entries:
@@ -582,19 +586,7 @@ class RetornoTextualApp(App):
             return [c for c in contacts if c.startswith(text)]
         if cmd in {"nav", "navigation", "travel"}:
             def _travel_targets(prefix: str) -> list[str]:
-                name_matches = []
-                for nid in contacts:
-                    node = state.world.space.nodes.get(nid)
-                    if node and node.name.lower().startswith(prefix.lower()):
-                        name_matches.append(node.name)
-                sector_matches = []
-                for nid in contacts:
-                    node = state.world.space.nodes.get(nid)
-                    if node and node.node_id.startswith("S"):
-                        sector_label = f"sector={node.node_id}"
-                        if sector_label.startswith(prefix):
-                            sector_matches.append(sector_label)
-                return [c for c in contacts if c.startswith(prefix)] + name_matches + sector_matches
+                return [c for c in contacts if c.startswith(prefix)]
 
             if len(tokens) == 2:
                 base_opts = ["abort", "--no-cruise"]
@@ -634,6 +626,13 @@ class RetornoTextualApp(App):
                 return [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
         if cmd == "install":
             return [m for m in modules if m.startswith(text)]
+        if cmd == "module":
+            if len(tokens) == 2:
+                return [c for c in ["install", "inspect"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] in {"install", "inspect"}:
+                return [m for m in modules if m.startswith(text)]
+        if cmd == "modules":
+            return []
         if cmd == "inventory":
             if len(tokens) == 2:
                 return [c for c in ["audit"] if c.startswith(text)]
@@ -704,7 +703,10 @@ class RetornoTextualApp(App):
             if len(tokens) == 4:
                 return [c for c in contacts if c.startswith(text)]
         if cmd == "route":
-            return [c for c in contacts if c.startswith(text)]
+            if len(tokens) == 2:
+                return [c for c in ["solve"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] == "solve":
+                return [c for c in contacts if c.startswith(text)]
         if cmd == "config":
             if len(tokens) == 2:
                 return [c for c in ["set", "show"] if c.startswith(text)]
@@ -712,6 +714,11 @@ class RetornoTextualApp(App):
                 return [c for c in ["lang"] if c.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "set" and tokens[2] == "lang":
                 return [c for c in ["en", "es"] if c.startswith(text)]
+        if cmd == "auth":
+            if len(tokens) == 2:
+                return [c for c in ["status", "recover"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] == "recover":
+                return [c for c in ["med", "eng", "ops", "sec"] if c.startswith(text)]
         if cmd == "mail":
             if len(tokens) == 2:
                 return [c for c in ["inbox", "read"] if c.startswith(text)]
@@ -733,7 +740,7 @@ class RetornoTextualApp(App):
                     dir_path = "/"
                     prefix = path_text
                 try:
-                    entries = list_dir(state.os.fs, dir_path, state.os.access_level)
+                    entries = list_dir(state.os.fs, dir_path)
                 except Exception:
                     entries = []
                 for name in entries:
@@ -757,6 +764,18 @@ class RetornoTextualApp(App):
         self._log_buffer.append(line)
         if len(self._log_buffer) > 2000:
             self._log_buffer = self._log_buffer[-2000:]
+
+    def _fatal_error(self) -> None:
+        # Override Textual's rich traceback with standard Python traceback.
+        import sys
+        import traceback
+        self.bell()
+        exc = getattr(self, "_exception", None)
+        if exc is not None:
+            traceback.print_exception(exc.__class__, exc, exc.__traceback__, file=sys.stderr)
+        else:
+            traceback.print_exc()
+        self._close_messages_no_wait()
 
     def _log_lines(self, lines: list[str]) -> None:
         for line in lines:
@@ -933,14 +952,16 @@ class RetornoTextualApp(App):
                 "Tip: if you still don't remember the command instructions, manuals are under /manuals (try: ls /manuals/commands, man <topic>).",
                 "Tip: use 'config set lang' to change ship_os languaje",
                 "Tip: use 'help' to see available commands.",
+                "Tip: use TAB key for list and autocomplete available commands, id's, paths, etc.",
             ],
             "es": [
                 "\n[INFO] new mail detected.",
-                "Tip: use 'mail inbox' to list messages.",
-                "Tip: use 'mail read <id|latest>' or 'cat <path>' to read.",
-                "Tip: if you still don't remember the command instructions, manuals are under /manuals (try: ls /manuals/commands, man <topic>).",
-                "Tip: use 'config set lang' to change ship_os languaje",
-                "Tip: use 'help' to see available commands.",
+                "Consejo: use 'mail inbox' to list messages.",
+                "Consejo: use 'mail read <id|latest>' or 'cat <path>' to read.",
+                "Consejo: if you still don't remember the command instructions, manuals are under /manuals (try: ls /manuals/commands, man <topic>).",
+                "Consejo: use 'config set lang' to change ship_os languaje",
+                "Consejo: use 'help' to see available commands.",
+                "Consejo: usa la tecla TAB para listar y/o completar automáticamente comandos disponibles, identificaciones, rutas, etc.",
             ],
         }
         return tips.get(locale, tips["en"])
@@ -1044,10 +1065,12 @@ class RetornoTextualApp(App):
             "LOGS",
             "INVENTORY",
             "MODULES",
+            "MODULE_INSPECT",
             "SECTORS",
             "DRONE_STATUS",
             "POWER_STATUS",
             "CONFIG_SHOW",
+            "AUTH_STATUS",
         }
         if (isinstance(parsed, str) and parsed in info_tokens) or (
             isinstance(parsed, tuple) and parsed[0] in {"LS", "CAT", "ABOUT", "MAN", "LOCATE", "ALERTS_EXPLAIN", "MAIL_LIST", "MAIL_READ", "JOBS", "DEBUG_MODULES"}
@@ -1072,6 +1095,14 @@ class RetornoTextualApp(App):
         if parsed == "JOBS":
             with self.loop.with_lock() as state:
                 self._log_lines(presenter.build_command_output(repl.render_jobs, state))
+            return
+        if isinstance(parsed, tuple) and parsed[0] == "MODULE_INSPECT":
+            with self.loop.with_lock() as state:
+                self._log_lines(presenter.build_command_output(repl.render_module_inspect, state, parsed[1]))
+            return
+        if parsed == "AUTH_STATUS":
+            with self.loop.with_lock() as state:
+                self._log_lines(presenter.build_command_output(repl.render_auth_status, state))
             return
         if isinstance(parsed, tuple) and parsed[0] == "JOBS":
             with self.loop.with_lock() as state:

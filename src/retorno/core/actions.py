@@ -134,6 +134,11 @@ class TravelAbort(Action):
 
 
 @dataclass(slots=True)
+class AuthRecover(Action):
+    level: str
+
+
+@dataclass(slots=True)
 class Hibernate(Action):
     mode: str  # "until_arrival" or "years"
     years: float = 0.0

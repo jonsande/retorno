@@ -6,7 +6,10 @@ from enum import Enum
 
 class AccessLevel(str, Enum):
     GUEST = "guest"
+    MED = "med"
     ENG = "eng"
+    OPS = "ops"
+    SEC = "sec"
     ROOT = "root"
 
 
@@ -31,7 +34,7 @@ class FSNode:
 
 @dataclass(slots=True)
 class OSState:
-    access_level: AccessLevel = AccessLevel.GUEST
+    auth_levels: set[str] = field(default_factory=lambda: {"GUEST"})
     locale: Locale = Locale.EN
     debug_enabled: bool = False
     fs: dict[str, FSNode] = field(default_factory=dict)
@@ -75,16 +78,33 @@ def register_mail(os_state: OSState, path: str, t: float) -> None:
         os_state.mail_received_t[base] = float(t)
 
 
-def _has_access(node: FSNode, access_level: AccessLevel) -> bool:
-    order = {
-        AccessLevel.GUEST: 0,
-        AccessLevel.ENG: 1,
-        AccessLevel.ROOT: 2,
-    }
-    return order[access_level] >= order[node.access]
+def _normalize_access(value: AccessLevel | str | None) -> AccessLevel:
+    if isinstance(value, AccessLevel):
+        return value
+    if not value:
+        return AccessLevel.GUEST
+    if isinstance(value, str):
+        raw = value.strip().lower()
+        for level in AccessLevel:
+            if level.value == raw:
+                return level
+        for level in AccessLevel:
+            if level.value == raw.lower():
+                return level
+    return AccessLevel.GUEST
 
 
-def list_dir(fs: dict[str, FSNode], dir_path: str, access_level: AccessLevel) -> list[str]:
+def _access_label(value: AccessLevel | str | None) -> str:
+    level = _normalize_access(value)
+    return level.value.upper()
+
+
+def _has_access(node: FSNode, auth_levels: set[str]) -> bool:
+    required = _access_label(node.access)
+    return required in auth_levels
+
+
+def list_dir(fs: dict[str, FSNode], dir_path: str) -> list[str]:
     dir_path = normalize_path(dir_path)
     if dir_path != "/":
         prefix = dir_path + "/"
@@ -92,8 +112,6 @@ def list_dir(fs: dict[str, FSNode], dir_path: str, access_level: AccessLevel) ->
         prefix = "/"
     entries: set[str] = set()
     for path, node in fs.items():
-        if not _has_access(node, access_level):
-            continue
         if not path.startswith(prefix):
             continue
         rest = path[len(prefix):]
@@ -104,13 +122,13 @@ def list_dir(fs: dict[str, FSNode], dir_path: str, access_level: AccessLevel) ->
     return sorted(entries)
 
 
-def read_file(fs: dict[str, FSNode], file_path: str, access_level: AccessLevel) -> str:
+def read_file(fs: dict[str, FSNode], file_path: str, auth_levels: set[str]) -> str:
     file_path = normalize_path(file_path)
     node = fs.get(file_path)
     if not node:
         raise KeyError(file_path)
-    if not _has_access(node, access_level):
-        raise PermissionError(file_path)
+    if not _has_access(node, auth_levels):
+        raise PermissionError(_access_label(node.access))
     if node.node_type != FSNodeType.FILE:
         raise IsADirectoryError(file_path)
     return node.content
@@ -135,11 +153,7 @@ def mount_files(fs: dict[str, FSNode], prefix: str, files: list[dict]) -> int:
         dest_path = normalize_path(prefix + src_path)
         if dest_path in fs:
             continue
-        access = entry.get("access", AccessLevel.GUEST)
-        try:
-            access = AccessLevel(access)
-        except Exception:
-            access = AccessLevel.GUEST
+        access = _normalize_access(entry.get("access", AccessLevel.GUEST))
         content = entry.get("content", "")
         # Ensure parent directories.
         parts = dest_path.strip("/").split("/")
@@ -150,3 +164,7 @@ def mount_files(fs: dict[str, FSNode], prefix: str, files: list[dict]) -> int:
         fs[dest_path] = FSNode(path=dest_path, node_type=FSNodeType.FILE, content=content, access=access)
         added += 1
     return added
+
+
+def required_access_label(node: FSNode) -> str:
+    return _access_label(node.access)

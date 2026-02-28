@@ -26,7 +26,7 @@ from retorno.runtime.startup import load_startup_sequence_lines
 from retorno.config.balance import Balance
 from retorno.model.systems import SystemState
 from retorno.model.drones import DroneStatus
-from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, list_dir, normalize_path, read_file
+from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, list_dir, normalize_path, read_file, required_access_label
 from retorno.model.world import SECTOR_SIZE_LY, sector_id_for_pos, add_known_link, record_intel
 from retorno.model.world import SpaceNode, region_for_pos
 from retorno.worldgen.generator import ensure_sector_generated
@@ -53,14 +53,16 @@ def _print_startup_tips(locale: str) -> None:
             "Tip: if you still don't remember the command instructions, manuals are under /manuals (try: ls /manuals/commands, man <topic>).",
             "Tip: use 'config set lang' to change ship_os languaje",
             "Tip: use 'help' to see available commands.",
+            "Tip: use TAB key for list and autocomplete available commands, id's, paths, etc.",
         ],
         "es": [
             "\n[INFO]: se han recibido mensajes nuevos.",
-            "Tip: usa 'mail inbox' para listarlos.",
-            "Tip: usa 'mail read <id|latest>' o 'cat <path> para leer.",
-            "Tip: si aún no recuerda la instrucción de operaciones, los manuales están en /manuals (prueba: ls /manuals/commands, man <tema>).",
-            "Tip: introduce 'config set lang' para cambiar el idioma de ship_os",
-            "Tip: usa 'help' para ver los comandos disponibles.",
+            "Consejo: usa 'mail inbox' para listarlos.",
+            "Consejo: usa 'mail read <id|latest>' o 'cat <path> para leer.",
+            "Consejo: si aún no recuerda la instrucción de operaciones, los manuales están en /manuals (prueba: ls /manuals/commands, man <tema>).",
+            "Consejo: introduce 'config set lang' para cambiar el idioma de ship_os",
+            "Consejo: usa 'help' para ver los comandos disponibles.",
+            "Consejo: usa la tecla TAB para listar y/o completar automáticamente comandos disponibles, identificaciones, rutas, etc.",
             
         ],
     }
@@ -152,6 +154,7 @@ def print_help(locale: str = "en") -> None:
             "  ls [path] | cat <path>\n"
             "  man <topic> | about <system_id>\n"
             "  mail inbox | mail read <id|latest>\n"
+            "  auth status | auth recover <med|eng|ops|sec>\n"
             "  intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>\n"
             "  config set lang <en|es> | config show\n"
             "\nInfo:\n"
@@ -160,8 +163,8 @@ def print_help(locale: str = "en") -> None:
             "  sectors | map | locate <system_id>\n"
             "\nNavigation:\n"
             "  nav routes\n"
-            "  dock <node_id> | nav <node_id|name> | nav --no-cruise <dest> | nav abort | uplink\n"
-            "  route <node_id>\n"
+            "  dock <node_id> | nav <node_id> | nav --no-cruise <node_id> | nav abort | uplink\n"
+            "  route solve <node_id>\n"
             "  hibernate until_arrival | hibernate <years>\n"
             "\nSystems / Power:\n"
             "  diag <system_id> | boot <service_name>\n"
@@ -178,7 +181,7 @@ def print_help(locale: str = "en") -> None:
             "  drone reboot <drone_id> | drone recall <drone_id>\n"
             "\nCargo / Modules:\n"
             "  cargo | cargo audit\n"
-            "  install <module_id> | modules\n"
+            "  module install <module_id> | module inspect <module_id> | modules\n"
             "\nHints:\n"
             "  ls /manuals/commands\n"
             "  man navigation\n"
@@ -191,6 +194,7 @@ def print_help(locale: str = "en") -> None:
             "  ls [path] | cat <path>\n"
             "  man <topic> | about <system_id>\n"
             "  mail inbox | mail read <id|latest>\n"
+            "  auth status | auth recover <med|eng|ops|sec>\n"
             "  intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>\n"
             "  config set lang <en|es> | config show\n"
             "\nInformación:\n"
@@ -199,8 +203,8 @@ def print_help(locale: str = "en") -> None:
             "  sectors | map | locate <system_id>\n"
             "\nNavegación:\n"
             "  nav routes\n"
-            "  dock <node_id> | nav <node_id|name> | nav --no-cruise <dest> | nav abort | uplink\n"
-            "  route <node_id>\n"
+            "  dock <node_id> | nav <node_id> | nav --no-cruise <node_id> | nav abort | uplink\n"
+            "  route solve <node_id>\n"
             "  hibernate until_arrival | hibernate <años>\n"
             "\nSistemas / Energía:\n"
             "  diag <system_id> | boot <service_name>\n"
@@ -217,7 +221,7 @@ def print_help(locale: str = "en") -> None:
             "  drone reboot <drone_id> | drone recall <drone_id>\n"
             "\nBodega / Módulos:\n"
             "  cargo | cargo audit\n"
-            "  install <module_id> | modules\n"
+            "  module install <module_id> | module inspect <module_id> | modules\n"
             "\nSugerencias:\n"
             "  ls /manuals/commands\n"
             "  man navigation\n"
@@ -502,8 +506,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "es": "Acción bloqueada: no se puede acoplar en {node_id}",
         },
         "no_route": {
-            "en": "Action blocked: no known route to {node_id}. Try: route <node_id> (if in range), or acquire intel at other hubs.",
-            "es": "Acción bloqueada: no hay ruta conocida a {node_id}. Prueba: route <node_id> (si está en rango) o consigue intel en otros hubs.",
+            "en": "Action blocked: no known route to {node_id}. Try: route solve <node_id> (if in range), or acquire intel at other hubs.",
+            "es": "Acción bloqueada: no hay ruta conocida a {node_id}. Prueba: route solve <node_id> (si está en rango) o consigue intel en otros hubs.",
         },
         "invalid_amount": {
             "en": "Action blocked: invalid amount",
@@ -879,8 +883,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             key = e.data.get("message_key", "")
             templates = {
                 "travel_profile_auto": {
-                    "en": "[{sev}] travel_profile_set :: Travel profile set: CRUISE (auto). Use 'nav --no-cruise <dest>' to override.",
-                    "es": "[{sev}] travel_profile_set :: Perfil de viaje: CRUISE (auto). Usa 'nav --no-cruise <dest>' para anular.",
+                    "en": "[{sev}] travel_profile_set :: Travel profile set: CRUISE (auto). Use 'nav --no-cruise <node_id>' to override.",
+                    "es": "[{sev}] travel_profile_set :: Perfil de viaje: CRUISE (auto). Usa 'nav --no-cruise <node_id>' para anular.",
                 },
                 "travel_profile_manual": {
                     "en": "[{sev}] travel_profile_set :: Travel override: CRUISE disabled. Increased wear expected.",
@@ -1132,6 +1136,17 @@ def render_status(state) -> None:
         print(f" - {sid:18s} state={sys.state.value:8s} health={sys.health:.2f}{fo}{svc}")
 
 
+def render_auth_status(state) -> None:
+    ordered = ["GUEST", "MED", "ENG", "OPS", "SEC", "ROOT"]
+    levels = [lvl for lvl in ordered if lvl in state.os.auth_levels]
+    print("\n=== AUTH STATUS ===")
+    if not levels:
+        print("(none)")
+        return
+    for lvl in levels:
+        print(f"- {lvl}")
+
+
 def render_power_status(state) -> None:
     ship = state.ship
     p = ship.power
@@ -1301,8 +1316,8 @@ def render_modules_installed(state) -> None:
         print("(none)")
         locale = state.os.locale.value
         hint = {
-            "en": "Hint: if you have a module, you can install it with: install <module_id>",
-            "es": "Pista: si tienes un módulo, puedes instalarlo con: install <module_id>",
+            "en": "Hint: if you have a module, you can install it with: module install <module_id>",
+            "es": "Pista: si tienes un módulo, puedes instalarlo con: module install <module_id>",
         }
         print(hint.get(locale, hint["en"]))
         return
@@ -1319,6 +1334,37 @@ def render_modules_installed(state) -> None:
         print(f"- {mid}: {name}{suffix}")
         if desc:
             print(f"  {desc}")
+
+
+def render_module_inspect(state, module_id: str) -> None:
+    modules = load_modules()
+    info = modules.get(module_id)
+    if not info:
+        print(f"(module) unknown module_id: {module_id}")
+        return
+    in_inventory = module_id in state.ship.cargo_modules
+    installed = module_id in state.ship.installed_modules
+    locale = state.os.locale.value
+    name = info.get("name", module_id)
+    effects = info.get("effects", {})
+    effects_str = ", ".join(f"{k}={v}" for k, v in effects.items()) or "no effects"
+    desc = info.get("desc_es") if locale == "es" else info.get("desc_en")
+    print("\n=== MODULE INSPECT ===")
+    print(f"id: {module_id}")
+    print(f"name: {name}")
+    print(f"effects: {effects_str}")
+    if desc:
+        print(f"desc: {desc}")
+    if installed:
+        print("status: installed")
+    elif in_inventory:
+        print("status: in inventory")
+    else:
+        msg = {
+            "en": "status: not in inventory (info from catalog)",
+            "es": "estado: no está en inventario (info del catálogo)",
+        }
+        print(msg.get(locale, msg["en"]))
 
 
 def render_modules_catalog(state) -> None:
@@ -1470,15 +1516,13 @@ def render_contacts(state) -> None:
         print(msg.get(locale, msg["en"]))
         return
     current_id = state.world.current_node_id
-    node = state.world.space.nodes.get(current_id)
-    if node and node.kind == "transit" and not _has_unlock(state, "scan_in_transit"):
+    if state.ship.in_transit:
         locale = state.os.locale.value
         msg = {
-            "en": "contacts: sensors lock unavailable while adrift",
-            "es": "contacts: bloqueo de sensores no disponible en tránsito",
+            "en": "contacts: in transit; showing cached known contacts only",
+            "es": "contacts: en tránsito; mostrando solo contactos conocidos en caché",
         }
         print(msg.get(locale, msg["en"]))
-        return
     print("\n=== CONTACTS ===")
     known = state.world.known_nodes if hasattr(state.world, "known_nodes") and state.world.known_nodes else state.world.known_contacts
     if not known:
@@ -2409,9 +2453,13 @@ def _process_intel_token(state, token: str, source_path: str, messages: list[str
 
 def _handle_intel_import(state, path: str) -> None:
     try:
-        content = read_file(state.os.fs, path, state.os.access_level)
-    except PermissionError:
-        print("intel import: permission denied")
+        content = read_file(state.os.fs, path, state.os.auth_levels)
+    except PermissionError as e:
+        required = e.args[0] if e.args else None
+        if required:
+            print(f"intel import: access denied (requires {required})")
+        else:
+            print("intel import: access denied")
         return
     except Exception:
         print("intel import: file not found")
@@ -2803,8 +2851,8 @@ def render_nav(state) -> None:
                 print(f"- {nid}")
         locale = state.os.locale.value
         hint = {
-            "en": "Try: scan, route, intel, uplink (at relay/waystation), or acquire intel.",
-            "es": "Prueba: scan, route, intel, uplink (en relay/waystation) o consigue inteligencia.",
+            "en": "Try: scan, route solve, intel, uplink (at relay/waystation), or acquire intel.",
+            "es": "Prueba: scan, route solve, intel, uplink (en relay/waystation) o consigue inteligencia.",
         }
         print(hint.get(locale, hint["en"]))
 
@@ -3108,7 +3156,18 @@ def _resolve_localized_path(state, path: str) -> str:
     path = normalize_path(path)
     if path in state.os.fs:
         return path
-    if path.endswith(".txt"):
+    if not path.endswith(".txt"):
+        candidate = f"{path}.txt"
+        if candidate in state.os.fs:
+            return candidate
+        candidate = f"{path}.{state.os.locale.value}.txt"
+        if candidate in state.os.fs:
+            return candidate
+        fallback = "en" if state.os.locale.value == "es" else "es"
+        candidate = f"{path}.{fallback}.txt"
+        if candidate in state.os.fs:
+            return candidate
+    else:
         base = path[:-4]
         candidate = f"{base}.{state.os.locale.value}.txt"
         if candidate in state.os.fs:
@@ -3122,7 +3181,7 @@ def _resolve_localized_path(state, path: str) -> str:
 
 def render_ls(state, path: str) -> None:
     path = normalize_path(path)
-    entries = list_dir(state.os.fs, path, state.os.access_level)
+    entries = list_dir(state.os.fs, path)
     print(f"\n=== LS {path} ===")
     if not entries:
         print("(empty)")
@@ -3130,18 +3189,32 @@ def render_ls(state, path: str) -> None:
     for name in entries:
         node = state.os.fs.get(normalize_path(f"{path}/{name}"))
         suffix = "/" if node and node.node_type == FSNodeType.DIR else ""
-        print(f"- {name}{suffix}")
+        locked = False
+        required = None
+        if node:
+            required = required_access_label(node)
+            locked = required not in state.os.auth_levels
+        lock_tag = f" [{required} locked]" if locked and required else ""
+        print(f"- {name}{suffix}{lock_tag}")
 
 
 def render_cat(state, path: str) -> None:
     path = _resolve_localized_path(state, path)
     try:
-        content = read_file(state.os.fs, path, state.os.access_level)
+        content = read_file(state.os.fs, path, state.os.auth_levels)
     except KeyError:
         print("No such file")
         return
-    except PermissionError:
-        print("Permission denied")
+    except PermissionError as e:
+        required = None
+        try:
+            required = str(e.args[0])
+        except Exception:
+            required = None
+        if required:
+            print(f"Access denied: requires {required}")
+        else:
+            print("Access denied")
         return
     except IsADirectoryError:
         print(f"{path} is a directory. Try: ls {path}")
@@ -3157,7 +3230,7 @@ def render_cat(state, path: str) -> None:
 def render_mailbox(state, box: str) -> None:
     path = f"/mail/{box}"
     print(f"\n=== MAIL {box} ===")
-    entries = list_dir(state.os.fs, path, state.os.access_level)
+    entries = list_dir(state.os.fs, path)
     if not entries:
         print("(empty)")
         return
@@ -3173,7 +3246,7 @@ def render_mailbox(state, box: str) -> None:
 
 def _latest_mail_id(state, box: str) -> str | None:
     path = f"/mail/{box}"
-    entries = list_dir(state.os.fs, path, state.os.access_level)
+    entries = list_dir(state.os.fs, path)
     base_ids: set[str] = set()
     for name in entries:
         if not name.endswith(".txt"):
@@ -3202,7 +3275,7 @@ def _latest_mail_id(state, box: str) -> str | None:
 def _list_mail_ids(state, box: str) -> list[str]:
     path = f"/mail/{box}"
     try:
-        entries = list_dir(state.os.fs, path, state.os.access_level)
+        entries = list_dir(state.os.fs, path)
     except Exception:
         return []
     ids = []
@@ -3422,8 +3495,9 @@ def render_man(state, topic: str) -> None:
     concept_path = _resolve_localized_path(state, f"/manuals/concepts/{topic}.txt")
     sys_path = _resolve_localized_path(state, f"/manuals/systems/{topic}.txt")
     alert_path = _resolve_localized_path(state, f"/manuals/alerts/{topic}.txt")
+    module_path = _resolve_localized_path(state, f"/manuals/modules/{topic}.txt")
     resolved_path = None
-    for path in (cmd_path, concept_path, sys_path, alert_path):
+    for path in (cmd_path, concept_path, sys_path, alert_path, module_path):
         if path in state.os.fs:
             resolved_path = path
             break
@@ -3432,9 +3506,13 @@ def render_man(state, topic: str) -> None:
         return
     try:
         print(f"\n=== MAN {topic} ===")
-        print(read_file(state.os.fs, resolved_path, state.os.access_level))
-    except PermissionError:
-        print("Permission denied")
+        print(read_file(state.os.fs, resolved_path, state.os.auth_levels))
+    except PermissionError as e:
+        required = e.args[0] if e.args else None
+        if required:
+            print(f"Access denied: requires {required}")
+        else:
+            print("Access denied")
     except Exception:
         print("No manual found")
 
@@ -3482,7 +3560,7 @@ def render_alert_explain(state, alert_key: str) -> None:
         if fallback in state.os.fs:
             manual_path = fallback
     try:
-        print(read_file(state.os.fs, manual_path, state.os.access_level))
+        print(read_file(state.os.fs, manual_path, state.os.auth_levels))
     except Exception:
         print("(no manual found)")
 
@@ -3577,6 +3655,7 @@ def main() -> None:
         "inventory",
         "cargo",
         "install",
+        "module",
         "modules",
         "shutdown",
         "system",
@@ -3618,7 +3697,7 @@ def main() -> None:
                         )
                         if c != "UNKNOWN_00"
                     )
-                    modules = list(set(locked_state.ship.cargo_modules))
+                    modules = list(set(locked_state.ship.cargo_modules or locked_state.ship.manifest_modules))
                     services = []
                     for sys in locked_state.ship.systems.values():
                         if sys.service and sys.service.is_installed:
@@ -3641,7 +3720,7 @@ def main() -> None:
                         dir_path = "/"
                         prefix = path_text
                     try:
-                        entries = list_dir(locked_state.os.fs, dir_path, locked_state.os.access_level)
+                        entries = list_dir(locked_state.os.fs, dir_path)
                     except Exception:
                         entries = []
                     for name in entries:
@@ -3667,19 +3746,7 @@ def main() -> None:
                     candidates = [c for c in contacts if c.startswith(text)]
                 elif cmd in {"nav", "navigation", "travel"}:
                     def _travel_targets(prefix: str) -> list[str]:
-                        name_matches = []
-                        for nid in contacts:
-                            node = locked_state.world.space.nodes.get(nid)
-                            if node and node.name.lower().startswith(prefix.lower()):
-                                name_matches.append(node.name)
-                        sector_matches = []
-                        for nid in contacts:
-                            node = locked_state.world.space.nodes.get(nid)
-                            if node and node.node_id.startswith("S"):
-                                sector_label = f"sector={node.node_id}"
-                                if sector_label.startswith(prefix):
-                                    sector_matches.append(sector_label)
-                        return [c for c in contacts if c.startswith(prefix)] + name_matches + sector_matches
+                        return [c for c in contacts if c.startswith(prefix)]
 
                     if len(tokens) == 2:
                         base_opts = ["abort", "--no-cruise"]
@@ -3705,6 +3772,11 @@ def main() -> None:
                         candidates = [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
                 elif cmd == "install":
                     candidates = [m for m in modules if m.startswith(text)]
+                elif cmd == "module":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["install", "inspect"] if c.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] in {"install", "inspect"}:
+                        candidates = [m for m in modules if m.startswith(text)]
                 elif cmd == "inventory":
                     if len(tokens) == 2:
                         candidates = [c for c in ["audit"] if c.startswith(text)]
@@ -3737,7 +3809,7 @@ def main() -> None:
                             dir_path = "/"
                             prefix = path_text
                         try:
-                            entries = list_dir(locked_state.os.fs, dir_path, locked_state.os.access_level)
+                            entries = list_dir(locked_state.os.fs, dir_path)
                         except Exception:
                             entries = []
                         for name in entries:
@@ -3823,7 +3895,10 @@ def main() -> None:
                     elif len(tokens) == 4:
                         candidates = [c for c in contacts if c.startswith(text)]
                 elif cmd == "route":
-                    candidates = [c for c in contacts if c.startswith(text)]
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["solve"] if c.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "solve":
+                        candidates = [c for c in contacts if c.startswith(text)]
                 elif cmd == "config":
                     if len(tokens) == 2:
                         candidates = [c for c in ["set", "show"] if c.startswith(text)]
@@ -3923,7 +3998,12 @@ def main() -> None:
         if parsed == "CONFIG_SHOW":
             with loop.with_lock() as locked_state:
                 print(f"language: {locked_state.os.locale.value}")
-                print(f"access: {locked_state.os.access_level.value}")
+                levels = ", ".join(sorted(locked_state.os.auth_levels))
+                print(f"auth: {levels or '(none)'}")
+            continue
+        if parsed == "AUTH_STATUS":
+            with loop.with_lock() as locked_state:
+                render_auth_status(locked_state)
             continue
         if isinstance(parsed, tuple) and parsed[0] == "CONFIG_SET_LANG":
             lang = parsed[1]
@@ -4068,6 +4148,11 @@ def main() -> None:
             _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_modules_installed(locked_state)
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "MODULE_INSPECT":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                render_module_inspect(locked_state, parsed[1])
             continue
         if parsed == "SECTORS":
             _drain_auto_events()
@@ -4239,9 +4324,10 @@ def main() -> None:
             continue
         if parsed.__class__.__name__ in {"Dock", "Travel"}:
             with loop.with_lock() as locked_state:
-                resolved = _resolve_node_id_from_input(locked_state, parsed.node_id)
-                if resolved:
-                    parsed.node_id = resolved
+                if parsed.__class__.__name__ == "Dock":
+                    resolved = _resolve_node_id_from_input(locked_state, parsed.node_id)
+                    if resolved:
+                        parsed.node_id = resolved
                 if not _confirm_abandon_drones(locked_state, parsed):
                     continue
 
@@ -4250,7 +4336,8 @@ def main() -> None:
             _apply_salvage_loot(loop, locked_state, ev)
             render_events(locked_state, ev)
             if parsed.__class__.__name__ == "Travel":
-                for _, event in ev:
+                for item in ev:
+                    event = item[1] if isinstance(item, tuple) and len(item) == 2 else item
                     if event.type == EventType.TRAVEL_STARTED:
                         locale = locked_state.os.locale.value
                         dest = event.data.get("to", parsed.node_id)

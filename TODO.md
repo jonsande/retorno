@@ -39,7 +39,23 @@ VITALS
 
 - [ ] Debe haber un límite de scrap que se puede tener. O un límite de volumen. Medir las cosas por volumen.
 
+ENERGY
+
+
+
 === COMMANDS ===
+
+- [ ] Estando docked en CURL_12, al hacer "uplink" el juego crashea y me devuelve un error "AttributeError: 'list' object has no attribute 'events'".
+
+- [ ] Creo que el comando logs sigue indicando cuál es la cantidad de scrap total recupelable (available) al ordenar salvage scrap. No debería mostrarse. Eso el jugador sólo debe saberlo una vez el job de salvage ha finalizado (actualmente se generan mensajes correctos en este sentido). Sólo corregir la información que se ofrece a este respecto cuando el job está todavía queued.
+
+- [ ] El contacto y la ruta a ARCHIVE_01 me ha aparecido haciendo mi primer uplink en ECHO_7. No debería. Debe costar más conseguir esa localización. Revisar el arco.
+
+- [ ] comando undock para volver a in orbit.
+
+- [ ] Parece que ahora se puede desactivar core_os y otros sistemas vitales que no deberían poder desacivarse. Pedirle a gpt que razone esto y me diga cuales tiene sentido y cuales no poder apagar.
+
+- [ ] Estoy pudiendo ejecutar "route solve CURL_12" desde ECHO_12 teniendo todos los sitemas apagados. ¿Por qué?
 
 - [x] Simplificar comandos 'nav' y 'travel'. Me inclino por sustituir el comando "travel <node_id|name>", "travel --no-cruise <dest>" y "travel abort" por "nav <node_id|name>", "nav --no-cruise <dest>" y "nav abort". Además, 'nav' debe ser un alias de 'navigation' (o sea, que funcione tanto escribir 'nav' como 'navigation'). El comando 'nav' actual, sin parámetros, lo sustituiremos por "nav routes" (o sea, que el comando "nav routes" hará lo que actualmente el comando "nav"). Después de implementar estos cambios hay que actualizar los manuales (localizados) en consecuencia, y el help. Por otra parte, si el usuario introduce el comando "nav" a secas, se debe imprimir un típico mensaje ParseError explicando el uso del comando.
 
@@ -87,6 +103,8 @@ Hay que buscar una solución más diegética a esto. La información de lore que
 
 === INTEL ===
 
+ - [ ] [INTEL] S+003_-001_+001 [/INTEL] devuelve "corrupt data: no usable intel found". ¿Por qué? ¿Qué está mal con el formato? ¿No son unas coordenadas correctas?
+
 - [ ] Los incrustados [INTEL]...[/INTEL] no debe verlos el usuario.
 
 - [ ] Tres nuevas formas de "recuperar" información (intel y lore): 
@@ -123,8 +141,16 @@ Esto da variedad, pero no lo haría aún como primer sistema.
 - [ ] Módulo instalable que permita automatizar ciertas tareas en tránsito (aunque el PJ esté hibernando). Por ejemplo, llevar a cabo un scan cada x tiempo (configurable por el jugador), y dar la opcion de deshibernar en caso de que se detecte algo nuevo.
 
 
+=== WIN/LOST CONDITIONS AND LOOPS ===
+
+
 
 === OTROS / SIN CATALOGAR ===
+
+- [ ] Pegarle a chatGPT:
+  - debug lore después de 1–2 uplinks
+  - un ejemplo del archivo entregado por captured_signal o ship_os_mail
+  Para calibrar probabilidades (para que no “llueva lore” y siga siendo calmado).
 
 - [x] Parece que se ha estropeado el autocomplete!
 

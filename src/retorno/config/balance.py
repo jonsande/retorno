@@ -48,6 +48,18 @@ class Balance:
     SELFTEST_REPAIR_SCRAP_PER_HEALTH = 12
     # Cargo audit time.
     CARGO_AUDIT_TIME_S = 11.0
+    # Auth recover (MED) time and power draw.
+    AUTH_RECOVER_MED_TIME_S = 45.0
+    AUTH_RECOVER_MED_POWER_KW = 0.8
+    # Auth recover (ENG) time and power draw.
+    AUTH_RECOVER_ENG_TIME_S = 65.0
+    AUTH_RECOVER_ENG_POWER_KW = 1.0
+    # Auth recover (OPS) time and power draw.
+    AUTH_RECOVER_OPS_TIME_S = 80.0
+    AUTH_RECOVER_OPS_POWER_KW = 1.2
+    # Auth recover (SEC) time and power draw.
+    AUTH_RECOVER_SEC_TIME_S = 95.0
+    AUTH_RECOVER_SEC_POWER_KW = 1.4
 
     # Transit wear / warnings
     # Multiplier applied to wear during normal transit.

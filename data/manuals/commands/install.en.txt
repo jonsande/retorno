@@ -1,3 +1,4 @@
 install <module_id>
+- Alias of: module install <module_id>
 - Installs a module from inventory.
 - Consumes the module item.

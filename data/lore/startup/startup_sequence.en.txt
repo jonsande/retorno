@@ -1,4 +1,7 @@
 [core_os] wake schedule integrity: FAIL (chronometry desync)
+[core_os] Multiple wake timers unreadable or outside valid bounds.
+[core_os] No authorized medical staff response detected.
+[core_os] Entering autonomous emergency recovery protocol.
 AUTONOMOUS RECOVERY PROTOCOL engaged
 CRYO VAULT status scan... ok
 TARGET selected: Sarcophagus-05

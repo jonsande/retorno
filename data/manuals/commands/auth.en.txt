@@ -1,0 +1,50 @@
+auth
+auth status
+auth recover med
+auth recover eng
+auth recover ops
+auth recover sec
+
+Summary
+- Shows available authorization levels or recovers MED credentials.
+
+Usage
+- auth status
+- auth recover med
+- auth recover eng
+- auth recover ops
+- auth recover sec
+
+Authorization Levels
+- GUEST: baseline access (startup).
+- MED: medical logs and restricted diagnostics.
+- ENG: engineering logs and system records.
+- OPS: operations logs and network records.
+- SEC: security logs and alerts.
+
+Auth Status
+- Lists currently available levels.
+- Levels are shown in increasing order of sensitivity.
+
+Recover MED
+- Queues a recovery job for the selected credentials.
+- Requirements:
+  - data_core state >= limited
+  - datad service installed and running
+  - ship not in transit
+- Power impact:
+  - While the job is running, it increases P_load.
+- Completion:
+  - Adds the selected level to your available levels.
+  - If the level is already available, it does nothing.
+
+Examples
+- auth status
+- auth recover med
+- auth recover eng
+- auth recover ops
+- auth recover sec
+
+Related
+- jobs (track recovery progress)
+- power status (watch P_load)

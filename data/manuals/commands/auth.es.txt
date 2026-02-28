@@ -1,0 +1,50 @@
+auth
+auth status
+auth recover med
+auth recover eng
+auth recover ops
+auth recover sec
+
+Resumen
+- Muestra niveles de autorización disponibles o recupera credenciales MED.
+
+Uso
+- auth status
+- auth recover med
+- auth recover eng
+- auth recover ops
+- auth recover sec
+
+Niveles de Autorización
+- GUEST: acceso base (inicio).
+- MED: logs médicos y diagnósticos restringidos.
+- ENG: logs de ingeniería y registros de sistemas.
+- OPS: logs de operaciones y registros de red.
+- SEC: logs de seguridad y alertas.
+
+Estado de Auth
+- Lista niveles disponibles actualmente.
+- Los niveles se muestran en orden de sensibilidad.
+
+Recuperar MED
+- Encola un trabajo de recuperación de credenciales del nivel elegido.
+- Requisitos:
+  - data_core estado >= limited
+  - servicio datad instalado y en ejecución
+  - nave no esté en tránsito
+- Impacto energético:
+  - Mientras el trabajo está activo, aumenta P_load.
+- Al completar:
+  - Añade el nivel elegido a los niveles disponibles.
+  - Si el nivel ya estaba disponible, no cambia nada.
+
+Ejemplos
+- auth status
+- auth recover med
+- auth recover eng
+- auth recover ops
+- auth recover sec
+
+Relacionado
+- jobs (seguir progreso)
+- power status (ver P_load)

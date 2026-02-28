@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 import difflib
 
 from retorno.core.actions import (
+    AuthRecover,
     Boot,
     CargoAudit,
     Diag,
@@ -49,7 +50,7 @@ _PARSE_ERROR_MESSAGES = {
         "debug_seed_int": "debug seed: <n> must be an integer",
         "usage_debug": "Usage: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules",
         "usage_dock": "Usage: dock <node_id>",
-        "usage_nav": "Usage: nav routes | nav <node_id|name> | nav --no-cruise <dest> | nav abort",
+        "usage_nav": "Usage: nav routes | nav <node_id> | nav --no-cruise <node_id> | nav abort",
         "usage_hibernate": "Usage: hibernate until_arrival | hibernate <years>",
         "hibernate_number": "hibernate: <years> must be a number",
         "hibernate_gt0": "hibernate: <years> must be > 0",
@@ -65,14 +66,16 @@ _PARSE_ERROR_MESSAGES = {
         "usage_mail": "Usage: mail inbox | mail read <id|latest>",
         "usage_mail_read": "Usage: mail read <id|latest>",
         "usage_intel": "Usage: intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>",
+        "usage_module": "Usage: module install <module_id> | module inspect <module_id> | modules",
+        "usage_auth": "Usage: auth status | auth recover <med|eng|ops|sec>",
         "intel_amount_gt0": "intel: amount must be > 0",
         "usage_jobs": "Usage: jobs | jobs <amount> | jobs all",
         "jobs_amount_gt0": "jobs: amount must be > 0",
-        "usage_route": "Usage: route <node_id>",
+        "usage_route": "Usage: route solve <node_id>",
         "usage_relay": "Usage: relay uplink",
         "usage_locate": "Usage: locate <system_id>",
         "usage_diag": "Usage: diag <system_id>",
-        "usage_install": "Usage: install <module_id>",
+        "usage_install": "Usage: module install <module_id> | install <module_id>",
         "usage_ls": "Usage: ls [<path>]",
         "usage_cat": "Usage: cat <path>",
         "usage_about": "Usage: about <system_id>",
@@ -109,7 +112,7 @@ _PARSE_ERROR_MESSAGES = {
         "debug_seed_int": "debug seed: <n> debe ser entero",
         "usage_debug": "Uso: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules",
         "usage_dock": "Uso: dock <node_id>",
-        "usage_nav": "Uso: nav routes | nav <node_id|name> | nav --no-cruise <dest> | nav abort",
+        "usage_nav": "Uso: nav routes | nav <node_id> | nav --no-cruise <node_id> | nav abort",
         "usage_hibernate": "Uso: hibernate until_arrival | hibernate <años>",
         "hibernate_number": "hibernate: <años> debe ser número",
         "hibernate_gt0": "hibernate: <años> debe ser > 0",
@@ -125,14 +128,16 @@ _PARSE_ERROR_MESSAGES = {
         "usage_mail": "Uso: mail inbox | mail read <id|latest>",
         "usage_mail_read": "Uso: mail read <id|latest>",
         "usage_intel": "Uso: intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>",
+        "usage_module": "Uso: module install <module_id> | module inspect <module_id> | modules",
+        "usage_auth": "Uso: auth status | auth recover <med|eng|ops|sec>",
         "intel_amount_gt0": "intel: amount debe ser > 0",
         "usage_jobs": "Uso: jobs | jobs <amount> | jobs all",
         "jobs_amount_gt0": "jobs: amount debe ser > 0",
-        "usage_route": "Uso: route <node_id>",
+        "usage_route": "Uso: route solve <node_id>",
         "usage_relay": "Uso: relay uplink",
         "usage_locate": "Uso: locate <system_id>",
         "usage_diag": "Uso: diag <system_id>",
-        "usage_install": "Uso: install <module_id>",
+        "usage_install": "Uso: module install <module_id> | install <module_id>",
         "usage_ls": "Uso: ls [<path>]",
         "usage_cat": "Uso: cat <path>",
         "usage_about": "Uso: about <system_id>",
@@ -337,8 +342,14 @@ def parse_command(line: str):
             return CargoAudit()
         raise ParseError("usage_inventory")
 
-    if cmd == "modules":
-        return "MODULES"
+    if cmd in {"module", "modules"}:
+        if len(args) == 0:
+            return "MODULES"
+        if len(args) == 2 and args[0] == "install":
+            return Install(module_id=args[1])
+        if len(args) == 2 and args[0] == "inspect":
+            return ("MODULE_INSPECT", args[1])
+        raise ParseError("usage_module")
 
     if cmd == "config":
         if len(args) == 0 or (len(args) == 1 and args[0] == "show"):
@@ -349,6 +360,15 @@ def parse_command(line: str):
                 raise ParseError("config_set_lang")
             return ("CONFIG_SET_LANG", lang)
         raise ParseError("usage_config")
+
+    if cmd == "auth":
+        if len(args) == 1 and args[0].lower() == "status":
+            return "AUTH_STATUS"
+        if len(args) == 2 and args[0].lower() == "recover":
+            level = args[1].lower()
+            if level in {"med", "eng", "ops", "sec"}:
+                return AuthRecover(level=level.upper())
+        raise ParseError("usage_auth")
 
     if cmd == "mail":
         if len(args) > 2:
@@ -385,9 +405,9 @@ def parse_command(line: str):
         raise ParseError("usage_intel")
 
     if cmd == "route":
-        if len(args) != 1:
+        if len(args) != 2 or args[0] != "solve":
             raise ParseError("usage_route")
-        return RouteSolve(node_id=args[0])
+        return RouteSolve(node_id=args[1])
 
     if cmd == "relay":
         if len(args) == 1 and args[0] == "uplink":
@@ -562,6 +582,7 @@ def _suggest_command(cmd: str) -> str | None:
         "diag",
         "about",
         "man",
+        "auth",
         "config",
         "mail",
         "intel",
@@ -590,6 +611,7 @@ def _suggest_command(cmd: str) -> str | None:
         "debug",
         "power",
         "logs",
+        "module",
         "exit",
         "quit",
     ]

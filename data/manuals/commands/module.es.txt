@@ -1,0 +1,5 @@
+module install <module_id>
+module inspect <module_id>
+- module y modules son equivalentes para listar módulos instalados.
+- module install <module_id> instala un módulo del inventario (alias: install <module_id>).
+- module inspect <module_id> muestra efectos y descripción del módulo.

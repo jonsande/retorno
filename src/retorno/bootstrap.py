@@ -4,7 +4,7 @@ from retorno.core.gamestate import GameState
 from retorno.model.drones import DroneLocation, DroneState, DroneStatus
 from retorno.model.events import AlertState, Event, EventType, Severity, SourceRef
 from retorno.model.ship import PowerNetworkState, ShipSector
-from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, normalize_path, register_mail
+from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, normalize_path, register_mail, _normalize_access
 from retorno.model.systems import Dependency, ServiceState, ShipSystem, SystemState
 from retorno.model.world import SpaceNode, region_for_pos, sector_id_for_pos, add_known_link
 from retorno.worldgen.generator import ensure_sector_generated
@@ -295,10 +295,7 @@ def _bootstrap_locations(state: GameState, rng: random.Random, module_ids: list[
         return [rng.choice(candidates) for _ in range(count)]
 
     def _access_level(value: str) -> AccessLevel:
-        try:
-            return AccessLevel(value)
-        except Exception:
-            return AccessLevel.GUEST
+        return _normalize_access(value)
 
     for loc in locations:
         node_cfg = loc.get("node", {})
@@ -386,7 +383,7 @@ def _bootstrap_alerts(state: GameState) -> None:
 
 def _bootstrap_os(state: GameState) -> None:
     fs = state.os.fs
-    state.os.access_level = AccessLevel.GUEST
+    state.os.auth_levels = {"GUEST"}
     state.os.locale = Locale.EN
 
     manuals_root = Path(__file__).resolve().parents[2] / "data" / "manuals"
@@ -435,6 +432,7 @@ def _bootstrap_os(state: GameState) -> None:
     add_dir("/data/nav/fragments")
     add_dir("/logs", access=AccessLevel.ENG)
     add_dir("/logs/nav", access=AccessLevel.ENG)
+    add_dir("/logs/medical", access=AccessLevel.MED)
 
     _load_manuals_from_disk()
 

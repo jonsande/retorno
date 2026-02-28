@@ -9,6 +9,7 @@ from pathlib import Path
 
 from retorno.core.actions import (
     Action,
+    AuthRecover,
     Boot,
     Diag,
     Dock,
@@ -123,17 +124,6 @@ class Engine:
             return []
 
         if isinstance(action, Diag):
-            if state.ship.in_transit:
-                event = self._make_event(
-                    state,
-                    EventType.BOOT_BLOCKED,
-                    Severity.WARN,
-                    SourceRef(kind="ship", id=state.ship.ship_id),
-                    "Action blocked: ship in transit",
-                    data={"message_key": "boot_blocked", "reason": "in_transit"},
-                )
-                self._record_event(state.events, event)
-                return [event]
             return []
 
         if isinstance(action, Travel):
@@ -485,6 +475,7 @@ class Engine:
             SelfTestRepair,
             Install,
             CargoAudit,
+            AuthRecover,
         )
         if state.ship.in_transit and not isinstance(action, allowed_in_transit):
             event = self._make_event(
@@ -670,6 +661,100 @@ class Engine:
                 owner_id=None,
                 eta_s=Balance.CARGO_AUDIT_TIME_S,
                 params={},
+            )
+
+        if isinstance(action, AuthRecover):
+            level = action.level.upper()
+            if level in state.os.auth_levels:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.INFO,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    f"{level} already available",
+                    data={"message_key": "boot_blocked", "reason": "auth_already_available"},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            system = state.ship.systems.get("data_core")
+            if not system:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id="data_core"),
+                    "Auth recover blocked: data_core missing",
+                    data={"message_key": "boot_blocked", "reason": "auth_recover_blocked"},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if system.forced_offline or system.state == SystemState.OFFLINE:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=system.system_id),
+                    "Auth recover blocked: data_core offline",
+                    data={"message_key": "boot_blocked", "reason": "auth_recover_blocked"},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if not system.service or system.service.service_name != "datad":
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=system.system_id),
+                    "Auth recover blocked: datad not installed",
+                    data={"message_key": "boot_blocked", "reason": "auth_recover_blocked"},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if not system.service.is_running:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=system.system_id),
+                    "Auth recover blocked: datad not running. Try: boot datad",
+                    data={"message_key": "boot_blocked", "reason": "auth_recover_blocked"},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if self._state_rank(system.state) < self._state_rank(SystemState.LIMITED):
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=system.system_id),
+                    "Auth recover blocked: data_core degraded (requires >= limited).",
+                    data={"message_key": "boot_blocked", "reason": "auth_recover_blocked"},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if level == "MED":
+                eta_s = Balance.AUTH_RECOVER_MED_TIME_S
+                power_kw = Balance.AUTH_RECOVER_MED_POWER_KW
+            elif level == "ENG":
+                eta_s = Balance.AUTH_RECOVER_ENG_TIME_S
+                power_kw = Balance.AUTH_RECOVER_ENG_POWER_KW
+            elif level == "OPS":
+                eta_s = Balance.AUTH_RECOVER_OPS_TIME_S
+                power_kw = Balance.AUTH_RECOVER_OPS_POWER_KW
+            elif level == "SEC":
+                eta_s = Balance.AUTH_RECOVER_SEC_TIME_S
+                power_kw = Balance.AUTH_RECOVER_SEC_POWER_KW
+            else:
+                eta_s = Balance.AUTH_RECOVER_MED_TIME_S
+                power_kw = Balance.AUTH_RECOVER_MED_POWER_KW
+            return self._enqueue_job(
+                state,
+                JobType.RECOVER_AUTH,
+                TargetRef(kind="auth", id=level),
+                owner_id=None,
+                eta_s=eta_s,
+                params={"level": level},
+                power_draw_kw=power_kw,
             )
 
         if isinstance(action, JobCancel):
@@ -2257,6 +2342,30 @@ class Engine:
                 )
             return events
 
+        if job.job_type == JobType.RECOVER_AUTH:
+            level = str(job.params.get("level", "")).upper()
+            if not level:
+                return events
+            already = level in state.os.auth_levels
+            if not already:
+                state.os.auth_levels.add(level)
+            message = f"Credential cache restored: {level}" if not already else f"{level} already available"
+            events.append(
+                self._make_event(
+                    state,
+                    EventType.JOB_COMPLETED,
+                    Severity.INFO,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    message,
+                    data={
+                        "job_id": job.job_id,
+                        "job_type": job.job_type.value,
+                        "level": level,
+                    },
+                )
+            )
+            return events
+
         if job.job_type == JobType.BOOT_SERVICE and job.target:
             system_id = job.params.get("system_id")
             system = state.ship.systems.get(system_id) if system_id else None
@@ -2732,6 +2841,10 @@ class Engine:
 
     def _compute_load_kw(self, state: GameState) -> float:
         systems = state.ship.systems.values()
+        job_load_kw = 0.0
+        for job in state.jobs.jobs.values():
+            if job.status == JobStatus.RUNNING and job.power_draw_kw > 0.0:
+                job_load_kw += job.power_draw_kw
         if state.ship.op_mode == "CRUISE":
             cruise_zero = {"sensors", "security", "data_core", "drone_bay"}
             def _factor(sys: ShipSystem) -> float:
@@ -2742,8 +2855,8 @@ class Engine:
                 if sys.system_id in cruise_zero:
                     return 0.0
                 return 0.1
-            return sum(sys.p_effective_kw() * _factor(sys) for sys in systems)
-        return sum(system.p_effective_kw() for system in systems if system.state != SystemState.OFFLINE)
+            return sum(sys.p_effective_kw() * _factor(sys) for sys in systems) + job_load_kw
+        return sum(system.p_effective_kw() for system in systems if system.state != SystemState.OFFLINE) + job_load_kw
 
     def _distance_between_nodes(self, state: GameState, from_id: str, to_id: str) -> float:
         nodes = state.world.space.nodes
@@ -3037,6 +3150,7 @@ class Engine:
         eta_s: float,
         params: dict,
         risk: RiskProfile | None = None,
+        power_draw_kw: float = 0.0,
     ) -> list[Event]:
         job_id = f"J{state.jobs.next_job_seq}"
         state.jobs.next_job_seq += 1
@@ -3048,6 +3162,7 @@ class Engine:
             owner_id=owner_id,
             target=target,
             params=params,
+            power_draw_kw=power_draw_kw,
         )
         if risk is not None:
             job.risk = risk

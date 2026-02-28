@@ -1,4 +1,7 @@
 [core_os] integridad de calendario de despertar: FALLO (desincronía de cronometraje)
+[core_os] Múltiples temporizadores de activación ilegibles o fuera de rango válido.
+[core_os] No se detecta respuesta de personal médico autorizado.
+[core_os] Entrando en protocolo autónomo de recuperación de emergencia.
 PROTOCOLO AUTÓNOMO DE RECUPERACIÓN activado
 Escaneo de bóveda criogénica... ok
 OBJETIVO seleccionado: Sarcophagus-05

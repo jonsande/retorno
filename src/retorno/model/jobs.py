@@ -21,6 +21,7 @@ class JobType(str, Enum):
     ROUTE_SOLVE = "route_solve"
     RECALL_DRONE = "recall_drone"
     CARGO_AUDIT = "cargo_audit"
+    RECOVER_AUTH = "recover_auth"
 
 
 class JobStatus(str, Enum):
@@ -54,6 +55,7 @@ class Job:
     target: TargetRef | None = None
     params: dict[str, Any] = field(default_factory=dict)
     risk: RiskProfile = field(default_factory=RiskProfile)
+    power_draw_kw: float = 0.0
 
 
 @dataclass(slots=True)

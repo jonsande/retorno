@@ -1,4 +1,4 @@
-route <node_id>
+route solve <node_id>
 - Calcula una ruta de viaje a un contacto cercano (dentro del rango de sensores).
 - Requiere sensores >= limitado y sensord en ejecución.
 - Tarda tiempo; objetivos más lejanos tardan más.
