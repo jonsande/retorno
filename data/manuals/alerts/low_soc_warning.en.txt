@@ -1,0 +1,5 @@
+low_soc_warning
+- Battery charge is critical (SoC < 0.10).
+- Emergency condition: high risk of brownout and cascading failures.
+- Prioritize survival/recovery actions and restore charge immediately.
+- Expect severe operational constraints while this alert remains active.

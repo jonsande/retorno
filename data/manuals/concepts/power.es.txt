@@ -16,28 +16,48 @@ Demanda instantánea de los sistemas activos. Más sistemas en marcha → más c
 Algunos estados consumen más: un sistema degradado o inestable puede “chupar” potencia extra.
 
 Q (power_quality)
-Puntuación de calidad (0..1). Es, en la práctica, lo limpia y estable que está la red.
-SoC bajo, déficit sostenido o energy_distribution dañado reducen Q.
+Puntuación de calidad (0..1). TAmbién conocido como "Factor de Calidad" o "Factor Q".
+Parámetro adimensional que describe la relación entre la energía almacenada y la energía disipada (o perdida) en un componente por ciclo de oscilación.
+En la práctica, lo limpia y estable que está la red.
+SoC bajo, déficit prolongado (net negativo) o energy_distribution dañado reducen Q.
 Con Q baja los sistemas envejecen más rápido y aumenta la probabilidad de inestabilidad.
+Umbrales operativos:
+- Q >= 0.70: nominal.
+- Q < 0.55: se bloquean operaciones complejas (uplink, route solve, auth recover).
+- Q < 0.40: hibernar bloqueado; arranque de servicios no críticos bloqueado.
+- Q < 0.25: riesgo de colapso. Se apagan sistemas no críticos.
 
 brownout (True/False)
-Brownout indica que la demanda excedió lo que la red puede entregar (incluso descargando batería).
-Cuando ocurre, la nave puede apagar forzosamente sistemas no vitales para proteger el bus.
+Brownout ('apagón') indica que la demanda excedió lo que la red puede entregar (incluso descargando batería).
+Cuando ocurre, la nave puede apagar forzosamente sistemas no vitales (o impedir inicio de operaciones no esenciales) para proteger el bus.
+Si el brownout persiste, la degradación se acelera (power_core, energy_distribution).
 
 Diagnóstico rápido (qué hacer)
 1) Calcula el balance
 net = P_gen - P_load
 - net > 0: puedes recargar baterías.
-- net < 0: estás descargando baterías o entrando en déficit.
+- net < 0: estás descargando baterías o entrando en déficit (riesgo de deterioro de Q).
 
 2) Margen de batería (cuánto déficit puedes cubrir)
 headroom = P_discharge_max - max(0, P_load - P_gen)
 - Si el margen es pequeño, estás cerca del brownout.
 
-Protocolo mínimo de estabilizaciónS
+Protocolo mínimo de estabilización
 1) Restaura distribución: repara energy_distribution (estabilidad).
 2) Restaura generación: repara power_core (suministro sostenido).
 3) Reduce consumo: apaga primero sistemas no críticos (usa el comando "power off").
-4) Recupera SoC (State of Charge): deja que la batería se recargue antes de operar o viajar.
+4) Recupera SoC (State of Charge): deja que la batería se recargue antes de llevar a cabo operaciones pesadas (viajar, hibernar, uplink, route solve, auth recover).
+
+Interacción con drone_bay
+- El estado de drone_bay añade fricción, no pérdida total de control: LIMITED/DAMAGED ralentiza operaciones asistidas por bahía.
+- Si drone_bay está OFFLINE, deploy normal queda bloqueado y no hay recarga.
+- El deploy de emergencia (`drone deploy!`) sigue siendo la vía de rescate; los drones ya desplegados siguen obedeciendo mientras haya batería/control mínimo.
+
+Bandas de SoC (resumen)
+- SoC >= 0.50: normal.
+- 0.25..0.50: bajo (avisos en acciones pesadas).
+- 0.10..0.25: crítico (avisos fuertes en acciones pesadas).
+- 0.00..0.10: emergencia (auto shedding aumenta).
+- SoC = 0: reserva agotada; si P_load > P_gen, brownout sostenido.
 
 Nota: En perfiles de CRUISE/hibernación, la nave solo puede sobrevivir largos periodos si Q se mantiene estable y la carga queda por debajo de la generación.

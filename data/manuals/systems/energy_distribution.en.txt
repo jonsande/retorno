@@ -10,6 +10,14 @@ Role
 Why it matters
 - Many systems require distribution to be at least nominal to boot safely.
 - If damaged, Q drops and bus instability may cascade.
+- If OFFLINE, non-critical systems will be forced OFFLINE to preserve the grid.
+- OFFLINE engages emergency maintenance bypass for terminal/core survival controls.
+
+Command impact by state
+- BELOW NOMINAL: some system boots blocked by dependencies (e.g., sensors, security, data_core).
+- CRITICAL/DAMAGED/LIMITED: Q penalty increases; unstable bus warnings.
+- OFFLINE: forces non-critical systems OFFLINE, reducing P_load.
+- OFFLINE: drone_bay charging and passive docked-drone repairs are unavailable until distribution is restored.
 
 Common symptoms
 - low_power_quality

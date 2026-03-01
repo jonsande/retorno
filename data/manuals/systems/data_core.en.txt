@@ -4,3 +4,7 @@ data_core
 - If offline or degraded, inventory audit is blocked.
 - Keep at least LIMITED for reliable audits.
 - Related commands: boot datad, cargo audit.
+
+Command impact by state
+- LIMITED or better: allows cargo audit and auth recover (with datad running).
+- BELOW LIMITED (DAMAGED/CRITICAL/OFFLINE): blocks cargo audit and auth recover; uplink blocked if data_core is degraded/offline.

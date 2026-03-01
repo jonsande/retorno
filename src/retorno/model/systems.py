@@ -59,6 +59,7 @@ class ShipSystem:
     sector_id: str = "UNKNOWN"
     state_locked: bool = False
     forced_offline: bool = False
+    auto_offline_reason: str | None = None
 
     dependencies: list[Dependency] = field(default_factory=list)
     service: ServiceState | None = None

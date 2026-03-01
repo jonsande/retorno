@@ -19,6 +19,14 @@ class Balance:
     BUS_INSTABILITY_AFTER_S = 120
     LOW_POWER_QUALITY_THRESHOLD = 0.7
     R_REF = 0.05
+    BROWNOUT_SUSTAINED_AFTER_S = 30
+    BROWNOUT_DEGRADE_MULT_DISTRIBUTION = 3.0
+    BROWNOUT_DEGRADE_MULT_POWER_CORE = 2.0
+    LIFE_SUPPORT_CRITICAL_GRACE_S = 300
+    POWER_QUALITY_BLOCK_THRESHOLD = 0.55
+    POWER_QUALITY_CRITICAL_THRESHOLD = 0.40
+    POWER_QUALITY_COLLAPSE_THRESHOLD = 0.25
+    POWER_QUALITY_SHED_INTERVAL_S = 10.0
 
     # Job times (seconds)
     # Base repair duration for ship systems.
@@ -31,6 +39,8 @@ class Balance:
     RECALL_TIME_S = 10.0
     # Docking time to a node.
     DOCK_TIME_S = 12.0
+    # Undocking time from a node.
+    UNDOCK_TIME_S = 6.0
     # Module installation time.
     INSTALL_TIME_S = 30.0
     # Salvage scrap time model: base + per unit.
@@ -170,15 +180,28 @@ class Balance:
     DRONE_BATTERY_DRAIN_MOVE = 0.05
     # Charge rate per second when in bay (fractions).
     DRONE_BATTERY_CHARGE_PER_S = 0.02
+    DRONE_BAY_LIMITED_CHARGE_RATE_MULT = 0.5
+    DRONE_BAY_DAMAGED_CHARGE_RATE_MULT = 0.25
     # Charge speed multiplier when ship SoC is low.
     DRONE_BATTERY_CHARGE_LOW_MULT = 0.25
+    DRONE_BAY_LIMITED_ETA_MULT = 1.5
+    DRONE_BAY_DAMAGED_ETA_MULT = 2.0
+    DRONE_BAY_DAMAGED_INTEGRITY_RISK_P = 0.10
+    DRONE_BAY_DAMAGED_INTEGRITY_HIT = 0.10
+    DRONE_BAY_LIMITED_REPAIR_RATE_MULT = 0.5
+    DRONE_BAY_DAMAGED_REPAIR_RATE_MULT = 0.5
+    DRONE_BAY_CRITICAL_REPAIR_RATE_MULT = 0.25
+    DRONE_BAY_DAMAGED_REPAIR_SCRAP_MULT = 2.0
+    DRONE_BAY_CRITICAL_REPAIR_SCRAP_MULT = 2.0
+    DRONE_BAY_CRITICAL_REPAIR_FAIL_P = 0.10
+    DRONE_BAY_CRITICAL_REPAIR_FAIL_HIT = 0.01
     # Power draw for charging a drone (kW).
     DRONE_CHARGE_KW = 0.2
     # Minimum net power required to allow drone charging.
     DRONE_CHARGE_NET_MIN_KW = -0.2
     DRONE_BATTERY_IDLE_DRAIN_DEPLOYED_PER_S = 0.00002 # Velocidad a la que descarga sin hacer nada
     # Repair efficiency per scrap spent.
-    DRONE_REPAIR_INTEGRITY_PER_SCRAP = 0.02
+    DRONE_REPAIR_INTEGRITY_PER_SCRAP = 5.0
     # Thresholds for alerts and action gating.
     DRONE_LOW_BATTERY_THRESHOLD = 0.15
     DRONE_MIN_BATTERY_FOR_TASK = 0.10

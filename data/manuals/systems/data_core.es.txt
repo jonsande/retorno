@@ -4,3 +4,7 @@ data_core
 - Si está offline o degradado, se bloquea la auditoría.
 - Mantén al menos LIMITED para auditorías fiables.
 - Comandos: boot datad, cargo audit.
+
+Impacto en comandos por estado
+- LIMITED o mejor: permite cargo audit y auth recover (con datad activo).
+- POR DEBAJO de LIMITED (DAMAGED/CRITICAL/OFFLINE): bloquea cargo audit y auth recover; uplink bloqueado si data_core está degradado/offline.

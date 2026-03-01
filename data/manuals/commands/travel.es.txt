@@ -8,3 +8,4 @@ travel abort
 - travel abort cancela el tránsito actual y retorna al origen.
 - Muestra ETA en años; la nave queda en tránsito hasta llegar.
 - Los comandos operativos quedan bloqueados en tránsito.
+- Si estás docked, primero debes desacoplar con `undock` para poder viajar.

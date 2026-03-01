@@ -1,3 +1,5 @@
 boot <service_name>
 - Inicia un servicio instalado.
 - Requiere dependencias satisfechas.
+- Si la calidad de energía es crítica (Q < 0.40), se bloquea el arranque de servicios no críticos.
+- El arranque se bloquea durante brownout.

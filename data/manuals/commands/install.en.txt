@@ -1,4 +1,3 @@
-install <module_id>
-- Alias of: module install <module_id>
-- Installs a module from inventory.
-- Consumes the module item.
+install
+- Legacy command removed.
+- Use: drone install <drone_id> <module_id>

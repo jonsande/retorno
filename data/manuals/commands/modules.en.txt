@@ -1,6 +1,6 @@
 modules
 - Lists installed modules only.
 - Alias: module
-- If none are installed, install one with: module install <module_id>
+- If none are installed, install one with: drone install <drone_id> <module_id>
 - Inspect a module with: module inspect <module_id>
 - Full module catalog is available via: debug modules

@@ -49,9 +49,7 @@ ENERGY
 
 - [ ] Creo que el comando logs sigue indicando cuál es la cantidad de scrap total recupelable (available) al ordenar salvage scrap. No debería mostrarse. Eso el jugador sólo debe saberlo una vez el job de salvage ha finalizado (actualmente se generan mensajes correctos en este sentido). Sólo corregir la información que se ofrece a este respecto cuando el job está todavía queued.
 
-- [ ] El contacto y la ruta a ARCHIVE_01 me ha aparecido haciendo mi primer uplink en ECHO_7. No debería. Debe costar más conseguir esa localización. Revisar el arco.
-
-- [ ] comando undock para volver a in orbit.
+- [x] comando undock para volver a in orbit.
 
 - [ ] Parece que ahora se puede desactivar core_os y otros sistemas vitales que no deberían poder desacivarse. Pedirle a gpt que razone esto y me diga cuales tiene sentido y cuales no poder apagar.
 
@@ -71,6 +69,9 @@ La palabra "uso" es español. Hay que localizar estos mensajes de error. Aprovec
 
 
 === LORE ===
+
+- [!] El contacto y la ruta a ARCHIVE_01 me ha aparecido haciendo mi primer uplink en ECHO_7. Cómo es posible? Pensé que el arco estaba configurado para que costara más pasos lograr esa ruta. Acaso ha aparecido a través de uplink de forma aleatoria? La idea que yo tenía era: en ECHO_12 el documento echo_cache te proporciona el contacto (pero no la ruta) HARBOR_12. En HARBOR_12 el documento 0141 te proporciona el link a ARCHIVE_01. El link a ARCHIVE_01, pues, tratándose del intel primario de un arco diseñado, sólo se podía (o eso pensaba yo) obtener a través del documento 0141 de HARBOR_12, y de ningún otro modo más. Aclárame qué está pasando, y cómo están funcionando los arcos.
+
 
 - [x] En el Virtual File Sistem no debe usarse ningún directorio llamado "lore". No es muy diegético. Por ejemplo, en el example_unforced encontramos esto:
   "path_template": "/logs/lore/example_unforced_note.{lang}.txt"

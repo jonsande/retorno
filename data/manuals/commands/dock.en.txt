@@ -6,3 +6,6 @@ dock <node_id>
 - The target must be a known contact.
 - Docking may be disallowed at some nodes (e.g., origin).
 - Docking queues a job; check status with jobs.
+- To leave dock and return to orbit, use: undock
+- Dock duration is configured by `Balance.DOCK_TIME_S`.
+- Dock can be interrupted if context changes before completion (for example, ship enters transit), or cancelled with `job cancel <job_id>`.

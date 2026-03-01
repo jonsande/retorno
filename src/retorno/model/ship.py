@@ -30,6 +30,9 @@ class PowerNetworkState:
     quality_offset: float = 0.0
 
     brownout: bool = False
+    brownout_sustained_s: float = 0.0
+    low_q_shed_timer_s: float = 0.0
+    battery_reserve_warned: bool = False
     shed_policy: ShedPolicyState = field(default_factory=ShedPolicyState)
 
 
@@ -89,6 +92,7 @@ class ShipState:
 
     inventory: Inventory = field(default_factory=Inventory)
     sensors_range_ly: float = Balance.SENSORS_RANGE_LY
+    life_support_critical_s: float = 0.0
 
     def orbit_status(self, world: "SpaceGraph | object", current_node_id: str) -> str:
         """Return 'docked', 'orbit', or 'adrift' based on ship + world state."""

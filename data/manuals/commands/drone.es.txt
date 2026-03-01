@@ -1,7 +1,8 @@
 drone deploy <drone_id> <sector_id|node_id>
 drone deploy! <drone_id> <sector_id|node_id>
 drone move <drone_id> <target_id>
-drone repair <drone_id> <system_id>
+drone repair <drone_id> <target_id>
+drone install <drone_id> <module_id>
 drone salvage scrap <drone_id> <node_id> <amount>
 drone salvage module <drone_id> [node_id]
 drone salvage data <drone_id> <node_id>
@@ -17,8 +18,12 @@ Campos de status
 - dose: radiación acumulada (rad)
 
 Notas operativas
-- Las acciones consumen batería (deploy/move/repair/salvage/recall/reboot).
+- Las acciones consumen batería (deploy/move/repair/install/salvage/recall/reboot).
 - Los drones desplegados también consumen batería en reposo.
-- La carga se realiza en drone_bay si está online y al menos LIMITED.
+- La recarga ocurre en drone_bay mientras haya soporte de bahía/distribución.
+- `drone repair` acepta sistemas de nave y drones como objetivo.
+- Para reparar otro dron, el dron operador debe estar desplegado y en la misma ubicación que el dron objetivo.
+- Con drone_bay LIMITED/DAMAGED se ralentizan deploy/recall/install/reboot y la recarga.
+- Con drone_bay OFFLINE se bloquean deploy normal e install; usa deploy! para emergencia.
 - Evita agotar la batería antes del recall; un dron sin batería puede quedar varado.
 - El deploy de emergencia puede fallar y dañar integridad.

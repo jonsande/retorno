@@ -10,6 +10,14 @@ Función
 Por qué importa
 - Muchos sistemas exigen distribución al menos nominal para arrancar con seguridad.
 - Si está dañado, baja Q y puede haber fallos en cascada.
+- Si está OFFLINE, los sistemas no críticos se forzarán a OFFLINE para proteger la red.
+- OFFLINE activa el bypass de mantenimiento de emergencia para control mínimo de terminal/core.
+
+Impacto en comandos por estado
+- POR DEBAJO de NOMINAL: algunos arranques se bloquean por dependencias (p.ej. sensors, security, data_core).
+- CRITICAL/DAMAGED/LIMITED: penalización extra a Q; avisos de inestabilidad.
+- OFFLINE: fuerza a OFFLINE sistemas no críticos, reduciendo P_load.
+- OFFLINE: la recarga y la reparación pasiva en drone_bay quedan no disponibles hasta restaurar distribución.
 
 Síntomas comunes
 - low_power_quality

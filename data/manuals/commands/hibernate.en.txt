@@ -2,3 +2,5 @@ hibernate until_arrival | hibernate <years>
 - Advances time in large chunks during transit.
 - until_arrival sleeps until the current trip ends.
 - Suppresses intermediate spam; shows arrival and critical events.
+- Blocked if life_support is degraded, power quality is critical (Q < 0.40), or brownout is active.
+- At low SoC (below 0.25) a warning is issued before proceeding.

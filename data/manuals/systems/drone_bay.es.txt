@@ -1,3 +1,18 @@
 drone_bay
 - Salida de drones al casco.
 - En emergencia usa deploy!.
+
+Impacto en comandos por estado
+- NOMINAL: soporte normal (ETA base en deploy/recall/install/reboot y recarga normal).
+- LIMITED: soporte degradado (operaciones afectadas más lentas y recarga más lenta).
+- DAMAGED: soporte muy degradado (operaciones afectadas mucho más lentas, recarga mucho más lenta, riesgo leve de integridad en deploy/recall).
+- LIMITED: la reparación pasiva de integridad en dron acoplado es más lenta.
+- DAMAGED: la reparación pasiva en dron acoplado sigue siendo lenta y consume más chatarra.
+- CRITICAL: la reparación pasiva en dron acoplado es aún más lenta, consume más chatarra y puede fallar dañando levemente el dron.
+- OFFLINE: sin soporte de bahía. drone deploy normal bloqueado; usa drone deploy! para lanzamiento de emergencia.
+- OFFLINE: drone install bloqueado (requiere soporte físico de bahía). drone recall sigue permitido, pero sin recarga.
+- Mientras energy_distribution esté OFFLINE, no hay recarga ni reparación pasiva en drone_bay aunque drone_bay esté online.
+
+Control vs soporte de bahía
+- El control del dron depende del enlace mínimo de core_os y de la batería del dron.
+- El estado de la bahía afecta funciones de soporte (recarga, tiempos de deploy/recall/install/reboot), no el control remoto de drones ya desplegados.

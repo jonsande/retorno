@@ -1,0 +1,5 @@
+low_soc_notice
+- Battery charge is low (SoC < 0.25).
+- Risk: reduced recovery margin under sustained load.
+- Recommendation: reduce non-critical load and recharge before heavy operations.
+- If SoC falls below 0.10, escalation to low_soc_warning.

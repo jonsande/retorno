@@ -13,6 +13,14 @@ Symptoms of degradation
 Operational notes
 - Treated as critical. The ship will attempt to preserve it during shedding.
 - If the bus becomes unstable (low Q), core_os may become unreliable long before it “dies”.
+- LIMITED: advanced commands blocked (uplink, route solve, auth recover).
+- CRITICAL: emergency recovery command set active.
+- OFFLINE: terminal control lost. Only basic help/status/exit remain.
+
+Command impact by state
+- NOMINAL/LIMITED: normal command set (LIMITED blocks uplink/route solve/auth recover).
+- CRITICAL: allowed commands include status, alerts, logs, jobs, power status, power on/off/plan, drone emergency/recovery actions, diag, help, exit.
+- OFFLINE: allowed commands include help, status, exit.
 
 Relevant commands
 - status, alerts, logs, diag core_os

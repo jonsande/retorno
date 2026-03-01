@@ -16,6 +16,10 @@ class EventType(str, Enum):
     POWER_CORE_DEGRADED = "power_core_degraded"
     POWER_BUS_INSTABILITY = "power_bus_instability"
     LOW_POWER_QUALITY = "low_power_quality"
+    BATTERY_RESERVE_EXHAUSTED = "battery_reserve_exhausted"
+    LOW_SOC_WARNING = "low_soc_warning"
+    LOW_SOC_NOTICE = "low_soc_notice"
+    DRONE_BAY_CHARGING_UNAVAILABLE = "drone_bay_charging_unavailable"
     SYSTEM_STATE_CHANGED = "system_state_changed"
     SYSTEM_POWER_RESTORED = "system_power_restored"
     JOB_COMPLETED = "job_completed"
@@ -24,6 +28,7 @@ class EventType(str, Enum):
     SIGNAL_DETECTED = "signal_detected"
     JOB_QUEUED = "job_queued"
     DOCKED = "docked"
+    UNDOCKED = "undocked"
     SALVAGE_SCRAP_GAINED = "salvage_scrap_gained"
     SALVAGE_MODULE_FOUND = "salvage_module_found"
     NODE_DEPLETED = "node_depleted"
@@ -43,6 +48,7 @@ class EventType(str, Enum):
     MAIL_RECEIVED = "mail_received"
     SIGNAL_CAPTURED = "signal_captured"
     BROADCAST_RECEIVED = "broadcast_received"
+    ACTION_WARNING = "action_warning"
 
 
 @dataclass(slots=True)

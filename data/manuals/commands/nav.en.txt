@@ -7,6 +7,7 @@ navigation <...> (alias)
 - nav <node_id>: start interstellar transit to a known node id.
 - nav --no-cruise <node_id>: travel without auto-setting CRUISE (advanced; higher wear).
 - nav abort: cancel the current transit and return to the origin.
+- If you are docked, undock first (`undock`) before starting nav.
 - Routes are obtained via: uplink (relay/waystation), route solve, intel import (nav logs/fragments), or scan if a hub is co-located with your current position.
 - If no routes appear, acquire navigation intel or attempt uplink/route solve.
 - travel remains accepted as an alias for nav.

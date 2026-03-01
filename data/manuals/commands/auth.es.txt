@@ -6,7 +6,7 @@ auth recover ops
 auth recover sec
 
 Resumen
-- Muestra niveles de autorización disponibles o recupera credenciales MED.
+- Muestra niveles de autorización disponibles o recupera credenciales.
 
 Uso
 - auth status
@@ -32,6 +32,7 @@ Recuperar MED
   - data_core estado >= limited
   - servicio datad instalado y en ejecución
   - nave no esté en tránsito
+- Se bloquea si la calidad de energía es demasiado baja (Q < 0.55) para cualquier nivel de recover.
 - Impacto energético:
   - Mientras el trabajo está activo, aumenta P_load.
 - Al completar:

@@ -9,6 +9,7 @@ from retorno.core.actions import (
     CargoAudit,
     Diag,
     Dock,
+    Undock,
     DroneDeploy,
     DroneMove,
     DroneRecall,
@@ -50,6 +51,7 @@ _PARSE_ERROR_MESSAGES = {
         "debug_seed_int": "debug seed: <n> must be an integer",
         "usage_debug": "Usage: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules",
         "usage_dock": "Usage: dock <node_id>",
+        "usage_undock": "Usage: undock",
         "usage_nav": "Usage: nav routes | nav <node_id> | nav --no-cruise <node_id> | nav abort",
         "usage_hibernate": "Usage: hibernate until_arrival | hibernate <years>",
         "hibernate_number": "hibernate: <years> must be a number",
@@ -66,8 +68,8 @@ _PARSE_ERROR_MESSAGES = {
         "usage_mail": "Usage: mail inbox | mail read <id|latest>",
         "usage_mail_read": "Usage: mail read <id|latest>",
         "usage_intel": "Usage: intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>",
-        "usage_module": "Usage: module install <module_id> | module inspect <module_id> | modules",
-        "usage_auth": "Usage: auth status | auth recover <med|eng|ops|sec>",
+        "usage_module": "Usage: module inspect <module_id> | modules",
+        "usage_auth": "Usage: auth status | auth recover <level>",
         "intel_amount_gt0": "intel: amount must be > 0",
         "usage_jobs": "Usage: jobs | jobs <amount> | jobs all",
         "jobs_amount_gt0": "jobs: amount must be > 0",
@@ -75,7 +77,7 @@ _PARSE_ERROR_MESSAGES = {
         "usage_relay": "Usage: relay uplink",
         "usage_locate": "Usage: locate <system_id>",
         "usage_diag": "Usage: diag <system_id>",
-        "usage_install": "Usage: module install <module_id> | install <module_id>",
+        "usage_install": "Install via drones only. Use: drone install <drone_id> <module_id>",
         "usage_ls": "Usage: ls [<path>]",
         "usage_cat": "Usage: cat <path>",
         "usage_about": "Usage: about <system_id>",
@@ -86,17 +88,19 @@ _PARSE_ERROR_MESSAGES = {
         "usage_power_on": "Usage: power on <system_id>",
         "usage_power_off": "Usage: power off <system_id>",
         "usage_shutdown": "Usage: shutdown <system_id>",
-        "usage_drone": "Usage: drone deploy <drone_id> <sector_id> | drone status",
+        "usage_drone": "Usage: drone status | drone deploy <drone_id> <sector_id> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id>",
         "usage_drone_recall": "Usage: drone recall <drone_id>",
         "usage_drone_reboot": "Usage: drone reboot <drone_id>",
-        "usage_drone_repair": "Usage: drone repair <drone_id> <system_id>",
+        "usage_drone_repair": "Usage: drone repair <drone_id> <target_id>",
         "usage_drone_move": "Usage: drone move <drone_id> <target_id>",
+        "usage_drone_install": "Usage: drone install <drone_id> <module_id>",
         "usage_drone_salvage": "Usage: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage data <drone_id> <node_id>",
         "usage_drone_salvage_scrap": "Usage: drone salvage scrap <drone_id> <node_id> <amount>",
         "usage_drone_salvage_data": "Usage: drone salvage data <drone_id> <node_id>",
         "usage_drone_deploy": "Usage: drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>",
-        "unknown_drone_subcommand": "Unknown drone subcommand. Use: drone status | drone deploy ...",
-        "usage_repair": "Usage: drone repair <drone_id> <system_id> | repair <system_id> --selftest",
+        "unknown_drone_subcommand": "Unknown drone subcommand. Use: drone status | drone deploy ... | drone repair ... | drone install ...",
+        "usage_repair": "Usage: drone repair <drone_id> <target_id> | repair <system_id> --selftest",
+        "module_install_migrated": "module install/install has been removed. Use: drone install <drone_id> <module_id>",
         "unknown_command_suggestion": "Unknown command: {cmd}. Did you mean: {suggestion}?",
         "unknown_command": "Unknown command: {cmd}",
     },
@@ -112,6 +116,7 @@ _PARSE_ERROR_MESSAGES = {
         "debug_seed_int": "debug seed: <n> debe ser entero",
         "usage_debug": "Uso: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules",
         "usage_dock": "Uso: dock <node_id>",
+        "usage_undock": "Uso: undock",
         "usage_nav": "Uso: nav routes | nav <node_id> | nav --no-cruise <node_id> | nav abort",
         "usage_hibernate": "Uso: hibernate until_arrival | hibernate <años>",
         "hibernate_number": "hibernate: <años> debe ser número",
@@ -128,8 +133,8 @@ _PARSE_ERROR_MESSAGES = {
         "usage_mail": "Uso: mail inbox | mail read <id|latest>",
         "usage_mail_read": "Uso: mail read <id|latest>",
         "usage_intel": "Uso: intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>",
-        "usage_module": "Uso: module install <module_id> | module inspect <module_id> | modules",
-        "usage_auth": "Uso: auth status | auth recover <med|eng|ops|sec>",
+        "usage_module": "Uso: module inspect <module_id> | modules",
+        "usage_auth": "Uso: auth status | auth recover <level>",
         "intel_amount_gt0": "intel: amount debe ser > 0",
         "usage_jobs": "Uso: jobs | jobs <amount> | jobs all",
         "jobs_amount_gt0": "jobs: amount debe ser > 0",
@@ -137,7 +142,7 @@ _PARSE_ERROR_MESSAGES = {
         "usage_relay": "Uso: relay uplink",
         "usage_locate": "Uso: locate <system_id>",
         "usage_diag": "Uso: diag <system_id>",
-        "usage_install": "Uso: module install <module_id> | install <module_id>",
+        "usage_install": "Instalación solo con drones. Usa: drone install <drone_id> <module_id>",
         "usage_ls": "Uso: ls [<path>]",
         "usage_cat": "Uso: cat <path>",
         "usage_about": "Uso: about <system_id>",
@@ -148,17 +153,19 @@ _PARSE_ERROR_MESSAGES = {
         "usage_power_on": "Uso: power on <system_id>",
         "usage_power_off": "Uso: power off <system_id>",
         "usage_shutdown": "Uso: shutdown <system_id>",
-        "usage_drone": "Uso: drone deploy <drone_id> <sector_id> | drone status",
+        "usage_drone": "Uso: drone status | drone deploy <drone_id> <sector_id> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id>",
         "usage_drone_recall": "Uso: drone recall <drone_id>",
         "usage_drone_reboot": "Uso: drone reboot <drone_id>",
-        "usage_drone_repair": "Uso: drone repair <drone_id> <system_id>",
+        "usage_drone_repair": "Uso: drone repair <drone_id> <target_id>",
         "usage_drone_move": "Uso: drone move <drone_id> <target_id>",
+        "usage_drone_install": "Uso: drone install <drone_id> <module_id>",
         "usage_drone_salvage": "Uso: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage data <drone_id> <node_id>",
         "usage_drone_salvage_scrap": "Uso: drone salvage scrap <drone_id> <node_id> <amount>",
         "usage_drone_salvage_data": "Uso: drone salvage data <drone_id> <node_id>",
         "usage_drone_deploy": "Uso: drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>",
-        "unknown_drone_subcommand": "Subcomando drone desconocido. Usa: drone status | drone deploy ...",
-        "usage_repair": "Uso: drone repair <drone_id> <system_id> | repair <system_id> --selftest",
+        "unknown_drone_subcommand": "Subcomando drone desconocido. Usa: drone status | drone deploy ... | drone repair ... | drone install ...",
+        "usage_repair": "Uso: drone repair <drone_id> <target_id> | repair <system_id> --selftest",
+        "module_install_migrated": "module install/install fue eliminado. Usa: drone install <drone_id> <module_id>",
         "unknown_command_suggestion": "Comando desconocido: {cmd}. ¿Quizá quisiste decir: {suggestion}?",
         "unknown_command": "Comando desconocido: {cmd}",
     },
@@ -297,6 +304,10 @@ def parse_command(line: str):
         if len(args) != 1:
             raise ParseError("usage_dock")
         return Dock(node_id=args[0])
+    if cmd == "undock":
+        if len(args) != 0:
+            raise ParseError("usage_undock")
+        return Undock()
 
     if cmd == "hibernate":
         if len(args) != 1:
@@ -346,7 +357,7 @@ def parse_command(line: str):
         if len(args) == 0:
             return "MODULES"
         if len(args) == 2 and args[0] == "install":
-            return Install(module_id=args[1])
+            raise ParseError("module_install_migrated")
         if len(args) == 2 and args[0] == "inspect":
             return ("MODULE_INSPECT", args[1])
         raise ParseError("usage_module")
@@ -365,8 +376,8 @@ def parse_command(line: str):
         if len(args) == 1 and args[0].lower() == "status":
             return "AUTH_STATUS"
         if len(args) == 2 and args[0].lower() == "recover":
-            level = args[1].lower()
-            if level in {"med", "eng", "ops", "sec"}:
+            level = args[1].strip()
+            if level:
                 return AuthRecover(level=level.upper())
         raise ParseError("usage_auth")
 
@@ -428,9 +439,7 @@ def parse_command(line: str):
         return Diag(system_id=args[0])
 
     if cmd == "install":
-        if len(args) != 1:
-            raise ParseError("usage_install")
-        return Install(module_id=args[0])
+        raise ParseError("module_install_migrated")
 
     if cmd == "ls":
         if len(args) > 1:
@@ -511,6 +520,10 @@ def parse_command(line: str):
             if len(args) != 3:
                 raise ParseError("usage_drone_move")
             return DroneMove(drone_id=args[1], target_id=args[2])
+        if sub == "install":
+            if len(args) != 3:
+                raise ParseError("usage_drone_install")
+            return Install(drone_id=args[1], module_id=args[2])
         if sub == "salvage":
             if len(args) < 3:
                 raise ParseError("usage_drone_salvage")
@@ -596,6 +609,7 @@ def _suggest_command(cmd: str) -> str | None:
         "map",
         "locate",
         "dock",
+        "undock",
         "nav",
         "navigation",
         "travel",

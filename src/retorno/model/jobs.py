@@ -7,11 +7,13 @@ from typing import Any
 
 class JobType(str, Enum):
     REPAIR_SYSTEM = "repair_system"
+    REPAIR_DRONE = "repair_drone"
     SELFTEST_REPAIR = "selftest_repair"
     BOOT_SERVICE = "boot_service"
     DEPLOY_DRONE = "deploy_drone"
     MOVE_DRONE = "move_drone"
     DOCK = "dock"
+    UNDOCK = "undock"
     SALVAGE = "salvage"
     INSTALL_MODULE = "install_module"
     REBOOT_DRONE = "reboot_drone"

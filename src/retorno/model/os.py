@@ -41,6 +41,8 @@ class OSState:
     mail_received_t: dict[str, float] = field(default_factory=dict)
     mail_received_seq: int = 0
     mail_received_seq_map: dict[str, int] = field(default_factory=dict)
+    terminal_lock: bool = False
+    terminal_reason: str | None = None
 
 
 def normalize_path(path: str) -> str:

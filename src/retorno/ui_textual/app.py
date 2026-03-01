@@ -500,6 +500,7 @@ class RetornoTextualApp(App):
             "map",
             "locate",
             "dock",
+            "undock",
             "nav",
             "navigation",
             "travel",
@@ -518,7 +519,6 @@ class RetornoTextualApp(App):
             "power",
             "logs",
             "log",
-            "install",
             "module",
             "modules",
             "exit",
@@ -584,6 +584,8 @@ class RetornoTextualApp(App):
                 return [s for s in systems if s.startswith(text)]
         if cmd in {"dock"}:
             return [c for c in contacts if c.startswith(text)]
+        if cmd == "undock":
+            return []
         if cmd in {"nav", "navigation", "travel"}:
             def _travel_targets(prefix: str) -> list[str]:
                 return [c for c in contacts if c.startswith(prefix)]
@@ -624,12 +626,10 @@ class RetornoTextualApp(App):
                 return [c for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "modules"] if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "scenario":
                 return [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
-        if cmd == "install":
-            return [m for m in modules if m.startswith(text)]
         if cmd == "module":
             if len(tokens) == 2:
-                return [c for c in ["install", "inspect"] if c.startswith(text)]
-            if len(tokens) == 3 and tokens[1] in {"install", "inspect"}:
+                return [c for c in ["inspect"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] == "inspect":
                 return [m for m in modules if m.startswith(text)]
         if cmd == "modules":
             return []
@@ -665,6 +665,13 @@ class RetornoTextualApp(App):
             topics = set(systems)
             topics.update(state.events.alerts.keys())
             for path in fs_paths:
+                if path.startswith("/manuals/alerts/"):
+                    name = path.rsplit("/", 1)[-1]
+                    if name.endswith(".txt"):
+                        name = name[:-4]
+                    if name.endswith(".en") or name.endswith(".es"):
+                        name = name[:-3]
+                    topics.add(name)
                 if path.startswith("/manuals/modules/"):
                     name = path.rsplit("/", 1)[-1]
                     if name.endswith(".txt"):
@@ -680,15 +687,17 @@ class RetornoTextualApp(App):
                 return [k for k in state.events.alerts.keys() if k.startswith(text)]
         if cmd == "drone":
             if len(tokens) == 2:
-                return [c for c in ["status", "deploy", "deploy!", "move", "reboot", "recall", "repair", "salvage"] if c.startswith(text)]
-            if len(tokens) == 3 and tokens[1] in {"deploy", "deploy!", "reboot", "recall", "repair", "move"}:
+                return [c for c in ["status", "deploy", "deploy!", "move", "reboot", "recall", "repair", "install", "salvage"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] in {"deploy", "deploy!", "reboot", "recall", "repair", "move", "install"}:
                 return [d for d in drones if d.startswith(text)]
             if len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
                 return [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "move":
                 return [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
+            if len(tokens) == 4 and tokens[1] == "install":
+                return [m for m in modules if m.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "repair":
-                return [s for s in systems if s.startswith(text)]
+                return [x for x in sorted(set(systems) | set(drones)) if x.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "salvage":
                 return [c for c in ["scrap", "module", "modules", "data"] if c.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "salvage":
@@ -859,6 +868,16 @@ class RetornoTextualApp(App):
     def _continue_hibernate(self, parsed: Hibernate, wake_on_low_battery: bool) -> None:
         try:
             with self.loop.with_lock() as state:
+                block_msg = repl._hibernate_blocked_message(state)
+                warn_msg = repl._hibernate_soc_warning(state)
+                if block_msg:
+                    self._log_line(block_msg)
+                    self._pending_hibernate_parsed = None
+                    self._pending_hibernate_requires_non_cruise = False
+                    self._pending_wake_on_low_battery = False
+                    return
+                if warn_msg:
+                    self._log_line(warn_msg)
                 if parsed.mode == "until_arrival":
                     if not state.ship.in_transit:
                         self._log_line("hibernate: not in transit")
@@ -1054,6 +1073,12 @@ class RetornoTextualApp(App):
             self._log_buffer.clear()
             return
 
+        with self.loop.with_lock() as state:
+            block_msg = repl._command_blocked_message(state, parsed)
+        if block_msg:
+            self._log_line(block_msg)
+            return
+
         # Informational commands (drain AUTO first to avoid mixing)
         info_tokens = {
             "CONTACTS",
@@ -1247,11 +1272,12 @@ class RetornoTextualApp(App):
                 self._log_lines(presenter.build_command_output(repl.render_locate, state, parsed[1]))
             return
 
-        if parsed.__class__.__name__ in {"Dock", "Travel"}:
+        if parsed.__class__.__name__ in {"Dock", "Travel", "Undock"}:
             with self.loop.with_lock() as state:
-                resolved = repl._resolve_node_id_from_input(state, parsed.node_id)
-                if resolved:
-                    parsed.node_id = resolved
+                if parsed.__class__.__name__ == "Dock":
+                    resolved = repl._resolve_node_id_from_input(state, parsed.node_id)
+                    if resolved:
+                        parsed.node_id = resolved
                 if self._confirm_abandon_drones_needed(state, parsed):
                     return
 

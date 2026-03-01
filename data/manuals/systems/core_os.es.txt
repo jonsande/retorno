@@ -13,6 +13,14 @@ Síntomas de degradación
 Notas operativas
 - Es crítico. La nave intentará preservarlo durante apagados automáticos.
 - Si la red se vuelve inestable (Q baja), core_os puede volverse errático antes de “morir”.
+- LIMITED: comandos avanzados bloqueados (uplink, route solve, auth recover).
+- CRITICAL: set de recuperación de emergencia activo.
+- OFFLINE: control de terminal perdido. Solo ayuda/status/salir.
+
+Impacto en comandos por estado
+- NOMINAL/LIMITED: set normal (LIMITED bloquea uplink/route solve/auth recover).
+- CRITICAL: se permiten status, alerts, logs, jobs, power status, power on/off/plan, acciones de dron de emergencia/recuperación, diag, help, exit.
+- OFFLINE: se permiten help, status, exit.
 
 Comandos relacionados
 - status, alerts, logs, diag core_os

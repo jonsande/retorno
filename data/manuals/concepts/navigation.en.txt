@@ -20,7 +20,7 @@ If a relay still responds, you may extract:
 Coordinates vs IDs
 - sector: a grid cell, identified as S{sx}_{sy}_{sz} (derived from x/y/z in ly).
 - coord: sector coordinates reported for a contact.
-- id: the actual node identifier used in commands (travel, dock).
+- id: the actual node identifier used in commands (nav/travel, dock).
 A contact can share a sector with others but has its own id.
 
 Operational notes
@@ -29,4 +29,4 @@ Operational notes
 - In a ruined network, relays are often the only way to expand navigation knowledge without blind jumps.
 
 Relevant commands
-- scan, nav, route, uplink, intel import, travel
+- scan, nav, route, uplink, intel import, travel, dock, undock

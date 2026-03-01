@@ -8,3 +8,4 @@ travel abort
 - travel abort cancels the current transit and returns to the origin.
 - Shows ETA in years; ship goes in-transit until arrival.
 - Operational commands are blocked during transit.
+- If you are docked, undock first (`undock`) before traveling.

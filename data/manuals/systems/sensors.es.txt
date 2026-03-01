@@ -17,3 +17,7 @@ Notas operativas
 
 Comandos relacionados
 - boot sensord, diag sensors, scan, contacts
+
+Impacto en comandos por estado
+- POR DEBAJO de LIMITED (DAMAGED/CRITICAL/OFFLINE): route solve bloqueado.
+- OFFLINE o sensord no activo: scan/contacts bloqueados o inefectivos.

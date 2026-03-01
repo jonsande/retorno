@@ -2,4 +2,8 @@ low_power_quality
 - Calidad de energía por debajo del rango nominal.
 - Causas: SoC bajo, déficit sostenido, distribución dañada.
 - Si persiste: degradación acelerada de sistemas.
+Escalado:
+- Q < 0.55: se bloquean operaciones complejas (uplink, route solve, auth recover).
+- Q < 0.40: hibernar y boot no crítico bloqueados.
+- Q < 0.25: se apagan sistemas no críticos; riesgo de colapso.
 Recomendado: recarga baterías, reduce carga, repara `energy_distribution`.

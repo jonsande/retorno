@@ -6,7 +6,7 @@ auth recover ops
 auth recover sec
 
 Summary
-- Shows available authorization levels or recovers MED credentials.
+- Shows available authorization levels or recovers credentials.
 
 Usage
 - auth status
@@ -32,6 +32,7 @@ Recover MED
   - data_core state >= limited
   - datad service installed and running
   - ship not in transit
+- Blocked if power quality is too low (Q < 0.55) for any recover level.
 - Power impact:
   - While the job is running, it increases P_load.
 - Completion:

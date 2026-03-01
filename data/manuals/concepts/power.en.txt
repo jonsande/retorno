@@ -19,10 +19,16 @@ Q (power_quality)
 Grid quality score (0..1). Think of it as how clean and stable the bus is.
 Low SoC, sustained deficit, or damaged energy_distribution will reduce Q.
 When Q drops, systems age faster and instability becomes more likely.
+Operational thresholds:
+- Q >= 0.70: nominal.
+- Q < 0.55: complex ops blocked (uplink, route solve, auth recover).
+- Q < 0.40: hibernate blocked; non-critical service boots blocked.
+- Q < 0.25: collapse risk. Ship sheds non-critical systems to keep essentials alive.
 
 brownout (True/False)
 Brownout indicates demand exceeded what the grid can deliver (even with battery discharge).
 When brownout happens, the ship may forcibly shed non-vital systems to protect the bus.
+If brownout persists, degradation accelerates (power_core, energy_distribution).
 
 Quick diagnostics (what to do)
 1) Compute net power
@@ -39,5 +45,17 @@ Recommended stabilization protocol (minimal)
 2) Restore distribution: repair energy_distribution (grid stability).
 3) Restore generation: repair power_core (sustained supply).
 4) Recover SoC: let batteries recharge before long operations or travel.
+
+Drone bay interaction
+- drone_bay state adds friction, not hard loss of control: LIMITED/DAMAGED slows bay-assisted operations.
+- If drone_bay is OFFLINE, normal deploy is blocked and charging is unavailable.
+- Emergency deploy (`drone deploy!`) remains the rescue path; already deployed drones can still be commanded while battery/control allow.
+
+SoC bands (summary)
+- SoC >= 0.50: normal.
+- 0.25..0.50: low (warnings on heavy actions).
+- 0.10..0.25: critical (strong warnings on heavy actions).
+- 0.00..0.10: emergency (auto shedding increases).
+- SoC = 0: reserve exhausted; if P_load > P_gen, brownout is sustained.
 
 Note: In CRUISE/hibernation profiles, the ship can survive long spans only if Q remains stable and load stays below generation.

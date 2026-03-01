@@ -25,6 +25,10 @@ Qué significa “degraded”
 - La salida puede estar limitada o “ruidosa”.
 - Efecto neto: menor P_gen, Q más baja bajo carga y envejecimiento más rápido del resto.
 
+Impacto en comandos por estado
+- CRITICAL/DAMAGED/LIMITED: P_gen reducido aumenta riesgo de Q baja y brownout.
+- OFFLINE: generación cero. Espera brownout si la carga no es mínima.
+
 Recuperación típica
 - Usa un dron de mantenimiento: repair power_core.
 - Si tienes módulos, instala parches de generación (futuro: micro_reactor_patch).

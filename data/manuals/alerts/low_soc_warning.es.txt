@@ -1,0 +1,5 @@
+low_soc_warning
+- Carga de batería crítica (SoC < 0.10).
+- Condición de emergencia: alto riesgo de brownout y fallos en cascada.
+- Prioriza acciones de supervivencia/recuperación y restaura carga de inmediato.
+- Espera restricciones operativas severas mientras esta alerta siga activa.

@@ -16,9 +16,9 @@ from pathlib import Path
 from retorno.core.engine import Engine
 from retorno.core.lore import LoreContext, maybe_deliver_lore
 from retorno.core.deadnodes import evaluate_dead_nodes
-from retorno.core.actions import Hibernate
-from retorno.core.actions import RouteSolve
+from retorno.core.actions import Action, AuthRecover, Hibernate, RouteSolve, Status
 from retorno.runtime.loop import GameLoop
+from retorno.core.power_policy import is_parsed_command_allowed_in_core_os_critical
 from retorno.model.events import Event, EventType, Severity, SourceRef
 from retorno.model.jobs import JobStatus
 from retorno.runtime.data_loader import load_modules, load_arcs, load_locations
@@ -154,7 +154,7 @@ def print_help(locale: str = "en") -> None:
             "  ls [path] | cat <path>\n"
             "  man <topic> | about <system_id>\n"
             "  mail inbox | mail read <id|latest>\n"
-            "  auth status | auth recover <med|eng|ops|sec>\n"
+            "  auth status | auth recover <level>\n"
             "  intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>\n"
             "  config set lang <en|es> | config show\n"
             "\nInfo:\n"
@@ -163,7 +163,7 @@ def print_help(locale: str = "en") -> None:
             "  sectors | map | locate <system_id>\n"
             "\nNavigation:\n"
             "  nav routes\n"
-            "  dock <node_id> | nav <node_id> | nav --no-cruise <node_id> | nav abort | uplink\n"
+            "  dock <node_id> | undock | nav <node_id> | nav --no-cruise <node_id> | nav abort | uplink\n"
             "  route solve <node_id>\n"
             "  hibernate until_arrival | hibernate <years>\n"
             "\nSystems / Power:\n"
@@ -174,14 +174,15 @@ def print_help(locale: str = "en") -> None:
             "  drone status\n"
             "  drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>\n"
             "  drone move <drone_id> <target_id>\n"
-            "  drone repair <drone_id> <system_id>\n"
+            "  drone repair <drone_id> <target_id>\n"
+            "  drone install <drone_id> <module_id>\n"
             "  drone salvage scrap <drone_id> <node_id> <amount>\n"
             "  drone salvage module <drone_id> [node_id]\n"
             "  drone salvage data <drone_id> <node_id>\n"
             "  drone reboot <drone_id> | drone recall <drone_id>\n"
             "\nCargo / Modules:\n"
             "  cargo | cargo audit\n"
-            "  module install <module_id> | module inspect <module_id> | modules\n"
+            "  module inspect <module_id> | modules\n"
             "\nHints:\n"
             "  ls /manuals/commands\n"
             "  man navigation\n"
@@ -194,7 +195,7 @@ def print_help(locale: str = "en") -> None:
             "  ls [path] | cat <path>\n"
             "  man <topic> | about <system_id>\n"
             "  mail inbox | mail read <id|latest>\n"
-            "  auth status | auth recover <med|eng|ops|sec>\n"
+            "  auth status | auth recover <level>\n"
             "  intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>\n"
             "  config set lang <en|es> | config show\n"
             "\nInformación:\n"
@@ -203,7 +204,7 @@ def print_help(locale: str = "en") -> None:
             "  sectors | map | locate <system_id>\n"
             "\nNavegación:\n"
             "  nav routes\n"
-            "  dock <node_id> | nav <node_id> | nav --no-cruise <node_id> | nav abort | uplink\n"
+            "  dock <node_id> | undock | nav <node_id> | nav --no-cruise <node_id> | nav abort | uplink\n"
             "  route solve <node_id>\n"
             "  hibernate until_arrival | hibernate <años>\n"
             "\nSistemas / Energía:\n"
@@ -214,14 +215,15 @@ def print_help(locale: str = "en") -> None:
             "  drone status\n"
             "  drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>\n"
             "  drone move <drone_id> <target_id>\n"
-            "  drone repair <drone_id> <system_id>\n"
+            "  drone repair <drone_id> <target_id>\n"
+            "  drone install <drone_id> <module_id>\n"
             "  drone salvage scrap <drone_id> <node_id> <amount>\n"
             "  drone salvage module <drone_id> [node_id]\n"
             "  drone salvage data <drone_id> <node_id>\n"
             "  drone reboot <drone_id> | drone recall <drone_id>\n"
             "\nBodega / Módulos:\n"
             "  cargo | cargo audit\n"
-            "  module install <module_id> | module inspect <module_id> | modules\n"
+            "  module inspect <module_id> | modules\n"
             "\nSugerencias:\n"
             "  ls /manuals/commands\n"
             "  man navigation\n"
@@ -298,6 +300,66 @@ def _mark_arc_discovered(state, left: str, right: str) -> None:
                 discovered = set(discovered or [])
             discovered.add(primary.get("id", "primary"))
             arc_state["discovered"] = discovered
+            primary_state = arc_state.get("primary")
+            if not isinstance(primary_state, dict):
+                primary_state = {}
+            primary_state["unlocked"] = True
+            arc_state["primary"] = primary_state
+
+
+def _primary_link_pair(primary: dict) -> tuple[str, str] | None:
+    line = str(primary.get("line", "")).strip()
+    if "->" not in line:
+        return None
+    try:
+        left, right = [p.strip() for p in line.split(":", 1)[1].split("->", 1)]
+    except Exception:
+        return None
+    if not left or not right:
+        return None
+    return left, right
+
+
+def _primary_target_node_id(primary: dict) -> str | None:
+    kind = str(primary.get("kind", "")).strip().lower()
+    if kind == "link":
+        pair = _primary_link_pair(primary)
+        return pair[1] if pair else None
+    if kind == "node":
+        line = str(primary.get("line", "")).strip()
+        if not line:
+            return None
+        if ":" in line:
+            head, payload = line.split(":", 1)
+            if head.strip().upper() == "NODE":
+                node_id = payload.strip()
+                return node_id or None
+        return line
+    return None
+
+
+def _locked_primary_targets(state) -> set[str]:
+    locked: set[str] = set()
+    for arc in load_arcs():
+        arc_id = arc.get("arc_id", "")
+        if not arc_id:
+            continue
+        primary = arc.get("primary_intel") or {}
+        target = _primary_target_node_id(primary)
+        if not target:
+            continue
+        pid = primary.get("id", "primary")
+        arc_state = state.world.arc_placements.get(arc_id) or {}
+        discovered = arc_state.get("discovered")
+        if not isinstance(discovered, set):
+            discovered = set(discovered or [])
+        primary_state = arc_state.get("primary")
+        if not isinstance(primary_state, dict):
+            primary_state = {}
+        unlocked = bool(primary_state.get("unlocked")) or pid in discovered
+        if not unlocked:
+            locked.add(target)
+    return locked
 
 
 def _has_unlock(state, command_key: str) -> bool:
@@ -341,6 +403,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "repair": "reparacion",
             "boot": "arranque",
             "manual_shed": "corte_manual",
+            "load_shed": "corte_carga",
+            "energy_distribution_offline": "colapso_distribucion",
         }
     }
     job_failed_templates = {
@@ -355,6 +419,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "en": "[{sev}] boot_blocked :: {message}",
         "es": "[{sev}] boot_blocked :: {message}",
     }
+    action_warning_templates = {
+        "en": "[{sev}] warning :: {message}",
+        "es": "[{sev}] advertencia :: {message}",
+    }
     signal_detected_templates = {
         "en": "[{sev}] signal_detected :: Signal detected: {contact_id}",
         "es": "[{sev}] signal_detected :: Señal detectada: {contact_id}",
@@ -366,6 +434,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
     docked_templates = {
         "en": "[{sev}] docked :: Docked at {node_id}",
         "es": "[{sev}] docked :: Acoplado en {node_id}",
+    }
+    undocked_templates = {
+        "en": "[{sev}] undocked :: Undocked from {node_id}",
+        "es": "[{sev}] undocked :: Desacoplado de {node_id}",
     }
     travel_templates = {
         "travel_started": {
@@ -405,6 +477,22 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "low_power_quality": {
             "en": "[{sev}] low_power_quality :: Low power quality",
             "es": "[{sev}] low_power_quality :: Baja calidad de energía",
+        },
+        "battery_reserve_exhausted": {
+            "en": "[{sev}] battery_reserve_exhausted :: Battery reserve exhausted",
+            "es": "[{sev}] battery_reserve_exhausted :: Reserva de batería agotada",
+        },
+        "drone_bay_charging_unavailable": {
+            "en": "[{sev}] drone_bay_charging_unavailable :: Drone bay charging unavailable while energy_distribution remains offline",
+            "es": "[{sev}] drone_bay_charging_unavailable :: Recarga en drone_bay no disponible mientras energy_distribution siga offline",
+        },
+        "low_soc_warning": {
+            "en": "[{sev}] low_soc_warning :: Battery critical. Heavy action may be unsafe (SoC={soc:.2f})",
+            "es": "[{sev}] low_soc_warning :: Batería crítica. Acción pesada puede ser insegura (SoC={soc:.2f})",
+        },
+        "low_soc_notice": {
+            "en": "[{sev}] low_soc_notice :: Battery low. Consider reducing load (SoC={soc:.2f})",
+            "es": "[{sev}] low_soc_notice :: Batería baja. Considera reducir carga (SoC={soc:.2f})",
         },
     }
     power_restore_templates = {
@@ -460,6 +548,14 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "drone_bay_offline": {
             "en": "Action blocked: drone bay offline",
             "es": "Acción bloqueada: bahía de drones fuera de línea",
+        },
+        "drone_bay_deploy_offline": {
+            "en": "Action blocked: drone bay offline; use 'drone deploy!' for emergency launch",
+            "es": "Acción bloqueada: drone_bay offline; usa 'drone deploy!' para lanzamiento de emergencia",
+        },
+        "drone_bay_install_offline": {
+            "en": "Action blocked: drone bay offline; module installation requires bay support",
+            "es": "Acción bloqueada: drone_bay offline; la instalación de módulos requiere soporte de bahía",
         },
         "drone_not_deployed": {
             "en": "Action blocked: drone not deployed ({drone_id})",
@@ -573,6 +669,18 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Action blocked: drone battery too low ({battery:.2f} < {threshold:.2f})",
             "es": "Acción bloqueada: batería de dron demasiado baja ({battery:.2f} < {threshold:.2f})",
         },
+        "drone_target_not_co_located": {
+            "en": "Repair blocked: target drone not at operator location ({drone_id})",
+            "es": "Reparación bloqueada: dron objetivo fuera de la ubicación del operador ({drone_id})",
+        },
+        "invalid_target": {
+            "en": "Action blocked: invalid target",
+            "es": "Acción bloqueada: objetivo inválido",
+        },
+        "already_nominal": {
+            "en": "Action skipped: target already nominal",
+            "es": "Acción omitida: objetivo ya está nominal",
+        },
         "system_too_damaged": {
             "en": "System on blocked: system too damaged",
             "es": "System on bloqueado: sistema demasiado dañado",
@@ -580,6 +688,30 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "in_transit": {
             "en": "Action blocked: ship in transit. Use 'hibernate until_arrival' to advance.",
             "es": "Acción bloqueada: nave en tránsito. Usa 'hibernate until_arrival' para avanzar.",
+        },
+        "power_quality_low": {
+            "en": "Action blocked: power quality too low (Q={q:.2f}, requires >= {required:.2f})",
+            "es": "Acción bloqueada: calidad de energía demasiado baja (Q={q:.2f}, requiere >= {required:.2f})",
+        },
+        "power_quality_critical": {
+            "en": "Action blocked: power quality critical (Q={q:.2f}, requires >= {required:.2f})",
+            "es": "Acción bloqueada: calidad de energía crítica (Q={q:.2f}, requiere >= {required:.2f})",
+        },
+        "power_quality_collapse": {
+            "en": "Action blocked: power quality collapse (Q={q:.2f}, requires >= {required:.2f})",
+            "es": "Acción bloqueada: colapso de calidad de energía (Q={q:.2f}, requiere >= {required:.2f})",
+        },
+        "critical_power_state": {
+            "en": "Action blocked: non-essential operations disabled during critical power state",
+            "es": "Acción bloqueada: operaciones no esenciales deshabilitadas durante estado crítico de energía",
+        },
+        "brownout_active": {
+            "en": "Action blocked: brownout active",
+            "es": "Acción bloqueada: brownout activo",
+        },
+        "terminal_state": {
+            "en": "Action blocked: terminal state active",
+            "es": "Acción bloqueada: estado terminal activo",
         },
         "already_at_target": {
             "en": "Action blocked: already at destination ({node_id})",
@@ -611,6 +743,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Repair completed for {system_id}",
             "es": "Reparación completada en {system_id}",
         },
+        "job_completed_drone_repair": {
+            "en": "Drone repair completed for {drone_id}",
+            "es": "Reparación de dron completada en {drone_id}",
+        },
         "job_completed_boot": {
             "en": "Service booted: {service}",
             "es": "Servicio iniciado: {service}",
@@ -630,6 +766,14 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "job_failed_recall": {
             "en": "Drone recall failed: {drone_id}",
             "es": "Fallo en recuperación de dron: {drone_id}",
+        },
+        "job_failed_dock_interrupted": {
+            "en": "Dock interrupted at {node_id}",
+            "es": "Dock interrumpido en {node_id}",
+        },
+        "job_failed_undock_interrupted": {
+            "en": "Undock interrupted at {node_id}",
+            "es": "Undock interrumpido en {node_id}",
         },
         "job_completed_salvage": {
             "en": "Salvage complete: +{amount} {kind} from {node_id}",
@@ -821,6 +965,15 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                 hint = boot_blocked_reasons[hint_key].get(locale, boot_blocked_reasons[hint_key]["en"])
                 print(f"[{origin_tag}] {hint}")
             continue
+        if e.type == EventType.ACTION_WARNING:
+            locale = state.os.locale.value
+            tmpl = action_warning_templates.get(locale, action_warning_templates["en"])
+            payload.update({"message": e.message})
+            try:
+                print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
+            except Exception:
+                print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
+            continue
         if e.type == EventType.SIGNAL_DETECTED:
             locale = state.os.locale.value
             tmpl = signal_detected_templates.get(locale, signal_detected_templates["en"])
@@ -833,6 +986,15 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         if e.type == EventType.DOCKED:
             locale = state.os.locale.value
             tmpl = docked_templates.get(locale, docked_templates["en"])
+            payload.update({"node_id": e.data.get("node_id", "?")})
+            try:
+                print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
+            except Exception:
+                print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
+            continue
+        if e.type == EventType.UNDOCKED:
+            locale = state.os.locale.value
+            tmpl = undocked_templates.get(locale, undocked_templates["en"])
             payload.update({"node_id": e.data.get("node_id", "?")})
             try:
                 print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
@@ -1016,6 +1178,9 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             EventType.POWER_CORE_DEGRADED,
             EventType.POWER_BUS_INSTABILITY,
             EventType.LOW_POWER_QUALITY,
+            EventType.LOW_SOC_WARNING,
+            EventType.LOW_SOC_NOTICE,
+            EventType.DRONE_BAY_CHARGING_UNAVAILABLE,
         }:
             locale = state.os.locale.value
             tmpl = power_alert_templates.get(e.type.value, {}).get(locale)
@@ -1031,6 +1196,7 @@ def render_events(state, events, origin_override: str | None = None) -> None:
 def render_status(state) -> None:
     ship = state.ship
     p = ship.power
+    locale = state.os.locale.value
     soc = (p.e_batt_kwh / p.e_batt_max_kwh) if p.e_batt_max_kwh else 0.0
     net = p.p_gen_kw - p.p_load_kw
     deficit = max(0.0, p.p_load_kw - p.p_gen_kw)
@@ -1111,7 +1277,51 @@ def render_status(state) -> None:
                     "es": f"transit: entre {tmp_from} y {tmp_to} (abortado)",
                 }
                 print(msg.get(locale, msg["en"]))
-    print(f"power: P_gen={p.p_gen_kw:.2f}kW  P_load={p.p_load_kw:.2f}kW  net={net:+.2f}kW headroom={headroom:.2f}kW  SoC={soc:.2f}  Q={p.power_quality:.2f}  brownout={p.brownout}")
+    print(
+        f"power: P_gen={p.p_gen_kw:.2f}kW  P_load={p.p_load_kw:.2f}kW  net={net:+.2f}kW "
+        f"headroom={headroom:.2f}kW  SoC={soc:.2f}  Q={p.power_quality:.2f}  brownout={p.brownout}"
+    )
+    core_os = ship.systems.get("core_os")
+    if core_os:
+        if core_os.state == SystemState.OFFLINE:
+            msg = {
+                "en": "core_os: offline (terminal control lost)",
+                "es": "core_os: fuera de línea (control terminal perdido)",
+            }
+            print(msg.get(locale, msg["en"]))
+        elif core_os.state == SystemState.CRITICAL:
+            msg = {
+                "en": "core_os: critical (emergency recovery command set active)",
+                "es": "core_os: crítico (set de recuperación de emergencia activo)",
+            }
+            print(msg.get(locale, msg["en"]))
+        elif core_os.state == SystemState.LIMITED:
+            msg = {
+                "en": "core_os: limited (advanced commands blocked)",
+                "es": "core_os: limitado (comandos avanzados bloqueados)",
+            }
+            print(msg.get(locale, msg["en"]))
+    life_support = ship.systems.get("life_support")
+    if life_support:
+        if life_support.state == SystemState.OFFLINE:
+            msg = {
+                "en": "life_support: offline (host viability lost)",
+                "es": "life_support: fuera de línea (viabilidad del huésped perdida)",
+            }
+            print(msg.get(locale, msg["en"]))
+        elif life_support.state == SystemState.CRITICAL:
+            remaining = max(0.0, Balance.LIFE_SUPPORT_CRITICAL_GRACE_S - ship.life_support_critical_s)
+            msg = {
+                "en": f"life_support: critical (grace { _format_eta_short(remaining, locale) } remaining)",
+                "es": f"life_support: crítico (gracia restante { _format_eta_short(remaining, locale) })",
+            }
+            print(msg.get(locale, msg["en"]))
+        elif life_support.state == SystemState.LIMITED:
+            msg = {
+                "en": "life_support: limited (degraded)",
+                "es": "life_support: limitado (degradado)",
+            }
+            print(msg.get(locale, msg["en"]))
     disp_scrap, disp_modules, dirty = _inventory_view(ship)
     dirty_suffix = " [manifest stale]" if dirty else ""
     print(f"inventory: scrap={disp_scrap} modules={len(disp_modules)}{dirty_suffix}")
@@ -1181,7 +1391,10 @@ def render_diag(state, system_id: str) -> None:
     print(f"priority: {sys.priority}")
     print(f"forced_offline: {sys.forced_offline}")
     if sys.forced_offline:
-        print("notes: manually powered down (power off/shutdown).")
+        if sys.auto_offline_reason == "energy_distribution_offline":
+            print("notes: auto-offline due to energy_distribution collapse.")
+        else:
+            print("notes: manually powered down (power off/shutdown).")
     if sys.dependencies:
         print("dependencies:")
         for d in sys.dependencies:
@@ -1192,6 +1405,10 @@ def render_diag(state, system_id: str) -> None:
         print("notes: grid phase alignment unstable. manual intervention required.")
     if system_id == "power_core" and sys.state == SystemState.DAMAGED:
         print("notes: output oscillation detected. efficiency reduced.")
+    if system_id == "drone_bay":
+        dist = state.ship.systems.get("energy_distribution")
+        if sys.state == SystemState.OFFLINE or (dist and dist.state == SystemState.OFFLINE):
+            print("notes: no drone charging available.")
 
 
 def render_alerts(state) -> None:
@@ -1316,8 +1533,8 @@ def render_modules_installed(state) -> None:
         print("(none)")
         locale = state.os.locale.value
         hint = {
-            "en": "Hint: if you have a module, you can install it with: module install <module_id>",
-            "es": "Pista: si tienes un módulo, puedes instalarlo con: module install <module_id>",
+            "en": "Hint: install modules with a drone: drone install <drone_id> <module_id>",
+            "es": "Pista: instala módulos con dron: drone install <drone_id> <module_id>",
         }
         print(hint.get(locale, hint["en"]))
         return
@@ -1773,11 +1990,12 @@ def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> lis
     current_sector = f"S{sx:+04d}_{sy:+04d}_{sz:+04d}"
 
     routes = state.world.known_links.get(current_id, set())
+    locked_primary_targets = _locked_primary_targets(state)
     hub_kinds = {"relay", "station", "waystation"}
     candidates: dict[str, int] = {}
 
     def _add_candidate(nid: str, weight: int) -> None:
-        if nid == current_id or nid in routes:
+        if nid == current_id or nid in routes or nid in locked_primary_targets:
             return
         prev = candidates.get(nid, 0)
         if weight > prev:
@@ -1807,6 +2025,8 @@ def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> lis
             node_id = entry.get("node_id") if isinstance(entry, dict) else None
             weight = int(entry.get("weight", 1)) if isinstance(entry, dict) else 1
             if not node_id or node_id == current_id or node_id in routes:
+                continue
+            if node_id in locked_primary_targets:
                 continue
             if node_id not in authored_ids:
                 continue
@@ -1903,6 +2123,8 @@ def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> lis
     for nid in state.world.known_nodes:
         if nid == current_id or nid in routes:
             continue
+        if nid in locked_primary_targets:
+            continue
         n = state.world.space.nodes.get(nid)
         if n and n.kind in hub_kinds:
             dx = n.x_ly - x
@@ -1986,12 +2208,15 @@ def _pick_mobility_failsafe_target(state) -> str | None:
         return None
     authored = _authored_node_ids()
     known = state.world.known_links.get(current_id, set())
+    locked_primary_targets = _locked_primary_targets(state)
     max_dist = Balance.MOBILITY_FAILSAFE_MAX_DIST_LY
 
     def _candidates() -> list[tuple[float, str]]:
         found: list[tuple[float, str]] = []
         for node in state.world.space.nodes.values():
             if node.node_id == current_id or node.node_id in authored:
+                continue
+            if node.node_id in locked_primary_targets:
                 continue
             if node.kind not in {"relay", "station", "waystation"}:
                 continue
@@ -2084,6 +2309,13 @@ def _apply_mobility_failsafe(state, added: list[str]) -> str | None:
 def _uplink_blocked_reason(state) -> str | None:
     if state.ship.in_transit:
         return "in_transit"
+    if state.ship.power.brownout:
+        return "brownout_active"
+    q = state.ship.power.power_quality
+    if q < Balance.POWER_QUALITY_COLLAPSE_THRESHOLD:
+        return "power_quality_collapse"
+    if q < Balance.POWER_QUALITY_BLOCK_THRESHOLD:
+        return "power_quality_low"
     if state.ship.docked_node_id != state.world.current_node_id:
         return "not_docked"
     node = state.world.space.nodes.get(state.world.current_node_id)
@@ -2105,12 +2337,139 @@ def _uplink_blocked_reason(state) -> str | None:
     return None
 
 
+def _core_os_limited_blocks(parsed) -> bool:
+    if parsed == "UPLINK":
+        return True
+    if isinstance(parsed, RouteSolve):
+        return True
+    if isinstance(parsed, AuthRecover):
+        return True
+    return False
+
+
+def _terminal_state_allows(parsed) -> bool:
+    if parsed in {"HELP", "EXIT"}:
+        return True
+    if isinstance(parsed, Status):
+        return True
+    return False
+
+
+def _command_blocked_message(state, parsed) -> str | None:
+    core_os = state.ship.systems.get("core_os")
+    life_support = state.ship.systems.get("life_support")
+    locale = state.os.locale.value
+    messages = {
+        "terminal": {
+            "en": "Core OS offline. Terminal control lost.",
+            "es": "Core OS fuera de línea. Control de terminal perdido.",
+        },
+        "core_os_critical": {
+            "en": "Core OS degraded: emergency recovery command set active",
+            "es": "Core OS degradado: set de recuperación de emergencia activo",
+        },
+        "core_os_limited": {
+            "en": "Core OS degraded: advanced commands blocked.",
+            "es": "Core OS degradado: comandos avanzados bloqueados.",
+        },
+        "life_support_offline": {
+            "en": "Life support offline. Host viability lost.",
+            "es": "Soporte vital fuera de línea. Viabilidad del huésped perdida.",
+        },
+    }
+
+    if state.os.terminal_lock:
+        if not _terminal_state_allows(parsed):
+            reason = state.os.terminal_reason or "terminal"
+            if reason in {"life_support_offline", "life_support_critical"}:
+                return messages["life_support_offline"].get(locale, messages["life_support_offline"]["en"])
+            return messages["terminal"].get(locale, messages["terminal"]["en"])
+        return None
+    if life_support and life_support.state == SystemState.OFFLINE:
+        if not _terminal_state_allows(parsed):
+            return messages["life_support_offline"].get(locale, messages["life_support_offline"]["en"])
+        return None
+    if core_os and core_os.state == SystemState.OFFLINE:
+        if not _terminal_state_allows(parsed):
+            return messages["terminal"].get(locale, messages["terminal"]["en"])
+        return None
+    if core_os and core_os.state == SystemState.CRITICAL:
+        if parsed == "UPLINK" or isinstance(parsed, Hibernate):
+            return messages["core_os_critical"].get(locale, messages["core_os_critical"]["en"])
+        if not isinstance(parsed, Action) and not is_parsed_command_allowed_in_core_os_critical(parsed):
+            return messages["core_os_critical"].get(locale, messages["core_os_critical"]["en"])
+    if core_os and core_os.state == SystemState.LIMITED:
+        if _core_os_limited_blocks(parsed):
+            return messages["core_os_limited"].get(locale, messages["core_os_limited"]["en"])
+    return None
+
+
+def _hibernate_blocked_message(state) -> str | None:
+    locale = state.os.locale.value
+    q = state.ship.power.power_quality
+    life_support = state.ship.systems.get("life_support")
+    if state.ship.power.brownout:
+        msg = {
+            "en": "Hibernate blocked: brownout active",
+            "es": "Hibernación bloqueada: brownout activo",
+        }
+        return msg.get(locale, msg["en"])
+    if q < Balance.POWER_QUALITY_CRITICAL_THRESHOLD:
+        msg = {
+            "en": f"Hibernate blocked: power quality too low (Q={q:.2f}, requires >= {Balance.POWER_QUALITY_CRITICAL_THRESHOLD:.2f})",
+            "es": f"Hibernación bloqueada: calidad de energía demasiado baja (Q={q:.2f}, requiere >= {Balance.POWER_QUALITY_CRITICAL_THRESHOLD:.2f})",
+        }
+        return msg.get(locale, msg["en"])
+    if life_support and life_support.state in {SystemState.LIMITED, SystemState.CRITICAL, SystemState.OFFLINE}:
+        msg = {
+            "en": "Hibernate blocked: life_support degraded",
+            "es": "Hibernación bloqueada: soporte vital degradado",
+        }
+        return msg.get(locale, msg["en"])
+    return None
+
+
+def _hibernate_soc_warning(state) -> str | None:
+    soc = (state.ship.power.e_batt_kwh / state.ship.power.e_batt_max_kwh) if state.ship.power.e_batt_max_kwh else 0.0
+    locale = state.os.locale.value
+    if 0.10 <= soc < 0.25:
+        msg = {
+            "en": f"[WARN] Battery critical: SoC={soc:.2f}. Hibernate may be unsafe.",
+            "es": f"[WARN] Batería crítica: SoC={soc:.2f}. Hibernar puede ser inseguro.",
+        }
+        return msg.get(locale, msg["en"])
+    if 0.25 <= soc < 0.50:
+        msg = {
+            "en": f"[INFO] Battery low: SoC={soc:.2f}. Consider reducing load.",
+            "es": f"[INFO] Batería baja: SoC={soc:.2f}. Considera reducir carga.",
+        }
+        return msg.get(locale, msg["en"])
+    return None
+
+
 def _handle_uplink(state) -> None:
     reason = _uplink_blocked_reason(state)
     locale = state.os.locale.value
+    q = state.ship.power.power_quality
+    soc = (state.ship.power.e_batt_kwh / state.ship.power.e_batt_max_kwh) if state.ship.power.e_batt_max_kwh else 0.0
+    if 0.10 <= soc < 0.25:
+        warn = {
+            "en": f"[WARN] Battery critical: SoC={soc:.2f}. Uplink may be unsafe.",
+            "es": f"[WARN] Batería crítica: SoC={soc:.2f}. Uplink puede ser inseguro.",
+        }
+        print(warn.get(locale, warn["en"]))
+    elif 0.25 <= soc < 0.50:
+        warn = {
+            "en": f"[INFO] Battery low: SoC={soc:.2f}. Consider reducing load.",
+            "es": f"[INFO] Batería baja: SoC={soc:.2f}. Considera reducir carga.",
+        }
+        print(warn.get(locale, warn["en"]))
     blocked = {
         "en": {
             "in_transit": "Uplink blocked: ship in transit.",
+            "brownout_active": "Uplink blocked: brownout active.",
+            "power_quality_low": f"Uplink blocked: power quality too low (Q={q:.2f}, requires >= {Balance.POWER_QUALITY_BLOCK_THRESHOLD:.2f}).",
+            "power_quality_collapse": f"Uplink blocked: power quality collapse (Q={q:.2f}, requires >= {Balance.POWER_QUALITY_COLLAPSE_THRESHOLD:.2f}).",
             "not_docked": "Uplink blocked: ship not docked.",
             "not_relay": "Uplink blocked: current node is not a relay/waystation/station.",
             "missing_data_core": "Uplink blocked: data_core missing.",
@@ -2122,6 +2481,9 @@ def _handle_uplink(state) -> None:
         },
         "es": {
             "in_transit": "Uplink bloqueado: nave en tránsito.",
+            "brownout_active": "Uplink bloqueado: brownout activo.",
+            "power_quality_low": f"Uplink bloqueado: calidad de energía demasiado baja (Q={q:.2f}, requiere >= {Balance.POWER_QUALITY_BLOCK_THRESHOLD:.2f}).",
+            "power_quality_collapse": f"Uplink bloqueado: colapso de calidad de energía (Q={q:.2f}, requiere >= {Balance.POWER_QUALITY_COLLAPSE_THRESHOLD:.2f}).",
             "not_docked": "Uplink bloqueado: nave no está docked.",
             "not_relay": "Uplink bloqueado: el nodo actual no es relay/waystation/estación.",
             "missing_data_core": "Uplink bloqueado: falta data_core.",
@@ -2334,6 +2696,7 @@ def _spawn_corrupt_intel_contact(state, source_path: str) -> str | None:
     seed = _hash64(state.meta.rng_seed + state.meta.rng_counter, f"intel_corrupt:{source_path}:{int(state.clock.t)}")
     state.meta.rng_counter += 1
     rng = random.Random(seed)
+    locked_primary_targets = _locked_primary_targets(state)
     # Try to find an unknown hub within radius.
     for _ in range(32):
         dx = rng.uniform(-radius, radius)
@@ -2350,7 +2713,7 @@ def _spawn_corrupt_intel_contact(state, source_path: str) -> str | None:
             for n in state.world.space.nodes.values()
             if n.is_hub and sector_id_for_pos(n.x_ly, n.y_ly, n.z_ly) == sector_id
         ]
-        hubs = [h for h in hubs if h.node_id not in state.world.known_contacts]
+        hubs = [h for h in hubs if h.node_id not in state.world.known_contacts and h.node_id not in locked_primary_targets]
         if not hubs:
             continue
         hubs.sort(key=lambda n: n.node_id)
@@ -3483,6 +3846,10 @@ def render_about(state, system_id: str) -> None:
                 for msg in sorted(set(added)):
                     print(msg)
         return
+    alert_path = _resolve_localized_path(state, f"/manuals/alerts/{system_id}.txt")
+    if alert_path in state.os.fs:
+        render_cat(state, alert_path)
+        return
     concept_path = _resolve_localized_path(state, f"/manuals/concepts/{system_id}.txt")
     if concept_path in state.os.fs:
         print(f"No system manual for '{system_id}'. Try: man {system_id}")
@@ -3646,6 +4013,7 @@ def main() -> None:
         "uplink",
         "relay",
         "dock",
+        "undock",
         "travel",
         "route",
         "salvage",
@@ -3654,7 +4022,6 @@ def main() -> None:
         "repair",
         "inventory",
         "cargo",
-        "install",
         "module",
         "modules",
         "shutdown",
@@ -3744,6 +4111,8 @@ def main() -> None:
                             candidates = [s for s in systems if s.startswith(text)]
                 elif cmd == "dock":
                     candidates = [c for c in contacts if c.startswith(text)]
+                elif cmd == "undock":
+                    candidates = []
                 elif cmd in {"nav", "navigation", "travel"}:
                     def _travel_targets(prefix: str) -> list[str]:
                         return [c for c in contacts if c.startswith(prefix)]
@@ -3770,12 +4139,10 @@ def main() -> None:
                         candidates = [c for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "modules"] if c.startswith(text)]
                     elif len(tokens) == 3 and tokens[1] == "scenario":
                         candidates = [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
-                elif cmd == "install":
-                    candidates = [m for m in modules if m.startswith(text)]
                 elif cmd == "module":
                     if len(tokens) == 2:
-                        candidates = [c for c in ["install", "inspect"] if c.startswith(text)]
-                    elif len(tokens) == 3 and tokens[1] in {"install", "inspect"}:
+                        candidates = [c for c in ["inspect"] if c.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "inspect":
                         candidates = [m for m in modules if m.startswith(text)]
                 elif cmd == "inventory":
                     if len(tokens) == 2:
@@ -3849,6 +4216,13 @@ def main() -> None:
                     topics = set(systems)
                     topics.update(locked_state.events.alerts.keys())
                     for path in fs_paths:
+                        if path.startswith("/manuals/alerts/"):
+                            name = path.rsplit("/", 1)[-1]
+                            if name.endswith(".txt"):
+                                name = name[:-4]
+                            if name.endswith(".en") or name.endswith(".es"):
+                                name = name[:-3]
+                            topics.add(name)
                         if path.startswith("/manuals/modules/"):
                             name = path.rsplit("/", 1)[-1]
                             if name.endswith(".txt"):
@@ -3870,17 +4244,19 @@ def main() -> None:
                 elif cmd == "drone":
                     if len(tokens) == 2:
                         candidates = [
-                            c for c in ["status", "deploy", "deploy!", "move", "reboot", "recall", "repair", "salvage"]
+                            c for c in ["status", "deploy", "deploy!", "move", "reboot", "recall", "repair", "install", "salvage"]
                             if c.startswith(text)
                         ]
-                    elif len(tokens) == 3 and tokens[1] in {"deploy", "deploy!", "reboot", "recall", "repair", "move"}:
+                    elif len(tokens) == 3 and tokens[1] in {"deploy", "deploy!", "reboot", "recall", "repair", "move", "install"}:
                         candidates = [d for d in drones if d.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
                         candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "move":
                         candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
+                    elif len(tokens) == 4 and tokens[1] == "install":
+                        candidates = [m for m in modules if m.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "repair":
-                        candidates = [s for s in systems if s.startswith(text)]
+                        candidates = [x for x in sorted(set(systems) | set(drones)) if x.startswith(text)]
                     elif len(tokens) == 3 and tokens[1] == "salvage":
                         candidates = [c for c in ["scrap", "module", "modules", "data"] if c.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "salvage":
@@ -3975,6 +4351,12 @@ def main() -> None:
 
         if parsed is None:
             # sin comando: mundo sigue si quieres; aquí no tickeamos automáticamente
+            continue
+
+        with loop.with_lock() as locked_state:
+            block_msg = _command_blocked_message(locked_state, parsed)
+        if block_msg:
+            print(block_msg)
             continue
 
         ev = loop.drain_events()
@@ -4293,6 +4675,14 @@ def main() -> None:
         if isinstance(parsed, Hibernate):
             _drain_auto_events()
             with loop.with_lock() as locked_state:
+                block_msg = _hibernate_blocked_message(locked_state)
+                warn_msg = _hibernate_soc_warning(locked_state)
+            if block_msg:
+                print(block_msg)
+                continue
+            if warn_msg:
+                print(warn_msg)
+            with loop.with_lock() as locked_state:
                 ok, wake_on_low = _confirm_hibernate_drones(locked_state)
                 if not ok:
                     continue
@@ -4322,7 +4712,7 @@ def main() -> None:
             with loop.with_lock() as locked_state:
                 render_status(locked_state)
             continue
-        if parsed.__class__.__name__ in {"Dock", "Travel"}:
+        if parsed.__class__.__name__ in {"Dock", "Travel", "Undock"}:
             with loop.with_lock() as locked_state:
                 if parsed.__class__.__name__ == "Dock":
                     resolved = _resolve_node_id_from_input(locked_state, parsed.node_id)

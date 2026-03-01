@@ -75,7 +75,7 @@ def create_initial_state_prologue() -> GameState:
             state_locked=True,
             sector_id="PWR-A2",
             p_nom_kw=0.3,
-            priority=1,
+            priority=2,
             base_decay_per_s=8.0e-11,
             k_power=0.35,
             k_rad=0.15,
@@ -88,19 +88,11 @@ def create_initial_state_prologue() -> GameState:
             health=0.9,
             sector_id="DRN-BAY",
             p_nom_kw=0.6,
-            priority=4,
+            priority=2,
             base_decay_per_s=8.0e-11,
             k_power=0.35,
             k_rad=0.15,
-            dependencies=[
-                Dependency(
-                    dep_type="system_state_at_least",
-                    target_id="energy_distribution",
-                    value=SystemState.NOMINAL.value,
-                    #value=SystemState.LIMITED.value,
-
-                )
-            ],
+            dependencies=[],
         ),
         "security": ShipSystem(
             system_id="security",
@@ -129,7 +121,7 @@ def create_initial_state_prologue() -> GameState:
             health=0.9,
             sector_id="BRG-01",
             p_nom_kw=0.4,
-            priority=3,
+            priority=4,
             base_decay_per_s=8.5e-11,
             k_power=0.30,
             k_rad=0.10,
@@ -150,7 +142,7 @@ def create_initial_state_prologue() -> GameState:
             state_locked=True,
             sector_id="BRG-01",
             p_nom_kw=0.7,
-            priority=4,
+            priority=3,
             base_decay_per_s=9.0e-11,
             k_power=0.35,
             k_rad=0.15,

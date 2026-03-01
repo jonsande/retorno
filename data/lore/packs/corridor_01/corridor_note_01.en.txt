@@ -2,3 +2,5 @@ CORRIDOR NOTE // routine
 
 Routine cache sweep found intermittent routing ghosts.
 Harbor-12 kept repeating a last ring path before the blackout.
+
+[INTEL] HARBOR_12 [/INTEL]

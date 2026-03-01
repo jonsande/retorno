@@ -1,4 +1,3 @@
-install <module_id>
-- Alias de: module install <module_id>
-- Instala un módulo del inventario.
-- Consume el módulo.
+install
+- Comando heredado eliminado.
+- Usa: drone install <drone_id> <module_id>

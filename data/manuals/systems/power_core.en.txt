@@ -25,6 +25,10 @@ What “degraded” means
 - Output may be throttled or noisy.
 - Net effect: lower P_gen, lower Q under load, faster aging elsewhere.
 
+Command impact by state
+- CRITICAL/DAMAGED/LIMITED: reduced P_gen increases risk of low Q and brownout.
+- OFFLINE: zero generation. Expect brownout unless load is minimal.
+
 Typical recovery
 - Use a maintenance drone to repair power_core.
 - If you have modules, install generation patches (future: micro_reactor_patch).

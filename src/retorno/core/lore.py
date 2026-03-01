@@ -85,7 +85,7 @@ def _delivery_channel_for_trigger(allowed: list[str], trigger: str) -> str | Non
     return None
 
 
-def _constraints_ok(piece: dict, ctx: LoreContext) -> bool:
+def piece_constraints_ok(piece: dict, ctx: LoreContext) -> bool:
     cons = piece.get("constraints") or {}
     min_year = cons.get("min_year")
     max_year = cons.get("max_year")
@@ -144,7 +144,29 @@ def _soft_force_roll(state, piece: dict) -> bool:
     return random.Random(seed).random() < p
 
 
-def _deliver_piece(state, piece_id: str, piece: dict, channel: str, ctx: LoreContext) -> LoreDelivery:
+def _mark_primary_unlocked(state, arc_id: str, piece: dict) -> None:
+    if not arc_id:
+        return
+    arc_state = state.world.arc_placements.setdefault(arc_id, {})
+    primary_state = arc_state.setdefault("primary", {})
+    primary_state["unlocked"] = True
+    discovered = arc_state.get("discovered")
+    if not isinstance(discovered, set):
+        discovered = set(discovered or [])
+    discovered.add(piece.get("id", "primary"))
+    arc_state["discovered"] = discovered
+
+
+def _deliver_piece(
+    state,
+    arc_id: str,
+    piece_id: str,
+    piece: dict,
+    channel: str,
+    ctx: LoreContext,
+    *,
+    is_primary: bool = False,
+) -> LoreDelivery:
     delivered_files: list[dict] = []
     events: list[Event] = []
     lang = state.os.locale.value
@@ -171,6 +193,8 @@ def _deliver_piece(state, piece_id: str, piece: dict, channel: str, ctx: LoreCon
                         source_kind="uplink_only",
                         source_ref=ctx.node_id,
                     )
+                    if is_primary:
+                        _mark_primary_unlocked(state, arc_id, piece)
         return LoreDelivery(delivered_files, events)
     if channel == "ship_os_mail":
         path = deliver_ship_mail(state, piece.get(f"content_ref_{lang}") or piece.get("content_ref_en"), lang)
@@ -273,7 +297,7 @@ def maybe_deliver_lore(state, trigger: str, ctx: LoreContext) -> LoreDelivery:
                 continue
             if not piece.get("force"):
                 continue
-            if not _constraints_ok(piece, ctx):
+            if not piece_constraints_ok(piece, ctx):
                 continue
             policy = piece.get("force_policy", "none")
             if policy == "none":
@@ -286,7 +310,7 @@ def maybe_deliver_lore(state, trigger: str, ctx: LoreContext) -> LoreDelivery:
             channel = _delivery_channel_for_trigger(allowed, trigger)
             if not channel:
                 continue
-            result = _deliver_piece(state, pid, piece, channel, ctx)
+            result = _deliver_piece(state, arc_id, pid, piece, channel, ctx, is_primary=(piece_key == "primary"))
             delivered_files.extend(result.files)
             events.extend(result.events)
             state.world.lore.delivered.add(key)
@@ -315,7 +339,7 @@ def maybe_deliver_lore(state, trigger: str, ctx: LoreContext) -> LoreDelivery:
                 if picked:
                     single_id = picked.get("single_id")
                     if single_id and single_id not in state.world.lore.delivered:
-                        if not _constraints_ok(picked, ctx):
+                        if not piece_constraints_ok(picked, ctx):
                             return delivered_files
                         allowed = picked.get("channels") or ["captured_signal"]
                         channel = _delivery_channel_for_trigger(allowed, trigger)
@@ -329,7 +353,7 @@ def maybe_deliver_lore(state, trigger: str, ctx: LoreContext) -> LoreDelivery:
                             "content_ref_en": file_entry.get("content_ref_en"),
                             "content_ref_es": file_entry.get("content_ref_es"),
                         }
-                        result = _deliver_piece(state, single_id, piece, channel, ctx)
+                        result = _deliver_piece(state, "", single_id, piece, channel, ctx, is_primary=False)
                         delivered_files.extend(result.files)
                         events.extend(result.events)
                         state.world.lore.delivered.add(single_id)

@@ -1,0 +1,80 @@
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+> help
+Commands (summary):
+  help | clear | exit | quit
+FS / Manuals / Mail:
+  ls [path] | cat <path>
+  man <topic> | about <system_id>
+  mail inbox | mail read <id|latest>
+  auth status | auth recover <med|eng|ops|sec>
+  intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>
+  config set lang <en|es> | config show
+Info:
+  status | jobs | jobs <amount> | jobs all | job cancel <job_id> | alerts | alerts explain <alert_key> | logs | log copy [n]
+  contacts | scan
+  sectors | map | locate <system_id>
+Navigation:
+  nav routes
+  dock <node_id> | nav <node_id> | nav --no-cruise <node_id> | nav abort | uplink
+  route solve <node_id>
+  hibernate until_arrival | hibernate <years>
+Systems / Power:
+  diag <system_id> | boot <service_name>
+  power status | power plan cruise|normal | power on <system_id> | power off <system_id>
+  repair <system_id> --selftest
+Drones:
+  drone status
+  drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>
+  drone move <drone_id> <target_id>
+  drone repair <drone_id> <system_id>
+  drone salvage scrap <drone_id> <node_id> <amount>
+  drone salvage module <drone_id> [node_id]
+  drone salvage data <drone_id> <node_id>
+  drone reboot <drone_id> | drone recall <drone_id>
+Cargo / Modules:
+  cargo | cargo audit
+  module install <module_id> | module inspect <module_id> | modules
+Hints:
+  ls /manuals/commands
+  man navigation
+  cat /mail/inbox/0001.txt
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+completions: locate log logs
+[AUTO] [WARN] system_state_changed :: drone_bay: nominal -> offline (cause=?, health=n/a)
+[AUTO] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=degradation, health=0.90)
+> log copy 80

@@ -9,11 +9,17 @@ Función
 
 Modos de fallo
 - Deriva lenta (la más común): baja eficiencia → sube consumo y aparecen alarmas.
-- Pérdida catastrófica: cuenta atrás de viabilidad (módulo futuro).
+- Pérdida catastrófica: cuenta atrás de viabilidad. Si CRITICAL persiste, se activa estado terminal.
 
 Notas operativas
 - Es crítico. Apagarlo equivale a rendirse.
 - Si debes recortar energía, recorta todo lo demás primero.
+- LIMITED/CRITICAL: hibernación bloqueada hasta estabilizar.
+
+Impacto en comandos por estado
+- LIMITED: hibernación bloqueada.
+- CRITICAL: hibernación bloqueada; inicia cuenta atrás. Si persiste, estado terminal.
+- OFFLINE: estado terminal; comandos muy restringidos.
 
 Comandos relacionados
 - status, alerts, diag life_support

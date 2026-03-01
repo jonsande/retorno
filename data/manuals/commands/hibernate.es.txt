@@ -2,3 +2,5 @@ hibernate until_arrival | hibernate <años>
 - Avanza el tiempo en bloques grandes durante el tránsito.
 - until_arrival duerme hasta el fin del viaje actual.
 - Suprime el ruido intermedio; muestra llegada y eventos críticos.
+- Se bloquea si life_support está degradado, Q es crítica (Q < 0.40) o hay brownout activo.
+- Con SoC bajo (por debajo de 0.25) se muestra advertencia antes de continuar.

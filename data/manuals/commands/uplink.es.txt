@@ -3,3 +3,4 @@ uplink
 - Requiere estar acoplado y data_core + datad operativos.
 - Puede revelar nuevas rutas de tablas de navegación en caché.
 - Escribe un registro en /logs/nav/ con los enlaces descubiertos.
+- Se bloquea si la calidad de energía es demasiado baja (Q < 0.55) o hay brownout activo.

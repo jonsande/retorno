@@ -1,3 +1,18 @@
 drone_bay
 - Drone launch subsystem.
 - In emergencies use deploy!.
+
+Command impact by state
+- NOMINAL: normal support (deploy/recall/install/reboot ETA baseline, normal charging).
+- LIMITED: support degraded (affected operations slower, charging slower).
+- DAMAGED: support severely degraded (affected operations much slower, charging much slower, minor integrity risk on deploy/recall).
+- LIMITED: passive docked-drone integrity repairs are slower.
+- DAMAGED: passive docked-drone integrity repairs stay slow and consume more scrap.
+- CRITICAL: passive docked-drone integrity repairs are even slower, consume high scrap, and may fail with minor damage.
+- OFFLINE: no bay support. drone deploy is blocked; use drone deploy! for emergency launch.
+- OFFLINE: drone install is blocked (requires bay support). drone recall still works, but charging remains unavailable.
+- While energy_distribution is OFFLINE, charging and passive bay repairs are unavailable even if drone_bay itself is online.
+
+Control vs bay support
+- Drone control depends on core_os minimum control link plus drone battery.
+- Bay state affects support functions (charging, deploy/recall/install/reboot timing), not remote control of already deployed drones.

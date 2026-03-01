@@ -1,4 +1,4 @@
-drone repair <drone_id> <system_id>
+drone repair <drone_id> <target_id>
 repair <system_id> --selftest
 
 Notes

@@ -1,0 +1,4 @@
+battery_reserve_exhausted
+- SoC de batería en 0.00 y la carga está cubierta por la generación.
+- No queda reserva. Cualquier carga extra puede causar brownout.
+Recomendado: reduce carga, restaura generación y recarga baterías.

@@ -49,8 +49,7 @@ class GameLoop:
 
     def apply_action(self, action: Action) -> list[Event]:
         with self._lock:
-            events = self.engine.apply_action(self.state, action)
-            return events
+            return self.engine.apply_action(self.state, action)
 
     def step(self, dt: float) -> list[Event]:
         with self._lock:

@@ -67,6 +67,11 @@ class Dock(Action):
 
 
 @dataclass(slots=True)
+class Undock(Action):
+    pass
+
+
+@dataclass(slots=True)
 class Salvage(Action):
     node_id: str
     kind: str
@@ -75,6 +80,7 @@ class Salvage(Action):
 
 @dataclass(slots=True)
 class Install(Action):
+    drone_id: str
     module_id: str
 
 

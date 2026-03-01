@@ -1,7 +1,8 @@
 drone deploy <drone_id> <sector_id|node_id>
 drone deploy! <drone_id> <sector_id|node_id>
 drone move <drone_id> <target_id>
-drone repair <drone_id> <system_id>
+drone repair <drone_id> <target_id>
+drone install <drone_id> <module_id>
 drone salvage scrap <drone_id> <node_id> <amount>
 drone salvage module <drone_id> [node_id]
 drone salvage data <drone_id> <node_id>
@@ -17,8 +18,12 @@ Status fields
 - dose: accumulated radiation exposure (rad)
 
 Operational notes
-- Drone actions consume battery (deploy/move/repair/salvage/recall/reboot).
+- Drone actions consume battery (deploy/move/repair/install/salvage/recall/reboot).
 - Deployed drones also drain battery slowly while idle.
-- Charging happens in drone_bay if it is online and at least LIMITED.
+- Charging happens in drone_bay while bay/distribution support is available.
+- `drone repair` accepts ship systems and drones as targets.
+- To repair another drone, the operator drone must be deployed and co-located with the target drone.
+- drone_bay LIMITED/DAMAGED slows deploy/recall/install/reboot and charging.
+- drone_bay OFFLINE blocks normal deploy and install; use deploy! for emergency launch.
 - Avoid running the battery to zero before recall; a dead drone may be stranded.
 - Emergency deploy may risk failure and integrity loss.

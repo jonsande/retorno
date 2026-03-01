@@ -1,0 +1,9 @@
+undock
+- Sale del acoplamiento y vuelve al estado en órbita en el nodo actual.
+- Requisitos:
+- La nave debe estar actualmente acoplada en el nodo actual.
+- La nave no debe estar en tránsito.
+- Si hay drones fuera de la nave (desplegados/deshabilitados en nodos del mundo), se requiere advertencia y confirmación antes de desacoplar.
+- Si el estado de energía es crítico, undock puede bloquearse como acción no esencial.
+- Undock encola un trabajo; su duración se configura en `Balance.UNDOCK_TIME_S`.
+- Undock puede interrumpirse si cambia el contexto antes de completar, o cancelarse con `job cancel <job_id>`.

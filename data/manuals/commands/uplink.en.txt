@@ -3,3 +3,4 @@ uplink
 - Requires docking at a relay/station and data_core + datad online.
 - May reveal new routes from cached navigation tables.
 - Writes a log under /logs/nav/ with discovered links.
+- Blocked if power quality is too low (Q < 0.55) or brownout is active.

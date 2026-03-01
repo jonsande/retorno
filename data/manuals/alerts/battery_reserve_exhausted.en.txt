@@ -1,0 +1,4 @@
+battery_reserve_exhausted
+- Battery SoC is 0.00 and load is fully covered by generation.
+- No reserve remains. Any additional load can trigger brownout.
+Recommended: reduce load, restore generation, and recharge batteries.

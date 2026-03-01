@@ -20,7 +20,7 @@ Si un relay todavía responde, puede permitir extraer:
 Coordenadas vs IDs
 - sector: celda de cuadrícula, identificada como S{sx}_{sy}_{sz} (derivada de x/y/z en ly).
 - coord: coordenada de sector reportada para un contacto.
-- id: identificador real del nodo que se usa en comandos (travel, dock).
+- id: identificador real del nodo que se usa en comandos (nav/travel, dock).
 Un mismo sector puede contener varios contactos con ids distintos.
 
 Notas operativas
@@ -29,4 +29,4 @@ Notas operativas
 - En una red arruinada, los relays suelen ser la única forma de ampliar conocimiento de navegación sin saltos ciegos.
 
 Comandos relacionados
-- scan, nav, route, uplink, intel import, travel
+- scan, nav, route, uplink, intel import, travel, dock, undock

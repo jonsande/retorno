@@ -27,36 +27,36 @@ def main() -> None:
     engine.tick(state, 1.0)
     engine.tick(state, 1.0)
 
-    # 3) Intentar desplegar dron al inicio: debería BLOQUEARSE (deps drone_bay)
+    # 3) Intentar desplegar dron al inicio: debe encolar job.
     ev = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="PWR-A2"))
-    assert ev, "Expected blocking event when deploying drone at start"
-    assert_any_message_contains(ev, "blocked")  # depende del texto exacto; si no, comenta esta línea
+    assert ev and all(e.severity.value != "warn" for e in ev), (
+        "DroneDeploy should enqueue at start; events: " + ", ".join([e.message for e in ev])
+    )
 
     # 4) Boot sensores al inicio debe bloquearse (depende de distribution NOMINAL)
     ev = engine.apply_action(state, Boot(service_name="sensord"))
     assert ev, "Expected boot blocked event for sensord"
-    assert_any_message_contains(ev, "unmet")  # o "dependencies", según tu mensaje
+    assert_any_message_contains(ev, "requires")  # o "dependencies", según tu mensaje
 
     # --- Transición controlada para probar desbloqueo ---
-    # Forzamos que Energy Distribution esté NOMINAL para simular "puzzle resuelto"
+    # Forzamos estado energético estable para simular "puzzle resuelto".
     dist = state.ship.systems["energy_distribution"]
     dist.health = 0.90
     dist.state = dist.state.NOMINAL  # SystemState.NOMINAL
+    state.ship.systems["core_os"].state = state.ship.systems["core_os"].state.NOMINAL
+    state.ship.power.power_quality = 0.90
+    state.ship.power.brownout = False
 
-    # Ahora drone_bay deps deberían estar satisfechas -> DroneDeploy debería encolar job sin evento de bloqueo
-    ev = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="PWR-A2"))
-    assert ev == [] or all(e.severity.value != "warn" for e in ev), (
-        "DroneDeploy still blocked after distribution nominal; events: "
-        + ", ".join([e.message for e in ev])
-    )
-
-    # Ejecutamos tiempo suficiente para completar el deploy (DEPLOY_TIME_S) + margen
-    engine.tick(state, 10.0)
+    # Ejecutamos tiempo suficiente para completar el deploy inicial (DEPLOY_TIME_S) + margen
+    engine.tick(state, 20.0)
     assert state.ship.drones["D1"].status.value == "deployed", "Drone should be DEPLOYED after deploy job"
 
     # 5) Repair: debe requerir dron DEPLOYED. Probamos repair de power_core (existe).
     ev = engine.apply_action(state, Repair(drone_id="D1", system_id="power_core"))
-    assert ev == [], f"Repair should be enqueued when drone deployed; got events: {[e.message for e in ev]}"
+    assert ev and all(e.severity.value != "warn" for e in ev), (
+        "Repair should be enqueued when drone deployed; got events: "
+        + ", ".join([e.message for e in ev])
+    )
 
     # Avanza tiempo para completar reparación
     engine.tick(state, 30.0)
@@ -64,7 +64,9 @@ def main() -> None:
 
     # 6) Boot sensord ahora debe permitir encolar job (no bloquear)
     ev = engine.apply_action(state, Boot(service_name="sensord"))
-    assert ev == [], f"sensord boot should be enqueued now; got events: {[e.message for e in ev]}"
+    assert ev and all(e.severity.value != "warn" for e in ev), (
+        "sensord boot should be enqueued now; got events: " + ", ".join([e.message for e in ev])
+    )
     engine.tick(state, 20.0)
     sensors = state.ship.systems["sensors"]
     assert sensors.service is not None and sensors.service.is_running, "sensord should be running after boot job"
