@@ -65,8 +65,9 @@ class ShipState:
 
     location: ShipLocation = field(default_factory=ShipLocation)
     hull_integrity: float = 1.0
+    is_hibernating: bool = False
 
-    # radiación interior base (luego por sectores/nodos)
+    # Radiación ambiental efectiva del entorno actual.
     radiation_env_rad_per_s: float = 0.001
 
     power: PowerNetworkState = field(default_factory=lambda: PowerNetworkState(

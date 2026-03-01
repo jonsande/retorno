@@ -20,7 +20,10 @@ Campos de status
 Notas operativas
 - Las acciones consumen batería (deploy/move/repair/install/salvage/recall/reboot).
 - Los drones desplegados también consumen batería en reposo.
+- Los drones desplegados/no acoplados acumulan dosis por radiación ambiental.
+- La dosis ahora acelera el desgaste de integridad del dron (por bandas de exposición).
 - La recarga ocurre en drone_bay mientras haya soporte de bahía/distribución.
+- Los drones acoplados se descontaminan automáticamente en drone_bay (más lento si la bahía está degradada).
 - `drone repair` acepta sistemas de nave y drones como objetivo.
 - Para reparar otro dron, el dron operador debe estar desplegado y en la misma ubicación que el dron objetivo.
 - Con drone_bay LIMITED/DAMAGED se ralentizan deploy/recall/install/reboot y la recarga.

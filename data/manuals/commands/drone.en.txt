@@ -20,7 +20,10 @@ Status fields
 Operational notes
 - Drone actions consume battery (deploy/move/repair/install/salvage/recall/reboot).
 - Deployed drones also drain battery slowly while idle.
+- Deployed/non-docked drones accumulate environmental radiation dose.
+- Radiation dose now accelerates drone integrity wear (banded multipliers by dose).
 - Charging happens in drone_bay while bay/distribution support is available.
+- Docked drones are automatically decontaminated in drone_bay (slower if bay is degraded).
 - `drone repair` accepts ship systems and drones as targets.
 - To repair another drone, the operator drone must be deployed and co-located with the target drone.
 - drone_bay LIMITED/DAMAGED slows deploy/recall/install/reboot and charging.

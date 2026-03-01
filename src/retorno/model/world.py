@@ -164,7 +164,7 @@ def record_intel(
     for item in state.intel:
         if _intel_key(item.kind, item.from_id, item.to_id, item.sector_id, item.coord) == key:
             return None
-    intel_id = f"I{state.next_intel_seq:05d}"
+    intel_id = f"I{state.next_intel_seq}"
     state.next_intel_seq += 1
     item = IntelItem(
         intel_id=intel_id,

@@ -1,2 +1,6 @@
 status
 - Muestra el estado de la nave, energía, sistemas y módulos instalados.
+- Incluye `hull` (0..1 de integridad estructural).
+- Incluye `radiation` con dos valores:
+  - `env`: radiación ambiental efectiva en ubicación/tránsito.
+  - `internal`: radiación que entra a sistemas internos (depende del casco).

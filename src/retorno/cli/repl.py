@@ -1193,6 +1193,19 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message}")
 
 
+def _compute_internal_radiation_for_status(hull_integrity: float, env_rad: float) -> float:
+    hull = max(0.0, min(1.0, hull_integrity))
+    ingress = (
+        Balance.HULL_INTERNAL_RAD_MIN_INGRESS
+        + (1.0 - hull) * (Balance.HULL_INTERNAL_RAD_MAX_INGRESS - Balance.HULL_INTERNAL_RAD_MIN_INGRESS)
+    )
+    ingress = max(
+        Balance.HULL_INTERNAL_RAD_MIN_INGRESS,
+        min(Balance.HULL_INTERNAL_RAD_MAX_INGRESS, ingress),
+    )
+    return max(0.0, env_rad) * ingress
+
+
 def render_status(state) -> None:
     ship = state.ship
     p = ship.power
@@ -1281,6 +1294,10 @@ def render_status(state) -> None:
         f"power: P_gen={p.p_gen_kw:.2f}kW  P_load={p.p_load_kw:.2f}kW  net={net:+.2f}kW "
         f"headroom={headroom:.2f}kW  SoC={soc:.2f}  Q={p.power_quality:.2f}  brownout={p.brownout}"
     )
+    env_rad = max(0.0, float(ship.radiation_env_rad_per_s))
+    internal_rad = _compute_internal_radiation_for_status(ship.hull_integrity, env_rad)
+    print(f"hull: {ship.hull_integrity:.2f}")
+    print(f"radiation: env={env_rad:.4f}rad/s internal={internal_rad:.4f}rad/s")
     core_os = ship.systems.get("core_os")
     if core_os:
         if core_os.state == SystemState.OFFLINE:
@@ -1370,6 +1387,7 @@ def render_power_status(state) -> None:
     print(f"net={net:+.2f} kW  headroom={headroom:.2f} kW")
     print(f"Battery={p.e_batt_kwh:.3f}/{p.e_batt_max_kwh:.3f} kWh (SoC={soc:.2f})")
     print(f"Quality={p.power_quality:.2f}  DeficitRatio={p.deficit_ratio:.2f}  Brownout={p.brownout}")
+    print(f"hull: {ship.hull_integrity:.2f}")
 
 
 def render_diag(state, system_id: str) -> None:
@@ -1776,7 +1794,8 @@ def render_contacts(state) -> None:
                 else:
                     dist_txt = f"{dist:.2f}ly"
             visited = "visited" if cid in state.world.visited_nodes else "unvisited"
-            route_flag = "route" if cid in routes else "no_route"
+            # Current location is always directly reachable (no self-link is stored).
+            route_flag = "route" if cid == current_id or cid in routes else "no_route"
             print(f"- {node.name} ({node.kind}){sector} id={cid} dist={dist_txt} {route_flag} {visited}")
         else:
             print(f"- {cid}")
@@ -3364,7 +3383,8 @@ def render_intel_list(state, limit: int | None = 20) -> None:
     items.sort(key=lambda i: i.t)
     if limit is not None:
         items = items[:limit]
-    print("ID     kind   what                        conf  source                 age")
+    id_w = max(2, max((len(item.intel_id) for item in items), default=2))
+    print(f"{'ID':<{id_w}}  kind   what                        conf  source                 age")
     now = state.clock.t
     for item in items:
         if item.kind == "link":
@@ -3385,7 +3405,7 @@ def render_intel_list(state, limit: int | None = 20) -> None:
             if len(source) > 20:
                 source = source[:17] + "..."
         age = _format_age_short(now - item.t)
-        print(f"{item.intel_id:<6} {item.kind:<6} {what:<28} {item.confidence:>4.2f}  {source:<20} {age:>4}")
+        print(f"{item.intel_id:<{id_w}}  {item.kind:<6} {what:<28} {item.confidence:>4.2f}  {source:<20} {age:>4}")
     locale = state.os.locale.value
     hint = {
         "en": "Try: intel import <path> | intel show <intel_id> | man intel",
@@ -3716,49 +3736,61 @@ def _run_hibernate(loop, years: float, wake_on_low_battery: bool = False) -> Non
             data={"years": years},
         )
     was_auto = getattr(loop, "_auto_tick_enabled", True)
-    loop.set_auto_tick(False)
     remaining = total_s
     step_events: list[tuple[str, Event]] = []
     woke_early = False
-    while remaining > 0:
-        step = Balance.HIBERNATE_CHUNK_S if remaining >= Balance.HIBERNATE_CHUNK_S else remaining
-        if wake_on_low_battery:
-            step = min(step, Balance.HIBERNATE_WAKE_CHECK_S)
-        ev = loop.step(step)
-        step_events.extend([("step", e) for e in ev])
-        if wake_on_low_battery:
-            for e in ev:
-                if e.type.value in Balance.HIBERNATE_WAKE_EVENT_TYPES:
-                    woke_early = True
-                    wake_t = e.t
-                    wake_reason = e.type.value
-                    break
-        remaining -= step
-        if woke_early:
-            break
-    with loop.with_lock() as locked_state:
-        if wake_on_low_battery and woke_early:
-            if wake_t is not None:
-                elapsed_s = max(0.0, wake_t - start_t)
-            else:
-                elapsed_s = total_s - remaining
-            actual_years = elapsed_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
-        _emit_runtime_event(
-            locked_state,
-            events_to_render,
-            "cmd",
-            EventType.HIBERNATION_ENDED,
-            Severity.INFO,
-            SourceRef(kind="ship", id=locked_state.ship.ship_id),
-            f"Hibernation ended after {actual_years:.2f} years",
-            data={"years": actual_years},
-        )
-        end_soc = locked_state.ship.power.e_batt_kwh / locked_state.ship.power.e_batt_max_kwh if locked_state.ship.power.e_batt_max_kwh else 0.0
-        end_health = {sid: sys.health for sid, sys in locked_state.ship.systems.items() if "critical" in sys.tags}
-        # Do not change ship_mode; restore previous values.
-        locked_state.ship.op_mode = prev_mode
-        locked_state.ship.op_mode_source = prev_source
-    loop.set_auto_tick(was_auto)
+    end_soc = start_soc
+    end_health = dict(start_health)
+    try:
+        with loop.with_lock() as locked_state:
+            locked_state.ship.is_hibernating = True
+        loop.set_auto_tick(False)
+        while remaining > 0:
+            step = Balance.HIBERNATE_CHUNK_S if remaining >= Balance.HIBERNATE_CHUNK_S else remaining
+            if wake_on_low_battery:
+                step = min(step, Balance.HIBERNATE_WAKE_CHECK_S)
+            ev = loop.step(step)
+            step_events.extend([("step", e) for e in ev])
+            if wake_on_low_battery:
+                for e in ev:
+                    if e.type.value in Balance.HIBERNATE_WAKE_EVENT_TYPES:
+                        woke_early = True
+                        wake_t = e.t
+                        wake_reason = e.type.value
+                        break
+            remaining -= step
+            if woke_early:
+                break
+        with loop.with_lock() as locked_state:
+            if wake_on_low_battery and woke_early:
+                if wake_t is not None:
+                    elapsed_s = max(0.0, wake_t - start_t)
+                else:
+                    elapsed_s = total_s - remaining
+                actual_years = elapsed_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
+            _emit_runtime_event(
+                locked_state,
+                events_to_render,
+                "cmd",
+                EventType.HIBERNATION_ENDED,
+                Severity.INFO,
+                SourceRef(kind="ship", id=locked_state.ship.ship_id),
+                f"Hibernation ended after {actual_years:.2f} years",
+                data={"years": actual_years},
+            )
+            end_soc = (
+                locked_state.ship.power.e_batt_kwh / locked_state.ship.power.e_batt_max_kwh
+                if locked_state.ship.power.e_batt_max_kwh
+                else 0.0
+            )
+            end_health = {sid: sys.health for sid, sys in locked_state.ship.systems.items() if "critical" in sys.tags}
+            # Do not change ship_mode; restore previous values.
+            locked_state.ship.op_mode = prev_mode
+            locked_state.ship.op_mode_source = prev_source
+    finally:
+        with loop.with_lock() as locked_state:
+            locked_state.ship.is_hibernating = False
+        loop.set_auto_tick(was_auto)
     filtered = [pair for pair in step_events if pair[1].severity == Severity.CRITICAL or pair[1].type in {EventType.ARRIVED}]
     events_to_render.extend(filtered)
     with loop.with_lock() as locked_state:

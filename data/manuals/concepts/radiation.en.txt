@@ -1,0 +1,24 @@
+radiation (mvp)
+- Radiation is modeled in two layers:
+  - env radiation: effective ambient radiation at current node or transit lane.
+  - internal radiation: env radiation filtered by hull integrity.
+
+hull coupling
+- `hull` is a global ship property (0..1), not a regular ship system.
+- Lower hull integrity increases radiation ingress into internal systems.
+- Internal radiation accelerates existing system wear through each system's `k_rad`.
+
+systems
+- Radiation does not replace degradation logic.
+- It only adds pressure to normal wear (power quality + base decay + radiation factor).
+- No lore/intel/data corruption is applied in this MVP.
+
+drones
+- Non-docked drones accumulate radiation dose over time.
+- Higher dose increases drone integrity wear using dose bands.
+- Docked drones are automatically decontaminated if drone_bay and energy_distribution support is available.
+
+scope limits
+- No random travel impact events in this MVP.
+- No terminal hull fail/game-over path in this MVP.
+- The hull damage path is prepared for future impact/event integration.

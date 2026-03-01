@@ -148,8 +148,12 @@ class Engine:
             state.ship.power.brownout
             and state.ship.power.brownout_sustained_s >= Balance.BROWNOUT_SUSTAINED_AFTER_S
         )
-        events.extend(self._apply_degradation(state, dt, power_quality, brownout_sustained))
-        self._apply_radiation(state, dt)
+        env_rad = self._compute_env_radiation_rad_per_s(state)
+        state.ship.radiation_env_rad_per_s = env_rad
+        internal_rad = self._compute_internal_radiation_rad_per_s(state, env_rad)
+        self._apply_hull_degradation(state, dt, env_rad)
+        events.extend(self._apply_degradation(state, dt, power_quality, brownout_sustained, internal_rad))
+        self._apply_radiation(state, dt, env_rad)
         self._update_drone_maintenance(state, dt)
         events.extend(self._update_drone_battery_alerts(state))
 
@@ -3380,15 +3384,15 @@ class Engine:
         dt: float,
         power_quality: float,
         brownout_sustained: bool,
+        internal_rad: float,
     ) -> list[Event]:
-        r_env = state.ship.radiation_env_rad_per_s
-        r_env_norm = self._clamp(r_env / Balance.R_REF)
+        internal_rad_norm = self._clamp(internal_rad / Balance.R_REF)
         events: list[Event] = []
         wear_mult = 1.0
         if state.ship.in_transit and state.ship.op_mode != "CRUISE":
             wear_mult = Balance.TRANSIT_WEAR_MULT_NORMAL
         for system in state.ship.systems.values():
-            s_factor = 1.0 + system.k_power * (1.0 - power_quality) + system.k_rad * r_env_norm
+            s_factor = 1.0 + system.k_power * (1.0 - power_quality) + system.k_rad * internal_rad_norm
             if brownout_sustained:
                 if system.system_id == "energy_distribution":
                     s_factor *= Balance.BROWNOUT_DEGRADE_MULT_DISTRIBUTION
@@ -3401,15 +3405,22 @@ class Engine:
             self._apply_health_state(system, state, events, cause="degradation")
         return events
 
-    def _apply_radiation(self, state: GameState, dt: float) -> None:
-        r_env = state.ship.radiation_env_rad_per_s
+    def _apply_radiation(self, state: GameState, dt: float, env_rad: float) -> None:
         for drone in state.ship.drones.values():
-            drone.dose_rad += r_env * drone.shield_factor * dt
+            if drone.status == DroneStatus.DOCKED:
+                continue
+            drone.dose_rad += env_rad * drone.shield_factor * dt
 
     def _update_drone_maintenance(self, state: GameState, dt: float) -> None:
         for drone in state.ship.drones.values():
             if drone.status == DroneStatus.DEPLOYED:
                 drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_IDLE_DRAIN_DEPLOYED_PER_S * dt)
+            if drone.status != DroneStatus.DOCKED:
+                decay_mult = self._drone_rad_decay_mult(drone.dose_rad)
+                drone.integrity = max(
+                    0.0,
+                    drone.integrity - Balance.DRONE_BASE_DECAY_PER_S * decay_mult * dt,
+                )
         bay_state = self._drone_bay_state(state)
         if bay_state == SystemState.OFFLINE:
             return
@@ -3427,12 +3438,16 @@ class Engine:
             charge_rate = Balance.DRONE_BATTERY_CHARGE_PER_S
         elif soc > 0.0 and net_kw >= Balance.DRONE_CHARGE_NET_MIN_KW:
             charge_rate = Balance.DRONE_BATTERY_CHARGE_PER_S * Balance.DRONE_BATTERY_CHARGE_LOW_MULT
-        charge_rate *= self._drone_bay_charge_rate_mult(state)
+        bay_mult = self._drone_bay_charge_rate_mult(state)
+        charge_rate *= bay_mult
+        decon_rate = Balance.DRONE_DECON_RAD_PER_S * bay_mult
         for drone in state.ship.drones.values():
             if drone.status == DroneStatus.DOCKED:
                 # charge battery
                 if charge_rate > 0.0:
                     drone.battery = min(1.0, drone.battery + charge_rate * dt)
+                if decon_rate > 0.0:
+                    drone.dose_rad = max(0.0, drone.dose_rad - decon_rate * dt)
                 # passive bay repair profile depends on drone_bay state
                 if drone.integrity < 1.0:
                     repair_rate_mult, repair_scrap_mult, fail_p, fail_hit = self._drone_bay_repair_profile(state)
@@ -3956,6 +3971,60 @@ class Engine:
             SystemState.UPGRADED: 5,
         }
         return order[state]
+
+    def _compute_env_radiation_rad_per_s(self, state: GameState) -> float:
+        fallback = max(0.0, float(state.ship.radiation_env_rad_per_s))
+        nodes = state.world.space.nodes
+        if state.ship.in_transit:
+            from_node = nodes.get(state.ship.transit_from)
+            to_node = nodes.get(state.ship.transit_to)
+            if from_node and to_node:
+                return max(0.0, (float(from_node.radiation_rad_per_s) + float(to_node.radiation_rad_per_s)) * 0.5)
+            if from_node:
+                return max(0.0, float(from_node.radiation_rad_per_s))
+            if to_node:
+                return max(0.0, float(to_node.radiation_rad_per_s))
+            return fallback
+        current_id = state.world.current_node_id or state.ship.current_node_id
+        node = nodes.get(current_id) if current_id else None
+        if node:
+            return max(0.0, float(node.radiation_rad_per_s))
+        return fallback
+
+    def _compute_internal_radiation_rad_per_s(self, state: GameState, env_rad: float) -> float:
+        hull = self._clamp(state.ship.hull_integrity)
+        ingress = (
+            Balance.HULL_INTERNAL_RAD_MIN_INGRESS
+            + (1.0 - hull) * (Balance.HULL_INTERNAL_RAD_MAX_INGRESS - Balance.HULL_INTERNAL_RAD_MIN_INGRESS)
+        )
+        ingress = self._clamp(
+            ingress,
+            Balance.HULL_INTERNAL_RAD_MIN_INGRESS,
+            Balance.HULL_INTERNAL_RAD_MAX_INGRESS,
+        )
+        return max(0.0, env_rad) * ingress
+
+    def _apply_hull_degradation(self, state: GameState, dt: float, env_rad: float) -> None:
+        env_norm = self._clamp(env_rad / Balance.HULL_RAD_REF) if Balance.HULL_RAD_REF > 0 else 0.0
+        env_mult = 1.0 + env_norm * (Balance.HULL_RAD_DECAY_MULT_MAX - 1.0)
+        if state.ship.in_transit or state.ship.is_hibernating:
+            env_mult *= Balance.HULL_TRANSIT_DECAY_MULT
+        amount = Balance.HULL_BASE_DECAY_PER_S * env_mult * dt
+        self._damage_hull(state, amount)
+
+    def _damage_hull(self, state: GameState, amount: float) -> None:
+        if amount <= 0.0:
+            return
+        state.ship.hull_integrity = self._clamp(state.ship.hull_integrity - amount)
+
+    def _drone_rad_decay_mult(self, dose: float) -> float:
+        if dose >= Balance.DRONE_RAD_DOSE_CRITICAL:
+            return Balance.DRONE_RAD_DECAY_MULT_CRITICAL
+        if dose >= Balance.DRONE_RAD_DOSE_HIGH:
+            return Balance.DRONE_RAD_DECAY_MULT_HIGH
+        if dose >= Balance.DRONE_RAD_DOSE_WARN:
+            return Balance.DRONE_RAD_DECAY_MULT_WARN
+        return 1.0
 
     def _clamp(self, value: float, lo: float = 0.0, hi: float = 1.0) -> float:
         if value < lo:

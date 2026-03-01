@@ -1,2 +1,6 @@
 status
 - Shows ship status, power, systems, and installed modules.
+- Includes `hull` (0..1 structural integrity).
+- Includes `radiation` with two values:
+  - `env`: effective environmental radiation at current location/transit.
+  - `internal`: radiation leaking into internal systems (depends on hull state).

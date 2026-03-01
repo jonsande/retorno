@@ -1,0 +1,24 @@
+radiation (mvp)
+- La radiación se modela en dos capas:
+  - radiación `env`: radiación ambiental efectiva en nodo actual o tramo de tránsito.
+  - radiación `internal`: radiación `env` filtrada por integridad de casco.
+
+acoplamiento con casco
+- `hull` es una propiedad global de la nave (0..1), no un sistema normal.
+- Menor integridad de casco implica mayor ingreso de radiación a sistemas internos.
+- La radiación interna acelera el desgaste existente según `k_rad` de cada sistema.
+
+sistemas
+- La radiación no sustituye la degradación base.
+- Solo añade presión al desgaste normal (calidad de potencia + decaimiento base + factor de radiación).
+- En este MVP no hay corrupción de lore/intel/datos por radiación.
+
+drones
+- Los drones no acoplados acumulan dosis de radiación con el tiempo.
+- Mayor dosis incrementa el desgaste de integridad por bandas.
+- Los drones acoplados se descontaminan automáticamente si hay soporte de drone_bay y energy_distribution.
+
+límites de alcance
+- En este MVP no hay eventos aleatorios complejos de impactos en viaje.
+- En este MVP no hay condición terminal por casco.
+- La ruta de daño de casco queda preparada para integrar impactos/eventos futuros.

@@ -19,6 +19,7 @@ class Balance:
     BUS_INSTABILITY_AFTER_S = 120
     LOW_POWER_QUALITY_THRESHOLD = 0.7
     R_REF = 0.05
+    HULL_RAD_REF = 0.003
     BROWNOUT_SUSTAINED_AFTER_S = 30
     BROWNOUT_DEGRADE_MULT_DISTRIBUTION = 3.0
     BROWNOUT_DEGRADE_MULT_POWER_CORE = 2.0
@@ -76,6 +77,12 @@ class Balance:
     TRANSIT_WEAR_MULT_NORMAL = 2.5
     # Minimum travel years before warning about transit wear.
     TRANSIT_WARN_YEARS = 0.2
+    # Hull wear multipliers.
+    HULL_BASE_DECAY_PER_S = 1.0e-11
+    HULL_TRANSIT_DECAY_MULT = 1.5
+    HULL_RAD_DECAY_MULT_MAX = 3.0
+    HULL_INTERNAL_RAD_MIN_INGRESS = 0.10
+    HULL_INTERNAL_RAD_MAX_INGRESS = 1.00
 
     # Emergency deploy risk (per second)
     # Probability per second that an emergency deploy fails or glitches.
@@ -200,6 +207,14 @@ class Balance:
     # Minimum net power required to allow drone charging.
     DRONE_CHARGE_NET_MIN_KW = -0.2
     DRONE_BATTERY_IDLE_DRAIN_DEPLOYED_PER_S = 0.00002 # Velocidad a la que descarga sin hacer nada
+    DRONE_BASE_DECAY_PER_S = 1.0e-7
+    DRONE_DECON_RAD_PER_S = 0.01
+    DRONE_RAD_DOSE_WARN = 1.0
+    DRONE_RAD_DOSE_HIGH = 3.0
+    DRONE_RAD_DOSE_CRITICAL = 6.0
+    DRONE_RAD_DECAY_MULT_WARN = 1.2
+    DRONE_RAD_DECAY_MULT_HIGH = 1.8
+    DRONE_RAD_DECAY_MULT_CRITICAL = 3.0
     # Repair efficiency per scrap spent.
     DRONE_REPAIR_INTEGRITY_PER_SCRAP = 5.0
     # Thresholds for alerts and action gating.

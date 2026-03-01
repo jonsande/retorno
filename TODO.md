@@ -51,6 +51,12 @@ ENERGY
 
 - [x] comando undock para volver a in orbit.
 
+- [!] Hibernate until_arrive debería pedir confimacion. También hace falta algo de cinemática, para que no parezca que no ha pasado nada.
+
+- [!] No debería dejar emprender viaje si se está dock. Antes se debe hacer con éxito un undock.
+
+- [ ] Necesitamos un comando que le sirva al usuario para conocer el grafo. Es decir, saber qué rutas hay, qué nodos conectan con qué nodos y con cuáles no. ¿Cómo se te ocurre que podría hacerse esto?
+
 - [ ] Parece que ahora se puede desactivar core_os y otros sistemas vitales que no deberían poder desacivarse. Pedirle a gpt que razone esto y me diga cuales tiene sentido y cuales no poder apagar.
 
 - [ ] Estoy pudiendo ejecutar "route solve CURL_12" desde ECHO_12 teniendo todos los sitemas apagados. ¿Por qué?
@@ -70,7 +76,7 @@ La palabra "uso" es español. Hay que localizar estos mensajes de error. Aprovec
 
 === LORE ===
 
-- [!] El contacto y la ruta a ARCHIVE_01 me ha aparecido haciendo mi primer uplink en ECHO_7. Cómo es posible? Pensé que el arco estaba configurado para que costara más pasos lograr esa ruta. Acaso ha aparecido a través de uplink de forma aleatoria? La idea que yo tenía era: en ECHO_12 el documento echo_cache te proporciona el contacto (pero no la ruta) HARBOR_12. En HARBOR_12 el documento 0141 te proporciona el link a ARCHIVE_01. El link a ARCHIVE_01, pues, tratándose del intel primario de un arco diseñado, sólo se podía (o eso pensaba yo) obtener a través del documento 0141 de HARBOR_12, y de ningún otro modo más. Aclárame qué está pasando, y cómo están funcionando los arcos.
+- [x] El contacto y la ruta a ARCHIVE_01 me ha aparecido haciendo mi primer uplink en ECHO_7. Cómo es posible? Pensé que el arco estaba configurado para que costara más pasos lograr esa ruta. Acaso ha aparecido a través de uplink de forma aleatoria? La idea que yo tenía era: en ECHO_12 el documento echo_cache te proporciona el contacto (pero no la ruta) HARBOR_12. En HARBOR_12 el documento 0141 te proporciona el link a ARCHIVE_01. El link a ARCHIVE_01, pues, tratándose del intel primario de un arco diseñado, sólo se podía (o eso pensaba yo) obtener a través del documento 0141 de HARBOR_12, y de ningún otro modo más. Aclárame qué está pasando, y cómo están funcionando los arcos.
 
 
 - [x] En el Virtual File Sistem no debe usarse ningún directorio llamado "lore". No es muy diegético. Por ejemplo, en el example_unforced encontramos esto:
