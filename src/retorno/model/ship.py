@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import MISSING, dataclass, field, fields
 
 from retorno.model.drones import DroneState, Inventory
 from retorno.model.systems import ShipSystem
@@ -93,7 +93,45 @@ class ShipState:
 
     inventory: Inventory = field(default_factory=Inventory)
     sensors_range_ly: float = Balance.SENSORS_RANGE_LY
-    life_support_critical_s: float = 0.0
+    # Time elapsed while life_support remains OFFLINE (used for viability grace countdown).
+    life_support_offline_s: float = 0.0
+
+    def __setstate__(self, state) -> None:
+        """Backward-compatible unpickle for renamed fields.
+
+        Older saves may contain `life_support_critical_s`; map it to
+        `life_support_offline_s` during load.
+        """
+        slot_state = state
+        if isinstance(state, tuple):
+            # Typical slots payload: (dict_or_none, slots_dict)
+            if len(state) == 2 and isinstance(state[1], dict):
+                slot_state = state[1]
+            elif len(state) == 2 and isinstance(state[0], dict):
+                slot_state = state[0]
+        if not isinstance(slot_state, dict):
+            raise TypeError(f"Unsupported ShipState pickle payload: {type(state)!r}")
+
+        data = dict(slot_state)
+        if "life_support_offline_s" not in data and "life_support_critical_s" in data:
+            data["life_support_offline_s"] = float(data.get("life_support_critical_s", 0.0) or 0.0)
+        data.pop("life_support_critical_s", None)
+
+        for f in fields(self):
+            if f.name in data:
+                value = data[f.name]
+            elif f.default is not MISSING:
+                value = f.default
+            elif f.default_factory is not MISSING:
+                value = f.default_factory()
+            else:
+                continue
+            object.__setattr__(self, f.name, value)
+
+        # Keep the OFFLINE grace timer only when life_support is actually OFFLINE.
+        life_support = self.systems.get("life_support") if isinstance(self.systems, dict) else None
+        if not life_support or getattr(getattr(life_support, "state", None), "value", "") != "offline":
+            object.__setattr__(self, "life_support_offline_s", 0.0)
 
     def orbit_status(self, world: "SpaceGraph | object", current_node_id: str) -> str:
         """Return 'docked', 'orbit', or 'adrift' based on ship + world state."""

@@ -1,20 +1,20 @@
-[AUTO] [CRITICAL] power_bus_instability :: Power bus instability
-[AUTO] [WARN] system_state_changed :: energy_distribution: damaged -> nominal (cause=repair, health=0.95)
-[AUTO] Repair completed for energy_distribution
-[AUTO] [WARN] system_state_changed :: power_core: damaged -> limited (cause=repair, health=0.75)
-[AUTO] Repair completed for power_core
-> drone repair D1 power_core
-[CMD] [INFO] job_queued :: J4 repair_system target=ship_system:power_core ETA=25s
-[AUTO] [WARN] system_state_changed :: power_core: limited -> nominal (cause=repair, health=0.90)
-[AUTO] Repair completed for power_core
-> power on sensors
-[CMD] [INFO] system_power_restored :: Power restored: sensors (offline -> offline)
-> power on sensors
-[CMD] [INFO] system_power_restored :: Power restored: sensors (offline -> offline)
-> boot sensord
-[CMD] [INFO] job_queued :: J5 boot_service target=service:sensord ETA=8s
-[AUTO] [WARN] system_state_changed :: sensors: offline -> limited (cause=boot, health=0.85)
-[AUTO] Service booted: sensord
-[AUTO] [INFO] signal_detected :: Signal detected: ECHO_7
-[AUTO] [WARN] power_net_deficit :: Power deficit detected
-> log copy 20
+> 
+=== STATUS ===
+time: Year 241 Day 1 09:07:31
+ship_mode: CRUISE (manual)
+location: UNKNOWN_00 (Unknown) [adrift]
+power: P_gen=0.00kW  P_load=2.10kW  net=-2.10kW headroom=7.90kW  SoC=0.00  Q=0.34  brownout=True
+hull: 0.85
+radiation: env=0.0005rad/s internal=0.0001rad/s
+life_support: critical (grace 0s remaining)
+inventory: scrap=64 modules=0 [manifest stale]
+systems:
+ - core_os            state=damaged  health=0.46 svc=core_os running=True
+ - life_support       state=critical health=0.27
+ - power_core         state=offline  health=0.00 forced_offline
+ - energy_distribution state=offline  health=0.00 forced_offline
+ - drone_bay          state=offline  health=0.18 forced_offline
+ - security           state=offline  health=0.16 forced_offline svc=securityd running=False
+ - data_core          state=offline  health=0.16 forced_offline svc=datad running=False
+ - sensors            state=offline  health=0.04 forced_offline svc=sensord running=False
+> DEBUG mode enabled

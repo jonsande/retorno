@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import argparse
 import asyncio
 import os
 import random
+import sys
 import time
 
 from textual.app import App, ComposeResult
@@ -23,6 +25,7 @@ from retorno.model.os import Locale, list_dir, normalize_path
 from retorno.runtime.loop import GameLoop
 from retorno.runtime.startup import load_startup_sequence_lines
 from retorno.ui_textual import presenter
+from retorno.io.save_load import LoadGameResult, SaveLoadError, load_single_slot, save_single_slot
 
 
 class CommandInput(Input):
@@ -171,12 +174,38 @@ class RetornoTextualApp(App):
         # Binding("alt+]", "scroll_down", "Scroll down"),
     ]
 
-    def __init__(self) -> None:
+    def __init__(self, force_new_game: bool = False, save_path: str | None = None) -> None:
+        self._save_path = save_path
+        self._exit_persist_done = False
+        self._play_startup_sequence = False
+        self._startup_notice = ""
         scenario = os.getenv("RETORNO_SCENARIO", "prologue").lower()
         if scenario in {"sandbox", "dev"}:
             state = create_initial_state_sandbox()
-        else:
+            self._play_startup_sequence = True
+            self._startup_notice = f"[INFO] Scenario '{scenario}' started as new game (save slot bypassed)."
+        elif force_new_game:
             state = create_initial_state_prologue()
+            self._play_startup_sequence = True
+            self._startup_notice = "[INFO] Started new game (save slot ignored by --new-game/RETORNO_NEW_GAME)."
+        else:
+            try:
+                loaded: LoadGameResult | None = load_single_slot(save_path)
+            except SaveLoadError as exc:
+                state = create_initial_state_prologue()
+                self._play_startup_sequence = True
+                self._startup_notice = f"[WARN] Could not load saved game ({exc}). Starting new game."
+            else:
+                if loaded is None:
+                    state = create_initial_state_prologue()
+                    self._play_startup_sequence = True
+                    self._startup_notice = "[INFO] No saved game found. Starting new game."
+                else:
+                    state = loaded.state
+                    if loaded.source == "backup":
+                        self._startup_notice = f"[WARN] Main save unreadable. Loaded backup: {loaded.path}"
+                    else:
+                        self._startup_notice = f"[INFO] Loaded saved game: {loaded.path}"
         engine = Engine()
         self.loop = GameLoop(engine, state, tick_s=1.0)
         self._history: list[str] = []
@@ -216,6 +245,8 @@ class RetornoTextualApp(App):
 
     def on_mount(self) -> None:
         self.loop.step(1.0)
+        if self._startup_notice:
+            self._log_line(self._startup_notice)
         if not self.loop.state.os.debug_enabled:
             self.loop.set_auto_tick(True)
             self.loop.start()
@@ -234,6 +265,8 @@ class RetornoTextualApp(App):
         self.call_after_refresh(self._start_startup_sequence)
 
     def _start_startup_sequence(self) -> None:
+        if not self._play_startup_sequence:
+            return
         if not Balance.STARTUP_SEQUENCE_ENABLED:
             return
         if self._startup_sequence_running:
@@ -335,7 +368,19 @@ class RetornoTextualApp(App):
         return
 
     def on_shutdown(self) -> None:
+        self._persist_game_on_exit()
+
+    def _persist_game_on_exit(self) -> None:
+        if self._exit_persist_done:
+            return
         self.loop.stop()
+        try:
+            with self.loop.with_lock() as state:
+                saved_path = save_single_slot(state, self._save_path)
+            print(f"[INFO] Game saved: {saved_path}")
+        except SaveLoadError as exc:
+            print(f"[WARN] Failed to save game: {exc}", file=sys.stderr)
+        self._exit_persist_done = True
 
     def action_clear_log(self) -> None:
         self.query_one("#log", RichLog).clear()
@@ -1142,6 +1187,7 @@ class RetornoTextualApp(App):
         if parsed is None:
             return
         if parsed == "EXIT":
+            self._persist_game_on_exit()
             self.exit()
             return
         if parsed == "HELP":
@@ -1529,5 +1575,25 @@ class RetornoTextualApp(App):
             pass
 
 
+def main() -> None:
+    parser = argparse.ArgumentParser(description="RETORNO (Textual UI)")
+    parser.add_argument(
+        "--new-game",
+        "--new",
+        action="store_true",
+        help="Start a new game and ignore existing save slot.",
+    )
+    parser.add_argument(
+        "--save-path",
+        default=None,
+        help="Override save slot path (default: ~/.retorno/savegame.dat).",
+    )
+    args = parser.parse_args()
+
+    env_force_new = os.environ.get("RETORNO_NEW_GAME", "").strip().lower() in {"1", "true", "yes", "on"}
+    force_new_game = args.new_game or env_force_new
+    RetornoTextualApp(force_new_game=force_new_game, save_path=args.save_path).run()
+
+
 if __name__ == "__main__":
-    RetornoTextualApp().run()
+    main()

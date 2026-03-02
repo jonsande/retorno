@@ -9,17 +9,17 @@ Role
 
 Failure modes
 - Slow drift (most common): efficiency loss → increasing load and alarms.
-- Catastrophic loss: capsule viability countdown. If CRITICAL persists, terminal state will trigger.
+- Catastrophic loss: when state reaches OFFLINE, a capsule viability countdown starts; terminal state triggers when grace is exhausted.
 
 Operational notes
 - Treated as critical. Shedding it is equivalent to surrender.
 - If you must cut power, cut everything else first.
-- LIMITED/CRITICAL: hibernation blocked until stabilized.
+- LIMITED/CRITICAL/OFFLINE: hibernation blocked until stabilized.
 
 Command impact by state
 - LIMITED: hibernate blocked.
-- CRITICAL: hibernate blocked; grace countdown starts. If sustained, terminal state triggers.
-- OFFLINE: terminal state; command set severely restricted.
+- CRITICAL: hibernate blocked.
+- OFFLINE: viability grace countdown starts (configurable). When exhausted, terminal state triggers and command set becomes severely restricted.
 
 Relevant commands
 - status, alerts, diag life_support

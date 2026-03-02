@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 from retorno.bootstrap import create_initial_state_prologue, create_initial_state_sandbox
 import os
 import math
@@ -24,13 +25,14 @@ from retorno.model.jobs import JobStatus, JobType
 from retorno.runtime.data_loader import load_modules, load_arcs, load_locations
 from retorno.runtime.startup import load_startup_sequence_lines
 from retorno.config.balance import Balance
+from retorno.io.save_load import LoadGameResult, SaveLoadError, load_single_slot, save_single_slot
 from retorno.model.systems import SystemState
 from retorno.model.drones import DroneStatus
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, list_dir, normalize_path, read_file, required_access_label
 from retorno.model.world import SECTOR_SIZE_LY, sector_id_for_pos, add_known_link, record_intel
 from retorno.model.world import SpaceNode, region_for_pos
 from retorno.worldgen.generator import ensure_sector_generated
-from retorno.util.timefmt import format_elapsed_long
+from retorno.util.timefmt import format_elapsed_long, format_elapsed_short
 
 
 def _maybe_run_startup_sequence(locale: str) -> None:
@@ -1343,16 +1345,22 @@ def render_status(state) -> None:
     life_support = ship.systems.get("life_support")
     if life_support:
         if life_support.state == SystemState.OFFLINE:
-            msg = {
-                "en": "life_support: offline (host viability lost)",
-                "es": "life_support: fuera de línea (viabilidad del huésped perdida)",
-            }
+            remaining = max(0.0, Balance.LIFE_SUPPORT_CRITICAL_GRACE_S - ship.life_support_offline_s)
+            if state.os.terminal_lock and state.os.terminal_reason == "life_support_offline":
+                msg = {
+                    "en": "life_support: offline (host viability lost)",
+                    "es": "life_support: fuera de línea (viabilidad del huésped perdida)",
+                }
+            else:
+                msg = {
+                    "en": f"life_support: offline (grace { _format_eta_short(remaining, locale) } remaining)",
+                    "es": f"life_support: fuera de línea (gracia restante { _format_eta_short(remaining, locale) })",
+                }
             print(msg.get(locale, msg["en"]))
         elif life_support.state == SystemState.CRITICAL:
-            remaining = max(0.0, Balance.LIFE_SUPPORT_CRITICAL_GRACE_S - ship.life_support_critical_s)
             msg = {
-                "en": f"life_support: critical (grace { _format_eta_short(remaining, locale) } remaining)",
-                "es": f"life_support: crítico (gracia restante { _format_eta_short(remaining, locale) })",
+                "en": "life_support: critical",
+                "es": "life_support: crítico",
             }
             print(msg.get(locale, msg["en"]))
         elif life_support.state == SystemState.LIMITED:
@@ -1472,10 +1480,11 @@ def render_alerts(state) -> None:
 
 def render_logs(state, limit: int = 15) -> None:
     print("\n=== EVENTS (recent) ===")
-    locale = state.os.locale.value
     for e in state.events.recent[-limit:]:
-        t_fmt = _format_eta_short(float(e.t), locale)
-        print(f"- t={t_fmt:>8s} [{e.severity.value.upper():8s}] {e.type.value}: {e.message}")
+        t_label = format_elapsed_short(float(e.t), include_seconds=True)
+        if t_label.startswith("T+"):
+            t_label = t_label[2:]
+        print(f"- [{t_label}] [{e.severity.value.upper()}] {e.type.value}: {e.message}")
 
 
 def render_jobs(state, limit: int | None = 5) -> None:
@@ -2445,10 +2454,27 @@ def _core_os_limited_blocks(parsed) -> bool:
 
 
 def _terminal_state_allows(parsed) -> bool:
-    if parsed in {"HELP", "EXIT"}:
+    if parsed == "HELP" or parsed == "EXIT" or parsed == "CLEAR":
         return True
     if isinstance(parsed, Status):
         return True
+    if isinstance(parsed, str) and parsed in {"LOGS", "ALERTS", "JOBS"}:
+        return True
+    if isinstance(parsed, tuple):
+        token = parsed[0]
+        if token in {
+            "LOG_COPY",
+            "ALERTS_EXPLAIN",
+            "JOBS",
+            "DEBUG",
+            "DEBUG_ARCS",
+            "DEBUG_LORE",
+            "DEBUG_DEADNODES",
+            "DEBUG_MODULES",
+            "DEBUG_SEED",
+            "DEBUG_SCENARIO",
+        }:
+            return True
     return False
 
 
@@ -2478,13 +2504,9 @@ def _command_blocked_message(state, parsed) -> str | None:
     if state.os.terminal_lock:
         if not _terminal_state_allows(parsed):
             reason = state.os.terminal_reason or "terminal"
-            if reason in {"life_support_offline", "life_support_critical"}:
+            if reason == "life_support_offline":
                 return messages["life_support_offline"].get(locale, messages["life_support_offline"]["en"])
             return messages["terminal"].get(locale, messages["terminal"]["en"])
-        return None
-    if life_support and life_support.state == SystemState.OFFLINE:
-        if not _terminal_state_allows(parsed):
-            return messages["life_support_offline"].get(locale, messages["life_support_offline"]["en"])
         return None
     if core_os and core_os.state == SystemState.OFFLINE:
         if not _terminal_state_allows(parsed):
@@ -4088,6 +4110,31 @@ def _apply_salvage_loot(loop, state, events):
     return
 
 
+def _hibernate_interrupt_reason(state, step_events: list[Event], wake_on_low_battery: bool) -> str | None:
+    if state.os.terminal_lock:
+        reason = state.os.terminal_reason or "terminal"
+        return f"terminal:{reason}"
+
+    for event in step_events:
+        if event.type != EventType.SYSTEM_STATE_CHANGED:
+            continue
+        if event.source.kind != "ship_system":
+            continue
+        system = state.ship.systems.get(event.source.id)
+        if not system or "critical" not in system.tags:
+            continue
+        to_state = str(event.data.get("to") or "").lower()
+        if to_state in {SystemState.CRITICAL.value, SystemState.OFFLINE.value}:
+            return f"critical_system:{system.system_id}:{to_state}"
+
+    if wake_on_low_battery:
+        for event in step_events:
+            if event.type.value in Balance.HIBERNATE_WAKE_EVENT_TYPES:
+                return f"event:{event.type.value}"
+
+    return None
+
+
 def _run_hibernate(loop, years: float, wake_on_low_battery: bool = False) -> None:
     total_s = max(0.0, years * Balance.YEAR_S)
     if total_s <= 0:
@@ -4131,18 +4178,17 @@ def _run_hibernate(loop, years: float, wake_on_low_battery: bool = False) -> Non
                 step = min(step, Balance.HIBERNATE_WAKE_CHECK_S)
             ev = loop.step(step)
             step_events.extend([("step", e) for e in ev])
-            if wake_on_low_battery:
-                for e in ev:
-                    if e.type.value in Balance.HIBERNATE_WAKE_EVENT_TYPES:
-                        woke_early = True
-                        wake_t = e.t
-                        wake_reason = e.type.value
-                        break
+            with loop.with_lock() as locked_state:
+                reason = _hibernate_interrupt_reason(locked_state, ev, wake_on_low_battery)
+                if reason:
+                    woke_early = True
+                    wake_t = locked_state.clock.t
+                    wake_reason = reason
             remaining -= step
             if woke_early:
                 break
         with loop.with_lock() as locked_state:
-            if wake_on_low_battery and woke_early:
+            if woke_early:
                 if wake_t is not None:
                     elapsed_s = max(0.0, wake_t - start_t)
                 else:
@@ -4176,19 +4222,39 @@ def _run_hibernate(loop, years: float, wake_on_low_battery: bool = False) -> Non
     with loop.with_lock() as locked_state:
         if events_to_render:
             render_events(locked_state, events_to_render)
-        if wake_on_low_battery and woke_early:
+        if woke_early:
             locale = locked_state.os.locale.value
-            if wake_reason == EventType.DRONE_LOW_BATTERY.value:
+            msg = None
+            if wake_reason:
+                if wake_reason == f"event:{EventType.DRONE_LOW_BATTERY.value}":
+                    msg = {
+                        "en": "Hibernation interrupted: drone low battery",
+                        "es": "Hibernación interrumpida: batería baja en dron",
+                    }
+                elif wake_reason.startswith("terminal:"):
+                    terminal_reason = wake_reason.split(":", 1)[1]
+                    if terminal_reason in {"life_support_offline", "life_support_critical"}:
+                        msg = {
+                            "en": "Hibernation interrupted: life support is no longer viable",
+                            "es": "Hibernación interrumpida: el soporte vital ya no es viable",
+                        }
+                    elif terminal_reason == "core_os_offline":
+                        msg = {
+                            "en": "Hibernation interrupted: core_os went offline",
+                            "es": "Hibernación interrumpida: core_os pasó a offline",
+                        }
+                elif wake_reason.startswith("critical_system:"):
+                    _, system_id, to_state = wake_reason.split(":", 2)
+                    msg = {
+                        "en": f"Hibernation interrupted: critical system '{system_id}' reached {to_state}",
+                        "es": f"Hibernación interrumpida: el sistema crítico '{system_id}' alcanzó {to_state}",
+                    }
+            if not msg:
                 msg = {
-                    "en": "Hibernation interrupted: drone low battery",
-                    "es": "Hibernación interrumpida: batería baja en dron",
+                    "en": f"Hibernation interrupted: {wake_reason or 'unknown reason'}",
+                    "es": f"Hibernación interrumpida: {wake_reason or 'motivo desconocido'}",
                 }
-            else:
-                msg = {
-                    "en": f"Hibernation interrupted: {wake_reason}",
-                    "es": f"Hibernación interrumpida: {wake_reason}",
-                }
-            print(msg.get(locale, msg["en"]))
+            print(f"[WARN] {msg.get(locale, msg['en'])}")
         days = actual_years * (Balance.YEAR_S / Balance.DAY_S)
         print(f"Advanced time by {actual_years:.2f} years ({days:.1f} days).")
         # digest de degradación para críticos
@@ -4393,6 +4459,20 @@ def render_alert_explain(state, alert_key: str) -> None:
 def main() -> None:
     from retorno.cli.parser import ParseError, parse_command, format_parse_error
 
+    parser = argparse.ArgumentParser(description="RETORNO (CLI)")
+    parser.add_argument(
+        "--new-game",
+        "--new",
+        action="store_true",
+        help="Start a new game and ignore existing save slot.",
+    )
+    parser.add_argument(
+        "--save-path",
+        default=None,
+        help="Override save slot path (default: ~/.retorno/savegame.dat).",
+    )
+    args = parser.parse_args()
+
     if not isinstance(sys.stdout, _TeeStdout):
         sys.stdout = _TeeStdout(sys.stdout, _LOG_BUFFER)
     if os.environ.get("RETORNO_DEBUG_COMPLETER", "").strip().lower() in {"1", "true", "yes"}:
@@ -4404,13 +4484,44 @@ def main() -> None:
 
     engine = Engine()
     scenario = os.environ.get("RETORNO_SCENARIO", "prologue").lower()
+    env_force_new = os.environ.get("RETORNO_NEW_GAME", "").strip().lower() in {"1", "true", "yes", "on"}
+    force_new_game = args.new_game or env_force_new
+
+    play_startup_sequence = False
+    startup_message = ""
     if scenario in {"sandbox", "dev"}:
         state = create_initial_state_sandbox()
-    else:
+        play_startup_sequence = True
+        startup_message = f"[INFO] Scenario '{scenario}' started as new game (save slot bypassed)."
+    elif force_new_game:
         state = create_initial_state_prologue()
+        play_startup_sequence = True
+        startup_message = "[INFO] Started new game (save slot ignored by --new-game/RETORNO_NEW_GAME)."
+    else:
+        try:
+            loaded: LoadGameResult | None = load_single_slot(args.save_path)
+        except SaveLoadError as exc:
+            state = create_initial_state_prologue()
+            play_startup_sequence = True
+            startup_message = f"[WARN] Could not load saved game ({exc}). Starting new game."
+        else:
+            if loaded is None:
+                state = create_initial_state_prologue()
+                play_startup_sequence = True
+                startup_message = "[INFO] No saved game found. Starting new game."
+            else:
+                state = loaded.state
+                if loaded.source == "backup":
+                    startup_message = f"[WARN] Main save unreadable. Loaded backup: {loaded.path}"
+                else:
+                    startup_message = f"[INFO] Loaded saved game: {loaded.path}"
+
     loop = GameLoop(engine, state, tick_s=1.0)
     loop.step(1.0)
-    _maybe_run_startup_sequence(state.os.locale.value)
+    if startup_message:
+        print(startup_message)
+    if play_startup_sequence:
+        _maybe_run_startup_sequence(state.os.locale.value)
     if not state.os.debug_enabled:
         loop.set_auto_tick(True)
         loop.start()
@@ -4775,12 +4886,27 @@ def main() -> None:
         render_status(locked_state)
         render_alerts(locked_state)
 
+    did_persist_on_exit = False
+
+    def _stop_and_persist() -> None:
+        nonlocal did_persist_on_exit
+        if did_persist_on_exit:
+            return
+        loop.stop()
+        try:
+            with loop.with_lock() as locked_state:
+                saved_path = save_single_slot(locked_state, args.save_path)
+            print(f"[INFO] Game saved: {saved_path}")
+        except SaveLoadError as exc:
+            print(f"[WARN] Failed to save game: {exc}")
+        did_persist_on_exit = True
+
     while True:
         try:
             line = input("\n> ")
         except (EOFError, KeyboardInterrupt):
-            loop.stop()
             print("\n(exit)")
+            _stop_and_persist()
             break
 
         try:
@@ -4808,7 +4934,7 @@ def main() -> None:
                 render_events(locked_state, ev)
 
         if parsed == "EXIT":
-            loop.stop()
+            _stop_and_persist()
             break
         if parsed == "HELP":
             _drain_auto_events()
@@ -5206,6 +5332,7 @@ def main() -> None:
                 _apply_salvage_loot(loop, locked_state, auto_ev)
                 render_events(locked_state, auto_ev)
 
+    _stop_and_persist()
     print("bye")
 
 

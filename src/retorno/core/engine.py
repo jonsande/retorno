@@ -3428,14 +3428,19 @@ class Engine:
             )
         if p_load > p_capacity:
             state.ship.power.brownout = True
-            events.append(
-                self._make_event(
+            events.extend(
+                self._ensure_alert(
                     state,
                     EventType.POWER_NET_DEFICIT,
                     Severity.CRITICAL,
                     SourceRef(kind="ship", id=state.ship.ship_id),
                     "Capacity exceeded, vital systems at risk",
-                    data={"p_load_kw": p_load, "p_capacity_kw": p_capacity},
+                    data={
+                        "message_key": "power_net_deficit",
+                        "reason": "capacity_exceeded",
+                        "p_load_kw": p_load,
+                        "p_capacity_kw": p_capacity,
+                    },
                 )
             )
         return events
@@ -4248,25 +4253,53 @@ class Engine:
         core_os = state.ship.systems.get("core_os")
         life_support = state.ship.systems.get("life_support")
 
-        if life_support and life_support.state == SystemState.CRITICAL:
-            state.ship.life_support_critical_s += dt
+        entered_life_support_offline = (
+            life_support is not None
+            and life_support.state == SystemState.OFFLINE
+            and state.ship.life_support_offline_s <= 0.0
+        )
+
+        if life_support and life_support.state == SystemState.OFFLINE:
+            state.ship.life_support_offline_s += dt
         else:
-            state.ship.life_support_critical_s = 0.0
+            state.ship.life_support_offline_s = 0.0
+
+        # Compatibility: old saves may carry a lock reason based on CRITICAL state.
+        # Under current rules, lock is tied to OFFLINE grace expiry.
+        if (
+            state.os.terminal_lock
+            and state.os.terminal_reason == "life_support_critical"
+            and (not life_support or life_support.state != SystemState.OFFLINE)
+        ):
+            state.os.terminal_lock = False
+            state.os.terminal_reason = None
+
+        if entered_life_support_offline:
+            events.append(
+                self._make_event(
+                    state,
+                    EventType.ACTION_WARNING,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id="life_support"),
+                    f"Life support offline: viability grace countdown started ({int(Balance.LIFE_SUPPORT_CRITICAL_GRACE_S)}s)",
+                    data={
+                        "message_key": "life_support_offline_grace_started",
+                        "grace_s": Balance.LIFE_SUPPORT_CRITICAL_GRACE_S,
+                    },
+                )
+            )
 
         if not state.os.terminal_lock:
             if core_os and core_os.state == SystemState.OFFLINE:
                 state.os.terminal_lock = True
                 state.os.terminal_reason = "core_os_offline"
-            elif life_support and life_support.state == SystemState.OFFLINE:
-                state.os.terminal_lock = True
-                state.os.terminal_reason = "life_support_offline"
             elif (
                 life_support
-                and life_support.state == SystemState.CRITICAL
-                and state.ship.life_support_critical_s >= Balance.LIFE_SUPPORT_CRITICAL_GRACE_S
+                and life_support.state == SystemState.OFFLINE
+                and state.ship.life_support_offline_s >= Balance.LIFE_SUPPORT_CRITICAL_GRACE_S
             ):
                 state.os.terminal_lock = True
-                state.os.terminal_reason = "life_support_critical"
+                state.os.terminal_reason = "life_support_offline"
 
         return events
 

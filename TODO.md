@@ -47,7 +47,11 @@ ENERGY
 
 === COMMANDS ===
 
-- [ ] Estando docked en CURL_12, al hacer "uplink" el juego crashea y me devuelve un error "AttributeError: 'list' object has no attribute 'events'".
+- [ ] Por lo que dice el manual life_support.es.txt los comandos status y alerts dependen de life_support. No deberían. Deben depender de core_os.
+
+- [ ] Hay que desarrollar un comando específico para conocer el status del "huesped" del sarcófago 5.
+
+- [x] Estando docked en CURL_12, al hacer "uplink" el juego crashea y me devuelve un error "AttributeError: 'list' object has no attribute 'events'".
 
 - [!] Cuando se ordena "salvage scrap", antes de que la tarea concluya, en el output del comando "logs" se imprime un mensaje que indica cuál es la cantidad de scrap total recupelable (available). Esa información no debería mostrarse/saberse hasta que la operación de "salvage scrap" no haya finalizado.
 
