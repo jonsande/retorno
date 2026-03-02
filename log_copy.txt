@@ -1,20 +1,20 @@
+[AUTO] [CRITICAL] power_bus_instability :: Power bus instability
+[AUTO] [WARN] system_state_changed :: energy_distribution: damaged -> nominal (cause=repair, health=0.95)
+[AUTO] Repair completed for energy_distribution
+[AUTO] [WARN] system_state_changed :: power_core: damaged -> limited (cause=repair, health=0.75)
+[AUTO] Repair completed for power_core
+> drone repair D1 power_core
+[CMD] [INFO] job_queued :: J4 repair_system target=ship_system:power_core ETA=25s
+[AUTO] [WARN] system_state_changed :: power_core: limited -> nominal (cause=repair, health=0.90)
+[AUTO] Repair completed for power_core
+> power on sensors
+[CMD] [INFO] system_power_restored :: Power restored: sensors (offline -> offline)
+> power on sensors
+[CMD] [INFO] system_power_restored :: Power restored: sensors (offline -> offline)
+> boot sensord
+[CMD] [INFO] job_queued :: J5 boot_service target=service:sensord ETA=8s
+[AUTO] [WARN] system_state_changed :: sensors: offline -> limited (cause=boot, health=0.85)
+[AUTO] Service booted: sensord
+[AUTO] [INFO] signal_detected :: Signal detected: ECHO_7
 [AUTO] [WARN] power_net_deficit :: Power deficit detected
-> scan
-=== SCAN ===
-- Harbor-12 Waystation (station) id=HARBOR_12
-> contacts
-=== CONTACTS ===
-- CURL-12 Waystation (station) id=CURL_12 dist=12.65ly no_route unvisited
-- Derelict A3 (derelict) id=DERELICT_A3 dist=33.56ly no_route unvisited
-- ECHO-7 Relay Station (station) id=ECHO_7 dist=12.65ly route visited
-- Harbor-12 Waystation (station) id=HARBOR_12 dist=0.0000ly no_route visited
-- Unknown (origin) id=UNKNOWN_00 dist=12.65ly no_route visited
-> intel
-=== INTEL ===
-ID     kind   what                        conf  source                 age
-I00001 link   ECHO_7 -> HARBOR_12          0.90  uplink@ECHO_7        4616d
-I00002 link   ECHO_7 -> CURL_12            0.90  uplink@ECHO_7        4616d
-I00003 link   ECHO_7 -> DERELICT_A3        0.90  uplink@ECHO_7        4616d
-Try: intel import <path> | intel show <intel_id> | man intel
-completions: log logs
 > log copy 20

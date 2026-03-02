@@ -340,7 +340,7 @@ def maybe_deliver_lore(state, trigger: str, ctx: LoreContext) -> LoreDelivery:
                     single_id = picked.get("single_id")
                     if single_id and single_id not in state.world.lore.delivered:
                         if not piece_constraints_ok(picked, ctx):
-                            return delivered_files
+                            return LoreDelivery(delivered_files, events)
                         allowed = picked.get("channels") or ["captured_signal"]
                         channel = _delivery_channel_for_trigger(allowed, trigger)
                         if not channel:

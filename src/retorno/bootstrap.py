@@ -139,7 +139,6 @@ def create_initial_state_prologue() -> GameState:
             name="Sensors",
             state=SystemState.OFFLINE,
             health=0.85,
-            state_locked=True,
             sector_id="BRG-01",
             p_nom_kw=0.7,
             priority=3,
@@ -154,7 +153,6 @@ def create_initial_state_prologue() -> GameState:
                 )
             ],
             service=ServiceState(service_name="sensord", is_running=False, boot_time_s=8),
-            tags={"locked"},
         ),
     }
 

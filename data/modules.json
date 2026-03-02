@@ -5,7 +5,7 @@
     "desc_es": "Estabiliza la alineación de fase del bus de energía.",
     "scrap_cost": 12,
     "pool": "common",
-    "effects": { "power_quality_offset": 0.05 }
+    "effects": { "power_quality_offset": 0.15 }
   },
   "aux_battery_cell": {
     "name": "Aux Battery Cell",

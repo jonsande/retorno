@@ -1,6 +1,7 @@
 drone deploy <drone_id> <sector_id|node_id>
 drone deploy! <drone_id> <sector_id|node_id>
 drone move <drone_id> <target_id>
+drone autorecall <drone_id> <on|off|percent>
 drone repair <drone_id> <target_id>
 drone install <drone_id> <module_id>
 drone salvage scrap <drone_id> <node_id> <amount>
@@ -26,6 +27,10 @@ Operational notes
 - Docked drones are automatically decontaminated in drone_bay (slower if bay is degraded).
 - `drone repair` accepts ship systems and drones as targets.
 - To repair another drone, the operator drone must be deployed and co-located with the target drone.
+- `drone move <drone_id> <ship_sector>` can move a drone from a world_node to a ship sector when the ship is docked at that same node.
+- `drone move <drone_id> RETORNO_SHIP` is an alias to return to ship via `DRN-BAY`.
+- `drone autorecall <drone_id> on|off` enables/disables low-battery auto-recall.
+- `drone autorecall <drone_id> <percent>` sets the battery threshold (%) used for auto-recall.
 - drone_bay LIMITED/DAMAGED slows deploy/recall/install/reboot and charging.
 - drone_bay OFFLINE blocks normal deploy and install; use deploy! for emergency launch.
 - Avoid running the battery to zero before recall; a dead drone may be stranded.

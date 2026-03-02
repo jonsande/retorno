@@ -19,11 +19,6 @@
   },
   "fs_files": [
     {
-      "path": "/data/nav/fragments/frag_0001b.txt",
-      "access": "GUEST",
-      "content": "LINK: ECHO_7 -> CURL_12\n"
-    },
-    {
       "path": "/logs/echo_cache.en.txt",
       "access": "GUEST",
       "content_ref": "lore/echo_7/logs/echo_cache.en.txt"
@@ -37,6 +32,11 @@
       "path": "/logs/echo_fragment_0002.txt",
       "access": "GUEST",
       "content_ref": "lore/echo_7/logs/echo_fragment.txt"
+    },
+    {
+      "path": "/logs/echo_fragment_0001.txt",
+      "access": "GUEST",
+      "content": "LINK: ECHO_7 -> CURL_12\n"
     }
   ]
 }

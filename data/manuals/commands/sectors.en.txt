@@ -1,2 +1,3 @@
 sectors
 - Lists ship sectors and their tags.
+- Equivalent to: `map ship`.

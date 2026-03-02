@@ -1,2 +1,3 @@
 sectors
 - Lista los sectores de la nave y sus etiquetas.
+- Equivale a: `map ship`.

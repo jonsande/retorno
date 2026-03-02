@@ -10,4 +10,5 @@ navigation <...> (alias)
 - Si estás docked, primero debes desacoplar con `undock` para poder iniciar nav.
 - Las rutas se obtienen con: uplink (relay/waystation), route solve, intel import (logs/fragmentos), o scan si hay un hub co‑ubicado con tu posición actual.
 - Si no hay rutas, consigue inteligencia de navegación o intenta uplink/route solve.
+- Para planificación global entre nodos conocidos, usa `map graph` y `map path <node_id>`.
 - travel sigue aceptado como alias de nav.

@@ -34,9 +34,11 @@ DRONE BAY
 - [ ] Necesitamos que drone_bay tenga una capacidad máxima para albergar drones.
 
 VITALS
+- [!] Parece que ahora mismo apagar el life_support no tiene ninguna consecuencia. Qué sucede si se desconecta (power off) el sistema life_support? Y si está en estado LIMITED, DAMAGED o CRITICAL?
 - [ ] La cámara de sarcófagos será un sistema independiente? o retocar life_support?
 - [ ] Hay que desarrollar una v0 de vitals. El usuario tiene también que mantener a su PJ. La hibernación debe tener su coste (y/o riesgos). También tiene que haber algún consumo de alimento, y un generador de oxígeno que requiera alguna forma de mantenimiento o combustible o...
 
+CARGO
 - [ ] Debe haber un límite de scrap que se puede tener. O un límite de volumen. Medir las cosas por volumen.
 
 ENERGY
@@ -47,7 +49,7 @@ ENERGY
 
 - [ ] Estando docked en CURL_12, al hacer "uplink" el juego crashea y me devuelve un error "AttributeError: 'list' object has no attribute 'events'".
 
-- [ ] Creo que el comando logs sigue indicando cuál es la cantidad de scrap total recupelable (available) al ordenar salvage scrap. No debería mostrarse. Eso el jugador sólo debe saberlo una vez el job de salvage ha finalizado (actualmente se generan mensajes correctos en este sentido). Sólo corregir la información que se ofrece a este respecto cuando el job está todavía queued.
+- [!] Cuando se ordena "salvage scrap", antes de que la tarea concluya, en el output del comando "logs" se imprime un mensaje que indica cuál es la cantidad de scrap total recupelable (available). Esa información no debería mostrarse/saberse hasta que la operación de "salvage scrap" no haya finalizado.
 
 - [x] comando undock para volver a in orbit.
 
@@ -55,11 +57,11 @@ ENERGY
 
 - [!] No debería dejar emprender viaje si se está dock. Antes se debe hacer con éxito un undock.
 
-- [ ] Necesitamos un comando que le sirva al usuario para conocer el grafo. Es decir, saber qué rutas hay, qué nodos conectan con qué nodos y con cuáles no. ¿Cómo se te ocurre que podría hacerse esto?
+- [x] Necesitamos un comando que le sirva al usuario para conocer el grafo. Es decir, no sólo saber qué rutas conocidas hay desde el nodo actual sino poder ver qué nodos conectan con qué nodos y con cuáles no (de forma que pueda así planear su viaje, saber a dónde ir para poder llegar a uno u otro nodo). ¿Cómo se te ocurre que podría hacerse esto?
 
-- [ ] Parece que ahora se puede desactivar core_os y otros sistemas vitales que no deberían poder desacivarse. Pedirle a gpt que razone esto y me diga cuales tiene sentido y cuales no poder apagar.
+- [x] Parece que ahora se puede desactivar core_os y otros sistemas vitales que no deberían poder desacivarse. Pedirle a gpt que razone esto y me diga cuales tiene sentido y cuales no poder apagar.
 
-- [ ] Estoy pudiendo ejecutar "route solve CURL_12" desde ECHO_12 teniendo todos los sitemas apagados. ¿Por qué?
+- [x] Estoy pudiendo ejecutar "route solve CURL_12" desde ECHO_12 teniendo todos los sitemas apagados. ¿Por qué?
 
 - [x] Simplificar comandos 'nav' y 'travel'. Me inclino por sustituir el comando "travel <node_id|name>", "travel --no-cruise <dest>" y "travel abort" por "nav <node_id|name>", "nav --no-cruise <dest>" y "nav abort". Además, 'nav' debe ser un alias de 'navigation' (o sea, que funcione tanto escribir 'nav' como 'navigation'). El comando 'nav' actual, sin parámetros, lo sustituiremos por "nav routes" (o sea, que el comando "nav routes" hará lo que actualmente el comando "nav"). Después de implementar estos cambios hay que actualizar los manuales (localizados) en consecuencia, y el help. Por otra parte, si el usuario introduce el comando "nav" a secas, se debe imprimir un típico mensaje ParseError explicando el uso del comando.
 
@@ -153,6 +155,16 @@ Esto da variedad, pero no lo haría aún como primer sistema.
 
 
 === OTROS / SIN CATALOGAR ===
+
+- [ ] Diseñar sistema "security". Por ahora, este sistema servirá para detectar intrusos en la nave (biológicos o no biológicos)
+
+- [ ] HAcer dock tiene que tener una pequeña posibilidad de que "se meta algo" en tu nave al dockear, u otros eventos.
+
+- [!] Operaciones en cadena (pipeline)!!! Es decir, poder indicarle varios comandos en cadena, que cada cual se ejecute sólo cuando haya acabado el anterior.
+
+- [ ] Que sentido tiene que "contacts" dependa de sensors? Qué operaciones/comandos dependen actualmente de "sensors"?
+
+- [ ] A veces en textual al darle a TAB no se autocompleta (ni listan las opciones) sino que se cambia el foco de la ventana. Esto sólo sucede a veces.
 
 - [ ] Pegarle a chatGPT:
   - debug lore después de 1–2 uplinks

@@ -75,6 +75,7 @@ _PARSE_ERROR_MESSAGES = {
         "jobs_amount_gt0": "jobs: amount must be > 0",
         "usage_route": "Usage: route solve <node_id>",
         "usage_relay": "Usage: relay uplink",
+        "usage_map": "Usage: map | map ship | map graph [node_id] | map path <node_id>",
         "usage_locate": "Usage: locate <system_id>",
         "usage_diag": "Usage: diag <system_id>",
         "usage_install": "Install via drones only. Use: drone install <drone_id> <module_id>",
@@ -88,17 +89,19 @@ _PARSE_ERROR_MESSAGES = {
         "usage_power_on": "Usage: power on <system_id>",
         "usage_power_off": "Usage: power off <system_id>",
         "usage_shutdown": "Usage: shutdown <system_id>",
-        "usage_drone": "Usage: drone status | drone deploy <drone_id> <sector_id> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id>",
+        "usage_drone": "Usage: drone status | drone deploy <drone_id> <sector_id> | drone move <drone_id> <target_id> | drone recall <drone_id> | drone autorecall <drone_id> <on|off|amount_percent> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id>",
         "usage_drone_recall": "Usage: drone recall <drone_id>",
         "usage_drone_reboot": "Usage: drone reboot <drone_id>",
         "usage_drone_repair": "Usage: drone repair <drone_id> <target_id>",
         "usage_drone_move": "Usage: drone move <drone_id> <target_id>",
+        "usage_drone_autorecall": "Usage: drone autorecall <drone_id> <on|off|amount_percent>",
+        "drone_autorecall_amount": "drone autorecall: amount must be a number in (0, 100]",
         "usage_drone_install": "Usage: drone install <drone_id> <module_id>",
         "usage_drone_salvage": "Usage: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage data <drone_id> <node_id>",
         "usage_drone_salvage_scrap": "Usage: drone salvage scrap <drone_id> <node_id> <amount>",
         "usage_drone_salvage_data": "Usage: drone salvage data <drone_id> <node_id>",
         "usage_drone_deploy": "Usage: drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>",
-        "unknown_drone_subcommand": "Unknown drone subcommand. Use: drone status | drone deploy ... | drone repair ... | drone install ...",
+        "unknown_drone_subcommand": "Unknown drone subcommand. Use: drone status | drone deploy ... | drone move ... | drone recall ... | drone autorecall ...",
         "usage_repair": "Usage: drone repair <drone_id> <target_id> | repair <system_id> --selftest",
         "module_install_migrated": "module install/install has been removed. Use: drone install <drone_id> <module_id>",
         "unknown_command_suggestion": "Unknown command: {cmd}. Did you mean: {suggestion}?",
@@ -140,6 +143,7 @@ _PARSE_ERROR_MESSAGES = {
         "jobs_amount_gt0": "jobs: amount debe ser > 0",
         "usage_route": "Uso: route solve <node_id>",
         "usage_relay": "Uso: relay uplink",
+        "usage_map": "Uso: map | map ship | map graph [node_id] | map path <node_id>",
         "usage_locate": "Uso: locate <system_id>",
         "usage_diag": "Uso: diag <system_id>",
         "usage_install": "Instalación solo con drones. Usa: drone install <drone_id> <module_id>",
@@ -153,17 +157,19 @@ _PARSE_ERROR_MESSAGES = {
         "usage_power_on": "Uso: power on <system_id>",
         "usage_power_off": "Uso: power off <system_id>",
         "usage_shutdown": "Uso: shutdown <system_id>",
-        "usage_drone": "Uso: drone status | drone deploy <drone_id> <sector_id> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id>",
+        "usage_drone": "Uso: drone status | drone deploy <drone_id> <sector_id> | drone move <drone_id> <target_id> | drone recall <drone_id> | drone autorecall <drone_id> <on|off|porcentaje> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id>",
         "usage_drone_recall": "Uso: drone recall <drone_id>",
         "usage_drone_reboot": "Uso: drone reboot <drone_id>",
         "usage_drone_repair": "Uso: drone repair <drone_id> <target_id>",
         "usage_drone_move": "Uso: drone move <drone_id> <target_id>",
+        "usage_drone_autorecall": "Uso: drone autorecall <drone_id> <on|off|porcentaje>",
+        "drone_autorecall_amount": "drone autorecall: el porcentaje debe ser número en (0, 100]",
         "usage_drone_install": "Uso: drone install <drone_id> <module_id>",
         "usage_drone_salvage": "Uso: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage data <drone_id> <node_id>",
         "usage_drone_salvage_scrap": "Uso: drone salvage scrap <drone_id> <node_id> <amount>",
         "usage_drone_salvage_data": "Uso: drone salvage data <drone_id> <node_id>",
         "usage_drone_deploy": "Uso: drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>",
-        "unknown_drone_subcommand": "Subcomando drone desconocido. Usa: drone status | drone deploy ... | drone repair ... | drone install ...",
+        "unknown_drone_subcommand": "Subcomando drone desconocido. Usa: drone status | drone deploy ... | drone move ... | drone recall ... | drone autorecall ...",
         "usage_repair": "Uso: drone repair <drone_id> <target_id> | repair <system_id> --selftest",
         "module_install_migrated": "module install/install fue eliminado. Usa: drone install <drone_id> <module_id>",
         "unknown_command_suggestion": "Comando desconocido: {cmd}. ¿Quizá quisiste decir: {suggestion}?",
@@ -425,8 +431,19 @@ def parse_command(line: str):
             return "UPLINK"
         raise ParseError("usage_relay")
 
-    if cmd == "sectors" or cmd == "map":
+    if cmd == "sectors":
         return "SECTORS"
+
+    if cmd == "map":
+        if len(args) == 0:
+            return ("MAP", "graph", None)
+        if len(args) == 1 and args[0] in {"ship", "graph"}:
+            return ("MAP", args[0], None)
+        if len(args) == 2 and args[0] == "graph":
+            return ("MAP", "graph", args[1])
+        if len(args) == 2 and args[0] == "path":
+            return ("MAP", "path", args[1])
+        raise ParseError("usage_map")
 
     if cmd == "locate":
         if len(args) != 1:
@@ -520,6 +537,22 @@ def parse_command(line: str):
             if len(args) != 3:
                 raise ParseError("usage_drone_move")
             return DroneMove(drone_id=args[1], target_id=args[2])
+        if sub == "autorecall":
+            if len(args) != 3:
+                raise ParseError("usage_drone_autorecall")
+            drone_id = args[1]
+            value = args[2].strip().lower()
+            if value in {"on", "off"}:
+                return ("DRONE_AUTORECALL_ENABLED", drone_id, value == "on")
+            if value.endswith("%"):
+                value = value[:-1].strip()
+            try:
+                amount = float(value)
+            except ValueError as e:
+                raise ParseError("drone_autorecall_amount") from e
+            if not (0.0 < amount <= 100.0):
+                raise ParseError("drone_autorecall_amount")
+            return ("DRONE_AUTORECALL_THRESHOLD", drone_id, amount / 100.0)
         if sub == "install":
             if len(args) != 3:
                 raise ParseError("usage_drone_install")

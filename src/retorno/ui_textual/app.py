@@ -504,6 +504,8 @@ class RetornoTextualApp(App):
             "nav",
             "navigation",
             "travel",
+            "uplink",
+            "relay",
             "salvage",
             "route",
             "drone",
@@ -598,6 +600,11 @@ class RetornoTextualApp(App):
             if len(tokens) == 3 and tokens[1] == "--no-cruise":
                 return _travel_targets(text)
             return _travel_targets(text)
+        if cmd == "map":
+            if len(tokens) == 2:
+                return [c for c in ["ship", "graph", "path"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] in {"graph", "path"}:
+                return [c for c in contacts if c.startswith(text)]
         if cmd == "power":
             if len(tokens) == 2:
                 return [c for c in ["status", "plan", "on", "off"] if c.startswith(text)]
@@ -685,15 +692,24 @@ class RetornoTextualApp(App):
                 return [c for c in ["explain"] if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "explain":
                 return [k for k in state.events.alerts.keys() if k.startswith(text)]
+        if cmd == "uplink":
+            return []
+        if cmd == "relay":
+            if len(tokens) == 2:
+                return [c for c in ["uplink"] if c.startswith(text)]
+            return []
         if cmd == "drone":
             if len(tokens) == 2:
-                return [c for c in ["status", "deploy", "deploy!", "move", "reboot", "recall", "repair", "install", "salvage"] if c.startswith(text)]
-            if len(tokens) == 3 and tokens[1] in {"deploy", "deploy!", "reboot", "recall", "repair", "move", "install"}:
+                return [c for c in ["status", "deploy", "deploy!", "move", "reboot", "recall", "autorecall", "repair", "install", "salvage"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] in {"deploy", "deploy!", "reboot", "recall", "autorecall", "repair", "move", "install"}:
                 return [d for d in drones if d.startswith(text)]
             if len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
                 return [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "move":
-                return [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
+                ship_aliases = [state.ship.ship_id] if state.ship.ship_id.startswith(text) else []
+                return [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)] + ship_aliases
+            if len(tokens) == 4 and tokens[1] == "autorecall":
+                return [c for c in ["on", "off", "10"] if c.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "install":
                 return [m for m in modules if m.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "repair":
@@ -767,7 +783,7 @@ class RetornoTextualApp(App):
         return candidates
 
     def _log_line(self, line: str) -> None:
-        if not line:
+        if line is None:
             return
         self.query_one("#log", RichLog).write(line)
         self._log_buffer.append(line)
@@ -804,6 +820,38 @@ class RetornoTextualApp(App):
             "en": f"WARNING: drones not aboard ({drone_ids}). Leaving {current_node} will abandon them. Continue? [y/N]",
             "es": f"ADVERTENCIA: drones fuera de la nave ({drone_ids}). Al salir de {current_node} quedarán abandonados. ¿Continuar? [s/N]",
         }
+        self._pending_confirm_action = action
+        self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
+        self._pending_confirm_locale = locale
+        self._log_line(self._pending_confirm_prompt)
+        return True
+
+    def _confirm_nav_needed(self, state, action) -> bool:
+        locale = state.os.locale.value
+        current_node = state.world.current_node_id
+        dest = getattr(action, "node_id", "?")
+        out = []
+        for d in state.ship.drones.values():
+            if d.status in {DroneStatus.DEPLOYED, DroneStatus.DISABLED} and d.location.kind == "world_node":
+                out.append(d)
+        if out:
+            drone_ids = ", ".join(d.drone_id for d in out)
+            prompts = {
+                "en": (
+                    f"WARNING: confirm nav to {dest}? "
+                    f"Drones not aboard ({drone_ids}) will be abandoned when leaving {current_node}. Continue? [y/N]"
+                ),
+                "es": (
+                    f"ADVERTENCIA: ¿confirmar nav a {dest}? "
+                    f"Los drones fuera de la nave ({drone_ids}) quedarán abandonados al salir de {current_node}. "
+                    "¿Continuar? [s/N]"
+                ),
+            }
+        else:
+            prompts = {
+                "en": f"WARNING: confirm nav to {dest}. Continue? [y/N]",
+                "es": f"ADVERTENCIA: confirmar nav a {dest}. ¿Continuar? [s/N]",
+            }
         self._pending_confirm_action = action
         self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
         self._pending_confirm_locale = locale
@@ -864,6 +912,24 @@ class RetornoTextualApp(App):
         self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
         self._pending_confirm_locale = locale
         self._log_line(self._pending_confirm_prompt)
+
+    def _confirm_hibernate_start_needed(self, state, parsed: Hibernate) -> bool:
+        locale = state.os.locale.value
+        if parsed.mode == "until_arrival":
+            prompts = {
+                "en": "WARNING: confirm hibernation until arrival. Continue? [y/N]",
+                "es": "ADVERTENCIA: confirmar hibernación hasta la llegada. ¿Continuar? [s/N]",
+            }
+        else:
+            prompts = {
+                "en": f"WARNING: confirm hibernation for {parsed.years:g}y. Continue? [y/N]",
+                "es": f"ADVERTENCIA: confirmar hibernación durante {parsed.years:g} años. ¿Continuar? [s/N]",
+            }
+        self._pending_confirm_action = "HIBERNATE_START"
+        self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
+        self._pending_confirm_locale = locale
+        self._log_line(self._pending_confirm_prompt)
+        return True
 
     def _continue_hibernate(self, parsed: Hibernate, wake_on_low_battery: bool) -> None:
         try:
@@ -1017,6 +1083,19 @@ class RetornoTextualApp(App):
                 if self._pending_hibernate_parsed is not None:
                     self._continue_hibernate(self._pending_hibernate_parsed, wake)
                 return
+            if action == "HIBERNATE_START":
+                if reply in yes:
+                    with self.loop.with_lock() as state:
+                        if self._confirm_hibernate_drones_needed(state):
+                            return
+                    if self._pending_hibernate_parsed is not None:
+                        self._continue_hibernate(self._pending_hibernate_parsed, wake_on_low_battery=False)
+                else:
+                    self._pending_hibernate_parsed = None
+                    self._pending_hibernate_requires_non_cruise = False
+                    self._pending_wake_on_low_battery = False
+                    self._log_line("(cancelled)")
+                return
             if reply in yes:
                 if action == "TRAVEL_ABORT":
                     from retorno.core.actions import TravelAbort
@@ -1098,7 +1177,22 @@ class RetornoTextualApp(App):
             "AUTH_STATUS",
         }
         if (isinstance(parsed, str) and parsed in info_tokens) or (
-            isinstance(parsed, tuple) and parsed[0] in {"LS", "CAT", "ABOUT", "MAN", "LOCATE", "ALERTS_EXPLAIN", "MAIL_LIST", "MAIL_READ", "JOBS", "DEBUG_MODULES"}
+            isinstance(parsed, tuple)
+            and parsed[0] in {
+                "LS",
+                "CAT",
+                "ABOUT",
+                "MAN",
+                "LOCATE",
+                "ALERTS_EXPLAIN",
+                "MAIL_LIST",
+                "MAIL_READ",
+                "JOBS",
+                "DEBUG_MODULES",
+                "MAP",
+                "DRONE_AUTORECALL_ENABLED",
+                "DRONE_AUTORECALL_THRESHOLD",
+            }
         ):
             self._drain_auto_to_log()
 
@@ -1200,9 +1294,21 @@ class RetornoTextualApp(App):
             with self.loop.with_lock() as state:
                 self._log_lines(presenter.build_command_output(repl.render_sectors, state))
             return
+        if isinstance(parsed, tuple) and parsed[0] == "MAP":
+            with self.loop.with_lock() as state:
+                self._log_lines(presenter.build_command_output(repl.render_map, state, parsed[1], parsed[2]))
+            return
         if parsed == "DRONE_STATUS":
             with self.loop.with_lock() as state:
                 self._log_lines(presenter.build_command_output(repl.render_drone_status, state))
+            return
+        if isinstance(parsed, tuple) and parsed[0] == "DRONE_AUTORECALL_ENABLED":
+            with self.loop.with_lock() as state:
+                self._log_lines(presenter.build_command_output(repl._set_drone_autorecall, state, parsed[1], bool(parsed[2]), None))
+            return
+        if isinstance(parsed, tuple) and parsed[0] == "DRONE_AUTORECALL_THRESHOLD":
+            with self.loop.with_lock() as state:
+                self._log_lines(presenter.build_command_output(repl._set_drone_autorecall, state, parsed[1], None, float(parsed[2])))
             return
         if parsed == "POWER_STATUS":
             with self.loop.with_lock() as state:
@@ -1278,7 +1384,10 @@ class RetornoTextualApp(App):
                     resolved = repl._resolve_node_id_from_input(state, parsed.node_id)
                     if resolved:
                         parsed.node_id = resolved
-                if self._confirm_abandon_drones_needed(state, parsed):
+                if parsed.__class__.__name__ == "Travel":
+                    if self._confirm_nav_needed(state, parsed):
+                        return
+                elif self._confirm_abandon_drones_needed(state, parsed):
                     return
 
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG":
@@ -1384,9 +1493,8 @@ class RetornoTextualApp(App):
             self._pending_hibernate_parsed = parsed
             self._pending_hibernate_requires_non_cruise = False
             with self.loop.with_lock() as state:
-                if self._confirm_hibernate_drones_needed(state):
+                if self._confirm_hibernate_start_needed(state, parsed):
                     return
-            self._continue_hibernate(parsed, wake_on_low_battery=False)
             return
 
         if parsed.__class__.__name__ == "Status":

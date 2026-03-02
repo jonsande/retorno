@@ -80,6 +80,7 @@ class Engine:
                 if node.kind != "transit":
                     state.world.visited_nodes.add(node.node_id)
             self._clear_tmp_node(state)
+            self._drop_initial_unknown_node(state)
             events.append(
                 self._make_event(
                     state,
@@ -1381,8 +1382,31 @@ class Engine:
                 return [event]
             target_kind = None
             target_id = action.target_id
+            if target_id == state.ship.ship_id:
+                # Alias to bring the drone back to the ship via bay sector.
+                bay_sector_id = next(
+                    (
+                        sid
+                        for sid, sector in state.ship.sectors.items()
+                        if "bay" in getattr(sector, "tags", set())
+                    ),
+                    "DRN-BAY",
+                )
+                target_id = bay_sector_id
             if target_id in state.ship.sectors:
-                if drone.location.kind != "ship_sector":
+                if drone.location.kind == "world_node":
+                    if state.ship.docked_node_id != drone.location.id:
+                        event = self._make_event(
+                            state,
+                            EventType.BOOT_BLOCKED,
+                            Severity.WARN,
+                            SourceRef(kind="drone", id=drone.drone_id),
+                            f"Drone move blocked: ship not docked at {drone.location.id}",
+                            data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": drone.location.id},
+                        )
+                        self._record_event(state.events, event)
+                        return [event]
+                elif drone.location.kind != "ship_sector":
                     event = self._make_event(
                         state,
                         EventType.BOOT_BLOCKED,
@@ -2256,6 +2280,7 @@ class Engine:
         jobs_state = state.jobs
         completed: list[str] = []
         running_by_owner: set[str] = set()
+        route_solve_running = False
 
         for job_id in list(jobs_state.active_job_ids):
             job = jobs_state.jobs.get(job_id)
@@ -2263,6 +2288,8 @@ class Engine:
                 continue
             if job.status == JobStatus.RUNNING and job.owner_id:
                 running_by_owner.add(job.owner_id)
+            if job.status == JobStatus.RUNNING and job.job_type == JobType.ROUTE_SOLVE:
+                route_solve_running = True
 
         for job_id in list(jobs_state.active_job_ids):
             job = jobs_state.jobs.get(job_id)
@@ -2278,9 +2305,13 @@ class Engine:
             if job.status == JobStatus.QUEUED:
                 if job.owner_id and job.owner_id in running_by_owner:
                     continue
+                if job.job_type == JobType.ROUTE_SOLVE and route_solve_running:
+                    continue
                 job.status = JobStatus.RUNNING
                 if job.owner_id:
                     running_by_owner.add(job.owner_id)
+                if job.job_type == JobType.ROUTE_SOLVE:
+                    route_solve_running = True
             if job.params.get("emergency"):
                 failed_event = self._maybe_fail_emergency_job(state, job, dt)
                 if failed_event:
@@ -2700,6 +2731,22 @@ class Engine:
         state.world.active_tmp_from = None
         state.world.active_tmp_to = None
         state.world.active_tmp_progress = None
+
+    def _drop_initial_unknown_node(self, state: GameState) -> None:
+        unknown_id = "UNKNOWN_00"
+        if state.world.current_node_id == unknown_id:
+            return
+        state.world.space.nodes.pop(unknown_id, None)
+        state.world.known_contacts.discard(unknown_id)
+        if hasattr(state.world, "known_nodes"):
+            state.world.known_nodes.discard(unknown_id)
+        state.world.visited_nodes.discard(unknown_id)
+        state.world.fine_ranges_km.pop(unknown_id, None)
+        state.world.known_links.pop(unknown_id, None)
+        for links in state.world.known_links.values():
+            links.discard(unknown_id)
+        if hasattr(state.world, "dead_nodes"):
+            state.world.dead_nodes.pop(unknown_id, None)
 
     def _apply_job_effect(self, state: GameState, job: Job) -> list[Event]:
         events: list[Event] = []
@@ -3180,15 +3227,24 @@ class Engine:
                 state.os.fs["/remote"] = FSNode(path="/remote", node_type=FSNodeType.DIR, access=AccessLevel.GUEST)
             if mount_root not in state.os.fs:
                 state.os.fs[mount_root] = FSNode(path=mount_root, node_type=FSNodeType.DIR, access=AccessLevel.GUEST)
+            mounted_candidates: list[str] = []
+            preexisting: set[str] = set()
+            for entry in files:
+                src_path = normalize_path(str(entry.get("path", "")))
+                if not src_path:
+                    continue
+                if not (src_path.startswith("/mail") or src_path.startswith("/logs") or src_path.startswith("/data")):
+                    continue
+                dest_path = normalize_path(mount_root + src_path)
+                mounted_candidates.append(dest_path)
+                if dest_path in state.os.fs:
+                    preexisting.add(dest_path)
             count = mount_files(state.os.fs, mount_root, files)
+            mounted_paths = sorted({p for p in mounted_candidates if p not in preexisting and p in state.os.fs})
             drone_id = job.params.get("drone_id")
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
                 drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_SALVAGE)
-            tip = None
-            if node_id not in state.world.salvage_tip_nodes:
-                state.world.salvage_tip_nodes.add(node_id)
-                tip = f"Tip: ls /remote/{node_id}/mail or /remote/{node_id}/logs"
             events.append(
                 self._make_event(
                     state,
@@ -3196,7 +3252,13 @@ class Engine:
                     Severity.INFO,
                     SourceRef(kind="world", id=node_id),
                     f"Data salvaged: {count} files mounted at {mount_root}/",
-                    data={"node_id": node_id, "files_count": count, "mount_root": mount_root, "tip": tip},
+                    data={
+                        "node_id": node_id,
+                        "files_count": count,
+                        "mount_root": mount_root,
+                        "mounted_paths": mounted_paths,
+                        "tip_key": "data_salvaged_cat",
+                    },
                 )
             )
             events.extend(lore_result.events)
@@ -3504,7 +3566,72 @@ class Engine:
             else:
                 if drone.low_battery_warned:
                     drone.low_battery_warned = False
+            if (
+                drone.status == DroneStatus.DEPLOYED
+                and drone.autorecall_enabled
+                and drone.battery <= max(0.0, min(1.0, drone.autorecall_threshold))
+                and not self._drone_has_active_job(state, drone.drone_id, JobType.RECALL_DRONE)
+            ):
+                auto_recall_events = self._enqueue_drone_autorecall(state, drone)
+                events.extend(auto_recall_events)
         return events
+
+    def _drone_has_active_job(self, state: GameState, drone_id: str, job_type: JobType) -> bool:
+        for job_id in state.jobs.active_job_ids:
+            job = state.jobs.jobs.get(job_id)
+            if not job:
+                continue
+            if job.owner_id != drone_id:
+                continue
+            if job.job_type != job_type:
+                continue
+            if job.status in {JobStatus.QUEUED, JobStatus.RUNNING}:
+                return True
+        return False
+
+    def _enqueue_drone_autorecall(self, state: GameState, drone) -> list[Event]:
+        if drone.integrity < Balance.DRONE_RECALL_MIN_INTEGRITY:
+            return []
+        if drone.battery < Balance.DRONE_MIN_BATTERY_FOR_RECALL:
+            return []
+        if drone.location.kind == "world_node" and state.ship.docked_node_id != drone.location.id:
+            return []
+        pre_events: list[Event] = []
+        support_warning = self._emit_drone_bay_support_warning(state, DroneRecall(drone_id=drone.drone_id))
+        if support_warning:
+            pre_events.append(support_warning)
+        bay_state = self._drone_bay_state(state)
+        eta = Balance.RECALL_TIME_S * self._drone_bay_eta_mult(state)
+        job_id = f"J{state.jobs.next_job_seq}"
+        state.jobs.next_job_seq += 1
+        job = Job(
+            job_id=job_id,
+            job_type=JobType.RECALL_DRONE,
+            status=JobStatus.QUEUED,
+            eta_s=eta,
+            owner_id=drone.drone_id,
+            target=TargetRef(kind="drone", id=drone.drone_id),
+            params={"drone_id": drone.drone_id, "bay_state_at_start": bay_state.value if bay_state else ""},
+        )
+        state.jobs.jobs[job_id] = job
+        state.jobs.active_job_ids.append(job_id)
+        queued_event = self._make_event(
+            state,
+            EventType.JOB_QUEUED,
+            Severity.INFO,
+            SourceRef(kind="drone", id=drone.drone_id),
+            f"Job queued: recall_drone -> drone:{drone.drone_id} (ETA {int(eta)}s)",
+            data={
+                "job_id": job_id,
+                "job_type": JobType.RECALL_DRONE.value,
+                "eta_s": eta,
+                "target": {"kind": "drone", "id": drone.drone_id},
+                "owner_id": drone.drone_id,
+                "message_key": "job_queued",
+                "reason": "drone_autorecall",
+            },
+        )
+        return pre_events + [queued_event]
 
     def _update_alerts(self, state: GameState, p_load: float, p_gen: float, power_quality: float) -> list[Event]:
         events: list[Event] = []
@@ -3598,7 +3725,7 @@ class Engine:
                 )
             )
             active_keys.add(EventType.LOW_SOC_WARNING.value)
-        elif soc < 0.25:
+        elif soc < 0.25 and p_load > p_gen:
             events.extend(
                 self._ensure_alert(
                     state,

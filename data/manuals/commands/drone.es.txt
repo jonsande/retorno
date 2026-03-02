@@ -1,6 +1,7 @@
 drone deploy <drone_id> <sector_id|node_id>
 drone deploy! <drone_id> <sector_id|node_id>
 drone move <drone_id> <target_id>
+drone autorecall <drone_id> <on|off|porcentaje>
 drone repair <drone_id> <target_id>
 drone install <drone_id> <module_id>
 drone salvage scrap <drone_id> <node_id> <amount>
@@ -26,6 +27,10 @@ Notas operativas
 - Los drones acoplados se descontaminan automáticamente en drone_bay (más lento si la bahía está degradada).
 - `drone repair` acepta sistemas de nave y drones como objetivo.
 - Para reparar otro dron, el dron operador debe estar desplegado y en la misma ubicación que el dron objetivo.
+- `drone move <drone_id> <ship_sector>` permite mover un dron desde un world_node a un sector de nave cuando la nave está acoplada en ese mismo nodo.
+- `drone move <drone_id> RETORNO_SHIP` es alias de volver a la nave vía `DRN-BAY`.
+- `drone autorecall <drone_id> on|off` activa/desactiva auto-recall por batería baja.
+- `drone autorecall <drone_id> <porcentaje>` fija el umbral de batería (%) para auto-recall.
 - Con drone_bay LIMITED/DAMAGED se ralentizan deploy/recall/install/reboot y la recarga.
 - Con drone_bay OFFLINE se bloquean deploy normal e install; usa deploy! para emergencia.
 - Evita agotar la batería antes del recall; un dron sin batería puede quedar varado.

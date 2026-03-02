@@ -1,5 +1,30 @@
 route solve <node_id>
-- Calcula una ruta de viaje a un contacto cercano (dentro del rango de sensores).
-- Requiere sensores >= limitado y sensord en ejecución.
-- Tarda tiempo; objetivos más lejanos tardan más.
-- Se bloquea si la calidad de energía es demasiado baja (Q < 0.55) o hay brownout activo.
+- Intenta resolver/añadir una ruta conocida desde tu nodo actual hasta `<node_id>`.
+
+Comportamiento
+- Si la ruta ya es conocida desde tu nodo actual, no encola trabajo:
+  - Puede afinar distancia local (si el destino se encuentra en el sector actual a una distancia no demasiado no demasiado grande) y mostrar: `Ruta afinada: distancia fina fijada para <node_id>`.
+  - Si no hay nada que afinar (porque el destino se encuentra fuera del sector actual o a una distancia demasiado grande), informa que la ruta ya era conocida.
+- Si la ruta no es conocida, encola un job `ROUTE_SOLVE`.
+- La duración del job escala con la distancia al objetivo (más cerca = más rápido).
+
+Requisitos (gating)
+- `sensors` en estado `>= limited`.
+- Servicio `sensord` en ejecución.
+- Objetivo conocido y existente.
+- Objetivo dentro del rango de sensores.
+- Nave no en tránsito.
+- Energía suficiente:
+  - sin estado crítico de potencia ni `brownout`,
+  - calidad de energía `Q >= 0.55`.
+
+Bloqueos frecuentes
+- `sensors` degradado/offline.
+- `sensord` parado.
+- Objetivo fuera de rango.
+- Objetivo no conocido o inexistente.
+- Potencia insuficiente.
+
+Notas
+- `route solve` no inicia viaje; para viajar usa `nav <node_id>`.
+- La ruta conocida es relativa al nodo actual.

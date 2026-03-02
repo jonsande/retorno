@@ -20,7 +20,7 @@ from retorno.core.actions import Action, AuthRecover, Hibernate, RouteSolve, Sta
 from retorno.runtime.loop import GameLoop
 from retorno.core.power_policy import is_parsed_command_allowed_in_core_os_critical
 from retorno.model.events import Event, EventType, Severity, SourceRef
-from retorno.model.jobs import JobStatus
+from retorno.model.jobs import JobStatus, JobType
 from retorno.runtime.data_loader import load_modules, load_arcs, load_locations
 from retorno.runtime.startup import load_startup_sequence_lines
 from retorno.config.balance import Balance
@@ -160,7 +160,7 @@ def print_help(locale: str = "en") -> None:
             "\nInfo:\n"
             "  status | jobs | jobs <amount> | jobs all | job cancel <job_id> | alerts | alerts explain <alert_key> | logs | log copy [n]\n"
             "  contacts | scan\n"
-            "  sectors | map | locate <system_id>\n"
+            "  sectors | map ship|graph [node_id]|path <node_id> | locate <system_id>\n"
             "\nNavigation:\n"
             "  nav routes\n"
             "  dock <node_id> | undock | nav <node_id> | nav --no-cruise <node_id> | nav abort | uplink\n"
@@ -174,6 +174,7 @@ def print_help(locale: str = "en") -> None:
             "  drone status\n"
             "  drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>\n"
             "  drone move <drone_id> <target_id>\n"
+            "  drone autorecall <drone_id> <on|off|percent>\n"
             "  drone repair <drone_id> <target_id>\n"
             "  drone install <drone_id> <module_id>\n"
             "  drone salvage scrap <drone_id> <node_id> <amount>\n"
@@ -201,7 +202,7 @@ def print_help(locale: str = "en") -> None:
             "\nInformación:\n"
             "  status | jobs | jobs <amount> | jobs all | job cancel <job_id> | alerts | alerts explain <alert_key> | logs | log copy [n]\n"
             "  contacts | scan\n"
-            "  sectors | map | locate <system_id>\n"
+            "  sectors | map ship|graph [node_id]|path <node_id> | locate <system_id>\n"
             "\nNavegación:\n"
             "  nav routes\n"
             "  dock <node_id> | undock | nav <node_id> | nav --no-cruise <node_id> | nav abort | uplink\n"
@@ -215,6 +216,7 @@ def print_help(locale: str = "en") -> None:
             "  drone status\n"
             "  drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>\n"
             "  drone move <drone_id> <target_id>\n"
+            "  drone autorecall <drone_id> <on|off|porcentaje>\n"
             "  drone repair <drone_id> <target_id>\n"
             "  drone install <drone_id> <module_id>\n"
             "  drone salvage scrap <drone_id> <node_id> <amount>\n"
@@ -853,7 +855,27 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             continue
         if e.type == EventType.DATA_SALVAGED:
             print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message}")
-            tip = e.data.get("tip") if isinstance(e.data, dict) else None
+            mounted_paths = e.data.get("mounted_paths") if isinstance(e.data, dict) else None
+            if isinstance(mounted_paths, list) and mounted_paths:
+                locale = state.os.locale.value
+                title = {
+                    "en": "Recovered documents:",
+                    "es": "Documentos recuperados:",
+                }.get(locale, "Recovered documents:")
+                print(title)
+                for path in mounted_paths:
+                    print(f"- {path}")
+            tip = None
+            if isinstance(e.data, dict):
+                tip_key = e.data.get("tip_key")
+                if tip_key == "data_salvaged_cat":
+                    locale = state.os.locale.value
+                    tip = {
+                        "en": "Tip: use 'cat <path>' to read recovered files and auto-import their intel.",
+                        "es": "Pista: usa 'cat <path>' para leer los archivos recuperados e importar su intel automáticamente.",
+                    }.get(locale)
+                else:
+                    tip = e.data.get("tip")
             if tip:
                 locale = state.os.locale.value
                 if locale == "es" and tip.startswith("Tip:"):
@@ -1465,9 +1487,12 @@ def render_jobs(state, limit: int | None = 5) -> None:
         if job:
             active_jobs.append(job)
     running_by_owner: set[str] = set()
+    route_solve_running = False
     for job in active_jobs:
         if job.status == JobStatus.RUNNING and job.owner_id:
             running_by_owner.add(job.owner_id)
+        if job.status == JobStatus.RUNNING and job.job_type == JobType.ROUTE_SOLVE:
+            route_solve_running = True
 
     if not jobs_state.jobs:
         print("(none)")
@@ -1477,6 +1502,10 @@ def render_jobs(state, limit: int | None = 5) -> None:
     wait_note_templates = {
         "en": " (waiting: drone busy {drone_id})",
         "es": " (en espera: dron ocupado {drone_id})",
+    }
+    route_wait_note_templates = {
+        "en": " (waiting: route solver busy)",
+        "es": " (en espera: solver de rutas ocupado)",
     }
 
     def _format_job(job):
@@ -1488,6 +1517,9 @@ def render_jobs(state, limit: int | None = 5) -> None:
         if job.status == JobStatus.QUEUED and job.owner_id and job.owner_id in running_by_owner:
             tmpl = wait_note_templates.get(locale, wait_note_templates["en"])
             wait_note = tmpl.format(drone_id=job.owner_id)
+        if job.status == JobStatus.QUEUED and job.job_type == JobType.ROUTE_SOLVE and route_solve_running:
+            tmpl = route_wait_note_templates.get(locale, route_wait_note_templates["en"])
+            wait_note += tmpl
         return f"- {job.job_id}: {job.status.value:8s} type={job.job_type.value} target={target} ETA={eta} owner={owner}{emergency}{wait_note}"
 
     print("Active (queued/running):")
@@ -1519,10 +1551,41 @@ def render_jobs(state, limit: int | None = 5) -> None:
 def render_drone_status(state) -> None:
     print("\n=== DRONES ===")
     for did, d in state.ship.drones.items():
+        ar_mode = "on" if d.autorecall_enabled else "off"
+        ar_threshold = int(round(d.autorecall_threshold * 100.0))
         print(
             f"- drone_id={did} status={d.status.value} loc={d.location.kind}:{d.location.id} "
-            f"battery={d.battery:.2f} integrity={d.integrity:.2f} dose={d.dose_rad:.3f}"
+            f"battery={d.battery:.2f} integrity={d.integrity:.2f} dose={d.dose_rad:.3f} "
+            f"autorecall={ar_mode}@{ar_threshold}%"
         )
+
+
+def _set_drone_autorecall(state, drone_id: str, enabled: bool | None = None, threshold: float | None = None) -> None:
+    drone = state.ship.drones.get(drone_id)
+    locale = state.os.locale.value
+    if not drone:
+        msg = {
+            "en": f"drone autorecall: drone not found ({drone_id})",
+            "es": f"drone autorecall: dron no encontrado ({drone_id})",
+        }
+        print(msg.get(locale, msg["en"]))
+        return
+    if enabled is not None:
+        drone.autorecall_enabled = bool(enabled)
+        mode = "on" if drone.autorecall_enabled else "off"
+        msg = {
+            "en": f"drone autorecall: {drone_id} set to {mode} (threshold={drone.autorecall_threshold*100:.0f}%)",
+            "es": f"drone autorecall: {drone_id} configurado a {mode} (umbral={drone.autorecall_threshold*100:.0f}%)",
+        }
+        print(msg.get(locale, msg["en"]))
+        return
+    if threshold is not None:
+        drone.autorecall_threshold = max(0.0, min(1.0, float(threshold)))
+        msg = {
+            "en": f"drone autorecall: {drone_id} threshold set to {drone.autorecall_threshold*100:.0f}%",
+            "es": f"drone autorecall: umbral de {drone_id} configurado a {drone.autorecall_threshold*100:.0f}%",
+        }
+        print(msg.get(locale, msg["en"]))
 
 
 def render_inventory(state) -> None:
@@ -1750,6 +1813,14 @@ def render_contacts(state) -> None:
         }
         print(msg.get(locale, msg["en"]))
         return
+    if not system.service or system.service.service_name != "sensord" or not system.service.is_running:
+        locale = state.os.locale.value
+        msg = {
+            "en": "contacts: sensord not running (try: boot sensord)",
+            "es": "contacts: sensord no está en ejecución (prueba: boot sensord)",
+        }
+        print(msg.get(locale, msg["en"]))
+        return
     current_id = state.world.current_node_id
     if state.ship.in_transit:
         locale = state.os.locale.value
@@ -1824,6 +1895,13 @@ def _scan_and_discover(state) -> tuple[list[str], list[str], list[str], list[str
         msg = {
             "en": "scan: sensors offline (requires >= limited)",
             "es": "scan: sensores fuera de línea (requiere >= limitado)",
+        }
+        return [], [], [], [], msg.get(locale, msg["en"])
+    if not system.service or system.service.service_name != "sensord" or not system.service.is_running:
+        locale = state.os.locale.value
+        msg = {
+            "en": "scan: sensord not running (try: boot sensord)",
+            "es": "scan: sensord no está en ejecución (prueba: boot sensord)",
         }
         return [], [], [], [], msg.get(locale, msg["en"])
     current_id = state.world.current_node_id
@@ -3139,6 +3217,276 @@ def render_sectors(state) -> None:
         print(f"- {sid}: {sector.name} [{tags}]")
 
 
+def _map_navdb_blocked_reason(state) -> str | None:
+    system = state.ship.systems.get("data_core")
+    if not system:
+        return "missing_data_core"
+    if system.forced_offline and state.ship.op_mode == "CRUISE":
+        return "data_core_shed"
+    if system.state == SystemState.OFFLINE:
+        return "data_core_offline"
+    if not system.service or system.service.service_name != "datad" or not system.service.is_installed:
+        return "datad_not_installed"
+    if not system.service.is_running:
+        return "datad_not_running"
+    if _state_rank(system.state) < _state_rank(SystemState.LIMITED):
+        return "data_core_degraded"
+    return None
+
+
+def _map_blocked_message(state, reason: str) -> str:
+    locale = state.os.locale.value
+    messages = {
+        "en": {
+            "missing_data_core": "map blocked: data_core missing.",
+            "data_core_shed": "map blocked: data_core offline. Try: power on data_core; boot datad",
+            "data_core_offline": "map blocked: data_core offline.",
+            "datad_not_installed": "map blocked: datad not installed.",
+            "datad_not_running": "map blocked: datad not running. Try: boot datad",
+            "data_core_degraded": "map blocked: data_core degraded (requires >= limited).",
+        },
+        "es": {
+            "missing_data_core": "map bloqueado: falta data_core.",
+            "data_core_shed": "map bloqueado: data_core offline. Prueba: power on data_core; boot datad",
+            "data_core_offline": "map bloqueado: data_core offline.",
+            "datad_not_installed": "map bloqueado: datad no instalado.",
+            "datad_not_running": "map bloqueado: datad no está en ejecución. Prueba: boot datad",
+            "data_core_degraded": "map bloqueado: data_core degradado (requiere >= limited).",
+        },
+    }
+    localized = messages.get(locale, messages["en"])
+    return localized.get(reason, messages["en"].get(reason, "map blocked"))
+
+
+def _map_known_nodes(state) -> set[str]:
+    current_id = state.world.current_node_id
+    known = set(state.world.known_nodes if state.world.known_nodes else state.world.known_contacts)
+    known.add(current_id)
+    ship_id = getattr(state.ship, "ship_id", "RETORNO_SHIP")
+    known = {nid for nid in known if nid != ship_id and (nid == current_id or not nid.startswith("UNKNOWN_"))}
+    for src, dests in state.world.known_links.items():
+        if src != ship_id and (src == current_id or not src.startswith("UNKNOWN_")):
+            known.add(src)
+        for dst in dests:
+            if dst != ship_id and (dst == current_id or not dst.startswith("UNKNOWN_")):
+                known.add(dst)
+    return known
+
+
+def _map_known_adjacency(state, nodes: set[str]) -> dict[str, set[str]]:
+    adj: dict[str, set[str]] = {nid: set() for nid in nodes}
+    for src, dests in state.world.known_links.items():
+        if src not in adj:
+            continue
+        for dst in dests:
+            if dst in adj and dst != src:
+                adj[src].add(dst)
+    return adj
+
+
+def _map_component_count(nodes: set[str], adj: dict[str, set[str]]) -> int:
+    undirected: dict[str, set[str]] = {nid: set() for nid in nodes}
+    for src, dests in adj.items():
+        if src not in undirected:
+            continue
+        for dst in dests:
+            if dst not in undirected:
+                continue
+            undirected[src].add(dst)
+            undirected[dst].add(src)
+    remaining = set(nodes)
+    components = 0
+    while remaining:
+        start = next(iter(remaining))
+        queue = [start]
+        seen = {start}
+        i = 0
+        while i < len(queue):
+            cur = queue[i]
+            i += 1
+            for nxt in undirected.get(cur, set()):
+                if nxt not in seen:
+                    seen.add(nxt)
+                    queue.append(nxt)
+        remaining -= seen
+        components += 1
+    return components
+
+
+def _map_preview(items: list[str], max_items: int = 6) -> str:
+    if not items:
+        return "-"
+    if len(items) <= max_items:
+        return ", ".join(items)
+    shown = ", ".join(items[:max_items])
+    return f"{shown}, +{len(items) - max_items} more"
+
+
+def _distance_ly_between_nodes(state, left_id: str, right_id: str) -> float | None:
+    left = state.world.space.nodes.get(left_id)
+    right = state.world.space.nodes.get(right_id)
+    if not left or not right:
+        return None
+    dx = left.x_ly - right.x_ly
+    dy = left.y_ly - right.y_ly
+    dz = left.z_ly - right.z_ly
+    return (dx * dx + dy * dy + dz * dz) ** 0.5
+
+
+def _map_bfs_path(adj: dict[str, set[str]], start_id: str, target_id: str) -> tuple[list[str] | None, set[str]]:
+    queue = [start_id]
+    prev: dict[str, str | None] = {start_id: None}
+    i = 0
+    while i < len(queue):
+        cur = queue[i]
+        i += 1
+        for nxt in sorted(adj.get(cur, set())):
+            if nxt in prev:
+                continue
+            prev[nxt] = cur
+            queue.append(nxt)
+            if nxt == target_id:
+                break
+    reachable = set(prev.keys())
+    if target_id not in prev:
+        return None, reachable
+    path: list[str] = []
+    cur: str | None = target_id
+    while cur is not None:
+        path.append(cur)
+        cur = prev.get(cur)
+    path.reverse()
+    return path, reachable
+
+
+def render_map_graph(state, node_id: str | None = None) -> None:
+    locale = state.os.locale.value
+    current_id = state.world.current_node_id
+    nodes = _map_known_nodes(state)
+    if node_id is not None and node_id not in nodes:
+        msg = {
+            "en": f"map graph: unknown node ({node_id})",
+            "es": f"map graph: nodo desconocido ({node_id})",
+        }
+        print(msg.get(locale, msg["en"]))
+        return
+    adj = _map_known_adjacency(state, nodes)
+
+    print("\n=== MAP GRAPH ===")
+    if node_id is None:
+        edge_count = sum(len(v) for v in adj.values()) // 2
+        components = _map_component_count(nodes, adj)
+        print(f"known_nodes={len(nodes)} known_links={edge_count} components={components}")
+        render_ids = sorted(nodes)
+    else:
+        render_ids = [node_id]
+
+    for nid in render_ids:
+        neighbors = sorted(adj.get(nid, set()))
+        missing = sorted(n for n in nodes if n != nid and n not in neighbors)
+        marker = "*" if nid == current_id else ""
+        visited = "visited" if nid in state.world.visited_nodes else "unvisited"
+        node = state.world.space.nodes.get(nid)
+        if node:
+            print(f"- {nid}{marker} ({node.name}, {node.kind}) {visited}")
+        else:
+            print(f"- {nid}{marker} {visited}")
+        print(f"  links: {_map_preview(neighbors, max_items=8)}")
+        print(f"  no_link: {_map_preview(missing, max_items=8)}")
+
+
+def render_map_path(state, target_id: str) -> None:
+    locale = state.os.locale.value
+    current_id = state.world.current_node_id
+    nodes = _map_known_nodes(state)
+    adj = _map_known_adjacency(state, nodes)
+
+    print("\n=== MAP PATH ===")
+    if target_id not in nodes:
+        msg = {
+            "en": f"map path: unknown node ({target_id})",
+            "es": f"map path: nodo desconocido ({target_id})",
+        }
+        print(msg.get(locale, msg["en"]))
+        return
+    if current_id not in nodes:
+        nodes.add(current_id)
+        adj.setdefault(current_id, set())
+    if target_id == current_id:
+        msg = {
+            "en": f"already at destination: {target_id}",
+            "es": f"ya estás en destino: {target_id}",
+        }
+        print(msg.get(locale, msg["en"]))
+        return
+
+    path, reachable = _map_bfs_path(adj, current_id, target_id)
+    if path:
+        hops = max(0, len(path) - 1)
+        print(f"path: {' -> '.join(path)}")
+        print(f"hops: {hops}")
+        return
+
+    unreachable = sorted(n for n in nodes if n not in reachable)
+    msg = {
+        "en": f"no known path from {current_id} to {target_id}",
+        "es": f"no hay camino conocido desde {current_id} hasta {target_id}",
+    }
+    print(msg.get(locale, msg["en"]))
+    print(f"reachable_component={len(reachable)} unreachable_known={len(unreachable)}")
+
+    bridges: list[tuple[float, str, str]] = []
+    for src in sorted(reachable):
+        for dst in unreachable:
+            dist = _distance_ly_between_nodes(state, src, dst)
+            if dist is None or dist > Balance.SENSORS_RANGE_LY:
+                continue
+            bridges.append((dist, src, dst))
+    bridges.sort(key=lambda x: x[0])
+    if bridges:
+        hint = {
+            "en": "possible bridge links in sensor range (route solve):",
+            "es": "posibles enlaces puente en rango de sensores (route solve):",
+        }
+        print(hint.get(locale, hint["en"]))
+        for dist, src, dst in bridges[:8]:
+            print(f"- {src} -> {dst} ({dist:.2f}ly)")
+    else:
+        hint = {
+            "en": "Try: travel within reachable nodes, then uplink/scan/route solve to discover bridge links.",
+            "es": "Prueba: viaja por nodos alcanzables y luego usa uplink/scan/route solve para descubrir enlaces puente.",
+        }
+        print(hint.get(locale, hint["en"]))
+
+
+def render_map(state, mode: str, node_id: str | None) -> None:
+    if mode == "ship":
+        render_sectors(state)
+        return
+    reason = _map_navdb_blocked_reason(state)
+    if reason:
+        print(_map_blocked_message(state, reason))
+        return
+    if mode == "graph":
+        render_map_graph(state, node_id=node_id)
+        return
+    if mode == "path":
+        if not node_id:
+            msg = {
+                "en": "map path: missing node_id",
+                "es": "map path: falta node_id",
+            }
+            print(msg.get(state.os.locale.value, msg["en"]))
+            return
+        render_map_path(state, target_id=node_id)
+        return
+    msg = {
+        "en": "map: unknown mode",
+        "es": "map: modo desconocido",
+    }
+    print(msg.get(state.os.locale.value, msg["en"]))
+
+
 def render_locate(state, system_id: str) -> None:
     sys = state.ship.systems.get(system_id)
     if sys:
@@ -3518,6 +3866,38 @@ def _confirm_travel_abort(state) -> bool:
     return reply in {"y", "yes"}
 
 
+def _confirm_nav(state, action) -> bool:
+    locale = state.os.locale.value
+    current_node = state.world.current_node_id
+    dest = getattr(action, "node_id", "?")
+    out = []
+    for d in state.ship.drones.values():
+        if d.status in {DroneStatus.DEPLOYED, DroneStatus.DISABLED} and d.location.kind == "world_node":
+            out.append(d)
+    if out:
+        drone_ids = ", ".join(d.drone_id for d in out)
+        msg = {
+            "en": (
+                f"WARNING: confirm nav to {dest}? "
+                f"Drones not aboard ({drone_ids}) will be abandoned when leaving {current_node}. Continue? [y/N] "
+            ),
+            "es": (
+                f"ADVERTENCIA: ¿confirmar nav a {dest}? "
+                f"Los drones fuera de la nave ({drone_ids}) quedarán abandonados al salir de {current_node}. "
+                "¿Continuar? [s/N] "
+            ),
+        }.get(locale, f"WARNING: confirm nav to {dest}. Continue? [y/N] ")
+    else:
+        msg = {
+            "en": f"WARNING: confirm nav to {dest}. Continue? [y/N] ",
+            "es": f"ADVERTENCIA: confirmar nav a {dest}. ¿Continuar? [s/N] ",
+        }.get(locale, f"WARNING: confirm nav to {dest}. Continue? [y/N] ")
+    reply = input(msg).strip().lower()
+    if locale == "es":
+        return reply in {"s", "si", "sí", "y", "yes"}
+    return reply in {"y", "yes"}
+
+
 def _resolve_node_id_from_input(state, token: str) -> str | None:
     token_lower = token.lower()
     nodes = state.world.space.nodes
@@ -3827,6 +4207,24 @@ def _confirm_hibernate_non_cruise(state) -> bool:
         "en": "WARNING: hibernating while not in CRUISE may increase wear. Continue? [y/N] ",
         "es": "ADVERTENCIA: hibernar fuera de CRUISE puede aumentar el desgaste. ¿Continuar? [s/N] ",
     }.get(locale, "WARNING: hibernating while not in CRUISE may increase wear. Continue? [y/N] ")
+    reply = input(msg).strip().lower()
+    if locale == "es":
+        return reply in {"s", "si", "sí", "y", "yes"}
+    return reply in {"y", "yes"}
+
+
+def _confirm_hibernate_start(state, parsed: Hibernate) -> bool:
+    locale = state.os.locale.value
+    if parsed.mode == "until_arrival":
+        msg = {
+            "en": "WARNING: confirm hibernation until arrival. Continue? [y/N] ",
+            "es": "ADVERTENCIA: confirmar hibernación hasta la llegada. ¿Continuar? [s/N] ",
+        }.get(locale, "WARNING: confirm hibernation until arrival. Continue? [y/N] ")
+    else:
+        msg = {
+            "en": f"WARNING: confirm hibernation for {parsed.years:g}y. Continue? [y/N] ",
+            "es": f"ADVERTENCIA: confirmar hibernación durante {parsed.years:g} años. ¿Continuar? [s/N] ",
+        }.get(locale, "WARNING: confirm hibernation. Continue? [y/N] ")
     reply = input(msg).strip().lower()
     if locale == "es":
         return reply in {"s", "si", "sí", "y", "yes"}
@@ -4159,6 +4557,11 @@ def main() -> None:
                         candidates = _travel_targets(text)
                     else:
                         candidates = _travel_targets(text)
+                elif cmd == "map":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["ship", "graph", "path"] if c.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] in {"graph", "path"}:
+                        candidates = [c for c in contacts if c.startswith(text)]
                 elif cmd == "power":
                     if len(tokens) == 2:
                         candidates = [c for c in ["status", "plan", "on", "off"] if c.startswith(text)]
@@ -4276,15 +4679,22 @@ def main() -> None:
                 elif cmd == "drone":
                     if len(tokens) == 2:
                         candidates = [
-                            c for c in ["status", "deploy", "deploy!", "move", "reboot", "recall", "repair", "install", "salvage"]
+                            c for c in ["status", "deploy", "deploy!", "move", "reboot", "recall", "autorecall", "repair", "install", "salvage"]
                             if c.startswith(text)
                         ]
-                    elif len(tokens) == 3 and tokens[1] in {"deploy", "deploy!", "reboot", "recall", "repair", "move", "install"}:
+                    elif len(tokens) == 3 and tokens[1] in {"deploy", "deploy!", "reboot", "recall", "autorecall", "repair", "move", "install"}:
                         candidates = [d for d in drones if d.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
                         candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "move":
-                        candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
+                        ship_aliases = [state.ship.ship_id] if state.ship.ship_id.startswith(text) else []
+                        candidates = (
+                            [s for s in sectors if s.startswith(text)]
+                            + [c for c in contacts if c.startswith(text)]
+                            + ship_aliases
+                        )
+                    elif len(tokens) == 4 and tokens[1] == "autorecall":
+                        candidates = [c for c in ["on", "off", "10"] if c.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "install":
                         candidates = [m for m in modules if m.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "repair":
@@ -4573,6 +4983,11 @@ def main() -> None:
             with loop.with_lock() as locked_state:
                 render_sectors(locked_state)
             continue
+        if isinstance(parsed, tuple) and parsed[0] == "MAP":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                render_map(locked_state, parsed[1], parsed[2])
+            continue
         if parsed == "ALERTS":
             _drain_auto_events()
             with loop.with_lock() as locked_state:
@@ -4670,6 +5085,16 @@ def main() -> None:
             with loop.with_lock() as locked_state:
                 render_drone_status(locked_state)
             continue
+        if isinstance(parsed, tuple) and parsed[0] == "DRONE_AUTORECALL_ENABLED":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                _set_drone_autorecall(locked_state, parsed[1], enabled=bool(parsed[2]))
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "DRONE_AUTORECALL_THRESHOLD":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                _set_drone_autorecall(locked_state, parsed[1], threshold=float(parsed[2]))
+            continue
         if isinstance(parsed, tuple) and parsed[0] == "ABOUT":
             _drain_auto_events()
             with loop.with_lock() as locked_state:
@@ -4712,6 +5137,9 @@ def main() -> None:
             if block_msg:
                 print(block_msg)
                 continue
+            with loop.with_lock() as locked_state:
+                if not _confirm_hibernate_start(locked_state, parsed):
+                    continue
             if warn_msg:
                 print(warn_msg)
             with loop.with_lock() as locked_state:
@@ -4750,7 +5178,10 @@ def main() -> None:
                     resolved = _resolve_node_id_from_input(locked_state, parsed.node_id)
                     if resolved:
                         parsed.node_id = resolved
-                if not _confirm_abandon_drones(locked_state, parsed):
+                if parsed.__class__.__name__ == "Travel":
+                    if not _confirm_nav(locked_state, parsed):
+                        continue
+                elif not _confirm_abandon_drones(locked_state, parsed):
                     continue
 
         ev = loop.apply_action(parsed)

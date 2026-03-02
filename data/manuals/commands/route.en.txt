@@ -1,5 +1,30 @@
 route solve <node_id>
-- Computes a travel route to a nearby known contact (within sensor range).
-- Requires sensors >= limited and sensord running.
-- Takes time; farther targets take longer.
-- Blocked if power quality is too low (Q < 0.55) or brownout is active.
+- Attempts to resolve/add a known route from your current node to `<node_id>`.
+
+Behavior
+- If the route is already known from your current node, no job is queued:
+  - It may refine local fine distance and show: `Route refined: fine range fixed for <node_id>`.
+  - If nothing can be refined, it reports the route is already known.
+- If the route is not known, it queues a `ROUTE_SOLVE` job.
+- Job ETA scales with target distance (closer targets finish faster).
+
+Requirements (gating)
+- `sensors` state `>= limited`.
+- `sensord` service running.
+- Target must be known and exist.
+- Target must be within sensor range.
+- Ship must not be in transit.
+- Sufficient power:
+  - no critical power state or `brownout`,
+  - power quality `Q >= 0.55`.
+
+Common block reasons
+- `sensors` degraded/offline.
+- `sensord` not running.
+- Target out of range.
+- Unknown or missing target node.
+- Insufficient power quality.
+
+Notes
+- `route solve` does not start travel; use `nav <node_id>` to travel.
+- Known route status is relative to your current node.
