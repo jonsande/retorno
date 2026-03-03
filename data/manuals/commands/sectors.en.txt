@@ -1,3 +1,8 @@
-sectors
-- Lists ship sectors and their tags.
-- Equivalent to: `map ship`.
+sectors (removed)
+
+This command was removed.
+- Use `ship sectors`.
+- Accepted alias: `ship map`.
+
+Migration note
+- `map ship` was also removed and now maps to `ship sectors`.

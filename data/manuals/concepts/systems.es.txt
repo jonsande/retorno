@@ -40,11 +40,12 @@ core_os
 - Qué es: capa minima de control de terminal, jobs y sesion de operador.
 - Consecuencias:
   - LIMITED: bloquea comandos avanzados (uplink, route solve, auth recover).
+  - DAMAGED: bloquea lo mismo que LIMITED y ademas bloquea viaje (`nav <node_id>`, `nav --no-cruise <node_id>`).
   - CRITICAL: solo queda el set de recuperacion de emergencia.
-  - OFFLINE: bloqueo de terminal (solo set minimo de terminal).
+  - OFFLINE: bloqueo de terminal (solo set minimo de supervivencia).
   - NOMINAL/UPGRADED: control completo (si el resto de condiciones lo permite).
 
-Set minimo de terminal (cuando core_os esta OFFLINE o hay terminal_lock)
+Set minimo de supervivencia (cuando core_os esta OFFLINE o hay terminal_lock)
 - help, clear, exit
 - status
 - logs, alerts, jobs
@@ -80,14 +81,14 @@ energy_distribution
 data_core
 - Qué es: nucleo de datos y servicios de inventario/navdb (datad).
 - Consecuencias:
-  - POR DEBAJO de LIMITED (damaged/critical/offline): bloquea cargo audit, auth recover, uplink y map graph/path.
+  - POR DEBAJO de LIMITED (damaged/critical/offline): bloquea cargo audit, auth recover, uplink y ship survey.
   - OFFLINE: sin datad util para navegacion de datos.
   - NOMINAL/UPGRADED: permite operaciones de datos completas (con datad en ejecucion).
 
 sensors
 - Que es: adquisicion de senal y deteccion de contactos (sensord).
 - Consecuencias:
-  - POR DEBAJO de LIMITED: bloquea scan/contacts y route solve.
+  - POR DEBAJO de LIMITED: bloquea scan, route solve y ship survey.
   - OFFLINE: sin barrido ni deteccion operativa.
   - NOMINAL/UPGRADED: deteccion y resolucion de rutas con mejor fiabilidad.
 
@@ -123,7 +124,7 @@ Nota base: salvo excepciones de emergencia/terminal minima, todos dependen de qu
 - cargo -> core_os (alias de inventory).
 - cat -> core_os.
 - config -> core_os.
-- contacts -> sensors >= limited + sensord running.
+- contacts -> alias de `nav map contacts`; depende de core_os (no de sensors/data_core).
 - debug -> core_os.
 - diag -> core_os (consulta de sistemas).
 - dock -> core_os (sin dependencia de subsistema concreto; sujeto a estado de potencia/terminal).
@@ -141,17 +142,18 @@ Nota base: salvo excepciones de emergencia/terminal minima, todos dependen de qu
 - ls -> core_os.
 - mail -> core_os.
 - man -> core_os.
-- map -> map ship: core_os; map graph/path: data_core >= limited + datad running.
+- map -> solo alias: `map path <node_id>` -> `nav map path <node_id>` (core_os).
 - module -> core_os (inspeccion/listado; install real via drones).
 - modules -> core_os.
-- nav -> core_os (y rutas conocidas); afectado por estado critico de potencia.
+- nav -> core_os. `nav map *` depende solo de core_os.
+- nav (viaje): `nav <node_id>` y `nav --no-cruise <node_id>` bloqueados si core_os = DAMAGED.
 - power -> core_os + red electrica (control de on/off/plan/estado).
 - relay -> alias de uplink: data_core >= limited + datad running + nodo relay/waystation + acoplado.
 - repair -> dron operador desplegado y con bateria; si es selftest, requiere modulo self-test rig.
 - route -> sensors >= limited + sensord running + Q >= 0.55 + objetivo en rango.
 - salvage -> dron desplegado y con bateria (sin requisito directo de drone_bay si ya esta fuera).
 - scan -> sensors >= limited + sensord running.
-- sectors -> core_os (vista de sectores de nave).
+- ship -> `ship sectors` depende de core_os; `ship survey` requiere core_os + sensors >= limited + sensord + data_core >= limited + datad.
 - shutdown -> alias de power off.
 - status -> core_os (comando de estado).
 - system -> alias de power on/off.

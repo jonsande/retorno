@@ -1,22 +1,59 @@
 radiation (mvp)
 - La radiación se modela en dos capas:
-  - radiación `env`: radiación ambiental efectiva en nodo actual o tramo de tránsito.
-  - radiación `internal`: radiación `env` filtrada por integridad de casco.
+  - `env`: radiación ambiental efectiva del nodo actual.
+  - `internal`: radiación que entra a sistemas internos tras el filtrado del casco.
 
-acoplamiento con casco
+de dónde sale la radiación ambiental
+- Fuera de tránsito: del nodo actual.
+- En tránsito: promedio de radiación entre nodo origen y nodo destino.
+- Al dockear no existe una mecánica especial de "transferencia". [TODO: aumento factor de radiación de la nave o estación al dockear en ella]
+- Si estás acoplado en un nodo con radiación alta, sigues bajo esa radiación ambiental.
+
+casco y sistemas de nave
 - `hull` es una propiedad global de la nave (0..1), no un sistema normal.
-- Menor integridad de casco implica mayor ingreso de radiación a sistemas internos.
-- La radiación interna acelera el desgaste existente según `k_rad` de cada sistema.
+- Menor integridad de casco implica mayor ingreso de radiación interna.
+- La radiación interna acelera el desgaste normal de sistemas según su `k_rad`.
+- La radiación no sustituye el modelo de degradación base (simplemente, empeora la degradación de los sistemas).
+- En este MVP no hay corrupción de lore/intel/datos por radiación. [TODO: corrupción de lore/intel/datos por radiación / módulo de reconstrucción plausible de data corrupta]
 
-sistemas
-- La radiación no sustituye la degradación base.
-- Solo añade presión al desgaste normal (calidad de potencia + decaimiento base + factor de radiación).
-- En este MVP no hay corrupción de lore/intel/datos por radiación.
+efectos en drones
+- Los drones no acoplados acumulan dosis con el tiempo:
+  - `dose += env_rad * shield_factor * dt`
+- Los drones no acoplados pierden integridad con el tiempo.
+- La dosis aumenta ese desgaste por bandas:
+  - dose < 1.0: x1.0
+  - 1.0 <= dose < 3.0: x1.2
+  - 3.0 <= dose < 6.0: x1.8
+  - dose >= 6.0: x3.0
 
-drones
-- Los drones no acoplados acumulan dosis de radiación con el tiempo.
-- Mayor dosis incrementa el desgaste de integridad por bandas.
-- Los drones acoplados se descontaminan automáticamente si hay soporte de drone_bay y energy_distribution.
+qué recibe radiación o se ve afectado en este MVP
+- Casco de la nave: sí (desgaste lento).
+- Sistemas de nave: sí (degradación acelerada por radiación interna).
+- Drones no acoplados: sí (dosis + desgaste de integridad).
+- Drones acoplados: no acumulan dosis ambiental mientras estén acoplados.
+- Vitals del PJ / corrupción de lore/intel/datos: no, fuera de alcance en esta iteración.
+
+descontaminación (nave y drones)
+- Nave: no hay rutina directa de descontaminación en este MVP.
+- Drones: descontaminación automática en drone_bay, sólo si:
+  - drone_bay no está OFFLINE
+  - energy_distribution no está OFFLINE
+
+ratios de descontaminación por estado de bahía
+- Nominal: 0.010 rad/s
+- Limited: 0.005 rad/s
+- Damaged: 0.0025 rad/s
+- Critical: 0.0025 rad/s
+- Offline o distribution offline: 0 rad/s (sin descontaminación)
+
+tabla rápida: tiempo para limpiar X de dose
+- Fórmula: `tiempo_segundos = dose / ratio_descontaminación`
+
+estado      ratio(rad/s)  dose 1.0         dose 3.0         dose 6.0
+- nominal   0.010         100s (1m40s)     300s (5m00s)     600s (10m00s)
+- limited   0.005         200s (3m20s)     600s (10m00s)    1200s (20m00s)
+- damaged   0.0025        400s (6m40s)     1200s (20m00s)   2400s (40m00s)
+- critical  0.0025        400s (6m40s)     1200s (20m00s)   2400s (40m00s)
 
 límites de alcance
 - En este MVP no hay eventos aleatorios complejos de impactos en viaje.

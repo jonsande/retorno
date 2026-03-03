@@ -1,14 +1,38 @@
-nav routes
+nav map sectors
+nav map graph [node_id]
+nav map path <node_id>
+nav map routes
+nav map contacts
 nav <node_id>
 nav --no-cruise <node_id>
 nav abort
-navigation <...> (alias)
-- nav routes: muestra rutas conocidas desde el nodo actual.
-- nav <node_id>: inicia tránsito interestelar a un nodo conocido por id.
-- nav --no-cruise <node_id>: viaja sin activar CRUISE (avanzado; mayor desgaste).
-- nav abort: cancela el tránsito actual y regresa al origen.
-- Si estás docked, primero debes desacoplar con `undock` para poder iniciar nav.
-- Las rutas se obtienen con: uplink (relay/waystation), route solve, intel import (logs/fragmentos), o scan si hay un hub co‑ubicado con tu posición actual.
-- Si no hay rutas, consigue inteligencia de navegación o intenta uplink/route solve.
-- Para planificación global entre nodos conocidos, usa `map graph` y `map path <node_id>`.
-- travel sigue aceptado como alias de nav.
+
+Descripción
+- `nav map sectors`: lista sectores del mundo conocidos y coordenadas de sector.
+- `nav map graph`: muestra el grafo global de nodos/rutas conocidas.
+- `nav map graph <node_id>`: enfoca el grafo en un nodo conocido.
+- `nav map path <node_id>`: calcula la mejor ruta conocida desde el nodo actual.
+- `nav map routes`: lista rutas directas conocidas desde el nodo actual.
+- `nav map contacts`: lista contactos conocidos y estado de ruta relativo al nodo actual.
+- `nav <node_id>`: inicia tránsito al destino.
+- `nav --no-cruise <node_id>`: inicia tránsito sin forzar perfil CRUISE.
+- `nav abort`: aborta tránsito en curso y revierte al origen.
+
+Aliases aceptados (no aparecen en `help`)
+- `nav sectors` -> `nav map sectors`
+- `nav graph` y `graph` -> `nav map graph`
+- `nav graph <node_id>` y `graph <node_id>` -> `nav map graph <node_id>`
+- `map path <node_id>` y `path <node_id>` -> `nav map path <node_id>`
+- `nav routes` y `routes` -> `nav map routes`
+- `nav contacts` y `contacts` -> `nav map contacts`
+- `travel <node_id>` -> `nav <node_id>`
+
+Dependencias y gating
+- `nav map *`: depende solo de `core_os`.
+- `nav <node_id>` y `nav --no-cruise <node_id>`: dependen de `core_os` y de que exista ruta/viaje válido.
+- Estado `core_os`:
+  - `NOMINAL/UPGRADED`: control completo.
+  - `LIMITED`: bloquea `uplink`, `route solve`, `auth recover`.
+  - `DAMAGED`: bloquea lo anterior y también `nav <node_id>` y `nav --no-cruise <node_id>`.
+  - `CRITICAL`: solo set de recuperación de emergencia.
+  - `OFFLINE`: terminal mínima de supervivencia.

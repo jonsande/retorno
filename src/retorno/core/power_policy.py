@@ -25,6 +25,7 @@ CRITICAL_SYSTEM_IDS = {"energy_distribution", "power_core", "core_os", "life_sup
 
 _CRITICAL_REPL_STRINGS = {
     "HELP",
+    "HELP_VERBOSE",
     "EXIT",
     "ALERTS",
     "LOGS",

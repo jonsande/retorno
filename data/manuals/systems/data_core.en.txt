@@ -1,10 +1,22 @@
-data_core
-- Data services and audit subsystem.
-- Required for cargo/manifest audit (datad).
-- If offline or degraded, inventory audit is blocked.
-- Keep at least LIMITED for reliable audits.
-- Related commands: boot datad, cargo audit.
+SYSTEM BRIEF — data_core
+Ref: OS-MAN/SYS/DATA-CORE
+
+`data_core` provides persistent data services (inventory, recovery, structured telemetry).
+
+Role
+- Supports `cargo audit` and manifest workflows.
+- Supports `auth recover`.
+- Supports `uplink` on valid docked nodes.
+- Provides data input for `ship survey`.
+
+Service
+- Associated service: `datad`.
 
 Command impact by state
-- LIMITED or better: allows cargo audit and auth recover (with datad running).
-- BELOW LIMITED (DAMAGED/CRITICAL/OFFLINE): blocks cargo audit and auth recover; uplink blocked if data_core is degraded/offline.
+- `cargo audit` and `auth recover`: require `data_core >= limited` + running `datad`.
+- `uplink`: requires `data_core >= limited` + running `datad` (plus dock/node/power constraints).
+- `ship survey`: requires `data_core >= limited` + running `datad` (with `sensors >= limited` + `sensord`).
+- `nav map *` does not depend on `data_core`.
+
+Relevant commands
+- `boot datad`, `cargo audit`, `auth recover`, `uplink`, `ship survey`.

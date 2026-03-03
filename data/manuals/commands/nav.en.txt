@@ -1,14 +1,38 @@
-nav routes
+nav map sectors
+nav map graph [node_id]
+nav map path <node_id>
+nav map routes
+nav map contacts
 nav <node_id>
 nav --no-cruise <node_id>
 nav abort
-navigation <...> (alias)
-- nav routes: show known routes from the current node.
-- nav <node_id>: start interstellar transit to a known node id.
-- nav --no-cruise <node_id>: travel without auto-setting CRUISE (advanced; higher wear).
-- nav abort: cancel the current transit and return to the origin.
-- If you are docked, undock first (`undock`) before starting nav.
-- Routes are obtained via: uplink (relay/waystation), route solve, intel import (nav logs/fragments), or scan if a hub is co-located with your current position.
-- If no routes appear, acquire navigation intel or attempt uplink/route solve.
-- For global planning across known nodes, use `map graph` and `map path <node_id>`.
-- travel remains accepted as an alias for nav.
+
+Description
+- `nav map sectors`: list known world sectors and their sector coordinates.
+- `nav map graph`: show the global graph of known nodes/routes.
+- `nav map graph <node_id>`: focus graph output around one known node.
+- `nav map path <node_id>`: compute the best known path from current node.
+- `nav map routes`: list known direct routes from current node.
+- `nav map contacts`: list known contacts and route status relative to current node.
+- `nav <node_id>`: start transit to destination.
+- `nav --no-cruise <node_id>`: start transit without forcing CRUISE profile.
+- `nav abort`: abort active transit and revert to origin.
+
+Accepted aliases (hidden from `help`)
+- `nav sectors` -> `nav map sectors`
+- `nav graph` and `graph` -> `nav map graph`
+- `nav graph <node_id>` and `graph <node_id>` -> `nav map graph <node_id>`
+- `map path <node_id>` and `path <node_id>` -> `nav map path <node_id>`
+- `nav routes` and `routes` -> `nav map routes`
+- `nav contacts` and `contacts` -> `nav map contacts`
+- `travel <node_id>` -> `nav <node_id>`
+
+Dependencies and gating
+- `nav map *`: depends only on `core_os`.
+- `nav <node_id>` and `nav --no-cruise <node_id>`: depend on `core_os` plus a valid reachable travel context.
+- `core_os` state impact:
+  - `NOMINAL/UPGRADED`: full control.
+  - `LIMITED`: blocks `uplink`, `route solve`, `auth recover`.
+  - `DAMAGED`: blocks the above and also `nav <node_id>` + `nav --no-cruise <node_id>`.
+  - `CRITICAL`: emergency recovery set only.
+  - `OFFLINE`: minimal survival terminal only.

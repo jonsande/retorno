@@ -1,3 +1,4 @@
 transit_sensor_pack
-- Permite scan y contacts mientras la nave está en tránsito.
-- Útil para detectar señales cercanas sin detener el viaje.
+- Habilita barrido útil (`scan`) durante tránsito.
+- Mejora detección de señales cercanas sin detener viaje.
+- No es requisito para `nav map contacts` (ese comando depende de core_os).

@@ -40,6 +40,7 @@ class ParseError(Exception):
 
 _PARSE_ERROR_MESSAGES = {
     "en": {
+        "usage_help": "Usage: help [--verbose]",
         "usage_job_cancel": "Usage: job cancel <job_id>",
         "usage_alerts": "Usage: alerts | alerts explain <alert_key>",
         "usage_log_copy": "Usage: log copy [n]",
@@ -52,7 +53,7 @@ _PARSE_ERROR_MESSAGES = {
         "usage_debug": "Usage: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules",
         "usage_dock": "Usage: dock <node_id>",
         "usage_undock": "Usage: undock",
-        "usage_nav": "Usage: nav routes | nav <node_id> | nav --no-cruise <node_id> | nav abort",
+        "usage_nav": "Usage: nav map sectors|graph [node_id]|path <node_id>|routes|contacts | nav <node_id> | nav --no-cruise <node_id> | nav abort",
         "usage_hibernate": "Usage: hibernate until_arrival | hibernate <years>",
         "hibernate_number": "hibernate: <years> must be a number",
         "hibernate_gt0": "hibernate: <years> must be > 0",
@@ -75,7 +76,11 @@ _PARSE_ERROR_MESSAGES = {
         "jobs_amount_gt0": "jobs: amount must be > 0",
         "usage_route": "Usage: route solve <node_id>",
         "usage_relay": "Usage: relay uplink",
-        "usage_map": "Usage: map | map ship | map graph [node_id] | map path <node_id>",
+        "usage_map": "Usage: map path <node_id> (alias of nav map path <node_id>)",
+        "usage_ship": "Usage: ship sectors | ship map | ship survey <target>",
+        "sectors_migrated": "Command 'sectors' was removed. Use: ship sectors",
+        "map_ship_migrated": "Command 'map ship' was removed. Use: ship sectors",
+        "map_graph_migrated": "Command 'map graph' was moved. Use: nav map graph [node_id]",
         "usage_locate": "Usage: locate <system_id>",
         "usage_diag": "Usage: diag <system_id>",
         "usage_install": "Install via drones only. Use: drone install <drone_id> <module_id>",
@@ -108,6 +113,7 @@ _PARSE_ERROR_MESSAGES = {
         "unknown_command": "Unknown command: {cmd}",
     },
     "es": {
+        "usage_help": "Uso: help [--verbose]",
         "usage_job_cancel": "Uso: job cancel <job_id>",
         "usage_alerts": "Uso: alerts | alerts explain <alert_key>",
         "usage_log_copy": "Uso: log copy [n]",
@@ -120,7 +126,7 @@ _PARSE_ERROR_MESSAGES = {
         "usage_debug": "Uso: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules",
         "usage_dock": "Uso: dock <node_id>",
         "usage_undock": "Uso: undock",
-        "usage_nav": "Uso: nav routes | nav <node_id> | nav --no-cruise <node_id> | nav abort",
+        "usage_nav": "Uso: nav map sectors|graph [node_id]|path <node_id>|routes|contacts | nav <node_id> | nav --no-cruise <node_id> | nav abort",
         "usage_hibernate": "Uso: hibernate until_arrival | hibernate <años>",
         "hibernate_number": "hibernate: <años> debe ser número",
         "hibernate_gt0": "hibernate: <años> debe ser > 0",
@@ -143,7 +149,11 @@ _PARSE_ERROR_MESSAGES = {
         "jobs_amount_gt0": "jobs: amount debe ser > 0",
         "usage_route": "Uso: route solve <node_id>",
         "usage_relay": "Uso: relay uplink",
-        "usage_map": "Uso: map | map ship | map graph [node_id] | map path <node_id>",
+        "usage_map": "Uso: map path <node_id> (alias de nav map path <node_id>)",
+        "usage_ship": "Uso: ship sectors | ship map | ship survey <target>",
+        "sectors_migrated": "El comando 'sectors' fue eliminado. Usa: ship sectors",
+        "map_ship_migrated": "El comando 'map ship' fue eliminado. Usa: ship sectors",
+        "map_graph_migrated": "El comando 'map graph' fue movido. Usa: nav map graph [node_id]",
         "usage_locate": "Uso: locate <system_id>",
         "usage_diag": "Uso: diag <system_id>",
         "usage_install": "Instalación solo con drones. Usa: drone install <drone_id> <module_id>",
@@ -200,12 +210,18 @@ def parse_command(line: str):
         return "EXIT"
 
     if cmd == "help":
-        return "HELP"
+        if len(args) == 0:
+            return "HELP"
+        if len(args) == 1 and args[0] in {"--verbose", "-v"}:
+            return "HELP_VERBOSE"
+        raise ParseError("usage_help")
     if cmd == "clear":
         return "CLEAR"
 
     if cmd == "contacts":
-        return "CONTACTS"
+        if len(args) != 0:
+            raise ParseError("usage_nav")
+        return ("NAV_MAP", "contacts", None)
 
     if cmd == "scan":
         return "SCAN"
@@ -235,14 +251,43 @@ def parse_command(line: str):
     if cmd in {"nav", "navigation", "travel"}:
         if len(args) == 0:
             raise ParseError("usage_nav")
-        if len(args) == 1 and args[0] == "routes":
-            return "NAV"
+        if args[0] == "map":
+            if len(args) == 2 and args[1] in {"sectors", "routes", "contacts", "graph"}:
+                return ("NAV_MAP", args[1], None)
+            if len(args) == 3 and args[1] == "graph":
+                return ("NAV_MAP", "graph", args[2])
+            if len(args) == 3 and args[1] == "path":
+                return ("NAV_MAP", "path", args[2])
+            raise ParseError("usage_nav")
+        if len(args) == 1 and args[0] in {"sectors", "routes", "contacts"}:
+            return ("NAV_MAP", args[0], None)
+        if len(args) == 1 and args[0] == "graph":
+            return ("NAV_MAP", "graph", None)
+        if len(args) == 2 and args[0] == "graph":
+            return ("NAV_MAP", "graph", args[1])
         if len(args) == 1 and args[0] == "abort":
             return TravelAbort()
         if len(args) == 2 and args[0] == "--no-cruise":
             return Travel(node_id=args[1], no_cruise=True)
         if len(args) == 1:
             return Travel(node_id=args[0])
+        raise ParseError("usage_nav")
+
+    if cmd == "routes":
+        if len(args) != 0:
+            raise ParseError("usage_nav")
+        return ("NAV_MAP", "routes", None)
+
+    if cmd == "graph":
+        if len(args) == 0:
+            return ("NAV_MAP", "graph", None)
+        if len(args) == 1:
+            return ("NAV_MAP", "graph", args[0])
+        raise ParseError("usage_nav")
+
+    if cmd == "path":
+        if len(args) == 1:
+            return ("NAV_MAP", "path", args[0])
         raise ParseError("usage_nav")
 
     if cmd == "uplink":
@@ -432,18 +477,23 @@ def parse_command(line: str):
         raise ParseError("usage_relay")
 
     if cmd == "sectors":
-        return "SECTORS"
+        raise ParseError("sectors_migrated")
 
     if cmd == "map":
-        if len(args) == 0:
-            return ("MAP", "graph", None)
-        if len(args) == 1 and args[0] in {"ship", "graph"}:
-            return ("MAP", args[0], None)
-        if len(args) == 2 and args[0] == "graph":
-            return ("MAP", "graph", args[1])
         if len(args) == 2 and args[0] == "path":
-            return ("MAP", "path", args[1])
+            return ("NAV_MAP", "path", args[1])
+        if len(args) >= 1 and args[0] == "ship":
+            raise ParseError("map_ship_migrated")
+        if len(args) >= 1 and args[0] == "graph":
+            raise ParseError("map_graph_migrated")
         raise ParseError("usage_map")
+
+    if cmd == "ship":
+        if len(args) == 1 and args[0] in {"sectors", "map"}:
+            return "SHIP_SECTORS"
+        if len(args) == 2 and args[0] == "survey":
+            return ("SHIP_SURVEY", args[1])
+        raise ParseError("usage_ship")
 
     if cmd == "locate":
         if len(args) != 1:
@@ -638,8 +688,11 @@ def _suggest_command(cmd: str) -> str | None:
         "cat",
         "contacts",
         "scan",
-        "sectors",
+        "routes",
+        "graph",
+        "path",
         "map",
+        "ship",
         "locate",
         "dock",
         "undock",

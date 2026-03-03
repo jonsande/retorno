@@ -398,6 +398,10 @@ class RetornoTextualApp(App):
         with self.loop.with_lock() as state:
             self._log_lines(presenter.build_help_lines(state))
 
+    def action_help_verbose(self) -> None:
+        with self.loop.with_lock() as state:
+            self._log_lines(presenter.build_help_lines(state, verbose=True))
+
     def action_toggle_status(self) -> None:
         self._panel_visible["status"] = not self._panel_visible["status"]
         self._apply_panel_layout()
@@ -548,11 +552,13 @@ class RetornoTextualApp(App):
             "intel",
             "ls",
             "cat",
-            "contacts",
             "scan",
-            "sectors",
             "map",
+            "routes",
+            "graph",
+            "path",
             "locate",
+            "ship",
             "dock",
             "undock",
             "nav",
@@ -602,6 +608,9 @@ class RetornoTextualApp(App):
             return [c for c in base_commands if c.startswith(text)]
         if len(tokens) == 1:
             return [c for c in base_commands if c.startswith(text)]
+        if cmd == "help":
+            if len(tokens) == 2:
+                return [c for c in ["--verbose", "-v"] if c.startswith(text)]
         if cmd in {"diag", "about", "locate"}:
             return [s for s in systems if s.startswith(text)]
         if cmd == "boot":
@@ -647,17 +656,36 @@ class RetornoTextualApp(App):
                 return [c for c in contacts if c.startswith(prefix)]
 
             if len(tokens) == 2:
-                base_opts = ["abort", "--no-cruise"]
-                if cmd in {"nav", "navigation"}:
-                    base_opts = ["routes"] + base_opts
+                base_opts = ["map", "abort", "--no-cruise"]
+                if cmd == "nav":
+                    base_opts.extend(["sectors", "routes", "contacts", "graph"])
                 return [c for c in base_opts if c.startswith(text)] + _travel_targets(text)
+            if len(tokens) == 3 and tokens[1] == "map":
+                return [c for c in ["sectors", "graph", "path", "routes", "contacts"] if c.startswith(text)]
+            if len(tokens) == 4 and tokens[1] == "map" and tokens[2] in {"graph", "path"}:
+                return _travel_targets(text)
             if len(tokens) == 3 and tokens[1] == "--no-cruise":
+                return _travel_targets(text)
+            if len(tokens) == 3 and tokens[1] == "graph":
                 return _travel_targets(text)
             return _travel_targets(text)
         if cmd == "map":
             if len(tokens) == 2:
-                return [c for c in ["ship", "graph", "path"] if c.startswith(text)]
-            if len(tokens) == 3 and tokens[1] in {"graph", "path"}:
+                return [c for c in ["path"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] == "path":
+                return [c for c in contacts if c.startswith(text)]
+        if cmd == "ship":
+            if len(tokens) == 2:
+                return [c for c in ["sectors", "survey", "map"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] == "survey":
+                ship_aliases = [state.ship.ship_id] if state.ship.ship_id.startswith(text) else []
+                ship_aliases += [s for s in ["RETORNO_SHIP"] if s.startswith(text)]
+                return [c for c in contacts if c.startswith(text)] + ship_aliases
+        if cmd == "graph":
+            if len(tokens) == 2:
+                return [c for c in contacts if c.startswith(text)]
+        if cmd == "path":
+            if len(tokens) == 2:
                 return [c for c in contacts if c.startswith(text)]
         if cmd == "power":
             if len(tokens) == 2:
@@ -714,7 +742,13 @@ class RetornoTextualApp(App):
         if cmd == "man":
             topics: set[str] = set()
             for path in fs_paths:
-                if path.startswith("/manuals/commands/") or path.startswith("/manuals/systems/") or path.startswith("/manuals/alerts/") or path.startswith("/manuals/modules/"):
+                if (
+                    path.startswith("/manuals/commands/")
+                    or path.startswith("/manuals/systems/")
+                    or path.startswith("/manuals/alerts/")
+                    or path.startswith("/manuals/modules/")
+                    or path.startswith("/manuals/concepts/")
+                ):
                     name = path.rsplit("/", 1)[-1]
                     if name.endswith(".txt"):
                         name = name[:-4]
@@ -1219,6 +1253,9 @@ class RetornoTextualApp(App):
         if parsed == "HELP":
             self.action_help()
             return
+        if parsed == "HELP_VERBOSE":
+            self.action_help_verbose()
+            return
         if parsed == "CLEAR":
             self.query_one("#log", RichLog).clear()
             self._log_buffer.clear()
@@ -1232,17 +1269,15 @@ class RetornoTextualApp(App):
 
         # Informational commands (drain AUTO first to avoid mixing)
         info_tokens = {
-            "CONTACTS",
             "SCAN",
             "JOBS",
-            "NAV",
             "UPLINK",
             "ALERTS",
             "LOGS",
             "INVENTORY",
             "MODULES",
             "MODULE_INSPECT",
-            "SECTORS",
+            "SHIP_SECTORS",
             "DRONE_STATUS",
             "POWER_STATUS",
             "CONFIG_SHOW",
@@ -1261,17 +1296,14 @@ class RetornoTextualApp(App):
                 "MAIL_READ",
                 "JOBS",
                 "DEBUG_MODULES",
-                "MAP",
+                "NAV_MAP",
+                "SHIP_SURVEY",
                 "DRONE_AUTORECALL_ENABLED",
                 "DRONE_AUTORECALL_THRESHOLD",
             }
         ):
             self._drain_auto_to_log()
 
-        if parsed == "CONTACTS":
-            with self.loop.with_lock() as state:
-                self._log_lines(presenter.build_command_output(repl.render_contacts, state))
-            return
         if parsed == "SCAN":
             with self.loop.with_lock() as state:
                 seen, discovered, handshakes, route_msgs, warn = repl._scan_and_discover(state)
@@ -1300,9 +1332,9 @@ class RetornoTextualApp(App):
                 limit = None if parsed[1] == "all" else int(parsed[1])
                 self._log_lines(presenter.build_command_output(repl.render_jobs, state, limit=limit))
             return
-        if parsed == "NAV":
+        if isinstance(parsed, tuple) and parsed[0] == "NAV_MAP":
             with self.loop.with_lock() as state:
-                self._log_lines(presenter.build_command_output(repl.render_nav, state))
+                self._log_lines(presenter.build_command_output(repl.render_nav_map, state, parsed[1], parsed[2]))
             return
         if isinstance(parsed, repl.RouteSolve):
             ev = self.loop.apply_action(parsed)
@@ -1362,13 +1394,13 @@ class RetornoTextualApp(App):
             with self.loop.with_lock() as state:
                 self._log_lines(presenter.build_command_output(repl.render_modules_installed, state))
             return
-        if parsed == "SECTORS":
+        if parsed == "SHIP_SECTORS":
             with self.loop.with_lock() as state:
-                self._log_lines(presenter.build_command_output(repl.render_sectors, state))
+                self._log_lines(presenter.build_command_output(repl.render_ship_sectors, state))
             return
-        if isinstance(parsed, tuple) and parsed[0] == "MAP":
+        if isinstance(parsed, tuple) and parsed[0] == "SHIP_SURVEY":
             with self.loop.with_lock() as state:
-                self._log_lines(presenter.build_command_output(repl.render_map, state, parsed[1], parsed[2]))
+                self._log_lines(presenter.build_command_output(repl.render_ship_survey, state, parsed[1]))
             return
         if parsed == "DRONE_STATUS":
             with self.loop.with_lock() as state:

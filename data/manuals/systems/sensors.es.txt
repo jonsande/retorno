@@ -1,23 +1,22 @@
 RESUMEN DE SISTEMA — sensors
 Ref: OS-MAN/SYS/SENS
 
-sensors es tu alcance más allá del sarcófago: captura de señal, escaneo pasivo, inferencia de contactos.
+`sensors` es la capa de adquisición de señal y detección local.
 
 Función
-- Detecta contactos (scan, contacts).
-- Identifica señales y clasifica nodos de forma básica.
+- Detecta ecos y contactos cercanos mediante `scan`.
+- Alimenta resolución de `route solve` en rango.
+- Aporta telemetría a `ship survey` junto con `data_core`.
 
 Requisitos de arranque
-- Requiere energy_distribution >= nominal (estabilidad de red).
-- El servicio es sensord (hay que arrancarlo aparte).
-
-Notas operativas
-- En perfiles CRUISE/hibernación, sensores pueden estar desactivados por defecto para ahorrar energía.
-- Si sensord está “running” con el sistema offline, es un fallo: reinicia tras restaurar el sistema.
-
-Comandos relacionados
-- boot sensord, diag sensors, scan, contacts
+- Requiere `energy_distribution >= nominal`.
+- Servicio asociado: `sensord` (arranque separado).
 
 Impacto en comandos por estado
-- POR DEBAJO de LIMITED (DAMAGED/CRITICAL/OFFLINE): route solve bloqueado.
-- OFFLINE o sensord no activo: scan/contacts bloqueados o inefectivos.
+- `scan`: requiere `sensors >= limited` y `sensord` en ejecución.
+- `route solve`: requiere `sensors >= limited` y `sensord` en ejecución (además de condiciones de potencia/rango).
+- `ship survey`: requiere `sensors >= limited` y `sensord` en ejecución (junto a `data_core >= limited` + `datad`).
+- OFFLINE o `sensord` detenido: telemetría de sensores no disponible.
+
+Comandos relacionados
+- `boot sensord`, `diag sensors`, `scan`, `route solve`, `ship survey`.

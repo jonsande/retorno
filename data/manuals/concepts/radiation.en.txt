@@ -1,24 +1,61 @@
 radiation (mvp)
 - Radiation is modeled in two layers:
-  - env radiation: effective ambient radiation at current node or transit lane.
-  - internal radiation: env radiation filtered by hull integrity.
+  - `env`: effective ambient radiation from the current node.
+  - `internal`: radiation leaking into internal systems after hull filtering.
 
-hull coupling
+where env radiation comes from
+- Not in transit: from the current node ambient radiation.
+- In transit: average of origin and destination node radiation.
+- Docking does not apply a special "transfer" mechanic.
+- If you are docked at a hot node, you are still in that node's ambient radiation.
+
+hull and ship systems
 - `hull` is a global ship property (0..1), not a regular ship system.
-- Lower hull integrity increases radiation ingress into internal systems.
-- Internal radiation accelerates existing system wear through each system's `k_rad`.
-
-systems
-- Radiation does not replace degradation logic.
-- It only adds pressure to normal wear (power quality + base decay + radiation factor).
+- Lower hull integrity means higher internal radiation ingress.
+- Internal radiation accelerates normal system wear through each system's `k_rad`.
+- Radiation does not replace the degradation model.
 - No lore/intel/data corruption is applied in this MVP.
 
-drones
-- Non-docked drones accumulate radiation dose over time.
-- Higher dose increases drone integrity wear using dose bands.
-- Docked drones are automatically decontaminated if drone_bay and energy_distribution support is available.
+drone radiation effects
+- Non-docked drones accumulate dose over time:
+  - `dose += env_rad * shield_factor * dt`
+- Non-docked drones lose integrity over time.
+- Dose increases integrity wear using bands:
+  - dose < 1.0: x1.0
+  - 1.0 <= dose < 3.0: x1.2
+  - 3.0 <= dose < 6.0: x1.8
+  - dose >= 6.0: x3.0
+
+what gets affected by radiation in this MVP
+- Ship hull: yes (slow wear).
+- Ship systems: yes (faster degradation through internal radiation).
+- Non-docked drones: yes (dose + integrity wear).
+- Docked drones: do not accumulate ambient dose while docked.
+- Player vitals/lore/intel/data corruption: no, out of scope in this iteration.
+
+decontamination (ship and drones)
+- Ship: no direct decontamination routine in this MVP.
+- Drones: automatic decontamination while docked in drone_bay, only if:
+  - drone_bay is not OFFLINE
+  - energy_distribution is not OFFLINE
+
+decontamination rates by bay state
+- Nominal: 0.010 rad/s
+- Limited: 0.005 rad/s
+- Damaged: 0.0025 rad/s
+- Critical: 0.0025 rad/s
+- Offline or distribution offline: 0 rad/s (no decon)
+
+quick table: time to clean X dose
+- Formula: `time_seconds = dose / decon_rate`
+
+state       rate(rad/s)  1.0 dose        3.0 dose        6.0 dose
+- nominal   0.010        100s (1m40s)    300s (5m00s)    600s (10m00s)
+- limited   0.005        200s (3m20s)    600s (10m00s)   1200s (20m00s)
+- damaged   0.0025       400s (6m40s)    1200s (20m00s)  2400s (40m00s)
+- critical  0.0025       400s (6m40s)    1200s (20m00s)  2400s (40m00s)
 
 scope limits
 - No random travel impact events in this MVP.
 - No terminal hull fail/game-over path in this MVP.
-- The hull damage path is prepared for future impact/event integration.
+- Hull damage path is prepared for future impact/event integration.

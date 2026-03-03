@@ -1,23 +1,22 @@
 SYSTEM BRIEF — sensors
 Ref: OS-MAN/SYS/SENS
 
-sensors is your reach beyond the capsule: signal capture, passive scan, contact inference.
+`sensors` is the local signal acquisition and detection layer.
 
 Role
-- Detects contacts (scan, contacts).
-- Identifies signals and basic node classification.
+- Detect nearby echoes/contacts through `scan`.
+- Feeds `route solve` within range.
+- Provides telemetry input for `ship survey` together with `data_core`.
 
 Boot requirements
-- Requires energy_distribution >= nominal (bus stability).
-- The service is sensord (must be booted separately).
-
-Operational notes
-- In CRUISE/hibernation profiles, sensors may be disabled by default to save power.
-- A running sensord on an offline system is a fault; reboot after restoring the system.
-
-Relevant commands
-- boot sensord, diag sensors, scan, contacts
+- Requires `energy_distribution >= nominal`.
+- Service: `sensord` (boot separately).
 
 Command impact by state
-- BELOW LIMITED (DAMAGED/CRITICAL/OFFLINE): route solve blocked.
-- OFFLINE or sensord not running: scan/contacts are blocked or ineffective.
+- `scan`: requires `sensors >= limited` and `sensord` running.
+- `route solve`: requires `sensors >= limited` and `sensord` running (plus power/range conditions).
+- `ship survey`: requires `sensors >= limited` and `sensord` running (plus `data_core >= limited` + `datad`).
+- OFFLINE or stopped `sensord`: sensor telemetry unavailable.
+
+Relevant commands
+- `boot sensord`, `diag sensors`, `scan`, `route solve`, `ship survey`.

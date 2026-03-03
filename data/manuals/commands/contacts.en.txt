@@ -1,26 +1,18 @@
-contacts | scan
-- Lists known contacts and their navigation status from your current location.
-- `scan` is an alias of `contacts`.
+nav map contacts
 
-Requirements
-- Requires `sensord` active (sensors state >= `limited`).
-- While in transit, it shows cached known contacts; it does not do a full live sweep unless specific support is present.
+Command status
+- `contacts` exists as a compatibility alias.
+- Canonical command: `nav map contacts`.
+
+Accepted aliases (hidden in `help`)
+- `contacts` -> `nav map contacts`
+- `nav contacts` -> `nav map contacts`
+
+Dependencies
+- Depends only on `core_os` (same as all `nav map *`).
+- No dependency on `sensors` or `data_core`.
 
 Output format
 - Header: `=== CONTACTS ===`
-- One line per contact, for example:
-  `- ECHO-7 Relay Station (station) id=ECHO_7 dist=12.65ly route visited`
-
-How to read each field
-- `name (kind)`: display name and node type (`station`, `relay`, `derelict`, etc.).
-- `id=...`: internal node identifier (used by commands like `nav` or `dock`).
-- `dist=...`: estimated distance from your current position (`ly`, or local fine `km/mi`).
-- `route` / `no_route`:
-  `route` = there is a known route from your current node to that contact.
-  `no_route` = the contact is known, but no route is known from your current node.
-- `visited` / `unvisited`: whether you have physically reached that node before.
-
-Important nuance about `route`
-- `route` is relative to your current node, not global.
-- If you learn route `A -> B` via `uplink`, while at `A` you should see `B` as `route` even if still `unvisited`.
-- After traveling to `B`, other entries can switch to `no_route` because the reference origin is now `B`.
+- Shows known contacts, estimated distance, and `route/no_route`, `visited/unvisited` flags.
+- While in transit it uses known-contact cache (`in transit; using cached known contacts`).

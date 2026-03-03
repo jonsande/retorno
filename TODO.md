@@ -128,9 +128,23 @@ Esto da variedad, pero no lo haría aún como primer sistema.
 
 === OTROS / SIN CATALOGAR ===
 
-- [ ] Quiero que me generes un documento en el que se le explique a chatGPT exactamente qué debe hacerse y cómo (incluyendo ejemplos) para crear nuevos arcos.
+- [ ] Necesitamos mensajes de advertencia (si es que no los hay) cada vez que haya un cambio muy brusco de radiación, y cada vez que se entre o salga de alguno de los umbrales de radiación. Definir umbrales "muy baja", "baja", "normal", "alta", "muy alta", "extrema".
 
-- [ ] Modelo avanzado de salvage. La opción simplificada (la actual, siempre estará disponible). La avanzada (juego dungeoning) tendrá riesgos, y llevará más tiempo, pero también posibles recompensas mayores. Este modelo avanzado de salvage requiere un nuevo comando "drone survey" entre otrso muchos. Desarrollar una v0.
+- [ ] Necesitamos diseñar una forma de limpiar la nave (e. e. el hull y los sistemas o lo que sea) de radiación. Actualmente no hay ninguna. Podría haber algunas estaciones especializadas en ello. Y algún módulo que redujeran lentamente la radiación.
+
+- [ ] Módulos para drones. Aumento de shield_factor de radiación, aumento de batería, velocidad, opciones de ataque o defensa, soplete, etc.
+
+- [x] Quiero que me generes un documento en "/home/jon/prog/retorno_case/retorno_docs/" en el que se le explique a chatGPT exactamente qué debe hacerse y cómo (incluyendo ejemplos) para crear nuevos arcos y para crear singles. La idea es que con esas instrucciones chatGPT pueda crearme nuevos arcos y singles.
+
+- [!] Al dockear en una nave o estación, actualmente, esa nave o estación transmite radiación de algún modo a la nave del personaje-jugador, o puede afectarla de algún modo? Debe afectarla, de forma que eso meta presión también para las operaciones de salvage. También debe pasar radiación a los drones. Hay por cierto que checkear de qué manera está afectando la radiación a los drones ahora mismo. Y cómo se limpia la nave y los drones de raciacióń, y a qué ratios.
+
+- [ ] Ship survey tiene que servir también para obtener un informe del nivel de radiación del nodo dockable (y así poder valorar si merece la pena dockear o no).
+
+- [ ] Modelo avanzado de salvage. La opción simplificada (la actual, siempre estará disponible). La avanzada (juego dungeoning) tendrá riesgos, y llevará más tiempo, pero también posibles recompensas mayores. Este modelo avanzado de salvage requiere un nuevo comando "drone survey" entre otros muchos. Desarrollar una v0.
+
+- [ ] Salvage avanzado v0. Quizá para poder acceder al modo avanzado haga falta instalar un módulo especial (advanced_drone_salvage_ops). Al hacer un deploy de dron a una nave o estación que no sea la del personaje-jugador (y lo mismo al mover un dron fuera de la nave del personaje-jugador), tiene que salir un mensaje preguntando si se desea entrar en modo salvage avanzado, o continuar con la versión automatizada.
+Todas las estaciones, ships, derelics, etc. tienen que tener un esquema de "sectores". Por ejemplo, y para la v0, todo ship tendrá los mismos sectores que la nuestra. Habrá que pedirle a GPT que cree un esquema básico de los sectores que tiene cada tipo kind.
+El paso de un sector a otro estará bloqueado por puertas. A veces esas puertas se pueden abrir sin más, otras veces hace falta reparar o hackear algo para que funcionen, y otras veces hará falta forzarlas. En cada sector se supone que se puede obtener un tipo de loot y que puede haber unas interacciones u otras.
 
 - [ ] Diseñar sistema "security". Por ahora, este sistema servirá para detectar intrusos en la nave (biológicos o no biológicos)
 

@@ -1,3 +1,8 @@
-sectors
-- Lista los sectores de la nave y sus etiquetas.
-- Equivale a: `map ship`.
+sectors (retirado)
+
+Este comando fue eliminado.
+- Usa `ship sectors`.
+- Alias aceptado: `ship map`.
+
+Nota de migración
+- `map ship` también fue eliminado y migra a `ship sectors`.

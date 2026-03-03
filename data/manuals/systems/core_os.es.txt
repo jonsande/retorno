@@ -4,23 +4,26 @@ Ref: OS-MAN/SYS/CORE-OS
 core_os es la capa mínima de supervisión de la nave. Si falla, pierdes autoridad de mando.
 
 Función
-- Planifica trabajos (jobs), enruta alertas, mantiene sesión del operador.
-- Proporciona la interfaz básica de comandos.
+- Planifica jobs, enruta alertas y mantiene sesión del operador.
+- Proporciona la interfaz base de comandos.
 
 Síntomas de degradación
 - Telemetría incompleta, retrasos en tareas, registros corruptos.
 
-Notas operativas
-- Es crítico. La nave intentará preservarlo durante apagados automáticos.
-- Si la red se vuelve inestable (Q baja), core_os puede volverse errático antes de “morir”.
-- LIMITED: comandos avanzados bloqueados (uplink, route solve, auth recover).
-- CRITICAL: set de recuperación de emergencia activo.
-- OFFLINE: control de terminal perdido. Solo ayuda/status/salir.
+Impacto por estado
+- NOMINAL/UPGRADED: control completo (si las demás condiciones del sistema lo permiten).
+- LIMITED: bloquea comandos avanzados (`uplink`, `route solve`, `auth recover`).
+- DAMAGED: bloquea lo mismo que LIMITED y además bloquea viaje (`nav <node_id>`, `nav --no-cruise <node_id>`).
+- CRITICAL: set de recuperación de emergencia.
+- OFFLINE: bloqueo de terminal; solo set mínimo de supervivencia.
 
-Impacto en comandos por estado
-- NOMINAL/LIMITED: set normal (LIMITED bloquea uplink/route solve/auth recover).
-- CRITICAL: se permiten status, alerts, logs, jobs, power status, power on/off/plan, acciones de dron de emergencia/recuperación, diag, help, exit.
-- OFFLINE: se permiten help, status, exit.
+Set mínimo de supervivencia (terminal)
+- `help`, `clear`, `exit`.
+- `status`.
+- `alerts`, `alerts explain <alert_key>`.
+- `logs`, `log copy [n]`.
+- `jobs`, `jobs <n|all>`.
+- Debug de soporte: `debug on|off|status`, `debug arcs`, `debug lore`, `debug deadnodes`, `debug modules`, `debug seed <n>`, `debug scenario <preset>`.
 
 Comandos relacionados
-- status, alerts, logs, diag core_os
+- `status`, `alerts`, `logs`, `diag core_os`.

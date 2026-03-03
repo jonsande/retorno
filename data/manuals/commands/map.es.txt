@@ -1,18 +1,12 @@
-map
-map ship
-map graph
-map graph <node_id>
 map path <node_id>
-- `map` por defecto ejecuta `map graph`.
-- `map ship` muestra los sectores de la RETORNO (mismo contenido que `sectors`).
-- `map graph` muestra el grafo global conocido (qué nodos enlazan con cuáles y con cuáles no).
-- `map graph <node_id>` enfoca la vista del grafo en un nodo conocido.
-- `map path <node_id>` muestra el camino conocido más corto desde tu nodo actual, si existe.
 
-Dependencias
-- `map ship`: sin dependencia extra.
-- `map graph` y `map path`: requieren `data_core` >= `limited` y `datad` en ejecución.
+Estado del comando
+- `map` ya no es comando canónico de cartografía.
+- Se mantiene solo como alias de compatibilidad para `nav map path <node_id>`.
+
+Alias equivalente
+- `map path <node_id>` -> `nav map path <node_id>`
 
 Notas
-- `no_link` significa "sin enlace directo conocido todavía", no "imposible para siempre".
-- Si no hay camino, usa `uplink`, `scan` y `route solve` para descubrir enlaces puente.
+- `map ship`, `map graph` y `map graph <node_id>` fueron retirados.
+- Usa `ship sectors`, `nav map graph` y `nav map graph <node_id>`.

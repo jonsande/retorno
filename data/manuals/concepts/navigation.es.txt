@@ -1,32 +1,38 @@
 SHIP OS — Navegación y conocimiento de rutas (Copia de campo)
 Ref: OS-MAN/ENG/NAV-01
 
-No “ves” la galaxia como un mapa completo. La terminal del sarcófago opera con conocimiento parcial:
-- contactos detectados por sensores (el alcance de scan es limitado),
-- y rutas obtenidas de datos de navegación registrados (intel).
-Las rutas se pueden obtener mediante:
-- uplink en relays/waystations,
-- route dentro del alcance de sensores,
-- intel import (logs/fragmentos/mail),
-- scan si un hub está exactamente co‑ubicado con tu posición actual.
+La navegación opera con conocimiento parcial, no con mapa total.
+RETORNO combina:
+- nodos/contactos conocidos,
+- enlaces/rutas conocidos,
+- telemetría local.
+
+Bloques de navegación
+- Topología global: `nav map graph [node_id]`.
+- Camino conocido: `nav map path <node_id>`.
+- Rutas directas desde posición actual: `nav map routes`.
+- Contactos conocidos desde posición actual: `nav map contacts`.
+- Sectores conocidos del mundo: `nav map sectors`.
+- Tránsito: `nav <node_id>`, `nav --no-cruise <node_id>`, `nav abort`.
+
+Adquisición de conocimiento de rutas
+- `uplink` en relay/station/waystation acoplado.
+- `route solve` con sensores y potencia suficiente.
+- `scan` para descubrimiento local.
+- `intel import` para importar conocimiento externo.
 
 Relays
-Un relay es infraestructura heredada: una baliza automatizada que repite señales y mantiene en caché tablas de rutas.
-Si un relay todavía responde, puede permitir extraer:
-- destinos alcanzables (rutas),
-- ecos de largo alcance (broadcasts antiguos),
-- y fragmentos parciales de navegación.
+- Un relay conserva y retransmite tablas antiguas/parciales.
+- Puede ampliar conocimiento, pero no garantiza vigencia del dato.
 
 Coordenadas vs IDs
-- sector: celda de cuadrícula, identificada como S{sx}_{sy}_{sz} (derivada de x/y/z en ly).
-- coord: coordenada de sector reportada para un contacto.
-- id: identificador real del nodo que se usa en comandos (nav/travel, dock).
-Un mismo sector puede contener varios contactos con ids distintos.
+- `sector`: celda S{sx}_{sy}_{sz} derivada de x/y/z.
+- `node_id`: identificador operativo para `nav`, `dock`, `ship survey`.
 
 Notas operativas
-- Un contacto puede ser conocido sin que exista una ruta conocida. Saber “que existe” no es saber “cómo llegar”.
-- Los relays pueden estar degradados, silenciosos o repitiendo datos antiguos. No asumas que un broadcast es actual.
-- En una red arruinada, los relays suelen ser la única forma de ampliar conocimiento de navegación sin saltos ciegos.
+- Conocer un contacto no implica conocer ruta hacia él.
+- `nav map *` depende de `core_os` (no de `sensors` ni `data_core`).
+- `ship survey <target>` aporta telemetría puntual, pero sí requiere `sensors`+`data_core` activos.
 
 Comandos relacionados
-- scan, nav, route, uplink, intel import, travel, dock, undock
+- `nav`, `ship survey`, `scan`, `route solve`, `uplink`, `intel import`, `dock`, `undock`.

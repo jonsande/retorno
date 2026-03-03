@@ -155,99 +155,147 @@ def _play_startup_sequence(lines: list[str]) -> None:
             except Exception:
                 pass
 
-def print_help(locale: str = "en") -> None:
-    help_text = {
-        "en": (
-            "\nCommands (summary):\n"
-            "  help | clear | exit | quit\n"
-            "\nFS / Manuals / Mail:\n"
-            "  ls [path] | cat <path>\n"
-            "  man <topic> | about <system_id>\n"
-            "  mail inbox | mail read <id|latest>\n"
-            "  auth status | auth recover <level>\n"
-            "  intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>\n"
-            "  config set lang <en|es> | config show\n"
-            "\nInfo:\n"
-            "  status | jobs | jobs <amount> | jobs all | job cancel <job_id> | alerts | alerts explain <alert_key> | logs | log copy [n]\n"
-            "  contacts | scan\n"
-            "  sectors | map ship|graph [node_id]|path <node_id> | locate <system_id>\n"
-            "\nNavigation:\n"
-            "  nav routes\n"
-            "  dock <node_id> | undock | nav <node_id> | nav --no-cruise <node_id> | nav abort | uplink\n"
-            "  route solve <node_id>\n"
-            "  hibernate until_arrival | hibernate <years>\n"
-            "\nSystems / Power:\n"
-            "  diag <system_id> | boot <service_name>\n"
-            "  power status | power plan cruise|normal | power on <system_id> | power off <system_id>\n"
-            "  repair <system_id> --selftest\n"
-            "\nDrones:\n"
-            "  drone status\n"
-            "  drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>\n"
-            "  drone move <drone_id> <target_id>\n"
-            "  drone autorecall <drone_id> <on|off|percent>\n"
-            "  drone repair <drone_id> <target_id>\n"
-            "  drone install <drone_id> <module_id>\n"
-            "  drone salvage scrap <drone_id> <node_id> <amount>\n"
-            "  drone salvage module <drone_id> [node_id]\n"
-            "  drone salvage data <drone_id> <node_id>\n"
-            "  drone reboot <drone_id> | drone recall <drone_id>\n"
-            "\nCargo / Modules:\n"
-            "  cargo | cargo audit\n"
-            "  module inspect <module_id> | modules\n"
-            "\nHints:\n"
-            "  ls /manuals/commands\n"
-            "  man navigation\n"
-            "  cat /mail/inbox/0001.txt\n"
+def print_help(locale: str = "en", verbose: bool = False) -> None:
+    lang = "es" if locale == "es" else "en"
+    sections: list[tuple[str, str, list[tuple[str, str, str]]]] = [
+        (
+            "Commands (summary)",
+            "Comandos (resumen)",
+            [
+                ("help", "show command list", "muestra lista de comandos"),
+                ("help --verbose", "show command list with short descriptions", "muestra comandos con descripciones breves"),
+                ("clear", "clear terminal output", "limpia salida de terminal"),
+                ("exit", "save and close session", "guarda y cierra sesión"),
+                ("quit", "save and close session", "guarda y cierra sesión"),
+            ],
         ),
-        "es": (
-            "\nComandos (resumen):\n"
-            "  help | clear | exit | quit\n"
-            "\nFS / Manuales / Correo:\n"
-            "  ls [path] | cat <path>\n"
-            "  man <topic> | about <system_id>\n"
-            "  mail inbox | mail read <id|latest>\n"
-            "  auth status | auth recover <level>\n"
-            "  intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>\n"
-            "  config set lang <en|es> | config show\n"
-            "\nInformación:\n"
-            "  status | jobs | jobs <amount> | jobs all | job cancel <job_id> | alerts | alerts explain <alert_key> | logs | log copy [n]\n"
-            "  contacts | scan\n"
-            "  sectors | map ship|graph [node_id]|path <node_id> | locate <system_id>\n"
-            "\nNavegación:\n"
-            "  nav routes\n"
-            "  dock <node_id> | undock | nav <node_id> | nav --no-cruise <node_id> | nav abort | uplink\n"
-            "  route solve <node_id>\n"
-            "  hibernate until_arrival | hibernate <años>\n"
-            "\nSistemas / Energía:\n"
-            "  diag <system_id> | boot <service_name>\n"
-            "  power status | power plan cruise|normal | power on <system_id> | power off <system_id>\n"
-            "  repair <system_id> --selftest\n"
-            "\nDrones:\n"
-            "  drone status\n"
-            "  drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>\n"
-            "  drone move <drone_id> <target_id>\n"
-            "  drone autorecall <drone_id> <on|off|porcentaje>\n"
-            "  drone repair <drone_id> <target_id>\n"
-            "  drone install <drone_id> <module_id>\n"
-            "  drone salvage scrap <drone_id> <node_id> <amount>\n"
-            "  drone salvage module <drone_id> [node_id]\n"
-            "  drone salvage data <drone_id> <node_id>\n"
-            "  drone reboot <drone_id> | drone recall <drone_id>\n"
-            "\nBodega / Módulos:\n"
-            "  cargo | cargo audit\n"
-            "  module inspect <module_id> | modules\n"
-            "\nSugerencias:\n"
-            "  ls /manuals/commands\n"
-            "  man navigation\n"
-            "  cat /mail/inbox/0001.txt\n"
+        (
+            "FS / Manuals / Mail",
+            "FS / Manuales / Correo",
+            [
+                ("ls [path]", "list directory entries", "lista entradas de directorio"),
+                ("cat <path>", "show file content", "muestra contenido de archivo"),
+                ("man <topic>", "open manual topic", "abre tema de manual"),
+                ("about <system_id>", "show system summary", "muestra resumen de sistema"),
+                ("mail inbox", "list inbox messages", "lista mensajes del buzón"),
+                ("mail read <id|latest>", "read one inbox message", "lee un mensaje del buzón"),
+                ("auth status", "show auth levels", "muestra niveles de acceso"),
+                ("auth recover <level>", "attempt access recovery", "intenta recuperación de acceso"),
+                ("intel", "list latest intel", "lista intel reciente"),
+                ("intel <amount>", "list N latest intel entries", "lista N entradas de intel"),
+                ("intel all", "list all intel entries", "lista toda la intel"),
+                ("intel show <intel_id>", "show one intel entry", "muestra una entrada de intel"),
+                ("intel import <path>", "import intel from file", "importa intel desde archivo"),
+                ("intel export <path>", "export intel to file", "exporta intel a archivo"),
+                ("config set lang <en|es>", "set interface language", "cambia idioma de interfaz"),
+                ("config show", "show current config", "muestra configuración actual"),
+            ],
         ),
-    }.get(locale)
-    if help_text is None:
-        help_text = (
-            "\nCommands (summary):\n"
-            "  help | clear | exit | quit\n"
-        )
-    print(help_text)
+        (
+            "Info",
+            "Información",
+            [
+                ("status", "show ship/system status", "muestra estado de nave/sistemas"),
+                ("jobs", "show active jobs", "muestra trabajos activos"),
+                ("jobs <amount>", "show first N active jobs", "muestra primeros N trabajos activos"),
+                ("jobs all", "show all active jobs", "muestra todos los trabajos activos"),
+                ("job cancel <job_id>", "cancel one job", "cancela un trabajo"),
+                ("alerts", "show active alerts", "muestra alertas activas"),
+                ("alerts explain <alert_key>", "explain one alert key", "explica una alerta"),
+                ("logs", "show recent event logs", "muestra eventos recientes"),
+                ("log copy [n]", "copy last N log lines", "copia últimas N líneas de log"),
+                ("scan", "perform local sensor scan", "realiza escaneo local"),
+                ("ship sectors", "show ship internal sectors", "muestra sectores internos de la nave"),
+                ("ship survey <target>", "show concise target telemetry", "muestra telemetría concisa del objetivo"),
+                ("locate <system_id>", "show known system position", "muestra posición conocida del sistema"),
+            ],
+        ),
+        (
+            "Navigation",
+            "Navegación",
+            [
+                ("nav map sectors", "list known world sectors", "lista sectores del mundo conocidos"),
+                ("nav map graph [node_id]", "show known route graph", "muestra grafo de rutas conocido"),
+                ("nav map path <node_id>", "show best known path", "muestra mejor camino conocido"),
+                ("nav map routes", "list direct known routes", "lista rutas directas conocidas"),
+                ("nav map contacts", "list known contacts", "lista contactos conocidos"),
+                ("nav <node_id>", "start transit to node", "inicia tránsito al nodo"),
+                ("nav --no-cruise <node_id>", "start transit without cruise profile", "inicia tránsito sin perfil cruise"),
+                ("nav abort", "abort active transit", "aborta tránsito activo"),
+                ("dock <node_id>", "dock at current node", "acopla en nodo actual"),
+                ("undock", "undock from current node", "desacopla del nodo actual"),
+                ("uplink", "pull route intel from docked hub", "extrae intel de rutas desde hub acoplado"),
+                ("route solve <node_id>", "compute route solution in range", "calcula solución de ruta en rango"),
+                ("hibernate until_arrival", "hibernate until transit arrival", "hiberna hasta la llegada"),
+                ("hibernate <years>", "hibernate for fixed years", "hiberna un número de años"),
+            ],
+        ),
+        (
+            "Systems / Power",
+            "Sistemas / Energía",
+            [
+                ("diag <system_id>", "inspect system diagnostics", "inspecciona diagnóstico del sistema"),
+                ("boot <service_name>", "start system service", "arranca servicio de sistema"),
+                ("power status", "show power telemetry", "muestra telemetría eléctrica"),
+                ("power plan cruise", "set cruise power profile", "activa plan energético cruise"),
+                ("power plan normal", "set normal power profile", "activa plan energético normal"),
+                ("power on <system_id>", "power on one system", "enciende un sistema"),
+                ("power off <system_id>", "power off one system", "apaga un sistema"),
+                ("repair <system_id> --selftest", "run self-test repair routine", "ejecuta rutina de autorreparación"),
+            ],
+        ),
+        (
+            "Drones",
+            "Drones",
+            [
+                ("drone status", "show drone fleet status", "muestra estado de la flota de drones"),
+                ("drone deploy <drone_id> <sector_id>", "deploy drone to sector", "despliega dron a sector"),
+                ("drone deploy! <drone_id> <sector_id>", "emergency deploy override", "despliegue de emergencia"),
+                ("drone move <drone_id> <target_id>", "move drone to target", "mueve dron a objetivo"),
+                ("drone autorecall <drone_id> on", "enable automatic recall", "activa autorretorno"),
+                ("drone autorecall <drone_id> off", "disable automatic recall", "desactiva autorretorno"),
+                ("drone autorecall <drone_id> <percent>", "set recall battery threshold", "ajusta umbral de batería para retorno"),
+                ("drone repair <drone_id> <target_id>", "repair target with drone", "repara objetivo con dron"),
+                ("drone install <drone_id> <module_id>", "install module using drone", "instala módulo usando dron"),
+                ("drone salvage scrap <drone_id> <node_id> <amount>", "salvage scrap from node", "recupera chatarra del nodo"),
+                ("drone salvage module <drone_id> [node_id]", "salvage module from node", "recupera módulo del nodo"),
+                ("drone salvage data <drone_id> <node_id>", "salvage data from node", "recupera datos del nodo"),
+                ("drone reboot <drone_id>", "reboot drone", "reinicia dron"),
+                ("drone recall <drone_id>", "recall drone to ship", "retorna dron a la nave"),
+            ],
+        ),
+        (
+            "Cargo / Modules",
+            "Bodega / Módulos",
+            [
+                ("cargo", "show cargo summary", "muestra resumen de bodega"),
+                ("cargo audit", "run cargo audit", "ejecuta auditoría de bodega"),
+                ("module inspect <module_id>", "inspect module details", "inspecciona detalles de módulo"),
+                ("modules", "list installed/known modules", "lista módulos instalados/conocidos"),
+            ],
+        ),
+        (
+            "Hints",
+            "Sugerencias",
+            [
+                ("ls /manuals/commands", "list command manuals", "lista manuales de comandos"),
+                ("man navigation", "open navigation manual", "abre manual de navegación"),
+                ("cat /mail/inbox/0001.txt", "read inbox file directly", "lee archivo de correo directamente"),
+            ],
+        ),
+    ]
+
+    lines = [""]
+    for title_en, title_es, entries in sections:
+        lines.append(title_es if lang == "es" else title_en)
+        for command, desc_en, desc_es in entries:
+            if verbose:
+                desc = desc_es if lang == "es" else desc_en
+                lines.append(f"  {command} - {desc}")
+            else:
+                lines.append(f"  {command}")
+        lines.append("")
+    print("\n".join(lines).rstrip())
 
 
 class SafeDict(dict):
@@ -1358,6 +1406,12 @@ def render_status(state) -> None:
                 "es": "core_os: limitado (comandos avanzados bloqueados)",
             }
             print(msg.get(locale, msg["en"]))
+        elif core_os.state == SystemState.DAMAGED:
+            msg = {
+                "en": "core_os: damaged (advanced commands blocked; travel blocked)",
+                "es": "core_os: dañado (comandos avanzados bloqueados; viaje bloqueado)",
+            }
+            print(msg.get(locale, msg["en"]))
     life_support = ship.systems.get("life_support")
     if life_support:
         if life_support.state == SystemState.OFFLINE:
@@ -1828,24 +1882,7 @@ def render_debug_deadnodes(state) -> None:
         for line in state.world.deadnode_log[-10:]:
             print(f"- {line}")
 
-def render_contacts(state) -> None:
-    system = state.ship.systems.get("sensors")
-    if not system or _state_rank(system.state) < _state_rank(SystemState.LIMITED):
-        locale = state.os.locale.value
-        msg = {
-            "en": "contacts: sensors offline (requires >= limited)",
-            "es": "contacts: sensores fuera de línea (requiere >= limitado)",
-        }
-        print(msg.get(locale, msg["en"]))
-        return
-    if not system.service or system.service.service_name != "sensord" or not system.service.is_running:
-        locale = state.os.locale.value
-        msg = {
-            "en": "contacts: sensord not running (try: boot sensord)",
-            "es": "contacts: sensord no está en ejecución (prueba: boot sensord)",
-        }
-        print(msg.get(locale, msg["en"]))
-        return
+def _render_contacts_table(state) -> None:
     current_id = state.world.current_node_id
     if state.ship.in_transit:
         locale = state.os.locale.value
@@ -1895,6 +1932,15 @@ def render_contacts(state) -> None:
             print(f"- {node.name} ({node.kind}){sector} id={cid} dist={dist_txt} {route_flag} {visited}")
         else:
             print(f"- {cid}")
+
+
+def render_nav_contacts(state) -> None:
+    _render_contacts_table(state)
+
+
+def render_contacts(state) -> None:
+    # Legacy wrapper used by tests and old call sites.
+    render_nav_contacts(state)
 
 
 def render_scan_results(state, node_ids: list[str]) -> None:
@@ -2469,8 +2515,14 @@ def _core_os_limited_blocks(parsed) -> bool:
     return False
 
 
+def _core_os_damaged_blocks(parsed) -> bool:
+    if _core_os_limited_blocks(parsed):
+        return True
+    return parsed.__class__.__name__ == "Travel"
+
+
 def _terminal_state_allows(parsed) -> bool:
-    if parsed == "HELP" or parsed == "EXIT" or parsed == "CLEAR":
+    if parsed in {"HELP", "HELP_VERBOSE", "EXIT", "CLEAR"}:
         return True
     if isinstance(parsed, Status):
         return True
@@ -2511,6 +2563,10 @@ def _command_blocked_message(state, parsed) -> str | None:
             "en": "Core OS degraded: advanced commands blocked.",
             "es": "Core OS degradado: comandos avanzados bloqueados.",
         },
+        "core_os_damaged": {
+            "en": "Core OS damaged: advanced commands blocked; navigation travel blocked.",
+            "es": "Core OS dañado: comandos avanzados bloqueados; viaje de navegación bloqueado.",
+        },
         "life_support_offline": {
             "en": "Life support offline. Host viability lost.",
             "es": "Soporte vital fuera de línea. Viabilidad del huésped perdida.",
@@ -2536,6 +2592,9 @@ def _command_blocked_message(state, parsed) -> str | None:
     if core_os and core_os.state == SystemState.LIMITED:
         if _core_os_limited_blocks(parsed):
             return messages["core_os_limited"].get(locale, messages["core_os_limited"]["en"])
+    if core_os and core_os.state == SystemState.DAMAGED:
+        if _core_os_damaged_blocks(parsed):
+            return messages["core_os_damaged"].get(locale, messages["core_os_damaged"]["en"])
     return None
 
 
@@ -3245,7 +3304,7 @@ def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str
                 added_msgs.append(f"(intel) node known: {nid}")
     return added_msgs
 
-def render_sectors(state) -> None:
+def render_ship_sectors(state) -> None:
     print("\n=== RETORNO SHIP SECTORS ===")
     if not state.ship.sectors:
         print("(none)")
@@ -3255,45 +3314,9 @@ def render_sectors(state) -> None:
         print(f"- {sid}: {sector.name} [{tags}]")
 
 
-def _map_navdb_blocked_reason(state) -> str | None:
-    system = state.ship.systems.get("data_core")
-    if not system:
-        return "missing_data_core"
-    if system.forced_offline and state.ship.op_mode == "CRUISE":
-        return "data_core_shed"
-    if system.state == SystemState.OFFLINE:
-        return "data_core_offline"
-    if not system.service or system.service.service_name != "datad" or not system.service.is_installed:
-        return "datad_not_installed"
-    if not system.service.is_running:
-        return "datad_not_running"
-    if _state_rank(system.state) < _state_rank(SystemState.LIMITED):
-        return "data_core_degraded"
-    return None
-
-
-def _map_blocked_message(state, reason: str) -> str:
-    locale = state.os.locale.value
-    messages = {
-        "en": {
-            "missing_data_core": "map blocked: data_core missing.",
-            "data_core_shed": "map blocked: data_core offline. Try: power on data_core; boot datad",
-            "data_core_offline": "map blocked: data_core offline.",
-            "datad_not_installed": "map blocked: datad not installed.",
-            "datad_not_running": "map blocked: datad not running. Try: boot datad",
-            "data_core_degraded": "map blocked: data_core degraded (requires >= limited).",
-        },
-        "es": {
-            "missing_data_core": "map bloqueado: falta data_core.",
-            "data_core_shed": "map bloqueado: data_core offline. Prueba: power on data_core; boot datad",
-            "data_core_offline": "map bloqueado: data_core offline.",
-            "datad_not_installed": "map bloqueado: datad no instalado.",
-            "datad_not_running": "map bloqueado: datad no está en ejecución. Prueba: boot datad",
-            "data_core_degraded": "map bloqueado: data_core degradado (requiere >= limited).",
-        },
-    }
-    localized = messages.get(locale, messages["en"])
-    return localized.get(reason, messages["en"].get(reason, "map blocked"))
+def render_sectors(state) -> None:
+    # Legacy wrapper used by existing call sites/tests.
+    render_ship_sectors(state)
 
 
 def _map_known_nodes(state) -> set[str]:
@@ -3495,30 +3518,74 @@ def render_map_path(state, target_id: str) -> None:
         print(hint.get(locale, hint["en"]))
 
 
-def render_map(state, mode: str, node_id: str | None) -> None:
-    if mode == "ship":
-        render_sectors(state)
+def _sector_coords_from_id(sector_id: str) -> tuple[int, int, int] | None:
+    if not sector_id.startswith("S"):
+        return None
+    body = sector_id[1:]
+    parts = body.split("_")
+    if len(parts) != 3:
+        return None
+    try:
+        return int(parts[0]), int(parts[1]), int(parts[2])
+    except ValueError:
+        return None
+
+
+def render_nav_map_sectors(state) -> None:
+    print("\n=== NAV MAP SECTORS ===")
+    known_ids = _map_known_nodes(state)
+    sector_ids: set[str] = set()
+    for nid in known_ids:
+        node = state.world.space.nodes.get(nid)
+        if not node:
+            continue
+        sector_ids.add(sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly))
+    cx, cy, cz = state.world.current_pos_ly
+    sector_ids.add(sector_id_for_pos(cx, cy, cz))
+    if not sector_ids:
+        print("(none)")
         return
-    reason = _map_navdb_blocked_reason(state)
-    if reason:
-        print(_map_blocked_message(state, reason))
-        return
+    for sid in sorted(sector_ids):
+        coords = _sector_coords_from_id(sid)
+        if coords is None:
+            print(f"- {sid}")
+            continue
+        sx, sy, sz = coords
+        origin_x = sx * SECTOR_SIZE_LY
+        origin_y = sy * SECTOR_SIZE_LY
+        origin_z = sz * SECTOR_SIZE_LY
+        print(
+            f"- {sid} coord=({sx:+d},{sy:+d},{sz:+d}) "
+            f"origin_ly=({origin_x:.2f},{origin_y:.2f},{origin_z:.2f})"
+        )
+
+
+def render_nav_map(state, mode: str, node_id: str | None = None) -> None:
     if mode == "graph":
         render_map_graph(state, node_id=node_id)
         return
     if mode == "path":
         if not node_id:
             msg = {
-                "en": "map path: missing node_id",
-                "es": "map path: falta node_id",
+                "en": "nav map path: missing node_id",
+                "es": "nav map path: falta node_id",
             }
             print(msg.get(state.os.locale.value, msg["en"]))
             return
         render_map_path(state, target_id=node_id)
         return
+    if mode == "routes":
+        render_nav_routes(state)
+        return
+    if mode == "contacts":
+        render_nav_contacts(state)
+        return
+    if mode == "sectors":
+        render_nav_map_sectors(state)
+        return
     msg = {
-        "en": "map: unknown mode",
-        "es": "map: modo desconocido",
+        "en": "nav map: unknown mode",
+        "es": "nav map: modo desconocido",
     }
     print(msg.get(state.os.locale.value, msg["en"]))
 
@@ -3545,7 +3612,7 @@ def render_locate(state, system_id: str) -> None:
     print(f"coords: {node.x_ly:.2f}, {node.y_ly:.2f}, {node.z_ly:.2f}")
 
 
-def render_nav(state) -> None:
+def render_nav_routes(state) -> None:
     print("\n=== NAV ROUTES ===")
     current_id = state.world.current_node_id
     player_ship_id = getattr(state.ship, "ship_id", "RETORNO_SHIP")
@@ -3621,6 +3688,136 @@ def render_nav(state) -> None:
             "es": "Prueba: scan, route solve, intel, uplink (en relay/waystation) o consigue inteligencia.",
         }
         print(hint.get(locale, hint["en"]))
+
+
+def render_nav(state) -> None:
+    # Legacy wrapper used by old call sites.
+    render_nav_routes(state)
+
+
+def _ship_survey_blocked_reason(state) -> str | None:
+    sensors = state.ship.systems.get("sensors")
+    if not sensors:
+        return "missing_sensors"
+    if sensors.state == SystemState.OFFLINE:
+        return "sensors_offline"
+    if _state_rank(sensors.state) < _state_rank(SystemState.LIMITED):
+        return "sensors_degraded"
+    if not sensors.service or sensors.service.service_name != "sensord" or not sensors.service.is_installed:
+        return "sensord_missing"
+    if not sensors.service.is_running:
+        return "sensord_not_running"
+
+    data_core = state.ship.systems.get("data_core")
+    if not data_core:
+        return "missing_data_core"
+    if data_core.state == SystemState.OFFLINE:
+        return "data_core_offline"
+    if _state_rank(data_core.state) < _state_rank(SystemState.LIMITED):
+        return "data_core_degraded"
+    if not data_core.service or data_core.service.service_name != "datad" or not data_core.service.is_installed:
+        return "datad_missing"
+    if not data_core.service.is_running:
+        return "datad_not_running"
+    return None
+
+
+def _ship_survey_blocked_message(state, reason: str) -> str:
+    locale = state.os.locale.value
+    messages = {
+        "en": {
+            "missing_sensors": "ship survey blocked: sensors missing",
+            "sensors_offline": "ship survey blocked: sensors offline",
+            "sensors_degraded": "ship survey blocked: sensors degraded (requires >= limited)",
+            "sensord_missing": "ship survey blocked: sensord not installed",
+            "sensord_not_running": "ship survey blocked: sensord not running. Try: boot sensord",
+            "missing_data_core": "ship survey blocked: data_core missing",
+            "data_core_offline": "ship survey blocked: data_core offline",
+            "data_core_degraded": "ship survey blocked: data_core degraded (requires >= limited)",
+            "datad_missing": "ship survey blocked: datad not installed",
+            "datad_not_running": "ship survey blocked: datad not running. Try: boot datad",
+        },
+        "es": {
+            "missing_sensors": "ship survey bloqueado: falta sensors",
+            "sensors_offline": "ship survey bloqueado: sensors offline",
+            "sensors_degraded": "ship survey bloqueado: sensors degradado (requiere >= limited)",
+            "sensord_missing": "ship survey bloqueado: sensord no instalado",
+            "sensord_not_running": "ship survey bloqueado: sensord no está en ejecución. Prueba: boot sensord",
+            "missing_data_core": "ship survey bloqueado: falta data_core",
+            "data_core_offline": "ship survey bloqueado: data_core offline",
+            "data_core_degraded": "ship survey bloqueado: data_core degradado (requiere >= limited)",
+            "datad_missing": "ship survey bloqueado: datad no instalado",
+            "datad_not_running": "ship survey bloqueado: datad no está en ejecución. Prueba: boot datad",
+        },
+    }
+    localized = messages.get(locale, messages["en"])
+    return localized.get(reason, messages["en"].get(reason, "ship survey blocked"))
+
+
+def render_ship_survey(state, target_id: str) -> None:
+    reason = _ship_survey_blocked_reason(state)
+    if reason:
+        print(_ship_survey_blocked_message(state, reason))
+        return
+
+    ship_id = getattr(state.ship, "ship_id", "RETORNO_SHIP")
+    target_norm = target_id.strip()
+    print("\n=== SHIP SURVEY ===")
+
+    if target_norm in {ship_id, "RETORNO_SHIP"}:
+        x, y, z = state.world.current_pos_ly
+        sector_id = sector_id_for_pos(x, y, z)
+        current_id = state.world.current_node_id
+        visited = "visited" if current_id in state.world.visited_nodes else "unvisited"
+        print(f"id: {ship_id}")
+        print("name: RETORNO")
+        print("kind: ship")
+        print(f"node: {current_id}")
+        print(f"sector: {sector_id}")
+        print(f"coords: {x:.2f}, {y:.2f}, {z:.2f}")
+        print("distance: 0.00ly")
+        print(f"visited: {visited}")
+        print("route: self")
+        print("availability: onboard")
+        return
+
+    node = state.world.space.nodes.get(target_norm)
+    if not node:
+        locale = state.os.locale.value
+        msg = {
+            "en": f"ship survey: unknown node ({target_norm})",
+            "es": f"ship survey: nodo desconocido ({target_norm})",
+        }
+        print(msg.get(locale, msg["en"]))
+        return
+
+    current_id = state.world.current_node_id
+    current = state.world.space.nodes.get(current_id)
+    if current:
+        cx, cy, cz = current.x_ly, current.y_ly, current.z_ly
+    else:
+        cx, cy, cz = state.world.current_pos_ly
+    dx = node.x_ly - cx
+    dy = node.y_ly - cy
+    dz = node.z_ly - cz
+    distance = (dx * dx + dy * dy + dz * dz) ** 0.5
+    sector_id = sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly)
+    known = target_norm in (
+        state.world.known_nodes if state.world.known_nodes else state.world.known_contacts
+    )
+    route = target_norm == current_id or target_norm in state.world.known_links.get(current_id, set())
+    visited = target_norm in state.world.visited_nodes
+    in_sensor_range = distance <= state.ship.sensors_range_ly
+    print(f"id: {target_norm}")
+    print(f"name: {node.name}")
+    print(f"kind: {node.kind}")
+    print(f"sector: {sector_id}")
+    print(f"coords: {node.x_ly:.2f}, {node.y_ly:.2f}, {node.z_ly:.2f}")
+    print(f"distance: {distance:.2f}ly")
+    print(f"visited: {'yes' if visited else 'no'}")
+    print(f"known_contact: {'yes' if known else 'no'}")
+    print(f"known_route_from_current: {'yes' if route else 'no'}")
+    print(f"in_sensor_range: {'yes' if in_sensor_range else 'no'}")
 
 
 def _format_age_short(seconds: float) -> str:
@@ -4577,11 +4774,13 @@ def main() -> None:
         "alerts",
         "logs",
         "log",
-        "contacts",
         "scan",
-        "sectors",
         "map",
+        "routes",
+        "graph",
+        "path",
         "locate",
+        "ship",
         "nav",
         "navigation",
         "uplink",
@@ -4647,6 +4846,9 @@ def main() -> None:
 
                 if len(tokens) == 1:
                     candidates = [c for c in base_commands if c.startswith(text)]
+                elif cmd == "help":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["--verbose", "-v"] if c.startswith(text)]
                 elif cmd == "diag" or cmd == "about" or cmd == "locate":
                     candidates = [s for s in systems if s.startswith(text)]
                 elif cmd == "boot":
@@ -4692,19 +4894,38 @@ def main() -> None:
                         return [c for c in contacts if c.startswith(prefix)]
 
                     if len(tokens) == 2:
-                        base_opts = ["abort", "--no-cruise"]
-                        if cmd in {"nav", "navigation"}:
-                            base_opts = ["routes"] + base_opts
+                        base_opts = ["map", "abort", "--no-cruise"]
+                        if cmd == "nav":
+                            base_opts.extend(["sectors", "routes", "contacts", "graph"])
                         candidates = [c for c in base_opts if c.startswith(text)]
                         candidates += _travel_targets(text)
+                    elif len(tokens) == 3 and tokens[1] == "map":
+                        candidates = [c for c in ["sectors", "graph", "path", "routes", "contacts"] if c.startswith(text)]
+                    elif len(tokens) == 4 and tokens[1] == "map" and tokens[2] in {"graph", "path"}:
+                        candidates = _travel_targets(text)
                     elif len(tokens) == 3 and tokens[1] == "--no-cruise":
+                        candidates = _travel_targets(text)
+                    elif len(tokens) == 3 and tokens[1] == "graph":
                         candidates = _travel_targets(text)
                     else:
                         candidates = _travel_targets(text)
                 elif cmd == "map":
                     if len(tokens) == 2:
-                        candidates = [c for c in ["ship", "graph", "path"] if c.startswith(text)]
-                    elif len(tokens) == 3 and tokens[1] in {"graph", "path"}:
+                        candidates = [c for c in ["path"] if c.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "path":
+                        candidates = [c for c in contacts if c.startswith(text)]
+                elif cmd == "ship":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["sectors", "survey", "map"] if c.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "survey":
+                        ship_aliases = [locked_state.ship.ship_id] if locked_state.ship.ship_id.startswith(text) else []
+                        ship_aliases += [s for s in ["RETORNO_SHIP"] if s.startswith(text)]
+                        candidates = [c for c in contacts if c.startswith(text)] + ship_aliases
+                elif cmd == "graph":
+                    if len(tokens) == 2:
+                        candidates = [c for c in contacts if c.startswith(text)]
+                elif cmd == "path":
+                    if len(tokens) == 2:
                         candidates = [c for c in contacts if c.startswith(text)]
                 elif cmd == "power":
                     if len(tokens) == 2:
@@ -4783,7 +5004,13 @@ def main() -> None:
                 elif cmd == "man":
                     topics: set[str] = set()
                     for path in fs_paths:
-                        if path.startswith("/manuals/commands/") or path.startswith("/manuals/systems/") or path.startswith("/manuals/alerts/") or path.startswith("/manuals/modules/"):
+                        if (
+                            path.startswith("/manuals/commands/")
+                            or path.startswith("/manuals/systems/")
+                            or path.startswith("/manuals/alerts/")
+                            or path.startswith("/manuals/modules/")
+                            or path.startswith("/manuals/concepts/")
+                        ):
                             name = path.rsplit("/", 1)[-1]
                             if name.endswith(".txt"):
                                 name = name[:-4]
@@ -4831,7 +5058,7 @@ def main() -> None:
                     elif len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
                         candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "move":
-                        ship_aliases = [state.ship.ship_id] if state.ship.ship_id.startswith(text) else []
+                        ship_aliases = [locked_state.ship.ship_id] if locked_state.ship.ship_id.startswith(text) else []
                         candidates = (
                             [s for s in sectors if s.startswith(text)]
                             + [c for c in contacts if c.startswith(text)]
@@ -4975,6 +5202,12 @@ def main() -> None:
                 locale = locked_state.os.locale.value
             print_help(locale)
             continue
+        if parsed == "HELP_VERBOSE":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                locale = locked_state.os.locale.value
+            print_help(locale, verbose=True)
+            continue
         if parsed == "CLEAR":
             print("\033[2J\033[H", end="")
             continue
@@ -5098,11 +5331,6 @@ def main() -> None:
             with loop.with_lock() as locked_state:
                 render_cat(locked_state, parsed[1])
             continue
-        if parsed == "CONTACTS":
-            _drain_auto_events()
-            with loop.with_lock() as locked_state:
-                render_contacts(locked_state)
-            continue
         if parsed == "SCAN":
             _drain_auto_events()
             with loop.with_lock() as locked_state:
@@ -5137,15 +5365,20 @@ def main() -> None:
             with loop.with_lock() as locked_state:
                 render_module_inspect(locked_state, parsed[1])
             continue
-        if parsed == "SECTORS":
+        if parsed == "SHIP_SECTORS":
             _drain_auto_events()
             with loop.with_lock() as locked_state:
-                render_sectors(locked_state)
+                render_ship_sectors(locked_state)
             continue
-        if isinstance(parsed, tuple) and parsed[0] == "MAP":
+        if isinstance(parsed, tuple) and parsed[0] == "SHIP_SURVEY":
             _drain_auto_events()
             with loop.with_lock() as locked_state:
-                render_map(locked_state, parsed[1], parsed[2])
+                render_ship_survey(locked_state, parsed[1])
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "NAV_MAP":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                render_nav_map(locked_state, parsed[1], parsed[2])
             continue
         if parsed == "ALERTS":
             _drain_auto_events()
@@ -5177,11 +5410,6 @@ def main() -> None:
             with loop.with_lock() as locked_state:
                 limit = None if parsed[1] == "all" else int(parsed[1])
                 render_jobs(locked_state, limit=limit)
-            continue
-        if parsed == "NAV":
-            _drain_auto_events()
-            with loop.with_lock() as locked_state:
-                render_nav(locked_state)
             continue
         if isinstance(parsed, RouteSolve):
             _drain_auto_events()

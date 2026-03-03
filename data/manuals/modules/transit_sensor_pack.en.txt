@@ -1,3 +1,4 @@
 transit_sensor_pack
-- Allows scan and contacts while the ship is in transit.
-- Useful for detecting nearby signals without stopping the journey.
+- Enables useful in-transit scanning (`scan`).
+- Improves nearby signal detection without stopping travel.
+- Not required for `nav map contacts` (that command depends on core_os).

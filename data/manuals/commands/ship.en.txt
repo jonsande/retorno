@@ -1,0 +1,29 @@
+ship sectors
+ship survey <target>
+
+Description
+- `ship sectors`: show RETORNO internal sectors and their tags.
+- `ship survey <target>`: concise telemetry for one target.
+
+Valid `ship survey` target
+- Any world `node_id`.
+- `RETORNO_SHIP`.
+- Active `state.ship.ship_id`.
+
+Accepted aliases (hidden in `help`)
+- `ship map` -> `ship sectors`
+
+Dependencies
+- `ship sectors`: depends on `core_os`.
+- `ship survey <target>` depends on:
+  - `core_os`
+  - `sensors >= limited`
+  - `sensord` running
+  - `data_core >= limited`
+  - `datad` running
+
+`ship survey` v0 output
+- `id`, `name`, `kind`.
+- `sector` and `coords`.
+- `distance`.
+- Basic availability/intel flags (`visited`, `known_contact`, `known_route_from_current`, `in_sensor_range`).

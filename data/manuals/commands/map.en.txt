@@ -1,18 +1,12 @@
-map
-map ship
-map graph
-map graph <node_id>
 map path <node_id>
-- `map` defaults to `map graph`.
-- `map ship` shows RETORNO ship sectors (same content as `sectors`).
-- `map graph` shows the known global route graph (which nodes link to which, and which do not).
-- `map graph <node_id>` focuses the graph view on one known node.
-- `map path <node_id>` shows the shortest known path from your current node, if any.
 
-Dependencies
-- `map ship`: no extra dependency.
-- `map graph` and `map path`: require `data_core` >= `limited` and `datad` running.
+Command status
+- `map` is no longer a canonical mapping command.
+- It is preserved only as a compatibility alias for `nav map path <node_id>`.
+
+Equivalent alias
+- `map path <node_id>` -> `nav map path <node_id>`
 
 Notes
-- `no_link` means "no known direct link yet", not "impossible forever".
-- If no path exists, use `uplink`, `scan`, and `route solve` to discover bridge links.
+- `map ship`, `map graph`, and `map graph <node_id>` were removed.
+- Use `ship sectors`, `nav map graph`, and `nav map graph <node_id>`.

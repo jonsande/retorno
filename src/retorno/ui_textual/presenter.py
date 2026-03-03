@@ -105,9 +105,9 @@ def build_jobs_lines(state) -> list[str]:
     return filtered
 
 
-def build_help_lines(state) -> list[str]:
+def build_help_lines(state, verbose: bool = False) -> list[str]:
     locale = state.os.locale.value
-    return _capture_output(repl.print_help, locale)
+    return _capture_output(repl.print_help, locale, verbose=verbose)
 
 
 def build_command_output(func, *args, **kwargs) -> list[str]:
