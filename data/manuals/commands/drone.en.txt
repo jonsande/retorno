@@ -17,6 +17,7 @@ Status fields
 - battery: charge level (0..1)
 - integrity: structural condition (0..1)
 - dose: accumulated radiation exposure (rad)
+- dose also shows a text band: `low / elevated / high / extreme`
 
 Operational notes
 - Drone actions consume battery (deploy/move/repair/install/salvage/recall/reboot).

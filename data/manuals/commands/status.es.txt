@@ -4,3 +4,4 @@ status
 - Incluye `radiation` con dos valores:
   - `env`: radiación ambiental efectiva en ubicación/tránsito.
   - `internal`: radiación que entra a sistemas internos (depende del casco).
+- Ambos (`env` e `internal`) muestran también banda textual: `bajo / elevado / alto / extremo`.

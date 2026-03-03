@@ -26,6 +26,21 @@ drone radiation effects
   - 3.0 <= dose < 6.0: x1.8
   - dose >= 6.0: x3.0
 
+radiation levels (4 configurable bands)
+- `low`: below the `elevated` threshold.
+- `elevated`: from `RAD_LEVEL_*_ELEVATED`.
+- `high`: from `RAD_LEVEL_*_HIGH`.
+- `extreme`: from `RAD_LEVEL_*_EXTREME`.
+- Bands apply to:
+  - ambient radiation (`env`)
+  - internal radiation (`internal`)
+  - each drone's dose (`dose`)
+
+threshold-crossing warnings
+- A warning is emitted when a metric changes band (`low/elevated/high/extreme`).
+- Applies to `env`, `internal`, and `drone dose`.
+- Events are emitted only on band change, not every tick.
+
 what gets affected by radiation in this MVP
 - Ship hull: yes (slow wear).
 - Ship systems: yes (faster degradation through internal radiation).

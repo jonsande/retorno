@@ -4,3 +4,4 @@ status
 - Includes `radiation` with two values:
   - `env`: effective environmental radiation at current location/transit.
   - `internal`: radiation leaking into internal systems (depends on hull state).
+- Both (`env` and `internal`) also show a text band: `low / elevated / high / extreme`.

@@ -186,7 +186,7 @@ class Balance:
     DRONE_BATTERY_DRAIN_SELFTEST = 0.02
     DRONE_BATTERY_DRAIN_MOVE = 0.05
     # Charge rate per second when in bay (fractions).
-    DRONE_BATTERY_CHARGE_PER_S = 0.02
+    DRONE_BATTERY_CHARGE_PER_S = 0.005 # original 0.02
     DRONE_BAY_LIMITED_CHARGE_RATE_MULT = 0.5
     DRONE_BAY_DAMAGED_CHARGE_RATE_MULT = 0.25
     # Charge speed multiplier when ship SoC is low.
@@ -215,6 +215,17 @@ class Balance:
     DRONE_RAD_DECAY_MULT_WARN = 1.2
     DRONE_RAD_DECAY_MULT_HIGH = 1.8
     DRONE_RAD_DECAY_MULT_CRITICAL = 3.0
+    # Radiation level thresholds (4-band): low / elevated / high / extreme.
+    # Values are ">= threshold"; below elevated is considered low.
+    RAD_LEVEL_ENV_ELEVATED = 0.001
+    RAD_LEVEL_ENV_HIGH = 0.003
+    RAD_LEVEL_ENV_EXTREME = 0.020
+    RAD_LEVEL_INTERNAL_ELEVATED = 0.0003
+    RAD_LEVEL_INTERNAL_HIGH = 0.0010
+    RAD_LEVEL_INTERNAL_EXTREME = 0.0050
+    RAD_LEVEL_DRONE_DOSE_ELEVATED = DRONE_RAD_DOSE_WARN
+    RAD_LEVEL_DRONE_DOSE_HIGH = DRONE_RAD_DOSE_HIGH
+    RAD_LEVEL_DRONE_DOSE_EXTREME = DRONE_RAD_DOSE_CRITICAL
     # Repair efficiency per scrap spent.
     DRONE_REPAIR_INTEGRITY_PER_SCRAP = 5.0
     # Thresholds for alerts and action gating.

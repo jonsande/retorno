@@ -66,6 +66,8 @@ class ShipState:
     location: ShipLocation = field(default_factory=ShipLocation)
     hull_integrity: float = 1.0
     is_hibernating: bool = False
+    radiation_env_level: str = "unknown"
+    radiation_internal_level: str = "unknown"
 
     # Radiación ambiental efectiva del entorno actual.
     radiation_env_rad_per_s: float = 0.001

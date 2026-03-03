@@ -152,10 +152,12 @@ class Engine:
         env_rad = self._compute_env_radiation_rad_per_s(state)
         state.ship.radiation_env_rad_per_s = env_rad
         internal_rad = self._compute_internal_radiation_rad_per_s(state, env_rad)
+        events.extend(self._update_ship_radiation_level_alerts(state, env_rad, internal_rad))
         self._apply_hull_degradation(state, dt, env_rad)
         events.extend(self._apply_degradation(state, dt, power_quality, brownout_sustained, internal_rad))
         self._apply_radiation(state, dt, env_rad)
         self._update_drone_maintenance(state, dt)
+        events.extend(self._update_drone_radiation_level_alerts(state))
         events.extend(self._update_drone_battery_alerts(state))
 
         events.extend(self._apply_critical_system_consequences(state, dt))
@@ -4196,6 +4198,135 @@ class Engine:
         if amount <= 0.0:
             return
         state.ship.hull_integrity = self._clamp(state.ship.hull_integrity - amount)
+
+    def _radiation_level(self, value: float, elevated: float, high: float, extreme: float) -> str:
+        v = max(0.0, float(value))
+        if v >= extreme:
+            return "extreme"
+        if v >= high:
+            return "high"
+        if v >= elevated:
+            return "elevated"
+        return "low"
+
+    def _env_radiation_level(self, env_rad: float) -> str:
+        return self._radiation_level(
+            env_rad,
+            Balance.RAD_LEVEL_ENV_ELEVATED,
+            Balance.RAD_LEVEL_ENV_HIGH,
+            Balance.RAD_LEVEL_ENV_EXTREME,
+        )
+
+    def _internal_radiation_level(self, internal_rad: float) -> str:
+        return self._radiation_level(
+            internal_rad,
+            Balance.RAD_LEVEL_INTERNAL_ELEVATED,
+            Balance.RAD_LEVEL_INTERNAL_HIGH,
+            Balance.RAD_LEVEL_INTERNAL_EXTREME,
+        )
+
+    def _drone_dose_level(self, dose: float) -> str:
+        return self._radiation_level(
+            dose,
+            Balance.RAD_LEVEL_DRONE_DOSE_ELEVATED,
+            Balance.RAD_LEVEL_DRONE_DOSE_HIGH,
+            Balance.RAD_LEVEL_DRONE_DOSE_EXTREME,
+        )
+
+    def _radiation_alert_severity(self, level: str) -> Severity:
+        if level == "extreme":
+            return Severity.CRITICAL
+        if level in {"high", "elevated"}:
+            return Severity.WARN
+        return Severity.INFO
+
+    def _emit_radiation_level_change_alert(
+        self,
+        state: GameState,
+        *,
+        source: SourceRef,
+        target_kind: str,
+        target_id: str,
+        metric: str,
+        from_level: str,
+        to_level: str,
+        value: float,
+    ) -> Event | None:
+        if not from_level or from_level == "unknown" or from_level == to_level:
+            return None
+        severity = self._radiation_alert_severity(to_level)
+        message = f"Radiation level changed ({metric}) {from_level} -> {to_level}"
+        return self._make_event(
+            state,
+            EventType.ACTION_WARNING,
+            severity,
+            source,
+            message,
+            data={
+                "message_key": "radiation_level_changed",
+                "metric": metric,
+                "target_kind": target_kind,
+                "target_id": target_id,
+                "from_level": from_level,
+                "to_level": to_level,
+                "value": max(0.0, float(value)),
+            },
+        )
+
+    def _update_ship_radiation_level_alerts(self, state: GameState, env_rad: float, internal_rad: float) -> list[Event]:
+        events: list[Event] = []
+        ship = state.ship
+
+        env_level = self._env_radiation_level(env_rad)
+        env_event = self._emit_radiation_level_change_alert(
+            state,
+            source=SourceRef(kind="ship", id=ship.ship_id),
+            target_kind="ship",
+            target_id=ship.ship_id,
+            metric="env",
+            from_level=ship.radiation_env_level,
+            to_level=env_level,
+            value=env_rad,
+        )
+        ship.radiation_env_level = env_level
+        if env_event:
+            events.append(env_event)
+
+        internal_level = self._internal_radiation_level(internal_rad)
+        internal_event = self._emit_radiation_level_change_alert(
+            state,
+            source=SourceRef(kind="ship", id=ship.ship_id),
+            target_kind="ship",
+            target_id=ship.ship_id,
+            metric="internal",
+            from_level=ship.radiation_internal_level,
+            to_level=internal_level,
+            value=internal_rad,
+        )
+        ship.radiation_internal_level = internal_level
+        if internal_event:
+            events.append(internal_event)
+
+        return events
+
+    def _update_drone_radiation_level_alerts(self, state: GameState) -> list[Event]:
+        events: list[Event] = []
+        for drone in state.ship.drones.values():
+            current = self._drone_dose_level(drone.dose_rad)
+            alert = self._emit_radiation_level_change_alert(
+                state,
+                source=SourceRef(kind="drone", id=drone.drone_id),
+                target_kind="drone",
+                target_id=drone.drone_id,
+                metric="drone_dose",
+                from_level=drone.radiation_level,
+                to_level=current,
+                value=drone.dose_rad,
+            )
+            drone.radiation_level = current
+            if alert:
+                events.append(alert)
+        return events
 
     def _drone_rad_decay_mult(self, dose: float) -> float:
         if dose >= Balance.DRONE_RAD_DOSE_CRITICAL:

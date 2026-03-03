@@ -8,6 +8,7 @@ from retorno.cli import repl
 from retorno.config.balance import Balance
 from retorno.core.engine import Engine
 from retorno.model.drones import DroneLocation, DroneState, DroneStatus
+from retorno.model.events import EventType
 from retorno.model.systems import SystemState
 
 
@@ -162,6 +163,52 @@ def main() -> None:
     state.ship.systems["energy_distribution"].state = SystemState.OFFLINE
     engine._update_drone_maintenance(state, 10.0)  # noqa: SLF001
     assert drone.dose_rad == 5.0
+
+    # 10) Radiation level warnings are emitted on threshold change only.
+    state = _fresh_state()
+    _set_node(state, "UNKNOWN_00")
+    baseline_events = engine.tick(state, 1.0)
+    assert not any(
+        e.type == EventType.ACTION_WARNING and e.data.get("message_key") == "radiation_level_changed"
+        for e in baseline_events
+    )
+
+    _set_node(state, "CARNAVAL_34")
+    ship_change_events = engine.tick(state, 1.0)
+    ship_rad_events = [
+        e
+        for e in ship_change_events
+        if e.type == EventType.ACTION_WARNING and e.data.get("message_key") == "radiation_level_changed"
+    ]
+    assert any(e.data.get("metric") == "env" for e in ship_rad_events), ship_rad_events
+    assert any(e.data.get("metric") == "internal" for e in ship_rad_events), ship_rad_events
+
+    drone = state.ship.drones["D1"]
+    drone.status = DroneStatus.DEPLOYED
+    drone.location = DroneLocation(kind="ship_sector", id="PWR-A2")
+    drone.dose_rad = Balance.RAD_LEVEL_DRONE_DOSE_HIGH - 0.01
+    drone.radiation_level = "elevated"
+    drone_cross_events = engine.tick(state, 1.0)
+    drone_rad_events = [
+        e
+        for e in drone_cross_events
+        if e.type == EventType.ACTION_WARNING
+        and e.data.get("message_key") == "radiation_level_changed"
+        and e.data.get("metric") == "drone_dose"
+        and e.data.get("target_id") == "D1"
+    ]
+    assert drone_rad_events, drone_cross_events
+
+    drone_same_band_events = engine.tick(state, 1.0)
+    drone_same_band_rad_events = [
+        e
+        for e in drone_same_band_events
+        if e.type == EventType.ACTION_WARNING
+        and e.data.get("message_key") == "radiation_level_changed"
+        and e.data.get("metric") == "drone_dose"
+        and e.data.get("target_id") == "D1"
+    ]
+    assert not drone_same_band_rad_events, drone_same_band_rad_events
 
     print("RADIATION/HULL SMOKE PASSED")
 

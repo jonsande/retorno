@@ -45,11 +45,16 @@ def build_header(state) -> str:
 
 
 def build_power_lines(state) -> list[str]:
-    p = state.ship.power
+    ship = state.ship
+    p = ship.power
     soc = (p.e_batt_kwh / p.e_batt_max_kwh) if p.e_batt_max_kwh else 0.0
     net = p.p_gen_kw - p.p_load_kw
+    env_rad = max(0.0, float(ship.radiation_env_rad_per_s))
+    internal_rad = repl._compute_internal_radiation_for_status(ship.hull_integrity, env_rad)
     return [
         f"P_gen={p.p_gen_kw:.2f}kW  P_load={p.p_load_kw:.2f}kW  net={net:+.2f}kW  SoC={soc:.2f}  Q={p.power_quality:.2f}"
+        f" | hull={ship.hull_integrity:.2f}"
+        f" | rad env={env_rad:.4f}rad/s internal={internal_rad:.4f}rad/s"
     ]
 
 

@@ -21,6 +21,8 @@
 
 === NAVIGATION / ROUTES / WORLD GEN ===
 
+- [ ] Se debería poder viajar a un sector. Los nodos de sector CREO que se en el código se llaman nav_point. Sea como sea, unas coordenadas de sector tienen que poder ser un destino válido (luego también un target válido de "route solve"). De este modo se abre la puerta a acudir a sectores del espacio e investigar qué hay en ellos.
+- [ ] Desde un nodo "transit" (temporal) sólo deja navegar a origen/destino del viaje abortado. Debería dejar hacer un "route solve" a otros puntos en rango y, si la ruta es viable, permitirse esa navegación también. 
 - [ ] En las naves, estaciones, etc. visitadas se genera algo de scrap con el tiempo. Esto responde a la idea de que las estaciones, naves, etc. van deteriorándose y siempre es posible recuperar de ellas algo nuevo. También preveo algún módulo que permita desmantelar estaciones, algo que llevaría mucho tiempo hacer, pero que produciría mucho scrap.
 - [ ] ¡Las estaciones, naves, etc. deben deteriorarse y y acabar desapareciendo con el tiempo! Todo rastro humano debe ir desapareciendo, teniendo en cuenta que una estación o nave abandonada difícilmente puede sobrevivir millones de años en el universo. Para una versión 3 o 4 del juego, se puede quizá diseñar un evento que haga que (alguna especie desconocida o resto de vida humana) vuelva a fabricar estaciones, naves, navegar por el espacio, etc. 
 - [ ] Alguna forma de generar el grafo del mundo en el estado actual, bien sea con fines de debug o con fines de que pueda en un futuro desarrollarse un módulo instalable que permita visualizarlo en pantalla del juego.
@@ -121,6 +123,10 @@ Esto da variedad, pero no lo haría aún como primer sistema.
 
 - [ ] Módulo instalable que permita automatizar ciertas tareas en tránsito (aunque el PJ esté hibernando). Por ejemplo, llevar a cabo un scan cada x tiempo (configurable por el jugador), y dar la opcion de deshibernar en caso de que se detecte algo nuevo.
 
+- [ ] Módulo para aumentar el rango de route solve.
+
+- [ ] Módulo de sonido de drones. Oir los sonidos que hacen los drones al operar, con un sonidito distinto por cada tipo de job o fallo, etc.
+
 
 === WIN/LOST CONDITIONS AND LOOPS ===
 
@@ -128,16 +134,17 @@ Esto da variedad, pero no lo haría aún como primer sistema.
 
 === OTROS / SIN CATALOGAR ===
 
-- [ ] Necesitamos mensajes de advertencia (si es que no los hay) cada vez que haya un cambio muy brusco de radiación, y cada vez que se entre o salga de alguno de los umbrales de radiación. Definir umbrales "muy baja", "baja", "normal", "alta", "muy alta", "extrema".
+- [ ] Eventos aleatorios durante viajes/hibernación.
 
-- [ ] Necesitamos diseñar una forma de limpiar la nave (e. e. el hull y los sistemas o lo que sea) de radiación. Actualmente no hay ninguna. Podría haber algunas estaciones especializadas en ello. Y algún módulo que redujeran lentamente la radiación.
+- [x] Necesitamos mensajes de advertencia (si es que no los hay) cada vez que haya un cambio muy brusco de radiación, y cada vez que se entre o salga de alguno de los umbrales de radiación. Definir umbrales "muy baja", "baja", "normal", "alta", "muy alta", "extrema".
+
+- [ ] Posible contamination_ship (rad que se acumula y se disipa lento y ha que limpiar). La fórmula sería  internal_rad = env_rad * ingress_factor + contamination_rad. Por otra parte, necesitamos diseñar una forma de limpiar la nave (e. e. el hull y los sistemas o lo que sea) de radiación. Podría haber algunas estaciones especializadas en ello. Y algún módulo que redujeran lentamente la radiación. Y operaciones con drones.
 
 - [ ] Módulos para drones. Aumento de shield_factor de radiación, aumento de batería, velocidad, opciones de ataque o defensa, soplete, etc.
 
 - [x] Quiero que me generes un documento en "/home/jon/prog/retorno_case/retorno_docs/" en el que se le explique a chatGPT exactamente qué debe hacerse y cómo (incluyendo ejemplos) para crear nuevos arcos y para crear singles. La idea es que con esas instrucciones chatGPT pueda crearme nuevos arcos y singles.
 
-- [!] Al dockear en una nave o estación, actualmente, esa nave o estación transmite radiación de algún modo a la nave del personaje-jugador, o puede afectarla de algún modo? Debe afectarla, de forma que eso meta presión también para las operaciones de salvage. También debe pasar radiación a los drones. Hay por cierto que checkear de qué manera está afectando la radiación a los drones ahora mismo. Y cómo se limpia la nave y los drones de raciacióń, y a qué ratios.
-
+- [ ] Al dockear en una nave o estación, algunas naves o estaciones añaden rads/s a los rad/s del nodo.
 - [ ] Ship survey tiene que servir también para obtener un informe del nivel de radiación del nodo dockable (y así poder valorar si merece la pena dockear o no).
 
 - [ ] Modelo avanzado de salvage. La opción simplificada (la actual, siempre estará disponible). La avanzada (juego dungeoning) tendrá riesgos, y llevará más tiempo, pero también posibles recompensas mayores. Este modelo avanzado de salvage requiere un nuevo comando "drone survey" entre otros muchos. Desarrollar una v0.
@@ -150,11 +157,7 @@ El paso de un sector a otro estará bloqueado por puertas. A veces esas puertas 
 
 - [ ] HAcer dock tiene que tener una pequeña posibilidad de que "se meta algo" en tu nave al dockear, u otros eventos.
 
-- [!] Se tiene que poder "añadir jobs a la cola". Es decir, añadir comandos a ejecutarse cuando se acaben las tareas actualmente en cola.Poder indicarle varios comandos en cadena, que cada cual se ejecute sólo cuando haya acabado el anterior.
-
-- [ ] Que sentido tiene que "contacts" dependa de sensors? Qué operaciones/comandos dependen actualmente de "sensors"?
-
-- [ ] A veces en textual al darle a TAB no se autocompleta (ni listan las opciones) sino que se cambia el foco de la ventana. Esto sólo sucede a veces.
+- [!] Se tiene que poder "añadir jobs a la cola". Es decir, una forma de introducir comandos que sólo se ejecuten una vez terminada la última tarea en cola.
 
 - [ ] Pegarle a chatGPT:
   - debug lore después de 1–2 uplinks
@@ -163,13 +166,9 @@ El paso de un sector a otro estará bloqueado por puertas. A veces esas puertas 
 
 - [ ] Enterarse de cuales son las consecuencias de no atender una alerta crítica u otra (pues ahora mismo no lo tengo muy claro).
 
-- [-] Hay que mejorar la definición de "atasco" urgenemente. Pasar a una v1. No se trata de que se generen por arte de magia destinos. Hace falta comprobar detenidamente si el jugador tiene algún modo (aunque él no lo sepa) de lograr una localización (a través de uplink o scan o salvage data u otro).
+- [?] Al hacer 'route <node_id>' a un node_id para el que ya conoces ruta,  no se debería iniciar el job. Debería salir un mensaje informando de que ya se conoce ruta a ese objetivo. Por otra parte, debería de haber un comando para cancelar jobs en curso.
 
-- [ ] Hay que modificar el comando "map". No es muy intuitivo. Podría ser algo como "ship sectors" o "map ship".
-
-- [?] Al  hacer 'route <node_id>' a un node_id para el que ya conoces ruta,  no se debería iniciar el job. Debería salir un mensaje informando de que ya se conoce ruta a ese objetivo. Por otra parte, debería de haber un comando para cancelar jobs en curso.
-
-- [ ] Al iniciar la hibernación, debería de salir un mensaje (localizado) diciendo algo así como "Iniciando secuencia de hibernación", y una serie de mensajes (meramente narrativos) diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la criogenización, y una cuenta atrás de 10 segundos. Después, debe limpiarse la pantalla de logs, esperar 3 segundos e imprimirse una serie de mensajes diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la descriogenización, junto con un mensaje (que se repetirá siempre), advirtiendo de que hay un problema crítico y no es posible descriogenizar completamente al sujeto del sarcófago (es decir, al Personaje Jugador). El sarcófago del PJ debe tener un id, por cierto. 
+- [ ] Al iniciar la hibernación, debería de salir un mensaje (localizado) diciendo algo así como "Iniciando secuencia de hibernación", y una serie de mensajes (meramente narrativos) diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la criogenización, y una cuenta atrás de 10 segundos. Después, debe limpiarse la pantalla de logs, esperar 2 segundos e imprimirse una serie de mensajes diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la descriogenización, junto con un mensaje (que se repetirá siempre), advirtiendo de que hay un problema crítico y no es posible descriogenizar completamente al sujeto del sarcófago (es decir, al Personaje Jugador). El sarcófago del PJ debe tener un id, por cierto. 
 
 - [ ] Necesitamos una merjor organización del help.
 
@@ -179,14 +178,12 @@ El paso de un sector a otro estará bloqueado por puertas. A veces esas puertas 
 
 - [ ] Ahora mismo los manuals se han generado con un tono "diegético". Me gustaría ver cómo sería la versión más "técnica", pues chatgpt y codex me la han propuesto varias veces pero siempre la he rechazado sin llegar a ver cómo sería.
 
-- [x] El comando "travel" hay que cambiarlo quizá por "navigate" (o algo primero como "trazar ruta" y después "navigate").
-
-- [-] Ahora mismo si queremos viajar a "S+000_-001_-001:02: Relay-97 (relay) dist=1.30ly" hace falta introducir "travel S+000_-001_-001:0". Me gustaría que también se pudiera introducit "travel Realy-97" simplemente, y que el autocompletado funcionara. Y por cierto: ¿qué quiere decir "000_-001_-001:02"? ¿Son unas coordenadas? Si es así, creo que estaría bien indicar de algún modo que esa numeración son unas coordenadas. 
+- [x] El comando "travel" hay que cambiarlo quizá por "navigate" (o algo primero como "trazar ruta" y después "navigate"). 
 
 - [ ] También creo que tendría que aparecer en primer lugar el nombre de la hubicación (si la tiene), por ejemplo Relay-97 (relay) dist=1.30ly coord=S+000_-001_-001:02""
 
 
-- [ ] dose es la dosis acumulada de radiación que ha recibido el dron (en rad). Se incrementa cada tick en función de la radiación ambiental (state.ship.radiation_env_rad_per_s) y el shield_factor del dron:
+- [x] dose es la dosis acumulada de radiación que ha recibido el dron (en rad). Se incrementa cada tick en función de la radiación ambiental (state.ship.radiation_env_rad_per_s) y el shield_factor del dron:
 drone.dose_rad += r_env * shield_factor * dt
 Ahora mismo es informativo (no afecta directamente a integridad/batería), pero lo usamos como base para futuras penalizaciones o fallos por exposición prolongada. Si quieres, puedo añadir un aviso cuando supere umbrales, o hacerlo afectar a la integridad.
 

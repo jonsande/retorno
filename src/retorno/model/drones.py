@@ -38,6 +38,7 @@ class DroneState:
 
     shield_factor: float = 1.0
     dose_rad: float = 0.0
+    radiation_level: str = "unknown"
     link_quality: float = 1.0
 
     cargo: Inventory = field(default_factory=Inventory)

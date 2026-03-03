@@ -1055,6 +1055,68 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             continue
         if e.type == EventType.ACTION_WARNING:
             locale = state.os.locale.value
+            if e.data.get("message_key") == "radiation_level_changed":
+                level_labels = {
+                    "en": {
+                        "low": "low",
+                        "elevated": "elevated",
+                        "high": "high",
+                        "extreme": "extreme",
+                    },
+                    "es": {
+                        "low": "bajo",
+                        "elevated": "elevado",
+                        "high": "alto",
+                        "extreme": "extremo",
+                    },
+                }
+                metric_labels = {
+                    "en": {
+                        "env": "ambient radiation",
+                        "internal": "internal radiation",
+                        "drone_dose": "drone dose",
+                    },
+                    "es": {
+                        "env": "radiación ambiental",
+                        "internal": "radiación interna",
+                        "drone_dose": "dosis de dron",
+                    },
+                }
+                templates = {
+                    "en": "[{sev}] radiation :: {target} {metric}: {from_level} -> {to_level} ({value_txt})",
+                    "es": "[{sev}] radiación :: {target} {metric}: {from_level} -> {to_level} ({value_txt})",
+                }
+                metric = e.data.get("metric", "")
+                value = max(0.0, float(e.data.get("value", 0.0) or 0.0))
+                if metric in {"env", "internal"}:
+                    value_txt = f"{value:.4f}rad/s"
+                else:
+                    value_txt = f"{value:.3f}"
+                level_map = level_labels.get(locale, level_labels["en"])
+                metric_map = metric_labels.get(locale, metric_labels["en"])
+                from_level = level_map.get(e.data.get("from_level", ""), e.data.get("from_level", "?"))
+                to_level = level_map.get(e.data.get("to_level", ""), e.data.get("to_level", "?"))
+                target_kind = e.data.get("target_kind", "")
+                target_id = e.data.get("target_id", "?")
+                if target_kind == "drone":
+                    target = target_id
+                else:
+                    target = "ship" if locale == "en" else "nave"
+                payload.update(
+                    {
+                        "target": target,
+                        "metric": metric_map.get(metric, metric),
+                        "from_level": from_level,
+                        "to_level": to_level,
+                        "value_txt": value_txt,
+                    }
+                )
+                tmpl = templates.get(locale, templates["en"])
+                try:
+                    print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
+                except Exception:
+                    print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
+                continue
             tmpl = action_warning_templates.get(locale, action_warning_templates["en"])
             payload.update({"message": e.message})
             try:
@@ -1294,6 +1356,35 @@ def _compute_internal_radiation_for_status(hull_integrity: float, env_rad: float
     return max(0.0, env_rad) * ingress
 
 
+def _radiation_level_id(value: float, elevated: float, high: float, extreme: float) -> str:
+    v = max(0.0, float(value))
+    if v >= extreme:
+        return "extreme"
+    if v >= high:
+        return "high"
+    if v >= elevated:
+        return "elevated"
+    return "low"
+
+
+def _radiation_level_label(locale: str, level: str) -> str:
+    labels = {
+        "en": {
+            "low": "low",
+            "elevated": "elevated",
+            "high": "high",
+            "extreme": "extreme",
+        },
+        "es": {
+            "low": "bajo",
+            "elevated": "elevado",
+            "high": "alto",
+            "extreme": "extremo",
+        },
+    }
+    return labels.get(locale, labels["en"]).get(level, level)
+
+
 def render_status(state) -> None:
     ship = state.ship
     p = ship.power
@@ -1384,8 +1475,24 @@ def render_status(state) -> None:
     )
     env_rad = max(0.0, float(ship.radiation_env_rad_per_s))
     internal_rad = _compute_internal_radiation_for_status(ship.hull_integrity, env_rad)
+    env_level = _radiation_level_id(
+        env_rad,
+        Balance.RAD_LEVEL_ENV_ELEVATED,
+        Balance.RAD_LEVEL_ENV_HIGH,
+        Balance.RAD_LEVEL_ENV_EXTREME,
+    )
+    internal_level = _radiation_level_id(
+        internal_rad,
+        Balance.RAD_LEVEL_INTERNAL_ELEVATED,
+        Balance.RAD_LEVEL_INTERNAL_HIGH,
+        Balance.RAD_LEVEL_INTERNAL_EXTREME,
+    )
     print(f"hull: {ship.hull_integrity:.2f}")
-    print(f"radiation: env={env_rad:.4f}rad/s internal={internal_rad:.4f}rad/s")
+    print(
+        "radiation: "
+        f"env={env_rad:.4f}rad/s ({_radiation_level_label(locale, env_level)}) "
+        f"internal={internal_rad:.4f}rad/s ({_radiation_level_label(locale, internal_level)})"
+    )
     core_os = ship.systems.get("core_os")
     if core_os:
         if core_os.state == SystemState.OFFLINE:
@@ -1629,12 +1736,20 @@ def render_jobs(state, limit: int | None = 5) -> None:
 
 def render_drone_status(state) -> None:
     print("\n=== DRONES ===")
+    locale = state.os.locale.value
     for did, d in state.ship.drones.items():
+        dose_level = _radiation_level_id(
+            d.dose_rad,
+            Balance.RAD_LEVEL_DRONE_DOSE_ELEVATED,
+            Balance.RAD_LEVEL_DRONE_DOSE_HIGH,
+            Balance.RAD_LEVEL_DRONE_DOSE_EXTREME,
+        )
         ar_mode = "on" if d.autorecall_enabled else "off"
         ar_threshold = int(round(d.autorecall_threshold * 100.0))
         print(
             f"- drone_id={did} status={d.status.value} loc={d.location.kind}:{d.location.id} "
-            f"battery={d.battery:.2f} integrity={d.integrity:.2f} dose={d.dose_rad:.3f} "
+            f"battery={d.battery:.2f} integrity={d.integrity:.2f} "
+            f"dose={d.dose_rad:.3f} ({_radiation_level_label(locale, dose_level)}) "
             f"autorecall={ar_mode}@{ar_threshold}%"
         )
 

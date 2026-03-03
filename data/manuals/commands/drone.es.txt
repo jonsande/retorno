@@ -17,6 +17,7 @@ Campos de status
 - battery: carga (0..1)
 - integrity: integridad estructural (0..1)
 - dose: radiación acumulada (rad)
+- dose muestra también banda textual: `bajo / elevado / alto / extremo`
 
 Notas operativas
 - Las acciones consumen batería (deploy/move/repair/install/salvage/recall/reboot).
