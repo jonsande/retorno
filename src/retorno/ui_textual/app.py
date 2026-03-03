@@ -25,7 +25,15 @@ from retorno.model.os import Locale, list_dir, normalize_path
 from retorno.runtime.loop import GameLoop
 from retorno.runtime.startup import load_startup_sequence_lines
 from retorno.ui_textual import presenter
-from retorno.io.save_load import LoadGameResult, SaveLoadError, load_single_slot, save_single_slot
+from retorno.io.save_load import (
+    LoadGameResult,
+    SaveLoadError,
+    load_single_slot,
+    normalize_user_id,
+    resolve_save_path,
+    save_exists,
+    save_single_slot,
+)
 
 
 class CommandInput(Input):
@@ -174,8 +182,9 @@ class RetornoTextualApp(App):
         # Binding("alt+]", "scroll_down", "Scroll down"),
     ]
 
-    def __init__(self, force_new_game: bool = False, save_path: str | None = None) -> None:
+    def __init__(self, force_new_game: bool = False, save_path: str | None = None, user: str | None = None) -> None:
         self._save_path = save_path
+        self._user = user
         self._exit_persist_done = False
         self._play_startup_sequence = False
         self._startup_notice = ""
@@ -190,7 +199,7 @@ class RetornoTextualApp(App):
             self._startup_notice = "[INFO] Started new game (save slot ignored by --new-game/RETORNO_NEW_GAME)."
         else:
             try:
-                loaded: LoadGameResult | None = load_single_slot(save_path)
+                loaded: LoadGameResult | None = load_single_slot(save_path, user=self._user)
             except SaveLoadError as exc:
                 state = create_initial_state_prologue()
                 self._play_startup_sequence = True
@@ -376,7 +385,7 @@ class RetornoTextualApp(App):
         self.loop.stop()
         try:
             with self.loop.with_lock() as state:
-                saved_path = save_single_slot(state, self._save_path)
+                saved_path = save_single_slot(state, self._save_path, user=self._user)
             print(f"[INFO] Game saved: {saved_path}")
         except SaveLoadError as exc:
             print(f"[WARN] Failed to save game: {exc}", file=sys.stderr)
@@ -1164,8 +1173,25 @@ class RetornoTextualApp(App):
                     self._pending_hibernate_requires_non_cruise = False
                     self._pending_wake_on_low_battery = False
                 else:
-                    self._log_line(f"> {action.__class__.__name__.lower()}")
-                    self._log_lines(presenter.build_command_output(self.loop.apply_action, action))
+                    if action.__class__.__name__ == "Travel":
+                        self._log_line(f"> nav {getattr(action, 'node_id', '?')}")
+                    else:
+                        self._log_line(f"> {action.__class__.__name__.lower()}")
+                    ev = self.loop.apply_action(action)
+                    if ev:
+                        with self.loop.with_lock() as state:
+                            lines = presenter.format_event_lines(state, [("cmd", e) for e in ev])
+                            if action.__class__.__name__ == "Travel":
+                                for e in ev:
+                                    if e.type == "travel_started" or e.type == repl.EventType.TRAVEL_STARTED:
+                                        dest = e.data.get("to", getattr(action, "node_id", "?"))
+                                        msg = {
+                                            "en": f"(nav) confirmed: en route to {dest}",
+                                            "es": f"(nav) confirmado: rumbo a {dest}",
+                                        }
+                                        lines.append(msg.get(state.os.locale.value, msg["en"]))
+                                        break
+                        self._log_lines(lines)
             else:
                 if action in {"HIBERNATE_DRONES", "HIBERNATE_WAKE", "HIBERNATE_NON_CRUISE"}:
                     self._pending_hibernate_parsed = None
@@ -1588,11 +1614,30 @@ def main() -> None:
         default=None,
         help="Override save slot path (default: ~/.retorno/savegame.dat).",
     )
+    parser.add_argument(
+        "--user",
+        default=None,
+        help="Save profile name (stored under ~/.retorno/users/<user>/savegame.dat).",
+    )
     args = parser.parse_args()
 
     env_force_new = os.environ.get("RETORNO_NEW_GAME", "").strip().lower() in {"1", "true", "yes", "on"}
     force_new_game = args.new_game or env_force_new
-    RetornoTextualApp(force_new_game=force_new_game, save_path=args.save_path).run()
+    try:
+        profile_user = normalize_user_id(args.user)
+    except SaveLoadError as exc:
+        print(f"[ERROR] {exc}")
+        return
+    if force_new_game and save_exists(args.save_path, user=profile_user):
+        save_path = resolve_save_path(args.save_path, user=profile_user)
+        try:
+            reply = input(f"[WARN] Existing save found at {save_path}. Start a new game anyway? [y/N]: ").strip().lower()
+        except EOFError:
+            reply = ""
+        if reply not in {"y", "yes", "s", "si", "sí"}:
+            print("Cancelled.")
+            return
+    RetornoTextualApp(force_new_game=force_new_game, save_path=args.save_path, user=profile_user).run()
 
 
 if __name__ == "__main__":

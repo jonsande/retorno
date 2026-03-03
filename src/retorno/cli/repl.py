@@ -25,7 +25,15 @@ from retorno.model.jobs import JobStatus, JobType
 from retorno.runtime.data_loader import load_modules, load_arcs, load_locations
 from retorno.runtime.startup import load_startup_sequence_lines
 from retorno.config.balance import Balance
-from retorno.io.save_load import LoadGameResult, SaveLoadError, load_single_slot, save_single_slot
+from retorno.io.save_load import (
+    LoadGameResult,
+    SaveLoadError,
+    load_single_slot,
+    normalize_user_id,
+    resolve_save_path,
+    save_exists,
+    save_single_slot,
+)
 from retorno.model.systems import SystemState
 from retorno.model.drones import DroneStatus
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, list_dir, normalize_path, read_file, required_access_label
@@ -4477,6 +4485,11 @@ def main() -> None:
         default=None,
         help="Override save slot path (default: ~/.retorno/savegame.dat).",
     )
+    parser.add_argument(
+        "--user",
+        default=None,
+        help="Save profile name (stored under ~/.retorno/users/<user>/savegame.dat).",
+    )
     args = parser.parse_args()
 
     if not isinstance(sys.stdout, _TeeStdout):
@@ -4492,6 +4505,20 @@ def main() -> None:
     scenario = os.environ.get("RETORNO_SCENARIO", "prologue").lower()
     env_force_new = os.environ.get("RETORNO_NEW_GAME", "").strip().lower() in {"1", "true", "yes", "on"}
     force_new_game = args.new_game or env_force_new
+    try:
+        profile_user = normalize_user_id(args.user)
+    except SaveLoadError as exc:
+        print(f"[ERROR] {exc}")
+        return
+    if force_new_game and save_exists(args.save_path, user=profile_user):
+        save_path = resolve_save_path(args.save_path, user=profile_user)
+        try:
+            reply = input(f"[WARN] Existing save found at {save_path}. Start a new game anyway? [y/N]: ").strip().lower()
+        except EOFError:
+            reply = ""
+        if reply not in {"y", "yes", "s", "si", "sí"}:
+            print("Cancelled.")
+            return
 
     play_startup_sequence = False
     startup_message = ""
@@ -4505,7 +4532,7 @@ def main() -> None:
         startup_message = "[INFO] Started new game (save slot ignored by --new-game/RETORNO_NEW_GAME)."
     else:
         try:
-            loaded: LoadGameResult | None = load_single_slot(args.save_path)
+            loaded: LoadGameResult | None = load_single_slot(args.save_path, user=profile_user)
         except SaveLoadError as exc:
             state = create_initial_state_prologue()
             play_startup_sequence = True
@@ -4901,7 +4928,7 @@ def main() -> None:
         loop.stop()
         try:
             with loop.with_lock() as locked_state:
-                saved_path = save_single_slot(locked_state, args.save_path)
+                saved_path = save_single_slot(locked_state, args.save_path, user=profile_user)
             print(f"[INFO] Game saved: {saved_path}")
         except SaveLoadError as exc:
             print(f"[WARN] Failed to save game: {exc}")

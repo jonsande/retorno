@@ -1,0 +1,168 @@
+SHIP OS — Sistemas y mantenimiento operacional (Copia de campo)
+Ref: OS-MAN/ENG/SYSTEMS-01
+
+El mantenimiento de sistemas no es una tarea secundaria: es la condicion de supervivencia de la nave.
+En RETORNO, dejar que un sistema se degrade no solo afecta a ese subsistema; arrastra calidad de energia (Q),
+consumo, disponibilidad de comandos y, en cadena, la viabilidad de los sarcófagos.
+
+Prioridad operativa recomendada
+1) Mantener viva la base critica: life_support, core_os, power_core, energy_distribution.
+2) Recuperar estabilidad electrica (Q) antes de operaciones complejas.
+3) Restaurar sensores y data_core para volver a navegar e inspeccionar.
+4) Mantener drone_bay operativo para cerrar el ciclo de reparacion/mantenimiento de drones.
+
+Modelo de estados (comun a todos los sistemas)
+- OFFLINE: sistema inactivo. Servicio asociado parado. Sin consumo del propio sistema.
+- CRITICAL: sistema muy deteriorado. Riesgo alto de bloqueo operativo.
+- DAMAGED: sistema degradado funcionalmente.
+- LIMITED: sistema operativo con capacidad parcial.
+- NOMINAL: operacion normal.
+- UPGRADED: operacion mejorada por encima de nominal.
+
+Umbrales de salud (por defecto)
+- salud <= 0.00 -> OFFLINE
+- salud < 0.35  -> CRITICAL
+- salud < 0.60  -> DAMAGED
+- salud < 0.85  -> LIMITED
+- salud >= 0.85 -> NOMINAL
+
+Consumo relativo por estado (factor sobre p_nom_kw)
+- OFFLINE: 0.00
+- CRITICAL: 1.35
+- DAMAGED: 1.20
+- LIMITED: 0.80
+- NOMINAL: 1.00
+- UPGRADED: 1.10
+
+Sistemas principales de la nave RETORNO (qué hace cada uno y consecuencias por estado)
+
+core_os
+- Qué es: capa minima de control de terminal, jobs y sesion de operador.
+- Consecuencias:
+  - LIMITED: bloquea comandos avanzados (uplink, route solve, auth recover).
+  - CRITICAL: solo queda el set de recuperacion de emergencia.
+  - OFFLINE: bloqueo de terminal (solo set minimo de terminal).
+  - NOMINAL/UPGRADED: control completo (si el resto de condiciones lo permite).
+
+Set minimo de terminal (cuando core_os esta OFFLINE o hay terminal_lock)
+- help, clear, exit
+- status
+- logs, alerts, jobs
+- log copy [n], alerts explain <alert_key>, jobs <n|all>
+- debug on|off|status, debug arcs, debug lore, debug deadnodes, debug modules, debug seed <n>, debug scenario <preset>
+
+life_support
+- Qué es: soporte vital del sarcofago (atmosfera, termica, perfusion).
+- Consecuencias:
+  - LIMITED/CRITICAL: hibernacion bloqueada.
+  - OFFLINE: inicia cuenta atras de viabilidad; al agotarse la cuenta atrás de gracia, la terminal y el huesped entran en estado terminal.
+  - NOMINAL/UPGRADED: hibernacion permitida (si Q y energia lo permiten).
+
+power_core
+- Qué es: generacion primaria de potencia.
+- Consecuencias directas por estado (salida de generacion):
+  - OFFLINE: 0%
+  - CRITICAL: 25%
+  - DAMAGED: 50%
+  - LIMITED: 75%
+  - NOMINAL/UPGRADED: 100%
+- Efecto operativo: menos P_gen => mas deficit, Q mas baja, mas riesgo de brownout.
+
+energy_distribution
+- Qué es: bus de distribucion, fase y estabilidad de red.
+- Consecuencias:
+  - LIMITED/DAMAGED: penaliza Q (red menos estable).
+  - CRITICAL: penaliza Q aun mas.
+  - OFFLINE: colapso de distribucion; sistemas no criticos pasan a OFFLINE automaticamente.
+  - OFFLINE: sin soporte energetico efectivo de bahia (sin recarga/descontaminacion/reparacion pasiva de drones).
+- Nota: es dependencia formal para arrancar sensors, security y data_core en estado >= nominal.
+
+data_core
+- Qué es: nucleo de datos y servicios de inventario/navdb (datad).
+- Consecuencias:
+  - POR DEBAJO de LIMITED (damaged/critical/offline): bloquea cargo audit, auth recover, uplink y map graph/path.
+  - OFFLINE: sin datad util para navegacion de datos.
+  - NOMINAL/UPGRADED: permite operaciones de datos completas (con datad en ejecucion).
+
+sensors
+- Que es: adquisicion de senal y deteccion de contactos (sensord).
+- Consecuencias:
+  - POR DEBAJO de LIMITED: bloquea scan/contacts y route solve.
+  - OFFLINE: sin barrido ni deteccion operativa.
+  - NOMINAL/UPGRADED: deteccion y resolucion de rutas con mejor fiabilidad.
+
+drone_bay
+- Que es: interfaz fisica de despliegue/retorno/soporte de drones.
+- Consecuencias:
+  - LIMITED: deploy/recall/install/reboot mas lentos; recarga y reparacion pasiva mas lentas.
+  - DAMAGED: lentitud mayor + riesgo de dano menor en integridad durante operaciones de bahia.
+  - CRITICAL: soporte muy degradado (reparacion pasiva lenta, cara y con posibilidad de fallo).
+  - OFFLINE: deploy normal bloqueado; install bloqueado; solo deploy de emergencia.
+  - OFFLINE de energy_distribution: anula soporte pasivo de bahia aunque drone_bay este online.
+
+security
+- Que es: capa de seguridad/servicio securityd (estructura preparada para futuras reglas).
+- Consecuencias:
+  - Hoy no bloquea comandos jugables por si sola, pero su estado afecta carga y supervivencia energetica.
+  - Requiere energy_distribution >= nominal para arrancar securityd.
+
+Efectos globales que cruzan sistemas
+- Estado critico de potencia (Q colapsada, brownout, core_os critical o energy_distribution offline):
+  desactiva operaciones no esenciales.
+- Q < 0.55: bloquea route solve, uplink y auth recover.
+- Q < 0.40: bloquea hibernacion y boot de servicios no criticos.
+- Brownout sostenido: acelera degradacion, especialmente en power_core y energy_distribution.
+
+Matriz de dependencias por comando (manuals/commands)
+Nota base: salvo excepciones de emergencia/terminal minima, todos dependen de que core_os permita operar.
+
+- about -> core_os.
+- alerts -> core_os.
+- auth -> core_os; auth recover requiere data_core >= limited + datad running + Q >= 0.55.
+- boot -> sistema objetivo (service host) + dependencias del sistema (p.ej. energy_distribution >= nominal para datad/sensord/securityd).
+- cargo -> core_os (alias de inventory).
+- cat -> core_os.
+- config -> core_os.
+- contacts -> sensors >= limited + sensord running.
+- debug -> core_os.
+- diag -> core_os (consulta de sistemas).
+- dock -> core_os (sin dependencia de subsistema concreto; sujeto a estado de potencia/terminal).
+- drone -> drones + drone_bay para deploy/install/soporte; deploy normal requiere drone_bay online (deploy! permite emergencia).
+- hibernate -> life_support nominal/upgraded + Q >= 0.40 + sin brownout.
+- install -> heredado; redirige a drone install (depende de drone_bay para soporte).
+- intel -> core_os (sin requisito duro de sistema dedicado en la implementacion actual).
+- inventory -> core_os (lectura de manifiesto).
+- inventory_update -> data_core >= limited + datad running (via cargo/inventory audit).
+- job -> core_os (gestion de jobs activos).
+- jobs -> core_os (listado de jobs).
+- locate -> core_os.
+- log -> core_os.
+- logs -> core_os.
+- ls -> core_os.
+- mail -> core_os.
+- man -> core_os.
+- map -> map ship: core_os; map graph/path: data_core >= limited + datad running.
+- module -> core_os (inspeccion/listado; install real via drones).
+- modules -> core_os.
+- nav -> core_os (y rutas conocidas); afectado por estado critico de potencia.
+- power -> core_os + red electrica (control de on/off/plan/estado).
+- relay -> alias de uplink: data_core >= limited + datad running + nodo relay/waystation + acoplado.
+- repair -> dron operador desplegado y con bateria; si es selftest, requiere modulo self-test rig.
+- route -> sensors >= limited + sensord running + Q >= 0.55 + objetivo en rango.
+- salvage -> dron desplegado y con bateria (sin requisito directo de drone_bay si ya esta fuera).
+- scan -> sensors >= limited + sensord running.
+- sectors -> core_os (vista de sectores de nave).
+- shutdown -> alias de power off.
+- status -> core_os (comando de estado).
+- system -> alias de power on/off.
+- travel -> alias de nav.
+- undock -> core_os (sin subsistema especifico; sujeto a estado critico de potencia).
+- uplink -> data_core >= limited + datad running + acoplado en relay/waystation/station + Q >= 0.55 + sin brownout.
+- wait -> core_os + modo DEBUG activo.
+
+Protocolo minimo de mantenimiento continuo
+1) Vigila status + power status en cada ciclo operativo.
+2) Si Q cae, prioriza repair energy_distribution y power_core.
+3) Recupera data_core/sensors para volver a generar conocimiento de rutas.
+4) Manten drone_bay fuera de OFFLINE para no perder capacidad de mantenimiento.
+5) No entres en hibernacion con life_support degradado o red inestable.

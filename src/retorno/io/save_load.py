@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import os
 import pickle
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -11,6 +12,7 @@ from retorno.core.gamestate import GameState
 _SAVE_MAGIC = b"RETORNO_SAVE_V1"
 _DEFAULT_SLOT_FILENAME = "savegame.dat"
 _BACKUP_SUFFIX = ".bak"
+_USER_RE = re.compile(r"^[a-z0-9](?:[a-z0-9._-]{0,30}[a-z0-9])?$")
 
 
 class SaveLoadError(RuntimeError):
@@ -24,7 +26,7 @@ class LoadGameResult:
     path: Path
 
 
-def resolve_save_path(save_path: str | Path | None = None) -> Path:
+def resolve_save_path(save_path: str | Path | None = None, user: str | None = None) -> Path:
     if save_path is not None:
         return Path(save_path).expanduser().resolve()
 
@@ -32,25 +34,34 @@ def resolve_save_path(save_path: str | Path | None = None) -> Path:
     if env_save_path:
         return Path(env_save_path).expanduser().resolve()
 
+    base_dir = Path.home() / ".retorno"
     env_save_dir = os.environ.get("RETORNO_SAVE_DIR", "").strip()
     if env_save_dir:
-        return (Path(env_save_dir).expanduser() / _DEFAULT_SLOT_FILENAME).resolve()
+        base_dir = Path(env_save_dir).expanduser()
 
-    return (Path.home() / ".retorno" / _DEFAULT_SLOT_FILENAME).resolve()
+    normalized_user = normalize_user_id(user)
+    if normalized_user:
+        return (base_dir / "users" / normalized_user / _DEFAULT_SLOT_FILENAME).resolve()
+
+    env_user = normalize_user_id(os.environ.get("RETORNO_USER"))
+    if env_user:
+        return (base_dir / "users" / env_user / _DEFAULT_SLOT_FILENAME).resolve()
+
+    return (base_dir / _DEFAULT_SLOT_FILENAME).resolve()
 
 
-def save_exists(save_path: str | Path | None = None) -> bool:
-    return resolve_save_path(save_path).exists()
+def save_exists(save_path: str | Path | None = None, user: str | None = None) -> bool:
+    return resolve_save_path(save_path, user=user).exists()
 
 
-def save_single_slot(state: GameState, save_path: str | Path | None = None) -> Path:
-    path = resolve_save_path(save_path)
+def save_single_slot(state: GameState, save_path: str | Path | None = None, user: str | None = None) -> Path:
+    path = resolve_save_path(save_path, user=user)
     payload = _pack_state(state)
     tmp_path = path.with_suffix(path.suffix + ".tmp")
     backup_path = _backup_path(path)
 
-    path.parent.mkdir(parents=True, exist_ok=True)
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
         with tmp_path.open("wb") as fh:
             fh.write(payload)
             fh.flush()
@@ -72,8 +83,8 @@ def save_single_slot(state: GameState, save_path: str | Path | None = None) -> P
     return path
 
 
-def load_single_slot(save_path: str | Path | None = None) -> LoadGameResult | None:
-    path = resolve_save_path(save_path)
+def load_single_slot(save_path: str | Path | None = None, user: str | None = None) -> LoadGameResult | None:
+    path = resolve_save_path(save_path, user=user)
     backup_path = _backup_path(path)
 
     if not path.exists() and not backup_path.exists():
@@ -145,6 +156,19 @@ def _load_from_file(path: Path) -> GameState:
 
 def _backup_path(path: Path) -> Path:
     return Path(str(path) + _BACKUP_SUFFIX)
+
+
+def normalize_user_id(user: str | None) -> str | None:
+    if user is None:
+        return None
+    cleaned = user.strip().lower()
+    if not cleaned:
+        return None
+    if not _USER_RE.fullmatch(cleaned):
+        raise SaveLoadError(
+            "Invalid user id. Use 1-32 chars: a-z, 0-9, '.', '_' or '-', no spaces."
+        )
+    return cleaned
 
 
 def _fsync_dir(path: Path) -> None:

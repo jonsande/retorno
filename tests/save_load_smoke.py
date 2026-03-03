@@ -6,7 +6,13 @@ from tempfile import TemporaryDirectory
 from retorno.bootstrap import create_initial_state_prologue
 from retorno.core.engine import Engine
 from retorno.core.actions import DroneDeploy
-from retorno.io.save_load import SaveLoadError, load_single_slot, save_single_slot
+from retorno.io.save_load import (
+    SaveLoadError,
+    load_single_slot,
+    normalize_user_id,
+    resolve_save_path,
+    save_single_slot,
+)
 
 
 def main() -> None:
@@ -55,6 +61,21 @@ def main() -> None:
             pass
         else:
             raise AssertionError("Expected SaveLoadError when primary and backup are both corrupted")
+
+        # Per-user default slots should resolve to different paths.
+        alice_path = resolve_save_path(user="alice")
+        bob_path = resolve_save_path(user="bob")
+        assert alice_path != bob_path, "User profiles should not share the same default save path"
+        assert "/users/alice/" in str(alice_path), "alice path should include user folder"
+        assert "/users/bob/" in str(bob_path), "bob path should include user folder"
+
+        # Invalid user ids must fail fast.
+        try:
+            normalize_user_id("../bad")
+        except SaveLoadError:
+            pass
+        else:
+            raise AssertionError("Expected invalid user id to raise SaveLoadError")
 
     print("SAVE/LOAD SMOKE PASSED")
 

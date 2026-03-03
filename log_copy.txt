@@ -1,20 +1,40 @@
-> 
-=== STATUS ===
-time: Year 241 Day 1 09:07:31
-ship_mode: CRUISE (manual)
-location: UNKNOWN_00 (Unknown) [adrift]
-power: P_gen=0.00kW  P_load=2.10kW  net=-2.10kW headroom=7.90kW  SoC=0.00  Q=0.34  brownout=True
-hull: 0.85
-radiation: env=0.0005rad/s internal=0.0001rad/s
-life_support: critical (grace 0s remaining)
-inventory: scrap=64 modules=0 [manifest stale]
-systems:
- - core_os            state=damaged  health=0.46 svc=core_os running=True
- - life_support       state=critical health=0.27
- - power_core         state=offline  health=0.00 forced_offline
- - energy_distribution state=offline  health=0.00 forced_offline
- - drone_bay          state=offline  health=0.18 forced_offline
- - security           state=offline  health=0.16 forced_offline svc=securityd running=False
- - data_core          state=offline  health=0.16 forced_offline svc=datad running=False
- - sensors            state=offline  health=0.04 forced_offline svc=sensord running=False
-> DEBUG mode enabled
+(no signals detected)
+> boot sensord
+[CMD] [INFO] job_queued :: J6 boot_service target=service:sensord ETA=8s
+[AUTO] Service booted: sensord
+[AUTO] [INFO] signal_detected :: Signal detected: ECHO_7
+[AUTO] [WARN] system_state_changed :: power_core: limited -> nominal (cause=repair, health=0.90)
+[AUTO] Repair completed for power_core
+> drone recall
+[ERROR] Usage: drone recall <drone_id>
+> drone recall D1
+[CMD] [INFO] job_queued :: J7 recall_drone target=drone:D1 ETA=10s
+> map
+map blocked: datad not running. Try: boot datad
+[AUTO] Drone recalled: D1
+> contacts
+=== CONTACTS ===
+- ECHO-7 Relay Station (station) id=ECHO_7 dist=0.0000ly no_route unvisited
+- Unknown (origin) id=UNKNOWN_00 dist=0.0000ly route visited
+> scan
+=== SCAN ===
+- CURL-12 Waystation (station) id=CURL_12
+- ECHO-7 Relay Station (station) id=ECHO_7
+- Unknown (origin) id=UNKNOWN_00
+[INFO] (scan) fine range fixed: CURL_12 (3.86kmi)
+[INFO] (scan) fine range fixed: ECHO_7 (14.49kmi)
+(scan) new: CURL_12
+> nav routes
+=== NAV ROUTES ===
+(no known routes from UNKNOWN_00)
+Nearby contacts without known route:
+- CURL-12 Waystation (station) sector=S+000_+000_+000 id=CURL_12 dist=3.86kmi unvisited
+- ECHO-7 Relay Station (station) sector=S+000_+000_+000 id=ECHO_7 dist=14.49kmi unvisited
+Try: scan, route solve, intel, uplink (at relay/waystation), or acquire intel.
+> nav CURL_12
+WARNING: confirm nav to CURL_12. Continue? [y/N]
+> travel
+> nav ECHO_7
+WARNING: confirm nav to ECHO_7. Continue? [y/N]
+> travel
+> log copy 40

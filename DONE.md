@@ -1,5 +1,7 @@
 === INTEL ===
 
+- [x] Estando docked en CURL_12, al hacer "uplink" el juego crashea y me devuelve un error "AttributeError: 'list' object has no attribute 'events'".
+
 - [x] Quiero que cada hub authored pueda tener su tabla propia de hubs a obtener mediante uplink. Quiero que sea opcional, es decir, que si la tiene, se use, pero que si no la tiene se aplique _discover_routes_via_uplink() con normalidad. La idea sería la siguiente: me gustaría que los hub authored (es decir, los que tienen su propio json) tengan una "tabla" propia en la que se pueda especificar qué otros hubs authored se pueden descubrir vía uplink en ellos. En esa tabla habrá que especificar la lista de hubs authored que se pueden descubrir por esta vía, el número máximo y mínimo de hubs authored que se pueden descubrir por esta vía, y el peso/probabilidad de que sea uno u otro el que se descubra. Como digo, en caso de que la localización authored no incluya esa tabla, o sus valores estén vacíos, se deberá usar  _discover_routes_via_uplink() como se venía haciendo hasta ahora. Dime, antes de implementar nada, si lo ves viable, y si crees que puede entrar en conflicto o generar algún problema. Por otra parte, ten siempre en cuenta que nos interesa la robustez y la escalabilidad, y aprovechar las cosas que ya tenemos y funcionan.
 
 - [x] Cuando se introduce el comando 'intel' sin más parametros debería salir al final un hint (localizado) que recomendara usar 'intel import <path>' para añadir intel y 'intel show <intel_id>' para ver el detalle de los intels, y 'man intel' para saber más acerca del comando 'intel'.
@@ -13,7 +15,7 @@ c) si no es un LINK ni tampoco un node_id o name o coordenada identificable, hac
 
 Antes de implementar nada, dime si ves algún conflicto en lo que te planteo, si lo ves viable, o si prevées que pueda dar algún problema.
 
-- [x] Sistema procedural para descubrir información de rutas a nodos conocidos pero sin ruta conocida. A través de uplink y a través de un flag específico en los txt. El caso es que ahora mismo los datos corruptos (información entre etiquetas [INTEL][/INTEL] no procesable) genera contactos (nodos) sin ruta. Los INTEL incrustados también pueden generar (esto hay que confirmarlo) contactos authored pero sin ruta. Además, el generador de contactos de uplink _discover_routes_via_uplink() puede generar contactos sin rutas (confirmarlo). Así que el caso es que se van generando por distintas vías contactos sin ruta, y tiene que diseñarse una manera procedural de conseguir intel de rutas a contactos existentes, para que todo marche [P.D. ya diseñado; ver más abajo]. Empezar por preguntar a codex: Actualmente ¿de qué maneras se pueden averiguar rutas para contactos conocidos (contactos authored y contactos procedurales)?
+- [x] Failsafe de nodos muertos, colgados o fantasma. Sistema procedural para descubrir información de rutas a nodos conocidos pero sin ruta conocida. A través de uplink y a través de un flag específico en los txt. El caso es que ahora mismo los datos corruptos (información entre etiquetas [INTEL][/INTEL] no procesable) genera contactos (nodos) sin ruta. Los INTEL incrustados también pueden generar (esto hay que confirmarlo) contactos authored pero sin ruta. Además, el generador de contactos de uplink _discover_routes_via_uplink() puede generar contactos sin rutas (confirmarlo). Así que el caso es que se van generando por distintas vías contactos sin ruta, y tiene que diseñarse una manera procedural de conseguir intel de rutas a contactos existentes, para que todo marche [P.D. ya diseñado; ver más abajo]. Empezar por preguntar a codex: Actualmente ¿de qué maneras se pueden averiguar rutas para contactos conocidos (contactos authored y contactos procedurales)?
 ==> PROMPT: Quiero desarrollar un sistema failsafe de gestión de nodos "colgados" o "muertos". No sé si actualmente existe ya en el juego algo parecido. Por "nodos colgados" o "nodos muertos" (indistintamente) entiendo aquellos contactos o nodos (sectores, stations, waystations, ships, o cualquier localización) que cumplen las siguientes condiciones: 1) son conocidos por el Personaje-Jugador (o sea que aparecen listados en el output del comando 'contacts' o 'nav'); 2) no se conoce ruta hacia ellos; 3) no existe actualmente una localización conocida (y con ruta) desde la cuál ese o esos nodos sin ruta queden a una distancia menor al radio de los sensores (en estado "nominal"), de forma que es estrictamente imposible para el jugador conseguir una ruta hacia ese o esos nodos por medio del comando 'route' desde ninguna posición; 4) no existe actualmente (bien porque no va a generarse proceduralmente nunca, bien porque no se ha generado proceduralmente aún) ningún documento extraible mediante "salvage data" o "uplink" u otro capaz de proporcionarle al jugador la ruta (link) hacia ellos. (Valorar si hace falta añadir alguna condición más o corregir alguna de las propuestas.)
 El sistema de gestion de "nodos colgados" o "nodos muertos" debe llevar un registro de los nodos que se encuentra "colgados" o "muertos" en todo momento, e ir registrando el tiempo que permanecen colgados o muertos (es decir, llevar un control de durante cuánto tiempo, interno del juego, no tiempo real, siguen cumpliendo todas las condiciones para seguir considerándose colgados o muertos). A partir de cierto tiempo (configurable desde el balance.py), debe dispararse alguna estrategia (preferiblemente indirecta [ver más abajo]) para lograr que dejen de estar muertos o colgados. Las estrategias que se me ocurren podrían ser estas: 
 
@@ -33,7 +35,62 @@ Si consideras que es preferible desarrollar e implementar primero estas nuevas f
 Como regla general: antes de implementar nada, valora la propuesta, su viabilidad y dime posibles conflictos o problemas que podría producir. Tengamos también en cuenta que nos interesa siempre la robustez y la escalabilidad. Queremos aprovechar siempre las herramientas ya disponibles (si son adecuadas) e introducir los cambios mínimos (a no ser que haya alguna buena razón para obrar de otro modo).
 
 
+=== LORE ===
+
+- [x] El contacto y la ruta a ARCHIVE_01 me ha aparecido haciendo mi primer uplink en ECHO_7. Cómo es posible? Pensé que el arco estaba configurado para que costara más pasos lograr esa ruta. Acaso ha aparecido a través de uplink de forma aleatoria? La idea que yo tenía era: en ECHO_12 el documento echo_cache te proporciona el contacto (pero no la ruta) HARBOR_12. En HARBOR_12 el documento 0141 te proporciona el link a ARCHIVE_01. El link a ARCHIVE_01, pues, tratándose del intel primario de un arco diseñado, sólo se podía (o eso pensaba yo) obtener a través del documento 0141 de HARBOR_12, y de ningún otro modo más. Aclárame qué está pasando, y cómo están funcionando los arcos. [P.D.: ahora mismo el tarjet de los link de lor primary_intel están "blockeados". Que esté bloqueado quiere decir que no aparecerá por ninguna de estas cuatro vías de generación procedural:
+
+    1. selección de destinos de uplink
+    2. uplink_table authored
+    3. mobility_failsafe
+    4. spawn de intel corrupta
+
+Pero, por ejemplo, scan no usa locked_primary_targets, así que puede seguir detectando nodos bloqueados si están en rango.]
+
+
+- [x] En el Virtual File Sistem no debe usarse ningún directorio llamado "lore". No es muy diegético. Por ejemplo, en el example_unforced encontramos esto:
+  "path_template": "/logs/lore/example_unforced_note.{lang}.txt"
+Hay que buscar una solución más diegética a esto. La información de lore que reciba el jugador debe almacenarse en su FS de un modo coherente y claro, pero sin ninguna referencia a la palabra "lore".
+
+- [x] Dentro de la carpeta /lore, me interesa una carpeta llamada "singles", pensada para albergar documentos txt que serán de ser después "colocados" proceduralmente en el mundo.
+
+- [x] Manual del comando mail. 
+
+- [x] Perfeccionar comando mail.
+
+- [x] Pensándolo mejor, sí quiero failsafe para algunos arcos. O mejor dicho, quiero tener la opción. Quiero que sea configurable para cada arco y/o .......
+
+
+
 === NAVIGATION / ROUTES / WORLD GEN ===
+
+- [x] Ahora mismo, al comienzo de juego, cuando el jugador consigue encender el sistema sensors se detecta una señal automáticamente (por cierto, ¿dónde se configura esto?):
+  [AUTO] [INFO] signal_detected :: Signal detected: ECHO_7
+Al introducir después el comando 'nav' se obtine esto:
+  === NAV ROUTES ===
+  (no known routes from UNKNOWN_00)
+  Nearby contacts without known route:
+  - Derelict A-3 (derelict) sector=S+004_-001_+000 id=DERELICT_A3 dist=45.06ly
+  - ECHO-7 Relay Station (station) sector=S+000_+000_+000 id=ECHO_7 dist=0.00ly
+  - Harbor-12 Waystation (station) sector=S+001_+000_+000 id=HARBOR_12 dist=12.65ly
+  Try: scan, route, intel, uplink (at relay/waystation), or acquire intel.
+Como se ve, ECHO_7 aparece entre los contactos conocidos pero sin ruta conocida. Por otra parte (corrígeme si me equivoco) la nave del jugador (RETORNO_SHIP) se encuentra a) en el mismo sector que ECHO_7, b) a una distancia de 0.00ly de HECHO_7, y c) no en órbita (in orbit) de ECHO_7 ni atracada (docked) en ECHO_7. Me gustaría entonces modificar algunas cosas (o asegurarse de que ya están implementadas, si fuera el caso). Me gustaría que cuando se cumplan esas tres condiciones [ a) la nave del jugador se encuentra en el mismo sector de un hub, b) ese hub está a 0.00ly de distancia, y c) la nave del jugador no está ni docked ni tampoco "in orbit" de ese hub], pase lo siguiente: si el hub figura entre las localizaciones conocidas pero sin ruta conocida, no se podrá viajar a esa ruta con 'travel' hasta que no se conozca ruta; se podrá averiguar/establecer la ruta y la distancia "fina" a ese hub con el comando 'route <node_id>'; una vez conocida la ruta, se calculará la distancia a ese hub ya no en años-luz sino en kilómetros (en caso de que el 'config set lang' sea 'es') o millas (en caso de que sea 'en'), y a partir de entonces el comando 'nav' reflejará la distancia a ese hub en esas unidades (siempre y cuando, insisto, el hub en cuestión esté en el mismo sector que la nave del jugaddor y a distancia 0.00ly); aunque no se use el comando 'route <node_id>', el comando 'scan' también servirá para hacer el cálculo fino de distancia (en km o millas) al hub (pero no servirá para averiguar/establecer ruta al hub, como sí hacía route); cómo calcular o decidir esa distancia te lo dejo a ti (puedes ser creativo, pero siempre prefiriendo las opciones más consistentes); en caso de que el jugador decida viajar a ese hub (y así entrar en su órbita), el ETA del viaje se calculará en función a esa distancia; llegar al destino significa entrar "in orbit" de ese hub (no docked), y quedarse a distancia de 0 (kilómetros/millas) de ese hub.
+Antes de implementar nada, dime qué opinas, si ves algún conflicto o problema potencial.
+
+- [x] Ahora mismo, cuando se empieza el juego, se comienza como "location: UNKNOWN_00 (Unknown) [in orbit]". Esto me hace pensar que además de docked y in orbit hace falta un tercer estado, que sea ni 'docked' ni 'in orbit' (por ejemplo: cuando se cancela un viaje y la nave queda en un nodo temporal ¿en qué estado se encuentra?). Se supone que la nave RETORNO_ship al inicio del juego simplemente está "parada" en el espacio, no orbitando nada. Dime qué opinas de esto y si ves algún posible conflicto o error con lo que te planteo.
+
+- [x] Cuando se intenta dockear estando lejos sale el mensaje "action blocked: not at ECHO_7". Quizá debería decir "Not in ECHO_7 orbit" o algo así.
+
+- [x] Simplificar comandos 'nav' y 'travel'. Me inclino por sustituir el comando "travel <node_id|name>", "travel --no-cruise <dest>" y "travel abort" por "nav <node_id|name>", "nav --no-cruise <dest>" y "nav abort". Además, 'nav' debe ser un alias de 'navigation' (o sea, que funcione tanto escribir 'nav' como 'navigation'). El comando 'nav' actual, sin parámetros, lo sustituiremos por "nav routes" (o sea, que el comando "nav routes" hará lo que actualmente el comando "nav"). Después de implementar estos cambios hay que actualizar los manuales (localizados) en consecuencia, y el help. Por otra parte, si el usuario introduce el comando "nav" a secas, se debe imprimir un típico mensaje ParseError explicando el uso del comando.
+
+- [x] comando undock para volver a in orbit.
+
+- [x] Necesitamos un comando que le sirva al usuario para conocer el grafo. Es decir, no sólo saber qué rutas conocidas hay desde el nodo actual sino poder ver qué nodos conectan con qué nodos y con cuáles no (de forma que pueda así planear su viaje, saber a dónde ir para poder llegar a uno u otro nodo).
+
+- [x] El output de "map graph" no debe implimir "no link". Para cada nodo, sólo interesa mostrar con qué otros conecta, no con cuáles no conecta.
+
+- [x] Al hacer scan, no se suponía que debía establecerse la distancia fina a los hubs con distancia de 0ly? No lo está reflejando el nav.
+- [x] Actualizar manual dock! Tiene que aclarar que se puede hacer un dock cuando se está a "distancia fina".
+- [x] Indicar en listado nav qué lugares han sido visitados.
 
 - [x] Si no me equivoco, ahora mismo el node_id de una localización puede estar construirda mediante unas coordenadas de sector más un sufijo. Hay pues algunas localizaciones que tienen nombre pero que su node_id no está construido en base a su nombre sino en base a las coordenadas del sector en que se encuentra (y añadiéndole un sufico). Lo primero, confírmame que estoy en lo correcto. Este sería el caso, por ejemplo, de la siguiente localización:
 
@@ -98,6 +155,7 @@ Así mantienes el failsafe diegético y evitas bloquear al jugador por rutas “
 === OPERATIONS ===
 
 DRONES
+- [x] Ahora mismo se informa del límite de scrap antes de llevar a cabo la operación de salvage si se ordena una cantidad mayor a la disponible. Esto no debería suceder. El jugador no debe saber antes de terminar el job de scrap cuál es el número total de scrap que hay en esa localización.
 - [x] Operaciones de salvage y de repair deberían estar dentro del comando drone.
 - [x] La cantidad de scrap que se ordena recuperar con 'salvage' tiene que afectar al tiempo
 que se tarda en llevar a cabo la tarea.
@@ -117,11 +175,17 @@ obtener scrap.
 
 JOBS
 - [x] Un comando que liste los trabajos (jobs) en proceso o en cola.
-
+- [x] Los jobs se numeran como J00001, J00002, etc. No me gusta esto. Implica que el límite está en 99999 jobs. Preveo que el jugador vaya a llevar a cabo más jobs que esos. No hay otra manera de identificar los jobs?
 
 NAVIGATION
+- [x] Al hibernar para viajar el "time" debería reflejar los años que han pasado desde que el PJ se despertó por primera vez. Necesitamos un reloj mejor. No vale sólo indicar segundos, pues el número es demasiado grando. Necesitamos un reloj que indique años luz, días, horas, minutos, segundos (o algo así; díme tú qué opinas).
 - [x] no debe crearse ruta conocida desde el nodo actual al hub ECHO_7 hasta que ECHO_7 no sea descubierto. En el momento en que se descubra ECHO_7, sí debe automáticamente crearse una ruta conocida también, pues se supone que ECHO_7 se encuentra en el mismo nodo de la nave del PJ.
+- [x] El comando travel devería ser el comando nav. Si se escribe sin parámetro, lista destinos y rutas, si con parámetro, funciona como travel.
 
+OTHER
+- [x] Locate debe admitir node_id's, tal como lo indica el Hint del drone deploy (cuando no se le da un tarjet válido).
+- [x] jobs debe admitir número de entradas que se quieren imprimir en pantalla, o filtros.
+- [x] El comando contacts debe imprimir también la distancia a la que se encuentra cada contacto y si hay o no ruta conocida.
 
 
 
@@ -130,6 +194,7 @@ NAVIGATION
 CARGO
 - [x] Ahora mismo tenemos algo llamado "inventario". Estoy hay que modificarlo. El inventario debería ser un sector de la nave del PJ. Muchas naves (la del PJ incluida) tienen que tener un sector de carga o almacén, es decir, una bodega. Esa bodega junto con su id debe aparecer al ejecutar el comando sectors. Por lo demás, por ahora el funcionamiento de ese "inventario" será igual que actualmente. 
 - [x] Otra cosa: el comando "inventory" debe conservarse, pero quiero modificar algo. Si se añade al inventario scrap nuevo o un módulo o lo que sea, no se verá reflejado en la información correspondiente del status ni en la información que genera el comando "inventory" hasta que no se ejecute el commando "inventory update" [P.D. ahora 'cargo audit']. No obstante, en la información que imprime "status" y en la información que imprime "inventory" debe aparecer de algún modo la indicación de que hay cambios en bodega y que es necesario inventariar para actualizar la información. Ahora bien, la operación "inventory update" quiero ser un "job", un trabajo, con su  orrespondiente ETA. La idea es que al introducir ese comando se ejecute un trabajo de actualización del inventario o inventariado de lo que hay en la bodega, y que eso tarde un rato.
+- [x] La cantidad inicial de scrap debe ser configurable desde balance.py.
 
 SENSORS
 - [x] Con los sensors con health 1.00, al intentar encenderlos con "system on sensors" me ha salido este mensaje:
@@ -138,6 +203,9 @@ SENSORS
 
 DRONE BAY
 - [x] Entiendo que el drone_bay se tiene que poder desconectar, para ahorrar energía.
+
+LIFE_SUPPORT
+- [x] Parece que ahora mismo apagar el life_support no tiene ninguna consecuencia. Qué sucede si se desconecta (power off) el sistema life_support? Y si está en estado LIMITED, DAMAGED o CRITICAL?
 
 
 === MANUALS ===
@@ -158,3 +226,11 @@ DRONE BAY
 - [X] El contenido de los paneles fijos de la interfaz Textual es el mismo que el que se imprime al introducir el comando correspondiente (por ejemplo, en el panel status se observa exactamente lo mismo que se imprime cuando se escribe "status"). Esto me gustaría modificarlo. Es decir: por razones de diseño y espacio, quiero que lo que se ve en cada uno de los paneles pueda ser diferente a lo que se imprime al introducir un comando. En el panel status, por ejemplo, no quiero que se vea la línea de "time", ni de "location", ni de "power", ni de "inventory". Sólo quiero que aparezcan las líneas que refieren a los sistemas (core_os, life_support, etc.). Es posible?
 
 - [x] en el header no quiero que ponga "mode=" sino "ship_mode="
+
+
+
+=== IDIOMA Y LOCALIZACIÓN ===
+
+- [x] Los ParseError no parecen estar localizados. Con en lang configurado en inglés salen mensajes como este:
+ParseError: Uso: travel <node_id|name> | travel --no-cruise <dest> | travel abort
+La palabra "uso" es español. Hay que localizar estos mensajes de error. Aprovechar para revisar que estén bien localizados otros mensajes de error, advertencias y hints.
