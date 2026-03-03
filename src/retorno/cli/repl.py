@@ -779,6 +779,14 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Undock interrupted at {node_id}",
             "es": "Undock interrumpido en {node_id}",
         },
+        "job_failed_route_sensors_unavailable": {
+            "en": "Route solve interrupted: sensors unavailable for {node_id}",
+            "es": "Route solve interrumpido: sensores no disponibles para {node_id}",
+        },
+        "job_failed_route_sensord_stopped": {
+            "en": "Route solve interrupted: sensord stopped for {node_id}",
+            "es": "Route solve interrumpido: sensord detenido para {node_id}",
+        },
         "job_completed_salvage": {
             "en": "Salvage complete: +{amount} {kind} from {node_id}",
             "es": "Recuperación completa: +{amount} {kind} de {node_id}",
@@ -3405,7 +3413,6 @@ def render_map_graph(state, node_id: str | None = None) -> None:
 
     for nid in render_ids:
         neighbors = sorted(adj.get(nid, set()))
-        missing = sorted(n for n in nodes if n != nid and n not in neighbors)
         marker = "*" if nid == current_id else ""
         visited = "visited" if nid in state.world.visited_nodes else "unvisited"
         node = state.world.space.nodes.get(nid)
@@ -3414,7 +3421,6 @@ def render_map_graph(state, node_id: str | None = None) -> None:
         else:
             print(f"- {nid}{marker} {visited}")
         print(f"  links: {_map_preview(neighbors, max_items=8)}")
-        print(f"  no_link: {_map_preview(missing, max_items=8)}")
 
 
 def render_map_path(state, target_id: str) -> None:

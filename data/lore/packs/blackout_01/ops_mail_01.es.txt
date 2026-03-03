@@ -1,0 +1,4 @@
+FROM: Operaciones
+SUBJ: Aviso de ruta temporal
+
+Usar BLACKOUT_12 como nodo temporal de enlace.

@@ -1,0 +1,4 @@
+FROM: Operations
+SUBJ: Temporary route advisory
+
+Use BLACKOUT_12 as temporary handoff.

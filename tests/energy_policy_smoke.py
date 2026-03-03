@@ -11,6 +11,7 @@ from retorno.core.actions import (
     DroneRecall,
     DroneReboot,
     Install,
+    PowerShed,
     Repair,
     SystemOn,
     Undock,
@@ -18,7 +19,7 @@ from retorno.core.actions import (
 from retorno.core.engine import Engine
 from retorno.model.drones import DroneLocation, DroneState, DroneStatus
 from retorno.model.events import EventType
-from retorno.model.jobs import JobType
+from retorno.model.jobs import Job, JobStatus, JobType, TargetRef
 from retorno.model.systems import SystemState
 
 
@@ -382,6 +383,51 @@ def main() -> None:
         e.type == EventType.JOB_FAILED and e.data.get("message_key") == "job_failed_undock_interrupted"
         for e in interrupted
     ), interrupted
+
+    # Route solve interruption behavior: cancel automatically if sensors/sensord become unavailable.
+    state = _fresh_state()
+    sensors = state.ship.systems["sensors"]
+    sensors.state = SystemState.NOMINAL
+    assert sensors.service is not None
+    sensors.service.is_running = True
+    state.jobs.jobs["J_ROUTE_1"] = Job(
+        job_id="J_ROUTE_1",
+        job_type=JobType.ROUTE_SOLVE,
+        status=JobStatus.RUNNING,
+        eta_s=120.0,
+        target=TargetRef(kind="world_node", id="ECHO_7"),
+        params={"node_id": "ECHO_7", "from_id": state.world.current_node_id},
+    )
+    state.jobs.active_job_ids.append("J_ROUTE_1")
+    engine.apply_action(state, PowerShed(system_id="sensors"))
+    interrupted = engine.tick(state, 1.0)
+    assert any(
+        e.type == EventType.JOB_FAILED and e.data.get("message_key") == "job_failed_route_sensors_unavailable"
+        for e in interrupted
+    ), interrupted
+    assert "J_ROUTE_1" not in state.jobs.active_job_ids
+
+    state = _fresh_state()
+    sensors = state.ship.systems["sensors"]
+    sensors.state = SystemState.NOMINAL
+    assert sensors.service is not None
+    sensors.service.is_running = True
+    state.jobs.jobs["J_ROUTE_2"] = Job(
+        job_id="J_ROUTE_2",
+        job_type=JobType.ROUTE_SOLVE,
+        status=JobStatus.RUNNING,
+        eta_s=120.0,
+        target=TargetRef(kind="world_node", id="ECHO_7"),
+        params={"node_id": "ECHO_7", "from_id": state.world.current_node_id},
+    )
+    state.jobs.active_job_ids.append("J_ROUTE_2")
+    sensors.service.is_running = False
+    interrupted = engine.tick(state, 1.0)
+    assert any(
+        e.type == EventType.JOB_FAILED and e.data.get("message_key") == "job_failed_route_sensord_stopped"
+        for e in interrupted
+    ), interrupted
+    assert "J_ROUTE_2" not in state.jobs.active_job_ids
 
     print("ENERGY POLICY SMOKE PASSED")
 

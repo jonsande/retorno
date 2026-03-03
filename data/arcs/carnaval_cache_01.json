@@ -1,0 +1,35 @@
+{
+  "arc_id": "carnaval_cache_01",
+  "primary_intel": {
+    "id": "ancora_to_carnaval_cache_doc",
+    "category": "lore_intel",
+    "kind": "link",
+    "line": "LINK: ANCORA -> CARNAVAL_34",
+    "force": true,
+    "force_policy": "deadline",
+    "force_deadline": {
+      "max_docks": 2,
+      "max_uplinks": 3
+    },
+    "allowed_channels": ["station_broadcast", "captured_signal", "ship_os_mail"],
+    "content_ref_es": "lore/packs/carnaval_cache_01/primary_cache_doc.es.txt",
+    "constraints": {
+      "min_year": 0.0,
+      "max_dist_ly": 40.0,
+      "regions_any": ["disk", "halo"]
+    }
+  },
+  "secondary_lore_docs": [],
+  "placement_rules": {
+    "primary": {
+      "candidates": ["ancora", "procedural_station"],
+      "max_hops_from_start": 4,
+      "require_kind_any": ["station", "relay", "derelict"],
+      "avoid_node_ids": ["CARNAVAL_34"]
+    },
+    "secondary": {
+      "candidates": ["procedural_station"],
+      "count": 0
+    }
+  }
+}

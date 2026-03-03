@@ -1,0 +1,63 @@
+{
+  "arc_id": "blackout_01",
+  "primary_intel": {
+    "id": "blackout_01_to_vault",
+    "category": "lore_intel",
+    "kind": "link",
+    "line": "LINK: BLACKOUT_12 -> VAULT_09",
+    "preferred_sources": ["mail", "log"],
+    "mail_path_template": "/mail/inbox/02xx.blackout.{lang}.txt",
+    "log_path_template": "/logs/records/blackout_01.{lang}.txt",
+    "mail_from": "Grid Control",
+    "mail_subject": "Blackout attachment",
+    "log_header": "BLACKOUT LOG // attachment",
+    "confidence": 0.65,
+    "force": false,
+    "allowed_channels": ["salvage_data", "captured_signal", "station_broadcast"],
+    "constraints": {
+      "min_year": 0.2,
+      "max_year": 8.0,
+      "min_dist_ly": 2.0,
+      "max_dist_ly": 25.0,
+      "regions_any": ["disk", "halo"]
+    }
+  },
+  "secondary_lore_docs": [
+    {
+      "id": "blackout_01_lore_01",
+      "path_template": "/logs/records/grid_outage_note.{lang}.txt",
+      "content_ref_en": "lore/packs/blackout_01/grid_outage_note.en.txt",
+      "content_ref_es": "lore/packs/blackout_01/grid_outage_note.es.txt",
+      "force": false,
+      "allowed_channels": ["salvage_data", "ship_os_mail", "captured_signal", "station_broadcast"],
+      "constraints": {
+        "min_year": 0.1,
+        "max_dist_ly": 30.0
+      }
+    },
+    {
+      "id": "blackout_01_lore_02",
+      "path_template": "/mail/inbox/02xx.blackout_ops.{lang}.txt",
+      "content_ref_en": "lore/packs/blackout_01/ops_mail_01.en.txt",
+      "content_ref_es": "lore/packs/blackout_01/ops_mail_01.es.txt",
+      "force": false,
+      "allowed_channels": ["salvage_data", "ship_os_mail", "captured_signal", "station_broadcast"],
+      "constraints": {
+        "min_year": 0.3,
+        "regions_any": ["disk", "bulge"]
+      }
+    }
+  ],
+  "placement_rules": {
+    "primary": {
+      "candidates": ["procedural_station", "procedural_relay", "procedural_derelict", "blackout_12"],
+      "max_hops_from_start": 4,
+      "require_kind_any": ["station", "relay", "derelict"],
+      "avoid_node_ids": ["VAULT_09"]
+    },
+    "secondary": {
+      "candidates": ["procedural_station", "procedural_derelict"],
+      "count": 2
+    }
+  }
+}

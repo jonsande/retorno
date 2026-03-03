@@ -30,6 +30,10 @@
 
 === SYSTEMS ===
 
+- [!] Revisar/rediseñar qué comandos dependen de qué sistemas, y las implicaciones que ello tiene.
+
+- [x] El output de "map graph" no debe implimir "no link". Para cada nodo, sólo interesa mostrar con qué otros conecta, no con cuáles no conecta.
+
 DRONE BAY
 - [ ] Necesitamos que drone_bay tenga una capacidad máxima para albergar drones.
 
@@ -49,7 +53,7 @@ ENERGY
 
 - [ ] Por lo que dice el manual life_support.es.txt los comandos status y alerts dependen de life_support. No deberían. Deben depender de core_os.
 
-- [ ] Hay que desarrollar un comando específico para conocer el status del "huesped" del sarcófago 5.
+- [ ] Hay que desarrollar un comando específico para conocer el status del "huesped" del sarcófago
 
 - [x] Estando docked en CURL_12, al hacer "uplink" el juego crashea y me devuelve un error "AttributeError: 'list' object has no attribute 'events'".
 

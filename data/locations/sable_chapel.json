@@ -15,5 +15,16 @@
     "modules_min": 0,
     "modules_max": 0,
     "modules_pool": "common"
+  },
+  "uplink_table": {
+    "min_authored": 0,
+    "max_authored": 1,
+    "authored_candidates": [
+      {"node_id": "HARBOR_12", "weight": 10},
+      {"node_id": "MOURN_ANCHOR", "weight": 5},
+      {"node_id": "VEIL_GARDEN", "weight": 5},
+      {"node_id": "SABLE_CHAPEL", "weight": 4},
+      {"node_id": "GLASSHOLLOW", "weight": 3}
+    ]
   }
 }

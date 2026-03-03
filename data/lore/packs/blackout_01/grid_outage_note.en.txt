@@ -1,0 +1,3 @@
+[MAINTENANCE NOTE]
+Localized outages detected in relay mesh.
+Fallback path validated through node BLACKOUT_12.

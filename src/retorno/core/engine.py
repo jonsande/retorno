@@ -2332,6 +2332,45 @@ class Engine:
         return events
 
     def _check_job_interruption(self, state: GameState, job: Job) -> Event | None:
+        if job.job_type == JobType.ROUTE_SOLVE:
+            node_id = job.params.get("node_id", job.target.id if job.target else "")
+            system = state.ship.systems.get("sensors")
+            if not system or self._state_rank(system.state) < self._state_rank(SystemState.LIMITED):
+                event = self._make_event(
+                    state,
+                    EventType.JOB_FAILED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id="sensors"),
+                    f"Route solve interrupted: sensors unavailable for {node_id}",
+                    data={
+                        "job_id": job.job_id,
+                        "job_type": job.job_type.value,
+                        "node_id": node_id,
+                        "message_key": "job_failed_route_sensors_unavailable",
+                        "reason": "sensors_offline",
+                    },
+                )
+                self._record_event(state.events, event)
+                return event
+            if not system.service or system.service.service_name != "sensord" or not system.service.is_running:
+                event = self._make_event(
+                    state,
+                    EventType.JOB_FAILED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id="sensors"),
+                    f"Route solve interrupted: sensord stopped during solve for {node_id}",
+                    data={
+                        "job_id": job.job_id,
+                        "job_type": job.job_type.value,
+                        "node_id": node_id,
+                        "message_key": "job_failed_route_sensord_stopped",
+                        "reason": "sensord_not_running",
+                    },
+                )
+                self._record_event(state.events, event)
+                return event
+            return None
+
         if job.job_type == JobType.DOCK:
             node_id = job.params.get("node_id", job.target.id if job.target else "")
             if state.ship.in_transit:
@@ -2535,7 +2574,7 @@ class Engine:
             is_candidate = False
             if node_id in avoid_ids:
                 is_candidate = False
-            elif node_id == "HARBOR_12" and "harbor_12" in candidates:
+            elif node_id.lower() in candidates or node_id in candidates:
                 is_candidate = True
             elif is_procedural:
                 if node.kind == "station" and "procedural_station" in candidates:
@@ -2581,19 +2620,28 @@ class Engine:
                     source = rng.choice(pref_sources) if pref_sources else "log"
                     if source == "mail":
                         suffix = seed % 100
-                        path = f"/mail/inbox/02{suffix:02d}.corridor.{state.os.locale.value}.txt"
+                        template = primary.get("mail_path_template", "/mail/inbox/02xx.{arc_id}.{lang}.txt")
+                        path = (
+                            template.replace("{lang}", state.os.locale.value)
+                            .replace("{arc_id}", arc_id)
+                            .replace("02xx", f"02{suffix:02d}")
+                        )
+                        mail_from = primary.get("mail_from", "Network Ops")
+                        mail_subject = primary.get("mail_subject", "Arc attachment")
                         content = (
-                            "FROM: Network Ops\n"
-                            "SUBJ: Corridor attachment\n\n"
+                            f"FROM: {mail_from}\n"
+                            f"SUBJ: {mail_subject}\n\n"
                             "NAV:\n"
                             "[NAV ATTACHMENT BEGIN]\n"
                             f"{primary.get('line')}\n"
                             "[NAV ATTACHMENT END]\n"
                         )
                     else:
-                        path = f"/logs/records/corridor_01.{state.os.locale.value}.txt"
+                        template = primary.get("log_path_template", "/logs/records/{arc_id}.{lang}.txt")
+                        path = template.replace("{lang}", state.os.locale.value).replace("{arc_id}", arc_id)
+                        log_header = primary.get("log_header", "ARC LOG // attachment")
                         content = (
-                            "CORRIDOR LOG // attachment\n\n"
+                            f"{log_header}\n\n"
                             "[NAV ATTACHMENT BEGIN]\n"
                             f"{primary.get('line')}\n"
                             "[NAV ATTACHMENT END]\n"

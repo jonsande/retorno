@@ -1,0 +1,20 @@
+{
+  "node": {
+    "node_id": "CARNAVAL_34",
+    "name": "CARNAVAL",
+    "kind": "derelict",
+    "is_hub": true,
+    "radiation_rad_per_s": 0.033,
+    "x_ly": 21.0,
+    "y_ly": 22.0,
+    "z_ly": 0.0
+  },
+  "known_on_start": false,
+  "salvage": {
+    "scrap_min": 20,
+    "scrap_max": 150,
+    "modules_min": 2,
+    "modules_max": 2,
+    "modules_pool": "all"
+  }
+}
