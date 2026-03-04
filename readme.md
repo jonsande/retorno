@@ -1,6 +1,6 @@
 # RETORNO
 
-**RETORNO** is a hard sci-fi, slow-paced, inmersive system-driven game played through terminal commands (pure CLI game). You awaken inside a cryogenic sarcophagus aboard a damaged ship, thousands of years after entering suspended sleep. You cannot move physically. Your only link to the world is a terminal wired directly into your mind.
+**RETORNO** is a hard sci-fi, slow-paced, immersive system-driven game played through terminal commands (pure CLI game). You awaken inside a cryogenic sarcophagus aboard a damaged ship, thousands of years after entering suspended sleep. You cannot move physically. Your only link to the world is a terminal wired directly into your mind.
 
 Through that terminal, you must understand what happened, restore critical ship functions, manage power, control maintenance drones, explore abandoned ships and stations, recover resources and information, and gradually navigate a fragmented and silent universe.
 
@@ -38,9 +38,24 @@ The game aims to avoid both arbitrary punishment and excessive hand-holding: the
 
 ## Running the game
 
+Normal (loads savegame if exists)
+
 ```bash
-python -m retorno.ui_textual.app
+PYTHONPATH=src python -m retorno.ui_textual.app
 ```
+
+User profiles (save per user):
+
+```bash
+PYTHONPATH=src python -m retorno.ui_textual.app --user Joe
+```
+
+Force a new game:
+
+```bash
+PYTHONPATH=src python -m retorno.ui_textual.app --new-game
+```
+
 
 ## Basic commands
 

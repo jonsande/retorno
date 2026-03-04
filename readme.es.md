@@ -30,18 +30,42 @@ Actualmente RETORNO se encuentra en fase de prototipo jugable. Muchas mecánicas
 
 RETORNO no busca ser un juego de acción rápida ni un roguelike tradicional de combates constantes. Su núcleo está en:
 
-- la **gestión técnica bajo presión**
-- la **exploración lenta y deliberada**
-- la **lectura e interpretación de información dispersa**
-- la **agencia del jugador**, incluso cuando eso implica tomar malas decisiones
+- **gestión técnica bajo presión**
+- **exploración lenta y deliberada**
+- **lectura e interpretación de información dispersa**
+- **agencia del jugador** y gestión de malas decisiones
 
 El juego intenta evitar tanto el castigo arbitrario como el exceso de protecciones: el jugador debe poder equivocarse, pero también debe tener herramientas reales para comprender el sistema y reaccionar.
 
 ## Cómo ejecutarlo
 
+Normal (carga save si existe):
 ```bash
-python -m retorno.ui_textual.app
+PYTHONPATH=src python -m retorno.ui_textual.app
 ```
+
+Perfiles de usuario (save por usuario):
+```bash
+PYTHONPATH=src python -m retorno.ui_textual.app --user Pepe
+PYTHONPATH=src python -m retorno.ui_textual.app --user Pepe
+```
+
+Forzar partida nueva:
+```bash
+PYTHONPATH=src python -m retorno.ui_textual.app --new-game
+```
+
+Nueva partida para un usuario concreto:
+```bash
+PYTHONPATH=src python -m retorno.ui_textual.app --user Pepe --new-game
+```
+
+Opcional: ruta de save personalizada con --save-path ... (o env RETORNO_SAVE_PATH / RETORNO_SAVE_DIR).
+
+Notas:
+- --save-path tiene prioridad sobre --user.
+- También puedes definir RETORNO_USER para seleccionar perfil por entorno.
+- Formato de usuario válido: 1-32 caracteres en minúscula (a-z, 0-9, '.', '_' o '-').
 
 ## Basic commands
 
