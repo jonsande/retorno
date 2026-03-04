@@ -78,14 +78,14 @@ Commands and technical system names remain in English; diegetic texts (mail, log
 
 Systems already implemented or currently in development include:
 
-**power management and critical state handling**
-**drones and salvage**
-**routes, navigation, and intel**
-**procedurally generated locations**
-**access privileges (GUEST, MED, etc.)**
-**degradation, radiation, and ship hull integrity**
-**travel events**
-**expansion of distributed lore and mini narrative arcs**
+- **power management and critical state handling**
+- **drones and salvage**
+- **routes, navigation, and intel**
+- **procedurally generated locations**
+- **access privileges (GUEST, MED, etc.)**
+- **degradation, radiation, and ship hull integrity**
+- **travel events**
+- **expansion of distributed lore and mini narrative arcs**
 
 ## Note
 

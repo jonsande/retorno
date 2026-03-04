@@ -79,15 +79,15 @@ Los comandos y nombres técnicos del sistema se mantienen en inglés; los textos
 
 Sistemas ya implementados o en desarrollo:
 
-**Galaxia proceduralmente generada**
-**gestión de energía y estados críticos**
-**drones: operaciones de salvamento, reparación, recuperación de módulos, y más**
-**rutas, navegación e intel**
-**localizaciones proceduralmente generadas**
-**privilegios de acceso (GUEST, MED, etc.)**
-**degradación, radiación y casco de nave**
-**eventos de viaje aleatorios**
-**expansión de lore distribuido y mini-arcos narrativos**
+- **Galaxia proceduralmente generada**
+- **gestión de energía y estados críticos**
+- **drones: operaciones de salvamento, reparación, recuperación de módulos, y más**
+- **rutas, navegación e intel**
+- **localizaciones proceduralmente generadas**
+- **privilegios de acceso (GUEST, MED, etc.)**
+- **degradación, radiación y casco de nave**
+- **eventos de viaje aleatorios**
+- **expansión de lore distribuido y mini-arcos narrativos**
 
 ## Note
 
