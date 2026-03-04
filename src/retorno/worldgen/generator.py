@@ -5,6 +5,7 @@ import random
 from retorno.core.gamestate import GameState
 from retorno.model.world import SpaceNode, SECTOR_SIZE_LY, region_for_pos, sector_id_for_pos
 from retorno.runtime.data_loader import load_modules, load_worldgen_templates
+from retorno.config.balance import Balance
 
 
 def _hash64(seed: int, text: str) -> int:
@@ -23,6 +24,22 @@ def _weighted_choice(rng: random.Random, weights: dict[str, float]) -> str:
         if r <= upto:
             return k
     return next(iter(weights.keys()))
+
+
+def _roll_recoverable_drones_for_node(seed: int, node_id: str, node_kind: str) -> int:
+    cfg = Balance.SALVAGE_DRONES_BY_KIND.get(node_kind or "", {"prob": 0.0, "min": 0, "max": 0})
+    min_count = int(cfg.get("min", 0) or 0)
+    max_count = int(cfg.get("max", 0) or 0)
+    if max_count < min_count:
+        max_count = min_count
+    if max_count <= 0:
+        return 0
+    prob = float(cfg.get("prob", 0.0) or 0.0)
+    prob = max(0.0, min(1.0, prob))
+    node_rng = random.Random(_hash64(seed, f"salvage_drones:{node_id}"))
+    if node_rng.random() > prob:
+        return 0
+    return node_rng.randint(max(0, min_count), max(0, max_count))
 
 
 def ensure_sector_generated(state: GameState, sector_id: str) -> None:
@@ -105,6 +122,11 @@ def ensure_sector_generated(state: GameState, sector_id: str) -> None:
                 int(salvage.get("modules_max", 0)),
                 salvage.get("modules_pool"),
             )
+        node.recoverable_drones_count = _roll_recoverable_drones_for_node(
+            state.meta.rng_seed,
+            node.node_id,
+            node.kind,
+        )
         state.world.space.nodes[node_id] = node
 
     _generate_links_for_sector(state, sector_id, rng)

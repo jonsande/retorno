@@ -114,6 +114,18 @@ class SalvageData(Action):
 
 
 @dataclass(slots=True)
+class DroneSurvey(Action):
+    drone_id: str
+    node_id: str
+
+
+@dataclass(slots=True)
+class SalvageDrone(Action):
+    drone_id: str
+    node_id: str
+
+
+@dataclass(slots=True)
 class RouteSolve(Action):
     node_id: str
 

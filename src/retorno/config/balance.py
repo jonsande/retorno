@@ -51,6 +51,11 @@ class Balance:
     SALVAGE_MODULE_TIME_S = 12.0
     # Salvage data job time.
     SALVAGE_DATA_TIME_S = 18.0
+    # Drone survey job time.
+    DRONE_SURVEY_TIME_S = 10.0
+    # Recoverable drone salvage time model: base + per unit.
+    DRONE_SALVAGE_DRONE_BASE_TIME_S = 8.0
+    DRONE_SALVAGE_DRONE_PER_UNIT_S = 4.0
     # Self-test repair job time and amount.
     SELFTEST_REPAIR_TIME_S = 18.0
     SELFTEST_REPAIR_AMOUNT = 0.05
@@ -108,6 +113,23 @@ class Balance:
     SALVAGE_DATA_MAIL_P_OTHER = 0.30
     SALVAGE_DATA_FRAG_P_STATION_DERELICT = 0.25
     SALVAGE_DATA_FRAG_P_OTHER = 0.15
+    # Recoverable drones by node kind (procedural + authored fallback).
+    SALVAGE_DRONES_BY_KIND = {
+        "station": {"prob": 0.02, "min": 1, "max": 2},
+        "ship": {"prob": 0.08, "min": 1, "max": 3},
+        "derelict": {"prob": 0.06, "min": 1, "max": 2},
+        "relay": {"prob": 0.00, "min": 0, "max": 0},
+        "waystation": {"prob": 0.01, "min": 1, "max": 1},
+        "origin": {"prob": 0.00, "min": 0, "max": 0},
+        "transit": {"prob": 0.00, "min": 0, "max": 0},
+    }
+    # Initial stats for salvaged drones.
+    SALVAGED_DRONE_INTEGRITY_MIN = 0.45
+    SALVAGED_DRONE_INTEGRITY_MAX = 0.85
+    SALVAGED_DRONE_BATTERY_MIN = 0.20
+    SALVAGED_DRONE_BATTERY_MAX = 0.80
+    SALVAGED_DRONE_DOSE_MIN = 0.0
+    SALVAGED_DRONE_DOSE_MAX = 0.8
 
     # System health thresholds
     SYSTEM_HEALTH_OFFLINE = 0.0

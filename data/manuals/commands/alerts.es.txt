@@ -3,3 +3,4 @@ alerts
 - Las críticas requieren atención.
 alerts explain <alert_key>
 - Muestra explicación y valores actuales.
+- Ejemplo útil: `alerts explain drone_bay_maintenance_blocked`.

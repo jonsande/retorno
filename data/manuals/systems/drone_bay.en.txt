@@ -13,6 +13,7 @@ Command impact by state
 - OFFLINE: no bay support. drone deploy is blocked; use drone deploy! for emergency launch.
 - OFFLINE: drone install is blocked (requires bay support). drone recall still works, but charging/decontamination remain unavailable.
 - While energy_distribution is OFFLINE, charging, decontamination, and passive bay repairs are unavailable even if drone_bay itself is online.
+- If docked drones need charge/repair and bay support cannot provide it, alert `drone_bay_maintenance_blocked` is raised.
 
 Control vs bay support
 - Drone control depends on core_os minimum control link plus drone battery.

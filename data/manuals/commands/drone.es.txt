@@ -1,15 +1,18 @@
 drone deploy <drone_id> <sector_id|node_id>
 drone deploy! <drone_id> <sector_id|node_id>
 drone move <drone_id> <target_id>
+drone survey <drone_id> <node_id>
 drone autorecall <drone_id> <on|off|porcentaje>
 drone repair <drone_id> <target_id>
 drone install <drone_id> <module_id>
 drone salvage scrap <drone_id> <node_id> <amount>
 drone salvage module <drone_id> [node_id]
+drone salvage drone <drone_id> <node_id>
+drone salvage drones <drone_id> <node_id>
 drone salvage data <drone_id> <node_id>
 drone reboot <drone_id>
 drone recall <drone_id>
-drone status
+drone status [drone_id]
 
 Campos de status
 - status: docked / deployed / disabled
@@ -23,9 +26,11 @@ Notas operativas
 - Las acciones consumen batería (deploy/move/repair/install/salvage/recall/reboot).
 - Los drones desplegados también consumen batería en reposo.
 - Los drones desplegados/no acoplados acumulan dosis por radiación ambiental.
+- Convención de escudo (`shield_factor`): <1 mejor, =1 base, >1 peor (afecta a la dosis radiológica entrante).
 - La dosis ahora acelera el desgaste de integridad del dron (por bandas de exposición).
 - La recarga ocurre en drone_bay mientras haya soporte de bahía/distribución.
 - Los drones acoplados se descontaminan automáticamente en drone_bay (más lento si la bahía está degradada).
+- Si hay drones acoplados con batería/integridad pendiente y no se puede mantenerlos, se activa `drone_bay_maintenance_blocked` (ver `alerts explain drone_bay_maintenance_blocked`).
 - `drone repair` acepta sistemas de nave y drones como objetivo.
 - Para reparar otro dron, el dron operador debe estar desplegado y en la misma ubicación que el dron objetivo.
 - `drone move <drone_id> <ship_sector>` permite mover un dron desde un world_node a un sector de nave cuando la nave está acoplada en ese mismo nodo.

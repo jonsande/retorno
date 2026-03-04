@@ -26,6 +26,10 @@ casco y sistemas de nave
 efectos en drones
 - Drones no acoplados acumulan dosis con el tiempo:
   - `dose += env_rad * shield_factor * dt`
+- Convención de `shield_factor`:
+  - `< 1.0` => mejor blindaje (entra menos radiación)
+  - `= 1.0` => referencia/base
+  - `> 1.0` => peor blindaje (entra más radiación)
 - Drones no acoplados pierden integridad con el tiempo.
 - La dosis aumenta ese desgaste por bandas:
   - dose < 1.0: x1.0

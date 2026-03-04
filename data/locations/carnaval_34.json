@@ -15,6 +15,9 @@
     "scrap_max": 150,
     "modules_min": 2,
     "modules_max": 2,
-    "modules_pool": "all"
+    "modules_pool": "all",
+    "drones_min": 1,
+    "drones_max": 2,
+    "drone_prob": 0.06
   }
 }

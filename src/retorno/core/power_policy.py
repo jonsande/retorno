@@ -9,11 +9,13 @@ from retorno.core.actions import (
     DroneMove,
     DroneRecall,
     DroneReboot,
+    DroneSurvey,
     Install,
     PowerPlan,
     PowerShed,
     Repair,
     SalvageData,
+    SalvageDrone,
     SalvageModule,
     SalvageScrap,
     Status,
@@ -38,6 +40,7 @@ _CRITICAL_REPL_TUPLES = {
     "ALERTS_EXPLAIN",
     "LOG_COPY",
     "JOBS",
+    "DRONE_STATUS",
 }
 
 
@@ -87,6 +90,8 @@ def is_action_allowed_in_critical_state(state, action: Action) -> bool:
             SalvageScrap,
             SalvageModule,
             SalvageData,
+            DroneSurvey,
+            SalvageDrone,
             Install,
         ),
     ):

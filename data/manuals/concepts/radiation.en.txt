@@ -19,6 +19,10 @@ hull and ship systems
 drone radiation effects
 - Non-docked drones accumulate dose over time:
   - `dose += env_rad * shield_factor * dt`
+- `shield_factor` convention:
+  - `< 1.0` => better shielding (less radiation intake)
+  - `= 1.0` => baseline/reference
+  - `> 1.0` => worse shielding (more radiation intake)
 - Non-docked drones lose integrity over time.
 - Dose increases integrity wear using bands:
   - dose < 1.0: x1.0

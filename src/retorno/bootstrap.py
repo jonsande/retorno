@@ -11,6 +11,7 @@ from retorno.worldgen.generator import ensure_sector_generated
 from retorno.runtime.data_loader import load_modules, load_locations
 from retorno.config.balance import Balance
 import random
+import hashlib
 from pathlib import Path
 
 
@@ -259,6 +260,12 @@ def _bootstrap_locations(state: GameState, rng: random.Random, module_ids: list[
     if not locations:
         return
 
+    def _hash64(seed: int, text: str) -> int:
+        h = hashlib.blake2b(digest_size=8)
+        h.update(str(seed).encode("utf-8"))
+        h.update(text.encode("utf-8"))
+        return int.from_bytes(h.digest(), "big", signed=False)
+
     def _pick_modules(cfg: dict) -> list[str]:
         if not module_ids:
             return []
@@ -286,6 +293,42 @@ def _bootstrap_locations(state: GameState, rng: random.Random, module_ids: list[
 
     def _access_level(value: str) -> AccessLevel:
         return _normalize_access(value)
+
+    def _roll_recoverable_drones(
+        *,
+        node_id: str,
+        node_kind: str,
+        salvage_cfg: dict,
+    ) -> int:
+        if not node_id:
+            return 0
+        node_rng = random.Random(_hash64(state.meta.rng_seed, f"authored_salvage_drones:{node_id}"))
+        has_authored = any(k in salvage_cfg for k in ("drones_min", "drones_max", "drone_prob"))
+        if has_authored:
+            min_count = int(salvage_cfg.get("drones_min", 0) or 0)
+            max_count = int(salvage_cfg.get("drones_max", 0) or 0)
+            if max_count < min_count:
+                max_count = min_count
+            if max_count <= 0:
+                return 0
+            prob = float(salvage_cfg.get("drone_prob", 1.0) or 0.0)
+            prob = max(0.0, min(1.0, prob))
+            if node_rng.random() > prob:
+                return 0
+            return node_rng.randint(max(0, min_count), max(0, max_count))
+
+        kind_cfg = Balance.SALVAGE_DRONES_BY_KIND.get(node_kind or "", {"prob": 0.0, "min": 0, "max": 0})
+        min_count = int(kind_cfg.get("min", 0) or 0)
+        max_count = int(kind_cfg.get("max", 0) or 0)
+        if max_count < min_count:
+            max_count = min_count
+        if max_count <= 0:
+            return 0
+        prob = float(kind_cfg.get("prob", 0.0) or 0.0)
+        prob = max(0.0, min(1.0, prob))
+        if node_rng.random() > prob:
+            return 0
+        return node_rng.randint(max(0, min_count), max(0, max_count))
 
     for loc in locations:
         node_cfg = loc.get("node", {})
@@ -315,6 +358,11 @@ def _bootstrap_locations(state: GameState, rng: random.Random, module_ids: list[
                 if scrap_max > 0:
                     node.salvage_scrap_available = rng.randint(scrap_min, scrap_max)
                 node.salvage_modules_available = _pick_modules(salvage_cfg)
+            node.recoverable_drones_count = _roll_recoverable_drones(
+                node_id=node_id,
+                node_kind=node.kind,
+                salvage_cfg=salvage_cfg,
+            )
             state.world.space.nodes[node_id] = node
         if loc.get("known_on_start") and node_id:
             state.world.known_contacts.add(node_id)

@@ -1,0 +1,22 @@
+drone_bay_maintenance_blocked
+- Hay al menos un dron acoplado en `drone_bay` que necesita recuperar batería/integridad, pero no se cumplen las condiciones de soporte de bahía.
+- La alerta se mantiene activa mientras algún dron acoplado afectado siga bloqueado.
+
+Condiciones para recarga de batería:
+- dron en estado `docked` dentro de `drone_bay`
+- `drone_bay` no está `OFFLINE`
+- `energy_distribution` no está `OFFLINE`
+- puerta de potencia:
+  - carga normal si `net_kw >= DRONE_CHARGE_KW`
+  - carga lenta si `SoC > 0` y `net_kw >= DRONE_CHARGE_NET_MIN_KW`
+
+Condiciones para reparación pasiva de integridad:
+- dron en estado `docked` en `drone_bay` con integridad < 1.0
+- `drone_bay` y `energy_distribution` disponibles (no `OFFLINE`)
+- chatarra suficiente en bodega para el coste pasivo actual
+
+Condiciones para descontaminación del dron:
+- dron en estado `docked` en `drone_bay`
+- `drone_bay` no está `OFFLINE`
+- `energy_distribution` no está `OFFLINE`
+- no requiere umbral de potencia neta ni gasto de chatarra

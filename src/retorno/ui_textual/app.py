@@ -788,8 +788,8 @@ class RetornoTextualApp(App):
             return []
         if cmd == "drone":
             if len(tokens) == 2:
-                return [c for c in ["status", "deploy", "deploy!", "move", "reboot", "recall", "autorecall", "repair", "install", "salvage"] if c.startswith(text)]
-            if len(tokens) == 3 and tokens[1] in {"deploy", "deploy!", "reboot", "recall", "autorecall", "repair", "move", "install"}:
+                return [c for c in ["status", "deploy", "deploy!", "move", "survey", "reboot", "recall", "autorecall", "repair", "install", "salvage"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] in {"status", "deploy", "deploy!", "reboot", "recall", "autorecall", "repair", "move", "install", "survey"}:
                 return [d for d in drones if d.startswith(text)]
             if len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
                 return [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
@@ -802,15 +802,17 @@ class RetornoTextualApp(App):
                 return [m for m in modules if m.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "repair":
                 return [x for x in sorted(set(systems) | set(drones)) if x.startswith(text)]
+            if len(tokens) == 4 and tokens[1] == "survey":
+                return [c for c in contacts if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "salvage":
-                return [c for c in ["scrap", "module", "modules", "data"] if c.startswith(text)]
+                return [c for c in ["scrap", "module", "modules", "drone", "drones", "data"] if c.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "salvage":
                 return [d for d in drones if d.startswith(text)]
             if len(tokens) == 5 and tokens[1] == "salvage":
                 return [c for c in contacts if c.startswith(text)]
         if cmd == "salvage":
             if len(tokens) == 2:
-                return [c for c in ["scrap", "module", "modules", "data"] if c.startswith(text)]
+                return [c for c in ["scrap", "module", "modules", "drone", "drones", "data"] if c.startswith(text)]
             if len(tokens) == 3:
                 return [d for d in drones if d.startswith(text)]
             if len(tokens) == 4:
@@ -1298,6 +1300,7 @@ class RetornoTextualApp(App):
                 "DEBUG_MODULES",
                 "NAV_MAP",
                 "SHIP_SURVEY",
+                "DRONE_STATUS",
                 "DRONE_AUTORECALL_ENABLED",
                 "DRONE_AUTORECALL_THRESHOLD",
             }
@@ -1405,6 +1408,10 @@ class RetornoTextualApp(App):
         if parsed == "DRONE_STATUS":
             with self.loop.with_lock() as state:
                 self._log_lines(presenter.build_command_output(repl.render_drone_status, state))
+            return
+        if isinstance(parsed, tuple) and parsed[0] == "DRONE_STATUS":
+            with self.loop.with_lock() as state:
+                self._log_lines(presenter.build_command_output(repl.render_drone_status, state, parsed[1]))
             return
         if isinstance(parsed, tuple) and parsed[0] == "DRONE_AUTORECALL_ENABLED":
             with self.loop.with_lock() as state:

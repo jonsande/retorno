@@ -1,0 +1,22 @@
+drone_bay_maintenance_blocked
+- At least one docked drone in `drone_bay` needs battery/integrity recovery, but bay support conditions are not met.
+- The alert stays active while any affected docked drone remains blocked.
+
+Battery charging requires:
+- drone status `docked` in `drone_bay`
+- `drone_bay` not `OFFLINE`
+- `energy_distribution` not `OFFLINE`
+- power gate:
+  - normal charge if `net_kw >= DRONE_CHARGE_KW`
+  - slow charge if `SoC > 0` and `net_kw >= DRONE_CHARGE_NET_MIN_KW`
+
+Passive integrity repair requires:
+- drone status `docked` in `drone_bay` and integrity < 1.0
+- `drone_bay` and `energy_distribution` available (not `OFFLINE`)
+- enough cargo scrap for current passive-repair cost
+
+Drone decontamination requires:
+- drone status `docked` in `drone_bay`
+- `drone_bay` not `OFFLINE`
+- `energy_distribution` not `OFFLINE`
+- no net-power threshold and no scrap cost

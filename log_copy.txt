@@ -1,40 +1,10 @@
-(no signals detected)
-> boot sensord
-[CMD] [INFO] job_queued :: J6 boot_service target=service:sensord ETA=8s
-[AUTO] Service booted: sensord
-[AUTO] [INFO] signal_detected :: Signal detected: ECHO_7
-[AUTO] [WARN] system_state_changed :: power_core: limited -> nominal (cause=repair, health=0.90)
-[AUTO] Repair completed for power_core
-> drone recall
-[ERROR] Usage: drone recall <drone_id>
-> drone recall D1
-[CMD] [INFO] job_queued :: J7 recall_drone target=drone:D1 ETA=10s
-> map
-map blocked: datad not running. Try: boot datad
-[AUTO] Drone recalled: D1
-> contacts
-=== CONTACTS ===
-- ECHO-7 Relay Station (station) id=ECHO_7 dist=0.0000ly no_route unvisited
-- Unknown (origin) id=UNKNOWN_00 dist=0.0000ly route visited
-> scan
-=== SCAN ===
-- CURL-12 Waystation (station) id=CURL_12
-- ECHO-7 Relay Station (station) id=ECHO_7
-- Unknown (origin) id=UNKNOWN_00
-[INFO] (scan) fine range fixed: CURL_12 (3.86kmi)
-[INFO] (scan) fine range fixed: ECHO_7 (14.49kmi)
-(scan) new: CURL_12
-> nav routes
-=== NAV ROUTES ===
-(no known routes from UNKNOWN_00)
-Nearby contacts without known route:
-- CURL-12 Waystation (station) sector=S+000_+000_+000 id=CURL_12 dist=3.86kmi unvisited
-- ECHO-7 Relay Station (station) sector=S+000_+000_+000 id=ECHO_7 dist=14.49kmi unvisited
-Try: scan, route solve, intel, uplink (at relay/waystation), or acquire intel.
-> nav CURL_12
-WARNING: confirm nav to CURL_12. Continue? [y/N]
-> travel
-> nav ECHO_7
-WARNING: confirm nav to ECHO_7. Continue? [y/N]
-> travel
-> log copy 40
+- energy_distribution: Δhealth=-0.019 now=0.931
+SoC: start=0.365 end=1.000
+> dock DERELICT_30D4D3
+[CMD] [INFO] job_queued :: J32 dock target=world_node:DERELICT_30D4D3 ETA=12s
+completions: CURL_12 DERELICT_30D4D3 ECHO_7 HARBOR_12 MOURN_ANCHOR WRECK_B0C2BC
+[AUTO] [INFO] docked :: Docked at DERELICT_30D4D3
+[AUTO] [INFO] broadcast_received :: broadcast_received :: Station broadcast: /logs/broadcasts/DERELICT_30D4D3_0129.en.txt
+> cat /logs/broadcasts/DERELICT_30D4D3_0129.en.txt
+=== CAT /logs/broadcasts/DERELICT_30D4D3_0129.en.txt ===
+> log copy 10

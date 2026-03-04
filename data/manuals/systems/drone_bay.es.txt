@@ -13,6 +13,7 @@ Impacto en comandos por estado
 - OFFLINE: sin soporte de bahía. drone deploy normal bloqueado; usa drone deploy! para lanzamiento de emergencia.
 - OFFLINE: drone install bloqueado (requiere soporte físico de bahía). drone recall sigue permitido, pero sin recarga ni descontaminación.
 - Mientras energy_distribution esté OFFLINE, no hay recarga, descontaminación ni reparación pasiva en drone_bay aunque drone_bay esté online.
+- Si hay drones acoplados que necesitan recarga/reparación y el soporte no está disponible, se activa la alerta `drone_bay_maintenance_blocked`.
 
 Control vs soporte de bahía
 - El control del dron depende del enlace mínimo de core_os y de la batería del dron.

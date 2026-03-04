@@ -248,10 +248,11 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
             "Drones",
             "Drones",
             [
-                ("drone status", "show drone fleet status", "muestra estado de la flota de drones"),
+                ("drone status [drone_id]", "show drone fleet or one drone status", "muestra estado de la flota o de un dron"),
                 ("drone deploy <drone_id> <sector_id>", "deploy drone to sector", "despliega dron a sector"),
                 ("drone deploy! <drone_id> <sector_id>", "emergency deploy override", "despliegue de emergencia"),
                 ("drone move <drone_id> <target_id>", "move drone to target", "mueve dron a objetivo"),
+                ("drone survey <drone_id> <node_id>", "survey salvage signatures at node", "inspecciona señales de salvage en nodo"),
                 ("drone autorecall <drone_id> on", "enable automatic recall", "activa autorretorno"),
                 ("drone autorecall <drone_id> off", "disable automatic recall", "desactiva autorretorno"),
                 ("drone autorecall <drone_id> <percent>", "set recall battery threshold", "ajusta umbral de batería para retorno"),
@@ -259,6 +260,8 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ("drone install <drone_id> <module_id>", "install module using drone", "instala módulo usando dron"),
                 ("drone salvage scrap <drone_id> <node_id> <amount>", "salvage scrap from node", "recupera chatarra del nodo"),
                 ("drone salvage module <drone_id> [node_id]", "salvage module from node", "recupera módulo del nodo"),
+                ("drone salvage drone <drone_id> <node_id>", "recover all drones from node", "recupera todos los drones del nodo"),
+                ("drone salvage drones <drone_id> <node_id>", "alias of salvage drone", "alias de salvage drone"),
                 ("drone salvage data <drone_id> <node_id>", "salvage data from node", "recupera datos del nodo"),
                 ("drone reboot <drone_id>", "reboot drone", "reinicia dron"),
                 ("drone recall <drone_id>", "recall drone to ship", "retorna dron a la nave"),
@@ -546,6 +549,18 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "[{sev}] drone_bay_charging_unavailable :: Drone bay charging unavailable while energy_distribution remains offline",
             "es": "[{sev}] drone_bay_charging_unavailable :: Recarga en drone_bay no disponible mientras energy_distribution siga offline",
         },
+        "drone_bay_maintenance_blocked": {
+            "en": (
+                "[{sev}] drone_bay_maintenance_blocked :: "
+                "Docked drones need maintenance but bay support conditions are not met "
+                "(charge_needed={needs_charge_count}, repair_needed={needs_repair_count})"
+            ),
+            "es": (
+                "[{sev}] drone_bay_maintenance_blocked :: "
+                "Hay drones acoplados que requieren mantenimiento, pero no se cumplen las condiciones "
+                "de soporte de bahía (carga={needs_charge_count}, reparación={needs_repair_count})"
+            ),
+        },
         "low_soc_warning": {
             "en": "[{sev}] low_soc_warning :: Battery critical. Heavy action may be unsafe (SoC={soc:.2f})",
             "es": "[{sev}] low_soc_warning :: Batería crítica. Acción pesada puede ser insegura (SoC={soc:.2f})",
@@ -696,6 +711,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "scrap_empty": {
             "en": "No scrap available",
             "es": "No hay chatarra disponible",
+        },
+        "recoverable_drones_empty": {
+            "en": "No recoverable drones available",
+            "es": "No hay drones recuperables disponibles",
         },
         "emergency_override": {
             "en": "Emergency override: deploying despite unmet dependencies. Risk of failure and drone damage.",
@@ -859,6 +878,14 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Route solved: {from_id} -> {node_id}",
             "es": "Ruta calculada: {from_id} -> {node_id}",
         },
+        "job_completed_drone_survey": {
+            "en": "Survey completed at {node_id}",
+            "es": "Survey completado en {node_id}",
+        },
+        "job_completed_drone_salvage": {
+            "en": "Drone salvage complete at {node_id}: recovered {recovered_count} drone(s) [{recovered_ids}]",
+            "es": "Salvage de drones completado en {node_id}: recuperados {recovered_count} dron(es) [{recovered_ids}]",
+        },
         "route_refined": {
             "en": "Route refined: fine range fixed for {node_id}",
             "es": "Ruta afinada: distancia fina fijada para {node_id}",
@@ -1011,6 +1038,12 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         if e.type == EventType.JOB_COMPLETED and e.data.get("job_id"):
             locale = state.os.locale.value
             key = e.data.get("message_key", "")
+            if key == "job_completed_drone_salvage":
+                ids = e.data.get("recovered_ids", [])
+                if isinstance(ids, list) and ids:
+                    payload["recovered_ids"] = ", ".join(str(x) for x in ids)
+                else:
+                    payload["recovered_ids"] = "-"
             if key in job_completed_keys:
                 tmpl = job_completed_keys[key].get(locale, job_completed_keys[key]["en"])
                 message = _safe_format(tmpl, payload)
@@ -1025,6 +1058,48 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                 print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
             except Exception:
                 print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
+            if key == "job_completed_drone_survey":
+                scrap = int(e.data.get("scrap_available", 0) or 0)
+                modules_detected = bool(e.data.get("modules_detected", False))
+                recoverable_drones = int(e.data.get("recoverable_drones_count", 0) or 0)
+                data_signatures = bool(e.data.get("data_signatures_detected", False))
+                uplink_detected = bool(e.data.get("uplink_detected", False))
+                if locale == "es":
+                    print("=== SURVEY ===")
+                    print(f"chatarra detectable: {scrap}")
+                    print("módulos detectados" if modules_detected else "sin módulos detectados")
+                    if recoverable_drones > 0:
+                        print(f"drones recuperables detectados: {recoverable_drones}")
+                    else:
+                        print("sin drones recuperables detectados")
+                    print(
+                        "firmas de datos recuperables detectadas"
+                        if data_signatures
+                        else "sin firmas de datos recuperables"
+                    )
+                    print(
+                        "infraestructura con capacidad uplink detectada"
+                        if uplink_detected
+                        else "sin infraestructura con capacidad uplink"
+                    )
+                else:
+                    print("=== SURVEY ===")
+                    print(f"scrap detected: {scrap}")
+                    print("modules detected" if modules_detected else "no modules detected")
+                    if recoverable_drones > 0:
+                        print(f"recoverable drones detected: {recoverable_drones}")
+                    else:
+                        print("no recoverable drones detected")
+                    print(
+                        "recoverable data signatures detected"
+                        if data_signatures
+                        else "no recoverable data signatures detected"
+                    )
+                    print(
+                        "uplink-capable infrastructure detected"
+                        if uplink_detected
+                        else "no uplink-capable infrastructure detected"
+                    )
             continue
         if e.type == EventType.BOOT_BLOCKED:
             locale = state.os.locale.value
@@ -1331,6 +1406,7 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             EventType.LOW_SOC_WARNING,
             EventType.LOW_SOC_NOTICE,
             EventType.DRONE_BAY_CHARGING_UNAVAILABLE,
+            EventType.DRONE_BAY_MAINTENANCE_BLOCKED,
         }:
             locale = state.os.locale.value
             tmpl = power_alert_templates.get(e.type.value, {}).get(locale)
@@ -1734,10 +1810,23 @@ def render_jobs(state, limit: int | None = 5) -> None:
             print(_format_job(job))
 
 
-def render_drone_status(state) -> None:
+def render_drone_status(state, drone_id: str | None = None) -> None:
     print("\n=== DRONES ===")
     locale = state.os.locale.value
-    for did, d in state.ship.drones.items():
+    drones = state.ship.drones
+    if drone_id is not None:
+        d = drones.get(drone_id)
+        if d is None:
+            msg = {
+                "en": f"drone status: drone not found ({drone_id})",
+                "es": f"drone status: dron no encontrado ({drone_id})",
+            }
+            print(msg.get(locale, msg["en"]))
+            return
+        drone_items = [(drone_id, d)]
+    else:
+        drone_items = list(drones.items())
+    for did, d in drone_items:
         dose_level = _radiation_level_id(
             d.dose_rad,
             Balance.RAD_LEVEL_DRONE_DOSE_ELEVATED,
@@ -4781,6 +4870,78 @@ def render_alert_explain(state, alert_key: str) -> None:
         if alert:
             elapsed = max(0, int(state.clock.t) - alert.first_seen_t)
             print(f"- time_since_first_seen={elapsed}s")
+    if alert_key == "drone_bay_maintenance_blocked":
+        locale = state.os.locale.value
+        charge_reason_labels = {
+            "drone_bay_offline": {"en": "drone_bay is OFFLINE", "es": "drone_bay está OFFLINE"},
+            "energy_distribution_offline": {
+                "en": "energy_distribution is OFFLINE",
+                "es": "energy_distribution está OFFLINE",
+            },
+            "insufficient_net_power": {
+                "en": "insufficient net power for charging thresholds",
+                "es": "potencia neta insuficiente para los umbrales de carga",
+            },
+        }
+        repair_reason_labels = {
+            "drone_bay_offline": {"en": "drone_bay is OFFLINE", "es": "drone_bay está OFFLINE"},
+            "energy_distribution_offline": {
+                "en": "energy_distribution is OFFLINE",
+                "es": "energy_distribution está OFFLINE",
+            },
+            "insufficient_scrap": {
+                "en": "not enough scrap for passive repair cost",
+                "es": "no hay chatarra suficiente para el coste de reparación pasiva",
+            },
+        }
+
+        data = alert.data if alert else {}
+        if data:
+            bay_state = data.get("bay_state", "?")
+            dist_off = bool(data.get("distribution_offline", False))
+            print(f"- bay_state={bay_state}  distribution_offline={dist_off}")
+            print(
+                f"- docked_in_bay={int(data.get('docked_in_bay', 0))}  "
+                f"needs_charge={int(data.get('needs_charge_count', 0))}  "
+                f"needs_repair={int(data.get('needs_repair_count', 0))}"
+            )
+            print(
+                f"- charge_possible={bool(data.get('charge_possible', False))}  "
+                f"repair_possible={bool(data.get('repair_possible', False))}  "
+                f"decon_possible={bool(data.get('decon_possible', False))}"
+            )
+            ckey = str(data.get("charge_block_reason", "") or "")
+            if ckey:
+                cmsg = charge_reason_labels.get(ckey, {}).get(locale, ckey)
+                print(f"- charge_block_reason={cmsg}")
+            rkey = str(data.get("repair_block_reason", "") or "")
+            if rkey:
+                rmsg = repair_reason_labels.get(rkey, {}).get(locale, rkey)
+                print(f"- repair_block_reason={rmsg}")
+            print(
+                f"- net_kw={float(data.get('net_kw', metrics['net_kw'])):+.2f}kW  "
+                f"SoC={float(data.get('soc', metrics['soc'])):.2f}  "
+                f"scrap={int(data.get('scrap_available', state.ship.cargo_scrap))}  "
+                f"repair_scrap_cost={int(data.get('scrap_required_per_tick', 0))}"
+            )
+
+        print("Battery charging conditions:")
+        print("- Drone must be docked in drone_bay and battery < 1.0")
+        print("- drone_bay must not be OFFLINE")
+        print("- energy_distribution must not be OFFLINE")
+        print(
+            f"- Power gate: net >= {Balance.DRONE_CHARGE_KW:.2f}kW (normal charge), or "
+            f"SoC > 0 with net >= {Balance.DRONE_CHARGE_NET_MIN_KW:.2f}kW (slow charge)"
+        )
+        print("Integrity passive-repair conditions:")
+        print("- Drone must be docked in drone_bay and integrity < 1.0")
+        print("- drone_bay and energy_distribution must be available (not OFFLINE)")
+        print("- Ship must have enough scrap for passive repair cost of the current bay state")
+        print("Drone decontamination conditions:")
+        print("- Drone must be docked in drone_bay")
+        print("- drone_bay must not be OFFLINE")
+        print("- energy_distribution must not be OFFLINE")
+        print("- Decontamination does not require positive net power or scrap")
 
 def main() -> None:
     from retorno.cli.parser import ParseError, parse_command, format_parse_error
@@ -5165,10 +5326,10 @@ def main() -> None:
                 elif cmd == "drone":
                     if len(tokens) == 2:
                         candidates = [
-                            c for c in ["status", "deploy", "deploy!", "move", "reboot", "recall", "autorecall", "repair", "install", "salvage"]
+                            c for c in ["status", "deploy", "deploy!", "move", "survey", "reboot", "recall", "autorecall", "repair", "install", "salvage"]
                             if c.startswith(text)
                         ]
-                    elif len(tokens) == 3 and tokens[1] in {"deploy", "deploy!", "reboot", "recall", "autorecall", "repair", "move", "install"}:
+                    elif len(tokens) == 3 and tokens[1] in {"status", "deploy", "deploy!", "reboot", "recall", "autorecall", "repair", "move", "install", "survey"}:
                         candidates = [d for d in drones if d.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
                         candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
@@ -5185,15 +5346,17 @@ def main() -> None:
                         candidates = [m for m in modules if m.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "repair":
                         candidates = [x for x in sorted(set(systems) | set(drones)) if x.startswith(text)]
+                    elif len(tokens) == 4 and tokens[1] == "survey":
+                        candidates = [c for c in contacts if c.startswith(text)]
                     elif len(tokens) == 3 and tokens[1] == "salvage":
-                        candidates = [c for c in ["scrap", "module", "modules", "data"] if c.startswith(text)]
+                        candidates = [c for c in ["scrap", "module", "modules", "drone", "drones", "data"] if c.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "salvage":
                         candidates = [d for d in drones if d.startswith(text)]
                     elif len(tokens) == 5 and tokens[1] == "salvage":
                         candidates = [c for c in contacts if c.startswith(text)]
                 elif cmd == "salvage":
                     if len(tokens) == 2:
-                        candidates = [c for c in ["scrap", "module", "modules", "data"] if c.startswith(text)]
+                        candidates = [c for c in ["scrap", "module", "modules", "drone", "drones", "data"] if c.startswith(text)]
                     elif len(tokens) == 3:
                         candidates = [d for d in drones if d.startswith(text)]
                     elif len(tokens) == 4:
@@ -5586,6 +5749,11 @@ def main() -> None:
             _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_drone_status(locked_state)
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "DRONE_STATUS":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                render_drone_status(locked_state, parsed[1])
             continue
         if isinstance(parsed, tuple) and parsed[0] == "DRONE_AUTORECALL_ENABLED":
             _drain_auto_events()

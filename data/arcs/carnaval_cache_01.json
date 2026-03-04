@@ -13,6 +13,7 @@
     },
     "allowed_channels": ["station_broadcast", "captured_signal", "ship_os_mail"],
     "content_ref_es": "lore/packs/carnaval_cache_01/primary_cache_doc.es.txt",
+    "content_ref_en": "lore/packs/carnaval_cache_01/primary_cache_doc.en.txt",
     "constraints": {
       "min_year": 0.0,
       "max_dist_ly": 40.0,

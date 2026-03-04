@@ -15,7 +15,10 @@
     "scrap_max": 40,
     "modules_min": 0,
     "modules_max": 0,
-    "modules_pool": "common"
+    "modules_pool": "common",
+    "drones_min": 1,
+    "drones_max": 1,
+    "drone_prob": 0.04
   },
   "uplink_table": {
     "min_authored": 1,

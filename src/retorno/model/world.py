@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import MISSING, dataclass, field, fields
 from typing import Optional, Tuple
 
 
@@ -17,9 +17,36 @@ class SpaceNode:
     z_ly: float = 0.0
     salvage_scrap_available: int = 0
     salvage_modules_available: list[str] = field(default_factory=list)
+    recoverable_drones_count: int = 0
     salvage_dry: bool = False
     links: set[str] = field(default_factory=set)
     is_hub: bool = False
+
+    def __setstate__(self, state) -> None:
+        """Backward-compatible unpickle for slot additions."""
+        slot_state = state
+        if isinstance(state, tuple):
+            if len(state) == 2 and isinstance(state[1], dict):
+                slot_state = state[1]
+            elif len(state) == 2 and isinstance(state[0], dict):
+                slot_state = state[0]
+        if not isinstance(slot_state, dict):
+            raise TypeError(f"Unsupported SpaceNode pickle payload: {type(state)!r}")
+
+        data = dict(slot_state)
+        if "recoverable_drones_count" not in data:
+            data["recoverable_drones_count"] = 0
+
+        for f in fields(self):
+            if f.name in data:
+                value = data[f.name]
+            elif f.default is not MISSING:
+                value = f.default
+            elif f.default_factory is not MISSING:
+                value = f.default_factory()
+            else:
+                continue
+            object.__setattr__(self, f.name, value)
 
 
 @dataclass(slots=True)

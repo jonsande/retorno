@@ -20,6 +20,7 @@ class EventType(str, Enum):
     LOW_SOC_WARNING = "low_soc_warning"
     LOW_SOC_NOTICE = "low_soc_notice"
     DRONE_BAY_CHARGING_UNAVAILABLE = "drone_bay_charging_unavailable"
+    DRONE_BAY_MAINTENANCE_BLOCKED = "drone_bay_maintenance_blocked"
     SYSTEM_STATE_CHANGED = "system_state_changed"
     SYSTEM_POWER_RESTORED = "system_power_restored"
     JOB_COMPLETED = "job_completed"

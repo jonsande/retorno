@@ -15,7 +15,10 @@
     "scrap_max": 60,
     "modules_min": 1,
     "modules_max": 1,
-    "modules_pool": "common"
+    "modules_pool": "common",
+    "drones_min": 1,
+    "drones_max": 1,
+    "drone_prob": 0.08
   },
   "fs_files": [
     {

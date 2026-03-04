@@ -84,6 +84,8 @@ def main() -> None:
     # Parser migration still holds.
     assert parse_command("drone install D1 aux_battery_cell").__class__.__name__ == "Install"
     assert parse_command("undock").__class__.__name__ == "Undock"
+    assert parse_command("drone status") == "DRONE_STATUS"
+    assert parse_command("drone status D1") == ("DRONE_STATUS", "D1")
     for cmd in ("module install aux_battery_cell", "install aux_battery_cell"):
         try:
             parse_command(cmd)
@@ -331,6 +333,67 @@ def main() -> None:
     state.ship.power.p_load_kw = 0.0
     engine._update_drone_maintenance(state, 10.0)  # noqa: SLF001 - intentional policy smoke
     assert state.ship.drones["D1"].battery == 0.0
+
+    # Drone bay maintenance alert: active only when a docked drone needs battery/integrity and support is blocked.
+    state = _fresh_state()
+    _prepare_docked_drone(state)
+    state.ship.drones["D1"].battery = 0.4
+    state.ship.drones["D1"].integrity = 1.0
+    state.ship.systems["drone_bay"].state = SystemState.OFFLINE
+    state.ship.systems["drone_bay"].forced_offline = True
+    alert_events = engine._update_alerts(state, p_load=0.0, p_gen=1.0, power_quality=0.9)  # noqa: SLF001
+    assert any(e.type == EventType.DRONE_BAY_MAINTENANCE_BLOCKED for e in alert_events), alert_events
+    key = EventType.DRONE_BAY_MAINTENANCE_BLOCKED.value
+    assert key in state.events.alerts and state.events.alerts[key].is_active
+    assert state.events.alerts[key].data.get("charge_possible") is False
+    assert state.events.alerts[key].data.get("charge_block_reason") == "drone_bay_offline"
+    assert state.events.alerts[key].data.get("decon_possible") is False
+
+    # No alert if docked drones do not need maintenance.
+    state = _fresh_state()
+    _prepare_docked_drone(state)
+    state.ship.drones["D1"].battery = 1.0
+    state.ship.drones["D1"].integrity = 1.0
+    state.ship.systems["drone_bay"].state = SystemState.OFFLINE
+    state.ship.systems["drone_bay"].forced_offline = True
+    engine._update_alerts(state, p_load=0.0, p_gen=1.0, power_quality=0.9)  # noqa: SLF001
+    assert EventType.DRONE_BAY_MAINTENANCE_BLOCKED.value not in state.events.alerts
+
+    # Repair-blocked branch: no passive integrity recovery if scrap is insufficient.
+    state = _fresh_state()
+    _prepare_docked_drone(state)
+    state.ship.drones["D1"].battery = 1.0
+    state.ship.drones["D1"].integrity = 0.5
+    state.ship.cargo_scrap = 0
+    state.ship.systems["drone_bay"].state = SystemState.NOMINAL
+    state.ship.systems["drone_bay"].forced_offline = False
+    state.ship.systems["energy_distribution"].state = SystemState.NOMINAL
+    state.ship.power.p_gen_kw = 2.0
+    state.ship.power.p_load_kw = 1.0
+    alert_events = engine._update_alerts(state, p_load=1.0, p_gen=2.0, power_quality=0.9)  # noqa: SLF001
+    assert any(e.type == EventType.DRONE_BAY_MAINTENANCE_BLOCKED for e in alert_events), alert_events
+    data = state.events.alerts[EventType.DRONE_BAY_MAINTENANCE_BLOCKED.value].data
+    assert data.get("repair_possible") is False
+    assert data.get("repair_block_reason") == "insufficient_scrap"
+    assert data.get("decon_possible") is True
+
+    # Alert clears after restoring support conditions.
+    state = _fresh_state()
+    _prepare_docked_drone(state)
+    state.ship.drones["D1"].battery = 0.3
+    state.ship.drones["D1"].integrity = 1.0
+    state.ship.systems["drone_bay"].state = SystemState.OFFLINE
+    state.ship.systems["drone_bay"].forced_offline = True
+    engine._update_alerts(state, p_load=0.0, p_gen=1.0, power_quality=0.9)  # noqa: SLF001
+    key = EventType.DRONE_BAY_MAINTENANCE_BLOCKED.value
+    assert state.events.alerts[key].is_active
+    state.ship.systems["drone_bay"].state = SystemState.NOMINAL
+    state.ship.systems["drone_bay"].forced_offline = False
+    state.ship.systems["energy_distribution"].state = SystemState.NOMINAL
+    state.ship.power.p_gen_kw = 2.0
+    state.ship.power.p_load_kw = 1.0
+    engine._update_alerts(state, p_load=1.0, p_gen=2.0, power_quality=0.9)  # noqa: SLF001
+    assert state.events.alerts[key].is_active is False
 
     # Critical-state consistency: route blocked, repair allowed.
     state = _fresh_state()

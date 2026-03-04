@@ -1,6 +1,8 @@
 drone salvage scrap <drone_id> <node_id> <amount>
 drone salvage module <drone_id> [node_id]
+drone salvage drone <drone_id> <node_id>
+drone salvage drones <drone_id> <node_id>
 drone salvage data <drone_id> <node_id>
-- Salvage scrap, modules, or data from a node.
+- Salvage scrap, modules, recoverable drones, or data from a node.
 - Drone must be deployed at the node.
 - If node_id is omitted, uses the drone's current node.

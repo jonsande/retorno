@@ -132,7 +132,28 @@ Esto da variedad, pero no lo haría aún como primer sistema.
 
 
 
+
+=== SOUND AND MUSIC ===
+
+- [ ] Sonido ambiente (https://www.youtube.com/watch?v=wVMrSszssyo)
+
+- [ ] Posibilidad de apagar/encender el sonido ambiente.
+
+- [ ] Posibilidad de poner música clásica.
+
+
+
 === OTROS / SIN CATALOGAR ===
+
+- [x] Mensaje advirtiendo cuándo no está cargando la batería de los drones en bahía, y recordando las condiciones que se tienen que cumplir.
+
+- [ ] Mejorar el manual de drones. Hacerlo detallado y más homogéneo al resto.
+
+- [ ] Creo que route solve no sólo debería depender de sensord sino también de datad. (Valorarlo.)
+
+- [ ] Nuevo sistema: sonar. Que haga pip-pip. O un radar que esté constantemente en funcionamiento. Basarse en los submarinos actuales. La idea es que se puedan captar a veces objetos en movimiento. Incluso naves a la deriva. O peligros.
+
+- [ ] Nuevo loot: uranio (como combustible). La idea es que para poder generar energía, el reactor nuclear necesita uranio. Es duradero, pero teniendo en cuenta que se viaja durante años... El uranio (o lo que sea) se tiene que poder obtener con los drones de otras derelics.
 
 - [ ] Eventos aleatorios durante viajes/hibernación.
 
