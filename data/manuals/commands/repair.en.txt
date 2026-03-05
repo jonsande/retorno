@@ -1,8 +1,26 @@
 drone repair <drone_id> <target_id>
 repair <system_id> --selftest
 
-Notes
-- Drone repair consumes scrap based on repair amount.
-- Self-test repair is slower and requires a Self-Test Rig module.
-- Self-test also consumes scrap, but less per unit of health.
-- Repairs require deployed drone units.
+Purpose
+- Restore ship-system health or drone integrity through active repair workflows.
+
+Repair modes
+- `drone repair <drone_id> <target_id>`: field repair by deployed operator drone.
+- `repair <system_id> --selftest`: internal self-test repair cycle (requires `selftest_rig`).
+
+Requirements (gating)
+- Drone repair requires deployed operator drone, minimum battery, and valid target.
+- Drone-to-drone repair requires exact co-location between operator and target drone.
+- Both modes require enough scrap for initial reservation.
+
+Job outcomes
+- Repair jobs have low base fail chance (`Balance.REPAIR_JOB_FAIL_P_BASE`).
+- On failure, only a configurable scrap fraction is consumed; the remainder is refunded (`Balance.REPAIR_JOB_FAIL_SCRAP_CONSUME_FRACTION`).
+
+Operational notes
+- Drone repair consumes operator battery and reserved scrap.
+- Self-test repair is slower and more scrap-efficient per health unit.
+- In critical power state, non-critical repairs are allowed but warned as high-risk tradeoff.
+
+Related commands
+- `diag <system_id>`, `drone status [drone_id]`, `jobs`, `alerts`

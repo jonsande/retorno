@@ -1,5 +1,8 @@
 intel
 - Lists known navigation intel (latest first).
+Purpose
+- Manage navigation intelligence records (inspect, import, export).
+
 Usage: intel | intel <amount> | intel all
 - Columns:
   ID: intel item identifier.
@@ -29,3 +32,6 @@ intel import <path>
 
 intel export <path>
 - Exports current intel to a file under /logs/nav or /data/nav.
+
+Related commands
+- `uplink`, `nav map routes`, `route solve <node_id>`, `cat <path>`

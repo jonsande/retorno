@@ -1,12 +1,20 @@
 map path <node_id>
 
 Estado del comando
-- `map` ya no es comando canónico de cartografía.
-- Se mantiene solo como alias de compatibilidad para `nav map path <node_id>`.
+- `map` se conserva solo por compatibilidad retroactiva.
+- El espacio canónico de cartografía es `nav map ...`.
 
-Alias equivalente
+Forma equivalente
 - `map path <node_id>` -> `nav map path <node_id>`
 
-Notas
-- `map ship`, `map graph` y `map graph <node_id>` fueron retirados.
-- Usa `ship sectors`, `nav map graph` y `nav map graph <node_id>`.
+Formas heredadas retiradas
+- `map ship`
+- `map graph`
+- `map graph <node_id>`
+
+Guía operativa
+- Usa `ship sectors` para topología interna de nave.
+- Usa `nav map graph` y `nav map graph <node_id>` para cartografía del grafo mundial.
+
+Comandos relacionados
+- `nav map sectors`, `nav map graph [node_id]`, `nav map routes`, `nav map contacts`

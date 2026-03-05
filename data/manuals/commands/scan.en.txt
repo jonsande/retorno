@@ -1,4 +1,14 @@
 scan
-- Active sweep for nearby signals within sensor range.
-- Discovered contacts are not always reachable without a route.
-- Requires sensors lock; can be used in transit with transit_sensor_pack installed.
+
+Purpose
+- Perform local signal scan and update nearby contact intelligence.
+
+Requirements (gating)
+- Sensor stack must be available for scan workflow (`sensors` state and `sensord` service).
+- Power state must allow active scanning operations.
+
+Operational behavior
+- Updates local contact awareness and may reveal scan events.
+
+Related commands
+- `boot sensord`, `diag sensors`, `nav map contacts`, `route solve <node_id>`

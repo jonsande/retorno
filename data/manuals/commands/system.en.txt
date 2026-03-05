@@ -1,3 +1,12 @@
 system on <system_id>
 system off <system_id>
-- Alias for power on/off.
+
+Purpose
+- Compatibility gateway for subsystem power control.
+
+Command status
+- Canonical power-control namespace is `power on/off <system_id>`.
+- `system on/off` is retained as compatibility form.
+
+Related commands
+- `power on <system_id>`, `power off <system_id>`, `diag <system_id>`

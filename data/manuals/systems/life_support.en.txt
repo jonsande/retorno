@@ -1,25 +1,28 @@
-SYSTEM BRIEF — life_support
+SYSTEM SUMMARY — life_support
 Ref: OS-MAN/SYS/LIFE
 
-life_support keeps the capsule viable: oxygenation, thermal control, nutrient perfusion.
+`life_support` preserves capsule viability: atmosphere, thermal envelope, and metabolic support.
 
-Role
-- Maintains capsule atmosphere and metabolic support.
-- Regulates temperature and CO₂ scrubbing.
+Function
+- Maintains breathable/processable atmosphere and CO2 scrubbing.
+- Regulates thermal control envelope for capsule stability.
 
-Failure modes
-- Slow drift (most common): efficiency loss → increasing load and alarms.
-- Catastrophic loss: when state reaches OFFLINE, a capsule viability countdown starts; terminal state triggers when grace is exhausted.
-
-Operational notes
-- Treated as critical. Shedding it is equivalent to surrender.
-- If you must cut power, cut everything else first.
-- LIMITED/CRITICAL/OFFLINE: hibernation blocked until stabilized.
+Operational dependencies
+- Treated as critical system at all times.
+- If `life_support` reaches OFFLINE, viability grace countdown begins.
 
 Command impact by state
-- LIMITED: hibernate blocked.
-- CRITICAL: hibernate blocked.
-- OFFLINE: viability grace countdown starts (configurable). When exhausted, terminal state triggers and command set becomes severely restricted.
+- LIMITED: hibernation blocked.
+- CRITICAL: hibernation blocked; survival margin narrowing.
+- OFFLINE: viability countdown active; terminal-state lockout risk when grace expires.
 
-Relevant commands
-- status, alerts, diag life_support
+Common symptoms
+- escalating warnings, survivability pressure, blocked long-duration operations.
+
+Recovery pattern
+- restore power delivery,
+- prioritize `life_support` repair,
+- delay non-essential work until viability stabilizes.
+
+Related commands
+- `diag life_support`, `power status`, `drone repair <drone_id> life_support`, `hibernate`

@@ -1,22 +1,30 @@
-SYSTEM BRIEF — data_core
+SYSTEM SUMMARY — data_core
 Ref: OS-MAN/SYS/DATA-CORE
 
-`data_core` provides persistent data services (inventory, recovery, structured telemetry).
+`data_core` is the persistent data plane for manifests, recovery workflows, and structured telemetry.
 
-Role
-- Supports `cargo audit` and manifest workflows.
-- Supports `auth recover`.
-- Supports `uplink` on valid docked nodes.
-- Provides data input for `ship survey`.
+Function
+- Supports cargo manifest synchronization and audit jobs.
+- Hosts credential recovery workflows.
+- Supplies telemetry/data services to uplink and survey operations.
 
-Service
-- Associated service: `datad`.
+Operational dependencies
+- Primary service daemon: `datad`.
+- Most data operations require `data_core >= limited` and running `datad`.
 
 Command impact by state
-- `cargo audit` and `auth recover`: require `data_core >= limited` + running `datad`.
-- `uplink`: requires `data_core >= limited` + running `datad` (plus dock/node/power constraints).
-- `ship survey`: requires `data_core >= limited` + running `datad` (with `sensors >= limited` + `sensord`).
-- `nav map *` does not depend on `data_core`.
+- `cargo audit` / `inventory audit`: require `data_core >= limited` + `datad`.
+- `auth recover`: requires `data_core >= limited` + `datad` (+ power gating).
+- `uplink`: requires `data_core >= limited` + `datad` (+ dock/node/power gating).
+- `ship survey`: requires `data_core >= limited` + `datad` plus sensor stack availability.
 
-Relevant commands
-- `boot datad`, `cargo audit`, `auth recover`, `uplink`, `ship survey`.
+Common symptoms
+- stale manifests, failed auth recovery jobs, reduced intel ingestion.
+
+Recovery pattern
+- repair `data_core`,
+- boot `datad`,
+- rerun blocked data workflows.
+
+Related commands
+- `boot datad`, `cargo audit`, `auth recover`, `uplink`, `ship survey`

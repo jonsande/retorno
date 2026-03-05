@@ -1,5 +1,13 @@
-power_net_deficit
-- Load exceeds generation (plus battery discharge limit).
-- Typical causes: high load, low generation, damaged core.
-- If persistent: brownouts, forced shutdowns.
-Recommended: reduce load, repair power_core, charge batteries.
+ALERT — power_net_deficit
+
+Meaning
+- Effective load exceeds generation/discharge delivery envelope.
+
+Operational impact
+- Brownout pressure rises.
+- Automatic shedding and forced subsystem downgrades may trigger.
+
+Immediate response
+- shed non-critical load,
+- recover `power_core` output,
+- rebuild battery headroom.

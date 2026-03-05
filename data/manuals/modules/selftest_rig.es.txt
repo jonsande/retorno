@@ -1,6 +1,14 @@
-selftest_rig
-- Arnés de auto‑prueba y calibración para subsistemas.
-- Habilita ciclos internos de reparación sin drones.
-- Útil en sistemas LIMITADOS cuando no hay drones disponibles.
-- Más lento que la reparación de campo, pero más seguro.
-Lore: Se diseñó para estaciones con tripulación mínima.
+DOSSIER DE MÓDULO — selftest_rig
+
+Rol
+- Arnés interno de auto-prueba y calibración para ciclos de reparación de subsistemas.
+
+Efecto operativo
+- Habilita flujo `repair <system_id> --selftest` sin desplegar drones.
+- Intercambia velocidad por perfil de recuperación interna más seguro.
+
+Notas de integración
+- Especialmente útil cuando la disponibilidad de drones es limitada.
+
+Nota de campo
+- Diseñado originalmente para protocolos de mantenimiento en estaciones de tripulación mínima.

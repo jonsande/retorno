@@ -1,4 +1,14 @@
-shutdown <system_id>
-- Manually powers down a system (forced offline).
-- Equivalent to: power off <system_id>
-- Use to reduce load or isolate faults.
+shutdown <service_name>
+
+Purpose
+- Stop a running service daemon for load reduction, containment, or recovery sequencing.
+
+Operational behavior
+- Stops service if running and updates subsystem service state.
+- May reduce load but can disable dependent workflows.
+
+Usage notes
+- Prefer targeted shutdowns; avoid stopping critical services unless required for survival.
+
+Related commands
+- `boot <service_name>`, `power status`, `diag <system_id>`

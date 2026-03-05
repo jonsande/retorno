@@ -3,6 +3,24 @@ drone salvage module <drone_id> [node_id]
 drone salvage drone <drone_id> <node_id>
 drone salvage drones <drone_id> <node_id>
 drone salvage data <drone_id> <node_id>
-- Recupera chatarra, módulos, drones recuperables o datos del nodo.
-- El dron debe estar desplegado en el nodo.
-- Si no se indica node_id, se usa el nodo actual del dron.
+
+Propósito
+- Ejecutar operaciones de recuperación con drones para materiales, módulos, drones recuperables y firmas de datos.
+
+Requisitos (gating)
+- El dron operador debe estar desplegado, ser válido y tener batería mínima de tarea.
+- El nodo objetivo debe ser válido y compatible con el contexto de ubicación del dron/acoplamiento de nave.
+- Debe existir disponibilidad de salvage según acción (scrap/module/drone/data).
+
+Comportamiento
+- Las acciones de salvage encolan trabajos temporizados (duración según acción y carga).
+- El salvage exitoso actualiza bodega/intel/estado de agotamiento del mundo.
+- Las operaciones consumen batería del dron y heredan riesgo operativo por entorno/degradación.
+
+Bloqueos frecuentes
+- dron no desplegado / batería baja / objetivo inexistente
+- nave no acoplada al nodo world_node del dron cuando aplica
+- no queda salvage elegible para la acción pedida
+
+Comandos relacionados
+- `drone survey <drone_id> <node_id>`, `inventory`, `modules`, `intel`, `jobs`

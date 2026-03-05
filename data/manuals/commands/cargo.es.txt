@@ -1,4 +1,15 @@
 cargo
-- Alias de 'inventory'.
-- Muestra la chatarra y módulos según el último inventario.
-- Si hubo cambios en bodega, ejecuta 'cargo audit' o 'inventory audit' para inventariar.
+cargo audit
+
+Propósito
+- Consultar manifiesto de bodega y sincronizar desvíos cuando quede desactualizado.
+
+Comportamiento operativo
+- `cargo` es alias de `inventory` (snapshot de manifiesto conocido).
+- `cargo audit` encola trabajo de reconciliación de manifiesto.
+
+Notas de uso
+- Ejecuta audit tras salvage/install si los valores no cuadran.
+
+Comandos relacionados
+- `inventory`, `inventory update`, `modules`, `jobs`

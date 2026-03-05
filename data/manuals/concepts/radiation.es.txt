@@ -1,87 +1,40 @@
-radiation (mvp)
-- La radiación se modela en dos capas:
-  - `env`: radiación ambiental efectiva del entorno actual.
-  - `internal`: radiación que entra a sistemas internos tras el filtrado del casco.
-  
-  - [TODO: contaminación (contamination_rad), de forma que en vez de 
-    internal_rad = env_rad * ingress_factor, hacer 
-    internal_rad = env_rad * ingress_factor + contamination_rad; 
-    donde env_rad * ingress_factor = lo que entra desde fuera; y
-    contamination_rad = lo que la nave arrastra consigo.
-    De modo que si sales de una zona radiactiva la parte ambiental cae a casi 0 pero la contaminación puede seguir afectando un tiempo.]
+SHIP OS — Modelo de radiación y control de exposición (Copia de campo)
+Ref: OS-MAN/ENG/RAD-01
 
-de dónde sale la radiación ambiental
-- Fuera de tránsito: del nodo actual.
-- En tránsito: promedio entre nodo origen y nodo destino.
-- Estar acoplado no añade transferencia especial por sí sola.
-- Si estás acoplado en un nodo caliente, sigues bajo la radiación de ese nodo.
+La radiación en RETORNO es presión sistémica persistente, no un evento puntual.
+Afecta desgaste de nave, supervivencia de drones y coste de mantenimiento a largo plazo.
 
-casco y sistemas de nave
-- `hull` es una propiedad global de la nave (0..1), no un sistema estándar.
-- Menor integridad de casco implica mayor ingreso de radiación interna.
-- La radiación interna acelera el desgaste normal de sistemas según su `k_rad`.
-- La radiación no sustituye la degradación base: la amplifica.
-- En este MVP no hay corrupción narrativa de lore/intel/datos por radiación.
+Capas del modelo
+- `env_rad`: radiación ambiental del espacio operativo actual.
+- `internal_rad`: radiación que entra a internos de nave tras el filtrado del casco.
+- `dose` de dron: exposición acumulada por dron a lo largo del tiempo.
 
-efectos en drones
-- Drones no acoplados acumulan dosis con el tiempo:
-  - `dose += env_rad * shield_factor * dt`
-- Convención de `shield_factor`:
-  - `< 1.0` => mejor blindaje (entra menos radiación)
-  - `= 1.0` => referencia/base
-  - `> 1.0` => peor blindaje (entra más radiación)
-- Drones no acoplados pierden integridad con el tiempo.
-- La dosis aumenta ese desgaste por bandas:
-  - dose < 1.0: x1.0
-  - 1.0 <= dose < 3.0: x1.2
-  - 3.0 <= dose < 6.0: x1.8
-  - dose >= 6.0: x3.0
+Origen ambiental
+- Fuera de tránsito: radiación ambiental del nodo actual.
+- En tránsito: promedio de radiación ambiental entre origen y destino.
+- El acoplamiento no crea modelo de transferencia separado; la exposición acoplada sigue el nodo.
 
-niveles de radiación (4 bandas, configurables)
-- `low`: por debajo del umbral `elevated`.
-- `elevated`: desde `RAD_LEVEL_*_ELEVATED`.
-- `high`: desde `RAD_LEVEL_*_HIGH`.
-- `extreme`: desde `RAD_LEVEL_*_EXTREME`.
-- Estas bandas se aplican a:
-  - radiación ambiental (`env`)
-  - radiación interna (`internal`)
-  - dosis de cada dron (`dose`)
+Interacción con casco
+- La integridad de casco (`hull`) es protección global de nave (`0..1`).
+- Menor integridad de casco implica mayor ingreso interno.
+- La radiación interna amplifica degradación de subsistemas vía factor `k_rad` de cada sistema.
 
-alertas por cambio de umbral
-- Se emite advertencia cuando una métrica cambia de banda (`low/elevated/high/extreme`).
-- Se aplica a `env`, `internal` y `drone dose`.
-- Solo hay evento al cambiar de banda; no hay spam por tick si el nivel no cambia.
+Exposición de drones
+- Los drones no acoplados acumulan dosis de forma continua.
+- Convención de escudo (`shield_factor`):
+  - `< 1.0`: mejor blindaje (menos ingreso)
+  - `= 1.0`: blindaje base
+  - `> 1.0`: peor blindaje (más ingreso)
+- Bandas altas de dosis aceleran pérdida de integridad del dron.
 
-qué recibe radiación o se ve afectado en este MVP
-- Casco de la nave: sí (desgaste lento).
-- Sistemas de nave: sí (degradación acelerada por radiación interna).
-- Drones no acoplados: sí (dosis + desgaste de integridad).
-- Drones acoplados: no acumulan dosis ambiental mientras estén acoplados.
-- Vitals del PJ / corrupción de lore/intel/datos: no, fuera de alcance en esta iteración.
+Interacción con mantenimiento de bahía
+- Drones acoplados en `drone_bay` se descontaminan pasivamente si hay soporte de bahía/distribución.
+- La velocidad de descontaminación cae con degradación de bahía.
 
-descontaminación (nave y drones)
-- Nave: no hay rutina directa de descontaminación en este MVP.
-- Drones: descontaminación automática en `drone_bay`, solo si:
-  - `drone_bay` no está `OFFLINE`
-  - `energy_distribution` no está `OFFLINE`
+Guía operativa
+- Mantén drones acoplados cuando no sean necesarios en zonas de alta radiación.
+- Conserva integridad de casco para reducir presión radiológica interna sostenida.
+- Trata la radiación como desgaste acumulativo y programa mantenimiento antes de síntomas de colapso.
 
-ratios de descontaminación por estado de bahía
-- Nominal: 0.010 rad/s
-- Limited: 0.005 rad/s
-- Damaged: 0.0025 rad/s
-- Critical: 0.0025 rad/s
-- Offline o distribution offline: 0 rad/s (sin descontaminación)
-
-tabla rápida: tiempo para limpiar X de dose
-- Fórmula: `tiempo_segundos = dose / ratio_descontaminación`
-
-estado      ratio(rad/s)  dose 1.0         dose 3.0         dose 6.0
-- nominal   0.010         100s (1m40s)     300s (5m00s)     600s (10m00s)
-- limited   0.005         200s (3m20s)     600s (10m00s)    1200s (20m00s)
-- damaged   0.0025        400s (6m40s)     1200s (20m00s)   2400s (40m00s)
-- critical  0.0025        400s (6m40s)     1200s (20m00s)   2400s (40m00s)
-
-límites de alcance
-- En este MVP no hay eventos aleatorios complejos de viaje.
-- En este MVP no hay condición terminal por casco.
-- La ruta de daño de casco queda preparada para impactos/eventos futuros.
+Comandos relacionados
+- `status`, `drone status [drone_id]`, `diag drone_bay`, `alerts`

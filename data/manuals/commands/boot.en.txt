@@ -1,5 +1,25 @@
 boot <service_name>
-- Starts an installed service.
-- Requires dependencies satisfied.
-- If power quality is critical (Q < 0.40), booting non-critical services is blocked.
-- Boot is blocked during brownout.
+
+Purpose
+- Boot a subsystem service daemon (for example `sensord`, `datad`, `securityd`).
+
+Requirements (gating)
+- Service must exist and belong to an installed ship subsystem.
+- Target subsystem must be recoverable (not destroyed) and with dependencies satisfied.
+- Power state must allow boot:
+  - non-critical boots are blocked in critical power state (including active brownout),
+  - non-critical boots are blocked when power quality is critical (`Q < 0.40`),
+  - critical-service boots may remain available for survival recovery.
+
+Behavior
+- Boot enqueues a service boot job and completes after subsystem boot time.
+- If the service is already running, no new job is queued.
+
+Common block reasons
+- `service_missing`
+- `deps_unmet`
+- `critical_power_state` / `power_quality_critical`
+- `brownout_active`
+
+Related commands
+- `diag <system_id>`, `power status`, `shutdown <service_name>`, `jobs`

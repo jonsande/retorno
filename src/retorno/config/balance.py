@@ -31,50 +31,54 @@ class Balance:
 
     # Job times (seconds)
     # Base repair duration for ship systems.
-    REPAIR_TIME_S = 25.0
+    REPAIR_TIME_S = 45.0
     # Drone deployment time.
     DEPLOY_TIME_S = 13.0
     # Drone reboot time.
-    REBOOT_TIME_S = 15.0
+    REBOOT_TIME_S = 25.0
     # Drone recall time.
-    RECALL_TIME_S = 10.0
+    RECALL_TIME_S = 25.0
     # Docking time to a node.
-    DOCK_TIME_S = 12.0
+    DOCK_TIME_S = 60.0
     # Undocking time from a node.
-    UNDOCK_TIME_S = 6.0
+    UNDOCK_TIME_S = 45.0
     # Module installation time.
     INSTALL_TIME_S = 30.0
     # Salvage scrap time model: base + per unit.
-    SALVAGE_SCRAP_BASE_S = 4.0
+    SALVAGE_SCRAP_BASE_S = 5.0
     SALVAGE_SCRAP_PER_UNIT_S = 1.5
     # Salvage module job time.
-    SALVAGE_MODULE_TIME_S = 12.0
+    SALVAGE_MODULE_TIME_S = 25.0
     # Salvage data job time.
-    SALVAGE_DATA_TIME_S = 18.0
+    SALVAGE_DATA_TIME_S = 40.0
     # Drone survey job time.
-    DRONE_SURVEY_TIME_S = 10.0
+    DRONE_SURVEY_TIME_S = 20.0
     # Recoverable drone salvage time model: base + per unit.
-    DRONE_SALVAGE_DRONE_BASE_TIME_S = 8.0
+    DRONE_SALVAGE_DRONE_BASE_TIME_S = 35.0
     DRONE_SALVAGE_DRONE_PER_UNIT_S = 4.0
     # Self-test repair job time and amount.
     SELFTEST_REPAIR_TIME_S = 18.0
     SELFTEST_REPAIR_AMOUNT = 0.05
     # Scrap cost per unit of health repaired.
-    REPAIR_SCRAP_PER_HEALTH = 20
-    SELFTEST_REPAIR_SCRAP_PER_HEALTH = 12
+    REPAIR_SCRAP_PER_HEALTH = 20 # ???
+    SELFTEST_REPAIR_SCRAP_PER_HEALTH = 12 # ???
+    # Active repair jobs can fail with a low base chance.
+    REPAIR_JOB_FAIL_P_BASE = 0.10
+    # On repair failure, keep only this fraction of the originally paid scrap.
+    REPAIR_JOB_FAIL_SCRAP_CONSUME_FRACTION = 0.25
     # Cargo audit time.
     CARGO_AUDIT_TIME_S = 11.0
     # Auth recover (MED) time and power draw.
-    AUTH_RECOVER_MED_TIME_S = 45.0
+    AUTH_RECOVER_MED_TIME_S = 245.0
     AUTH_RECOVER_MED_POWER_KW = 0.8
     # Auth recover (ENG) time and power draw.
-    AUTH_RECOVER_ENG_TIME_S = 65.0
+    AUTH_RECOVER_ENG_TIME_S = 365.0
     AUTH_RECOVER_ENG_POWER_KW = 1.0
     # Auth recover (OPS) time and power draw.
-    AUTH_RECOVER_OPS_TIME_S = 80.0
+    AUTH_RECOVER_OPS_TIME_S = 780.0
     AUTH_RECOVER_OPS_POWER_KW = 1.2
     # Auth recover (SEC) time and power draw.
-    AUTH_RECOVER_SEC_TIME_S = 95.0
+    AUTH_RECOVER_SEC_TIME_S = 1095.0
     AUTH_RECOVER_SEC_POWER_KW = 1.4
 
     # Transit wear / warnings
@@ -113,6 +117,10 @@ class Balance:
     SALVAGE_DATA_MAIL_P_OTHER = 0.30
     SALVAGE_DATA_FRAG_P_STATION_DERELICT = 0.25
     SALVAGE_DATA_FRAG_P_OTHER = 0.15
+    # Survey false-negative probability when recoverable data files really exist.
+    # Positive surveys should read as "possible signatures" (not certainty), and this
+    # knob allows future drone modules to improve survey efficacy by reducing misses.
+    DRONE_SURVEY_DATA_FALSE_NEGATIVE_P = 0.35
     # Recoverable drones by node kind (procedural + authored fallback).
     SALVAGE_DRONES_BY_KIND = {
         "station": {"prob": 0.02, "min": 1, "max": 2},
@@ -186,6 +194,9 @@ class Balance:
     # This is checked before weights are applied. Higher values = more frequent singles
     # across uplink/dock/salvage_data triggers. Weights only affect which single is chosen.
     LORE_SINGLES_BASE_P = 0.05
+    # Toggle deterministic lore/intel behavior across processes for equal seed/state/action sequence.
+    # False restores legacy process-dependent behavior for lore seed derivation and set iteration order.
+    DETERMINISTIC_LORE_INTEL = True
     
     # Local (low scale) movement
     # Travel speed for local (km/mi) hops inside the same sector.

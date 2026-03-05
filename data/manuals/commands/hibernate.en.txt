@@ -1,6 +1,18 @@
-hibernate until_arrival | hibernate <years>
-- Advances time in large chunks during transit.
-- until_arrival sleeps until the current trip ends.
-- Suppresses intermediate spam; shows arrival and critical events.
-- Blocked if life_support is degraded, power quality is critical (Q < 0.40), or brownout is active.
-- At low SoC (below 0.25) a warning is issued before proceeding.
+hibernate until_arrival
+hibernate <years>
+
+Purpose
+- Advance long-duration transit time with reduced output noise.
+
+Requirements (gating)
+- Ship must be in transit.
+- Blocked when `life_support` is degraded enough to forbid hibernation.
+- Blocked in critical power quality / brownout conditions.
+
+Operational behavior
+- `until_arrival`: sleeps until current transit completes.
+- `<years>`: sleeps target duration in large chunks.
+- Wakes on critical events that require operator attention.
+
+Related commands
+- `nav <node_id>`, `nav abort`, `status`, `alerts`

@@ -862,6 +862,16 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Route solve interrupted: sensord stopped for {node_id}",
             "es": "Route solve interrumpido: sensord detenido para {node_id}",
         },
+        "job_failed_repair_attempt": {
+            "en": (
+                "Repair failed for {target_id}. "
+                "Consumed {scrap_consumed}/{scrap_required} scrap (refund: {scrap_refunded})"
+            ),
+            "es": (
+                "Reparación fallida en {target_id}. "
+                "Se consumió {scrap_consumed}/{scrap_required} chatarra (reembolso: {scrap_refunded})"
+            ),
+        },
         "job_completed_salvage": {
             "en": "Salvage complete: +{amount} {kind} from {node_id}",
             "es": "Recuperación completa: +{amount} {kind} de {node_id}",
@@ -1073,7 +1083,7 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                     else:
                         print("sin drones recuperables detectados")
                     print(
-                        "firmas de datos recuperables detectadas"
+                        "posibles firmas de datos recuperables detectadas"
                         if data_signatures
                         else "sin firmas de datos recuperables"
                     )
@@ -1091,7 +1101,7 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                     else:
                         print("no recoverable drones detected")
                     print(
-                        "recoverable data signatures detected"
+                        "possible recoverable data signatures detected"
                         if data_signatures
                         else "no recoverable data signatures detected"
                     )
@@ -2364,6 +2374,7 @@ def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> lis
     routes = state.world.known_links.get(current_id, set())
     locked_primary_targets = _locked_primary_targets(state)
     hub_kinds = {"relay", "station", "waystation"}
+    deterministic = Balance.DETERMINISTIC_LORE_INTEL
     candidates: dict[str, int] = {}
 
     def _add_candidate(nid: str, weight: int) -> None:
@@ -2444,7 +2455,8 @@ def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> lis
             print(f"[DEBUG] uplink_table applied: {current_id} -> {', '.join(added) if added else '(none)'}")
 
     # 1) Known contacts without routes (weighted by kind).
-    for nid in state.world.known_nodes:
+    known_nodes_iter = sorted(state.world.known_nodes) if deterministic else state.world.known_nodes
+    for nid in known_nodes_iter:
         if nid == current_id or nid in routes:
             continue
         n = state.world.space.nodes.get(nid)
@@ -2456,7 +2468,9 @@ def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> lis
             _add_candidate(nid, 1)
 
     # 2) Hubs in same sector.
-    for nid, n in state.world.space.nodes.items():
+    space_nodes_iter = sorted(state.world.space.nodes) if deterministic else state.world.space.nodes
+    for nid in space_nodes_iter:
+        n = state.world.space.nodes[nid]
         if not n.is_hub:
             continue
         if sector_id_for_pos(n.x_ly, n.y_ly, n.z_ly) == current_sector:
@@ -2469,7 +2483,9 @@ def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> lis
             sector_id = f"S{sx+dx:+04d}_{sy+dy:+04d}_{sz:+04d}"
             neighbor_sectors.append(sector_id)
             ensure_sector_generated(state, sector_id)
-    for nid, n in state.world.space.nodes.items():
+    space_nodes_iter = sorted(state.world.space.nodes) if deterministic else state.world.space.nodes
+    for nid in space_nodes_iter:
+        n = state.world.space.nodes[nid]
         if not n.is_hub:
             continue
         sid = sector_id_for_pos(n.x_ly, n.y_ly, n.z_ly)
@@ -2477,7 +2493,9 @@ def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> lis
             _add_candidate(nid, 5)
 
     # 4) Extra derelicts.
-    for nid, n in state.world.space.nodes.items():
+    space_nodes_iter = sorted(state.world.space.nodes) if deterministic else state.world.space.nodes
+    for nid in space_nodes_iter:
+        n = state.world.space.nodes[nid]
         if n.kind == "derelict":
             _add_candidate(nid, 1)
 
@@ -2492,7 +2510,8 @@ def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> lis
 
     # Guarantee one visible hub without a route if available.
     visible_hubs = []
-    for nid in state.world.known_nodes:
+    known_nodes_iter = sorted(state.world.known_nodes) if deterministic else state.world.known_nodes
+    for nid in known_nodes_iter:
         if nid == current_id or nid in routes:
             continue
         if nid in locked_primary_targets:
@@ -2514,7 +2533,7 @@ def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> lis
         candidates.pop(picked, None)
 
     # Weighted selection without replacement.
-    pool = list(candidates.items())
+    pool = sorted(candidates.items()) if deterministic else list(candidates.items())
     while pool and len(added) < max_new:
         total = sum(weight for _, weight in pool)
         if total <= 0:

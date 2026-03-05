@@ -1,4 +1,15 @@
 cargo
-- Alias of 'inventory'.
-- Shows last inventoried scrap and installed modules.
-- If cargo changed, run 'cargo audit' or 'inventory audit' to refresh numbers.
+cargo audit
+
+Purpose
+- Inspect cargo manifest and synchronize drift when manifest is stale.
+
+Operational behavior
+- `cargo` is an alias of `inventory` (last known manifest snapshot).
+- `cargo audit` queues manifest reconciliation job.
+
+Usage notes
+- Run audit after salvage/install operations if values look outdated.
+
+Related commands
+- `inventory`, `inventory update`, `modules`, `jobs`

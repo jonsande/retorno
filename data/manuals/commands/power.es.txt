@@ -2,7 +2,23 @@ power status
 power plan cruise|normal
 power on <system_id>
 power off <system_id>
-- Muestra el estado de la red de energía.
-- plan ajusta el plan CRUISE o NORMAL.
-- on/off cambia manualmente la energía de un subsistema.
-- Pista: lee /manuals/concepts/power.es.txt
+
+Propósito
+- Inspeccionar y controlar la postura eléctrica de RETORNO.
+
+Modelo operativo
+- `power status`: muestra SoC, `P_gen`, `P_load`, `Q`, brownout y márgenes.
+- `power plan cruise|normal`: aplica política de carga a nivel de perfil.
+- `power on/off <system_id>`: corte/restauración manual de energía por subsistema.
+
+Requisitos y límites
+- `power on <system_id>` requiere salud recuperable y dependencias satisfechas.
+- En condiciones inestables, la política automática puede forzar estados para preservar supervivencia.
+- En estado crítico de energía solo se permiten acciones de control esenciales.
+
+Guía operativa
+- Estabiliza `Q` antes de operaciones complejas.
+- Prioriza recortar cargas no críticas antes de tocar sistemas críticos.
+
+Comandos relacionados
+- `status`, `diag <system_id>`, `alerts`, `alerts explain <alert_key>`

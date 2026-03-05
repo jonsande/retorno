@@ -5,10 +5,12 @@ from tempfile import TemporaryDirectory
 
 from retorno.bootstrap import create_initial_state_sandbox, create_initial_state_prologue
 from retorno.cli.parser import parse_command
+from retorno.config.balance import Balance
 from retorno.core.actions import DroneDeploy, DroneSurvey, SalvageDrone
 from retorno.core.engine import Engine
 from retorno.io.save_load import load_single_slot, save_single_slot
-from retorno.model.drones import DroneStatus
+from retorno.model.drones import DroneLocation, DroneStatus
+from retorno.model.world import SpaceNode
 from retorno.worldgen.generator import ensure_sector_generated
 
 
@@ -48,6 +50,8 @@ def main() -> None:
 
     survey_action = parse_command("drone survey D1 ECHO_7")
     assert isinstance(survey_action, DroneSurvey), f"Unexpected survey parse: {survey_action!r}"
+    old_false_negative = Balance.DRONE_SURVEY_DATA_FALSE_NEGATIVE_P
+    Balance.DRONE_SURVEY_DATA_FALSE_NEGATIVE_P = 0.0
     survey_queue_events = engine.apply_action(state, survey_action)
     assert survey_queue_events, "Expected survey job queued"
     survey_tick_events = engine.tick(state, 30.0)
@@ -56,8 +60,73 @@ def main() -> None:
     assert int(survey_data.get("scrap_available", -1)) == 17
     assert bool(survey_data.get("modules_detected", False)) is True
     assert int(survey_data.get("recoverable_drones_count", -1)) == 2
+    assert int(survey_data.get("data_recoverable_files_count", 0)) > 0
+    assert bool(survey_data.get("data_signatures_detected", False)) is True
     assert node.recoverable_drones_count == 2, "Survey must not consume recoverable drones"
 
+    Balance.DRONE_SURVEY_DATA_FALSE_NEGATIVE_P = 1.0
+    survey_queue_events_2 = engine.apply_action(state, survey_action)
+    assert survey_queue_events_2, "Expected second survey job queued"
+    survey_tick_events_2 = engine.tick(state, 30.0)
+    survey_data_2 = _assert_any_event(survey_tick_events_2, "job_completed_drone_survey")
+    assert int(survey_data_2.get("data_recoverable_files_count", 0)) > 0
+    assert bool(survey_data_2.get("data_signatures_detected", True)) is False
+    Balance.DRONE_SURVEY_DATA_FALSE_NEGATIVE_P = old_false_negative
+
+    # No recoverable files => survey must report no data signatures.
+    empty_state = create_initial_state_sandbox()
+    empty_state.world.space.nodes["SURVEY_EMPTY"] = SpaceNode(
+        node_id="SURVEY_EMPTY",
+        name="Survey Empty Node",
+        kind="origin",
+        region="void",
+    )
+    empty_state.ship.current_node_id = "SURVEY_EMPTY"
+    empty_state.world.current_node_id = "SURVEY_EMPTY"
+    empty_state.ship.docked_node_id = "SURVEY_EMPTY"
+    empty_drone = empty_state.ship.drones["D1"]
+    empty_drone.status = DroneStatus.DEPLOYED
+    empty_drone.location = DroneLocation(kind="world_node", id="SURVEY_EMPTY")
+    old_cfg = (
+        Balance.SALVAGE_DATA_LOG_P_STATION_SHIP,
+        Balance.SALVAGE_DATA_LOG_P_OTHER,
+        Balance.SALVAGE_DATA_MAIL_P_STATION_SHIP,
+        Balance.SALVAGE_DATA_MAIL_P_OTHER,
+        Balance.SALVAGE_DATA_FRAG_P_STATION_DERELICT,
+        Balance.SALVAGE_DATA_FRAG_P_OTHER,
+        Balance.LORE_SINGLES_BASE_P,
+        Balance.DRONE_SURVEY_DATA_FALSE_NEGATIVE_P,
+    )
+    try:
+        Balance.SALVAGE_DATA_LOG_P_STATION_SHIP = 0.0
+        Balance.SALVAGE_DATA_LOG_P_OTHER = 0.0
+        Balance.SALVAGE_DATA_MAIL_P_STATION_SHIP = 0.0
+        Balance.SALVAGE_DATA_MAIL_P_OTHER = 0.0
+        Balance.SALVAGE_DATA_FRAG_P_STATION_DERELICT = 0.0
+        Balance.SALVAGE_DATA_FRAG_P_OTHER = 0.0
+        Balance.LORE_SINGLES_BASE_P = 0.0
+        Balance.DRONE_SURVEY_DATA_FALSE_NEGATIVE_P = 0.0
+        empty_survey = parse_command("drone survey D1 SURVEY_EMPTY")
+        assert isinstance(empty_survey, DroneSurvey), f"Unexpected empty survey parse: {empty_survey!r}"
+        empty_queue = engine.apply_action(empty_state, empty_survey)
+        assert empty_queue, "Expected empty survey job queued"
+        empty_tick = engine.tick(empty_state, 30.0)
+        empty_data = _assert_any_event(empty_tick, "job_completed_drone_survey")
+        assert int(empty_data.get("data_recoverable_files_count", -1)) == 0
+        assert bool(empty_data.get("data_signatures_detected", True)) is False
+    finally:
+        (
+            Balance.SALVAGE_DATA_LOG_P_STATION_SHIP,
+            Balance.SALVAGE_DATA_LOG_P_OTHER,
+            Balance.SALVAGE_DATA_MAIL_P_STATION_SHIP,
+            Balance.SALVAGE_DATA_MAIL_P_OTHER,
+            Balance.SALVAGE_DATA_FRAG_P_STATION_DERELICT,
+            Balance.SALVAGE_DATA_FRAG_P_OTHER,
+            Balance.LORE_SINGLES_BASE_P,
+            Balance.DRONE_SURVEY_DATA_FALSE_NEGATIVE_P,
+        ) = old_cfg
+
+    state.ship.drones["D1"].battery = 1.0
     parsed_singular = parse_command("drone salvage drone D1 ECHO_7")
     parsed_plural = parse_command("drone salvage drones D1 ECHO_7")
     assert isinstance(parsed_singular, SalvageDrone), f"Unexpected singular parse: {parsed_singular!r}"
@@ -65,7 +134,7 @@ def main() -> None:
 
     salvage_queue_events = engine.apply_action(state, parsed_singular)
     assert salvage_queue_events, "Expected salvage drone job queued"
-    salvage_tick_events = engine.tick(state, 30.0)
+    salvage_tick_events = engine.tick(state, 60.0)
     salvage_data = _assert_any_event(salvage_tick_events, "job_completed_drone_salvage")
     assert int(salvage_data.get("recovered_count", -1)) == 2
     recovered_ids = salvage_data.get("recovered_ids", [])

@@ -1,29 +1,31 @@
-SYSTEM BRIEF — core_os
+SYSTEM SUMMARY — core_os
 Ref: OS-MAN/SYS/CORE-OS
 
-core_os is the ship’s minimal supervisory layer. If it fails, you lose command authority.
+`core_os` is the ship supervisory kernel. If it collapses, command authority collapses with it.
 
-Role
-- Schedules jobs, routes alerts, and maintains operator session.
-- Provides the base command interface.
+Function
+- Schedules jobs and orchestrates command execution.
+- Routes alerts and event streams to operator interfaces.
+- Maintains active command session and control permissions.
 
-Degradation symptoms
-- Missing telemetry, delayed jobs, corrupted logs.
+Operational dependencies
+- Requires stable baseline power and minimal service continuity to preserve full command set.
+- In severe degradation, command availability is reduced to survival operations.
 
-State impact
-- NOMINAL/UPGRADED: full control (if other system conditions allow).
-- LIMITED: blocks advanced commands (`uplink`, `route solve`, `auth recover`).
-- DAMAGED: blocks the same as LIMITED and also blocks travel (`nav <node_id>`, `nav --no-cruise <node_id>`).
-- CRITICAL: emergency recovery command set.
-- OFFLINE: terminal lock; minimal survival set only.
+Command impact by state
+- NOMINAL/UPGRADED: full command surface (subject to subsystem-specific gating).
+- LIMITED: blocks advanced ops (`uplink`, `route solve`, `auth recover`).
+- DAMAGED: LIMITED restrictions plus travel commands blocked.
+- CRITICAL: emergency-recovery command set only.
+- OFFLINE: terminal lockout; minimal survival command subset.
 
-Minimal survival terminal set
-- `help`, `clear`, `exit`.
-- `status`.
-- `alerts`, `alerts explain <alert_key>`.
-- `logs`, `log copy [n]`.
-- `jobs`, `jobs <n|all>`.
-- Support debug: `debug on|off|status`, `debug arcs`, `debug lore`, `debug deadnodes`, `debug modules`, `debug seed <n>`, `debug scenario <preset>`.
+Common symptoms
+- delayed jobs, incomplete telemetry, fragmented logs, command rejection drift.
 
-Relevant commands
-- `status`, `alerts`, `logs`, `diag core_os`.
+Recovery pattern
+- restore power stability,
+- prioritize `core_os` and `energy_distribution` repairs,
+- recover blocked services in dependency order.
+
+Related commands
+- `status`, `diag core_os`, `alerts`, `logs`

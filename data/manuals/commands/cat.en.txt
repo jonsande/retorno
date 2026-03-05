@@ -1,3 +1,15 @@
 cat <path>
-- Shows file contents.
-- If a localized file exists, it is preferred automatically.
+
+Purpose
+- Read file contents from ship filesystem mounts.
+
+Operational behavior
+- Uses localized variant automatically when available for current language.
+- Returns text payload from file path if readable.
+
+Usage notes
+- Discover paths first with `ls`.
+- Use absolute mount paths for deterministic access.
+
+Related commands
+- `ls [path]`, `mail read <id|latest>`, `man <topic>`

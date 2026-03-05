@@ -14,30 +14,68 @@ drone reboot <drone_id>
 drone recall <drone_id>
 drone status [drone_id]
 
+Purpose
+- Unified operator surface for drone deployment, movement, maintenance, recovery, and telemetry status.
+
 Status fields
-- status: docked / deployed / disabled
-- loc: current location (ship_sector or world_node)
-- battery: charge level (0..1)
-- integrity: structural condition (0..1)
-- dose: accumulated radiation exposure (rad)
-- dose also shows a text band: `low / elevated / high / extreme`
+- status: `docked / deployed / disabled`
+- loc: current location (`ship_sector` or `world_node`)
+- battery: charge (`0..1`)
+- integrity: structural condition (`0..1`)
+- dose: accumulated radiation (`rad`) + text band (`low/elevated/high/extreme`)
+
+Key operational requirements
+- `deploy` / `deploy!`:
+  - drone exists, is docked, and is not disabled,
+  - minimum deploy integrity,
+  - valid target (ship sector or node where ship is docked).
+- `recall`:
+  - drone is deployed,
+  - minimum battery and integrity,
+  - if on a `world_node`, ship must still be docked there.
+- `repair`:
+  - operator drone is deployed,
+  - minimum battery,
+  - if target is another drone: exact co-location with operator.
+- `install`:
+  - deployed drone, module present in cargo, sufficient scrap,
+  - requires bay support (blocked when `drone_bay OFFLINE`).
+
+`drone_bay` state impact (shared structure)
+- NOMINAL: baseline ETA for `deploy/recall/install/reboot`; normal charging/decontamination/passive repair.
+- LIMITED: same operations slower; charging slower; passive repair slower.
+- DAMAGED: severe slowdown; minor integrity-hit risk on `deploy/recall`; passive repair costs more scrap.
+- CRITICAL: DAMAGED severe profile + passive repair can fail and cause minor damage.
+- OFFLINE: blocks normal `deploy` and `install`; `recall` still allowed; no charging/decontamination/passive repair.
+- Global dependency note: with `energy_distribution OFFLINE`, charging/decontamination/passive repair are unavailable even if `drone_bay` is online.
+
+EMERGENCY ADVICE
+- If bay support is down and launch is urgent, use `drone deploy!`.
+- `deploy!` enables emergency override (including critical power state), but physical prerequisites still apply:
+  - valid/docked/non-disabled drone,
+  - minimum integrity,
+  - valid target, and ship docking if target is a `world_node`.
+- `deploy!` does not bypass global terminal lockouts (`terminal_state`).
+- `deploy!` is not free: it uses a risk job with glitch/failure probability and may cause integrity loss.
+- With `energy_distribution OFFLINE`, `deploy!` runs in emergency maintenance bypass and remains risky.
 
 Operational notes
-- Drone actions consume battery (deploy/move/repair/install/salvage/recall/reboot).
-- Deployed drones also drain battery slowly while idle.
-- Deployed/non-docked drones accumulate environmental radiation dose.
-- Shield convention (`shield_factor`): <1 better, =1 baseline, >1 worse (affects incoming radiation dose).
-- Radiation dose now accelerates drone integrity wear (banded multipliers by dose).
-- Charging happens in drone_bay while bay/distribution support is available.
-- Docked drones are automatically decontaminated in drone_bay (slower if bay is degraded).
-- If docked drones need battery/integrity recovery but support is blocked, alert `drone_bay_maintenance_blocked` is raised (see `alerts explain drone_bay_maintenance_blocked`).
-- `drone repair` accepts ship systems and drones as targets.
-- To repair another drone, the operator drone must be deployed and co-located with the target drone.
-- `drone move <drone_id> <ship_sector>` can move a drone from a world_node to a ship sector when the ship is docked at that same node.
-- `drone move <drone_id> RETORNO_SHIP` is an alias to return to ship via `DRN-BAY`.
+- Drone actions consume battery (`deploy/move/repair/install/salvage/recall/reboot`).
+- `drone survey` reports possible recoverable data signatures, not certainty.
+- If no mountable data files exist, survey reports no signatures.
+- False negatives when files do exist are controlled by `Balance.DRONE_SURVEY_DATA_FALSE_NEGATIVE_P`.
+- Deployed drones drain battery while idle.
+- Deployed/non-docked drones accumulate environmental radiation.
+- Shield convention (`shield_factor`): `<1` better, `=1` baseline, `>1` worse.
+- Radiation dose accelerates integrity wear by dose band.
+- If docked drones need maintenance and support cannot provide it, alert `drone_bay_maintenance_blocked` is raised.
+- `drone repair` accepts both ship systems and drones.
+- Repair jobs have low base fail chance (`Balance.REPAIR_JOB_FAIL_P_BASE`).
+- On repair failure, only a configurable scrap fraction is consumed and the rest is refunded (`Balance.REPAIR_JOB_FAIL_SCRAP_CONSUME_FRACTION`).
+- `drone move <drone_id> <ship_sector>` can move a drone from a `world_node` to a ship sector when the ship is docked at that same node.
+- `drone move <drone_id> RETORNO_SHIP` is an alias to return via `DRN-BAY`.
 - `drone autorecall <drone_id> on|off` enables/disables low-battery auto-recall.
-- `drone autorecall <drone_id> <percent>` sets the battery threshold (%) used for auto-recall.
-- drone_bay LIMITED/DAMAGED slows deploy/recall/install/reboot and charging.
-- drone_bay OFFLINE blocks normal deploy and install; use deploy! for emergency launch.
-- Avoid running the battery to zero before recall; a dead drone may be stranded.
-- Emergency deploy may risk failure and integrity loss.
+- `drone autorecall <drone_id> <percent>` sets the auto-recall battery threshold (%).
+
+Related commands
+- `ship systems`, `diag drone_bay`, `alerts explain drone_bay_maintenance_blocked`, `jobs`

@@ -1,11 +1,22 @@
 dock <node_id>
-- Dock the ship at a node.
-- Requirements:
-- You must not be in transit.
-- You must already be at the target node (in orbit).
-- The target must be a known contact.
-- Docking may be disallowed at some nodes (e.g., origin).
-- Docking queues a job; check status with jobs.
-- To leave dock and return to orbit, use: undock
-- Dock duration is configured by `Balance.DOCK_TIME_S`.
-- Dock can be interrupted if context changes before completion (for example, ship enters transit), or cancelled with `job cancel <job_id>`.
+
+Purpose
+- Dock RETORNO at a known node and transition from orbit/transit posture to docked posture.
+
+Requirements (gating)
+- Ship must not be in transit.
+- Current position must already be the target node (`<node_id>`).
+- Target must be a known contact and dock-capable node.
+
+Behavior
+- Dock queues a timed job (`Balance.DOCK_TIME_S`).
+- Dock can be interrupted if context changes before completion.
+- `job cancel <job_id>` can abort an active dock job.
+
+Common block reasons
+- `in_transit`
+- `not_at_node`
+- target not known / node missing / docking not allowed
+
+Related commands
+- `undock`, `jobs`, `job cancel <job_id>`, `status`

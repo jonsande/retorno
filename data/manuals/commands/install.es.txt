@@ -1,3 +1,14 @@
 install
-- Comando heredado eliminado.
-- Usa: drone install <drone_id> <module_id>
+
+Estado del comando
+- Comando heredado retirado del flujo activo.
+- La instalación de módulos ahora es operación con dron.
+
+Reemplazo canónico
+- `drone install <drone_id> <module_id>`
+
+Nota operativa
+- La instalación sigue flujo de jobs de dron y gating de soporte de bahía.
+
+Comandos relacionados
+- `module inspect <module_id>`, `modules`, `drone status [drone_id]`

@@ -1,3 +1,14 @@
 job cancel <job_id>
-- Cancela un trabajo activo por id.
-- Usa jobs para ver los ids activos.
+
+Propósito
+- Cancelar un job activo en cola/ejecución.
+
+Comportamiento operativo
+- Retira el job del pipeline activo cuando es cancelable.
+- Cancelar no deshace retroactivamente efectos ya aplicados.
+
+Notas de uso
+- Obtén ids con `jobs`.
+
+Comandos relacionados
+- `jobs`, `jobs all`

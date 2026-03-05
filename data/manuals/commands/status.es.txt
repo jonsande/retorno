@@ -1,7 +1,13 @@
 status
-- Muestra el estado de la nave, energía, sistemas y módulos instalados.
-- Incluye `hull` (0..1 de integridad estructural).
-- Incluye `radiation` con dos valores:
-  - `env`: radiación ambiental efectiva en ubicación/tránsito.
-  - `internal`: radiación que entra a sistemas internos (depende del casco).
-- Ambos (`env` e `internal`) muestran también banda textual: `bajo / elevado / alto / extremo`.
+
+Propósito
+- Mostrar snapshot consolidado de misión: energía, sistemas, postura de tránsito y contexto de alertas.
+
+Comportamiento operativo
+- Diseñado como comando de primera lectura tras despertar, incidente o acción mayor.
+
+Notas de uso
+- Úsalo como entrada y profundiza con `alerts`, `diag`, `jobs` y comandos de dominio.
+
+Comandos relacionados
+- `alerts`, `power status`, `ship systems`, `drone status [drone_id]`

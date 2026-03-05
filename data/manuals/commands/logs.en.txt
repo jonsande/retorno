@@ -1,3 +1,13 @@
 logs
-- Shows recent event log entries.
-- Use log copy [n] to copy recent lines.
+
+Purpose
+- Show recent event timeline emitted by ship systems and job engine.
+
+Operational behavior
+- Displays newest retained events with severity/source context.
+
+Usage notes
+- Use together with `alerts` and `jobs` for incident triage.
+
+Related commands
+- `log copy [n]`, `alerts`, `status`

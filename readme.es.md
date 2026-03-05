@@ -99,6 +99,17 @@ Dentro del juego, usa **help --verbose** para ver el listado actualizado de coma
 RETORNO está siendo preparado para jugarse en español e inglés.
 Los comandos y nombres técnicos del sistema se mantienen en inglés; los textos diegéticos (mails, logs, manuales, mensajes del sistema) pueden cambiar según la configuración de idioma.
 
+## Estilo de manuales
+
+La plantilla oficial y reglas de estructura están documentadas en:
+- `docs/manuals_style_guide.md`
+
+Validación de estilo:
+
+```bash
+python tests/manuals_style_check.py
+```
+
 ## Roadmap (resumen)
 
 Sistemas ya implementados o en desarrollo:

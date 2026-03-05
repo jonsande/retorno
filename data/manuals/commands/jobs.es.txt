@@ -1,8 +1,17 @@
 jobs
 jobs <amount>
 jobs all
-- Muestra trabajos en cola/ejecución y recientes.
-- jobs <amount> limita el número de entradas completadas/fallidas.
-- jobs all muestra todas las entradas completadas/fallidas.
-- Columnas: id estado tipo objetivo ETA owner.
-- Usa: job cancel <job_id> para cancelar un trabajo activo.
+
+Propósito
+- Inspeccionar jobs en cola/ejecución y recientes completados/fallidos.
+
+Comportamiento operativo
+- Vista por defecto muestra jobs activos e histórico reciente acotado.
+- `jobs <amount>` limita entradas completadas/fallidas.
+- `jobs all` imprime histórico retenido completo.
+
+Notas de uso
+- Usa el id con `job cancel <job_id>` para abortar tareas activas.
+
+Comandos relacionados
+- `job cancel <job_id>`, `status`, `logs`

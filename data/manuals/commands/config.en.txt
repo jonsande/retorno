@@ -1,4 +1,15 @@
 config show
 config set lang <en|es>
-- Shows or sets configuration options.
-- Use lang to switch UI language.
+
+Purpose
+- Inspect and modify operator interface configuration.
+
+Operational behavior
+- `config show` prints current runtime configuration.
+- `config set lang <en|es>` switches command/UI localization.
+
+Usage notes
+- Language switch affects manuals, messages, and localized file preference.
+
+Related commands
+- `status`, `man <topic>`, `cat <path>`

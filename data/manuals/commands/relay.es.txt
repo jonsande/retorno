@@ -1,3 +1,15 @@
 relay uplink
-- Alias de uplink.
-- Intenta obtener intel de navegación desde un relay/waystation.
+
+Estado del comando
+- Alias de compatibilidad.
+- Comando canónico: `uplink`.
+
+Forma equivalente
+- `relay uplink` -> `uplink`
+
+Comportamiento operativo
+- Ejecuta ingestión de intel por uplink en nodos relay/station/waystation acoplados y elegibles.
+- Aplica el mismo gating de data-core y energía que `uplink`.
+
+Comandos relacionados
+- `uplink`, `intel`, `nav map routes`, `route solve <node_id>`

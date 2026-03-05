@@ -1,4 +1,14 @@
-shutdown <system_id>
-- Apaga manualmente un sistema (forced offline).
-- Equivalente a: power off <system_id>
-- Úsalo para reducir carga o aislar fallos.
+shutdown <service_name>
+
+Propósito
+- Detener un daemon de servicio en ejecución para reducir carga, contener fallos o secuenciar recuperación.
+
+Comportamiento operativo
+- Detiene servicio si está activo y actualiza estado de servicio del subsistema.
+- Puede reducir carga, pero también deshabilitar flujos dependientes.
+
+Notas de uso
+- Prioriza apagados selectivos; evita apagar servicios críticos salvo necesidad de supervivencia.
+
+Comandos relacionados
+- `boot <service_name>`, `power status`, `diag <system_id>`

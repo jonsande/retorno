@@ -1,6 +1,14 @@
 mail inbox
 mail read <id|latest>
-- Lists the contents of the inbox.
-- mail read <id> opens a specific message (use ids from mail inbox or ls /mail/inbox).
-- mail read latest opens the most recent message.
-- If a localized version exists, it is preferred automatically.
+
+Purpose
+- Access mission mailbox artifacts and message payloads.
+
+Operational behavior
+- `mail inbox` lists available message ids/subjects.
+- `mail read <id>` opens one message.
+- `mail read latest` opens most recent inbox message.
+- Localized variant is preferred when available.
+
+Related commands
+- `ls /mail/inbox`, `cat <path>`, `logs`

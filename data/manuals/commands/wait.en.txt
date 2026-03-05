@@ -1,3 +1,13 @@
 wait <seconds>
-- Advances time by a number of seconds.
+
+Purpose
+- Advance simulation time manually (debug workflow).
+
+Requirements
 - Available only in DEBUG mode.
+
+Operational behavior
+- Applies direct time advance for testing deterministic progression.
+
+Related commands
+- `debug on`, `status`, `jobs`

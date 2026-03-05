@@ -139,7 +139,11 @@ Esto da variedad, pero no lo haría aún como primer sistema.
 
 - [ ] Posibilidad de apagar/encender el sonido ambiente.
 
-- [ ] Posibilidad de poner música clásica.
+- [ ] Reproductor de música clásica (Sibelius, Mahler, Buckner, etc.).
+
+- [ ] Ruido de estática.
+
+- [ ] Bips con las advertencias. Quizá sonido de discos duros al procesar ciertas órdenes. Sonidos específicos únicos para ciertas tareas como solve route o hibernate. Sonido lejano pesado al hacer dock y undock. Chirridos de casco cuando el hull baja.
 
 
 
@@ -147,15 +151,19 @@ Esto da variedad, pero no lo haría aún como primer sistema.
 
 - [x] Mensaje advirtiendo cuándo no está cargando la batería de los drones en bahía, y recordando las condiciones que se tienen que cumplir.
 
-- [ ] Mejorar el manual de drones. Hacerlo detallado y más homogéneo al resto.
+- [-] Mejorar el manual de drones. Hacerlo detallado y más homogéneo al resto.
 
-- [ ] Creo que route solve no sólo debería depender de sensord sino también de datad. (Valorarlo.)
+- [?] Creo que route solve no sólo debería depender de sensord sino también de datad. (Valorarlo.)
 
 - [ ] Nuevo sistema: sonar. Que haga pip-pip. O un radar que esté constantemente en funcionamiento. Basarse en los submarinos actuales. La idea es que se puedan captar a veces objetos en movimiento. Incluso naves a la deriva. O peligros.
 
 - [ ] Nuevo loot: uranio (como combustible). La idea es que para poder generar energía, el reactor nuclear necesita uranio. Es duradero, pero teniendo en cuenta que se viaja durante años... El uranio (o lo que sea) se tiene que poder obtener con los drones de otras derelics.
 
-- [ ] Eventos aleatorios durante viajes/hibernación.
+- [ ] Eventos aleatorios durante viajes/hibernación, que despiertan de hibernación automática.
+  Tipos de eventos:
+    - [ ] Señal/mensaje capturado.
+    - [ ] Impacto con...
+    - [ ] 
 
 - [x] Necesitamos mensajes de advertencia (si es que no los hay) cada vez que haya un cambio muy brusco de radiación, y cada vez que se entre o salga de alguno de los umbrales de radiación. Definir umbrales "muy baja", "baja", "normal", "alta", "muy alta", "extrema".
 
@@ -165,7 +173,7 @@ Esto da variedad, pero no lo haría aún como primer sistema.
 
 - [x] Quiero que me generes un documento en "/home/jon/prog/retorno_case/retorno_docs/" en el que se le explique a chatGPT exactamente qué debe hacerse y cómo (incluyendo ejemplos) para crear nuevos arcos y para crear singles. La idea es que con esas instrucciones chatGPT pueda crearme nuevos arcos y singles.
 
-- [ ] Al dockear en una nave o estación, algunas naves o estaciones añaden rads/s a los rad/s del nodo.
+- [ ] Al dockear en una nave o estación, algunas naves o estaciones deben añadir rads/s a los rad/s del nodo.
 - [ ] Ship survey tiene que servir también para obtener un informe del nivel de radiación del nodo dockable (y así poder valorar si merece la pena dockear o no).
 
 - [ ] Modelo avanzado de salvage. La opción simplificada (la actual, siempre estará disponible). La avanzada (juego dungeoning) tendrá riesgos, y llevará más tiempo, pero también posibles recompensas mayores. Este modelo avanzado de salvage requiere un nuevo comando "drone survey" entre otros muchos. Desarrollar una v0.
@@ -185,9 +193,7 @@ El paso de un sector a otro estará bloqueado por puertas. A veces esas puertas 
   - un ejemplo del archivo entregado por captured_signal o ship_os_mail
   Para calibrar probabilidades (para que no “llueva lore” y siga siendo calmado).
 
-- [ ] Enterarse de cuales son las consecuencias de no atender una alerta crítica u otra (pues ahora mismo no lo tengo muy claro).
-
-- [?] Al hacer 'route <node_id>' a un node_id para el que ya conoces ruta,  no se debería iniciar el job. Debería salir un mensaje informando de que ya se conoce ruta a ese objetivo. Por otra parte, debería de haber un comando para cancelar jobs en curso.
+- [x] Al hacer 'route <node_id>' a un node_id para el que ya conoces ruta,  no se debería iniciar el job. Debería salir un mensaje informando de que ya se conoce ruta a ese objetivo. Por otra parte, debería de haber un comando para cancelar jobs en curso.
 
 - [ ] Al iniciar la hibernación, debería de salir un mensaje (localizado) diciendo algo así como "Iniciando secuencia de hibernación", y una serie de mensajes (meramente narrativos) diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la criogenización, y una cuenta atrás de 10 segundos. Después, debe limpiarse la pantalla de logs, esperar 2 segundos e imprimirse una serie de mensajes diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la descriogenización, junto con un mensaje (que se repetirá siempre), advirtiendo de que hay un problema crítico y no es posible descriogenizar completamente al sujeto del sarcófago (es decir, al Personaje Jugador). El sarcófago del PJ debe tener un id, por cierto. 
 

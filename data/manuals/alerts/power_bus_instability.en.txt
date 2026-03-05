@@ -1,5 +1,13 @@
-power_bus_instability
-- Distribution bus instability detected.
-- Often tied to damaged energy_distribution.
-- If persistent: intermittent shutdowns, sensor dropouts.
-Recommended: repair energy_distribution, reduce load.
+ALERT — power_bus_instability
+
+Meaning
+- Distribution bus stability is degraded beyond normal tolerance.
+
+Operational impact
+- Intermittent subsystem behavior may appear (dropouts, unstable service continuity).
+- Often co-occurs with damaged `energy_distribution` and low `Q`.
+
+Immediate response
+- repair `energy_distribution`,
+- reduce non-critical load,
+- monitor `Q` stabilization trend.

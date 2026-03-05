@@ -1,8 +1,12 @@
-sectors (retirado)
+ship sectors
+nav map sectors
 
-Este comando fue eliminado.
-- Usa `ship sectors`.
-- Alias aceptado: `ship map`.
+Propósito
+- Inspeccionar sectores conocidos desde perspectiva interna de nave y navegación mundial.
 
-Nota de migración
-- `map ship` también fue eliminado y migra a `ship sectors`.
+Comportamiento operativo
+- `ship sectors`: lista sectores internos y contexto de ubicación de subsistemas.
+- `nav map sectors`: lista sectores mundiales conocidos y cobertura de navegación.
+
+Comandos relacionados
+- `locate <id>`, `nav map graph`, `status`

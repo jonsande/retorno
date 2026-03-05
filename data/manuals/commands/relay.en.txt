@@ -1,3 +1,15 @@
 relay uplink
-- Alias for uplink.
-- Attempts to pull navigation intel from a relay/waystation.
+
+Command status
+- Compatibility alias.
+- Canonical command: `uplink`.
+
+Equivalent form
+- `relay uplink` -> `uplink`
+
+Operational behavior
+- Performs uplink intel ingestion on eligible docked relay/station/waystation nodes.
+- Applies the same data-core and power gating as `uplink`.
+
+Related commands
+- `uplink`, `intel`, `nav map routes`, `route solve <node_id>`

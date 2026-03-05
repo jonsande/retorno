@@ -1,8 +1,17 @@
 jobs
 jobs <amount>
 jobs all
-- Shows queued/running jobs and recent results.
-- jobs <amount> limits the number of completed/failed entries shown.
-- jobs all shows all completed/failed entries.
-- Columns: id status type target ETA owner.
-- Use: job cancel <job_id> to cancel an active job.
+
+Purpose
+- Inspect queued/running jobs and recent completions/failures.
+
+Operational behavior
+- Default view shows active jobs and bounded recent history.
+- `jobs <amount>` limits completed/failed entries.
+- `jobs all` prints full retained history.
+
+Usage notes
+- Use job id with `job cancel <job_id>` to abort active tasks.
+
+Related commands
+- `job cancel <job_id>`, `status`, `logs`

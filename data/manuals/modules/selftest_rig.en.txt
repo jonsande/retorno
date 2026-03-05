@@ -1,6 +1,14 @@
-selftest_rig
-- Self-test and calibration harness for onboard subsystems.
-- Enables internal repair cycles without drones.
-- Best used for limited systems that cannot spare drone time.
-- Slower than field repair but safer for critical bays.
-Lore: The rig was designed for stations that ran with skeleton crews.
+MODULE DOSSIER — selftest_rig
+
+Role
+- Internal self-test and calibration harness for subsystem repair cycles.
+
+Operational effect
+- Enables `repair <system_id> --selftest` workflow without drone deployment.
+- Trades speed for safer internal recovery profile.
+
+Integration notes
+- Especially useful when drone availability is constrained.
+
+Field note
+- Originally designed for low-crew station maintenance protocols.

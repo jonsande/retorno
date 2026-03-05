@@ -1,6 +1,18 @@
-hibernate until_arrival | hibernate <años>
-- Avanza el tiempo en bloques grandes durante el tránsito.
-- until_arrival duerme hasta el fin del viaje actual.
-- Suprime el ruido intermedio; muestra llegada y eventos críticos.
-- Se bloquea si life_support está degradado, Q es crítica (Q < 0.40) o hay brownout activo.
-- Con SoC bajo (por debajo de 0.25) se muestra advertencia antes de continuar.
+hibernate until_arrival
+hibernate <años>
+
+Propósito
+- Avanzar tiempo de tránsito de larga duración con menor ruido de salida.
+
+Requisitos (gating)
+- La nave debe estar en tránsito.
+- Bloqueado si `life_support` está lo bastante degradado como para impedir hibernación.
+- Bloqueado con calidad crítica de energía / brownout.
+
+Comportamiento operativo
+- `until_arrival`: duerme hasta completar el tránsito actual.
+- `<años>`: duerme la duración objetivo en bloques grandes.
+- Despierta ante eventos críticos que requieren intervención.
+
+Comandos relacionados
+- `nav <node_id>`, `nav abort`, `status`, `alerts`

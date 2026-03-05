@@ -1,4 +1,14 @@
 scan
-- Barrido activo de señales cercanas dentro del rango de sensores.
-- Un contacto detectado no implica ruta disponible.
-- Requiere bloqueo de sensores; puede usarse en tránsito con transit_sensor_pack instalado.
+
+Propósito
+- Ejecutar barrido local de señales y actualizar intel de contactos cercanos.
+
+Requisitos (gating)
+- La pila de sensores debe estar disponible para flujo de scan (estado `sensors` y servicio `sensord`).
+- El estado energético debe permitir operación activa de escaneo.
+
+Comportamiento operativo
+- Actualiza conciencia local de contactos y puede revelar eventos de detección.
+
+Comandos relacionados
+- `boot sensord`, `diag sensors`, `nav map contacts`, `route solve <node_id>`

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import random
 from pathlib import Path
 
@@ -23,6 +24,21 @@ class LoreContext:
 class LoreDelivery:
     files: list[dict]
     events: list[Event]
+
+
+def _stable_seed64(*parts: object) -> int:
+    # Use a stable hash instead of Python's process-randomized hash().
+    h = hashlib.blake2b(digest_size=8)
+    for part in parts:
+        h.update(b"\x1f")
+        h.update(str(part).encode("utf-8"))
+    return int.from_bytes(h.digest(), "big", signed=False)
+
+
+def _lore_seed(*parts: object) -> int:
+    if Balance.DETERMINISTIC_LORE_INTEL:
+        return _stable_seed64(*parts)
+    return hash(tuple(parts))
 
 
 def _content_from_ref(content_ref: str | None) -> str:
@@ -140,7 +156,7 @@ def _soft_force_roll(state, piece: dict) -> bool:
     total = sum(counters.values())
     year = state.clock.t / Balance.YEAR_S if Balance.YEAR_S else 0.0
     p = min(0.5, 0.1 + total * 0.02 + year * 0.02)
-    seed = hash((state.meta.rng_seed, "lore_soft", piece.get("id"), total))
+    seed = _lore_seed(state.meta.rng_seed, "lore_soft", piece.get("id"), total)
     return random.Random(seed).random() < p
 
 
@@ -320,7 +336,7 @@ def maybe_deliver_lore(state, trigger: str, ctx: LoreContext) -> LoreDelivery:
     # Singles (weighted, low probability)
     singles = load_singles()
     if singles:
-        seed = hash((state.meta.rng_seed, "singles", trigger, int(state.clock.t)))
+        seed = _lore_seed(state.meta.rng_seed, "singles", trigger, int(state.clock.t))
         rng = random.Random(seed)
         if rng.random() < Balance.LORE_SINGLES_BASE_P:
             pool = [(s.get("single_id"), float(s.get("weight", 1.0)), s) for s in singles]

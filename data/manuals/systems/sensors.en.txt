@@ -1,22 +1,30 @@
-SYSTEM BRIEF — sensors
+SYSTEM SUMMARY — sensors
 Ref: OS-MAN/SYS/SENS
 
-`sensors` is the local signal acquisition and detection layer.
+`sensors` is the local detection and acquisition layer for contacts, routes, and survey telemetry.
 
-Role
-- Detect nearby echoes/contacts through `scan`.
-- Feeds `route solve` within range.
-- Provides telemetry input for `ship survey` together with `data_core`.
+Function
+- Feeds local discovery and scan operations.
+- Supports route solving within effective range.
+- Contributes sensor-side telemetry to survey workflows.
 
-Boot requirements
-- Requires `energy_distribution >= nominal`.
-- Service: `sensord` (boot separately).
+Operational dependencies
+- Boot dependency: `energy_distribution >= nominal`.
+- Service daemon: `sensord` (must be running for active sensor workflows).
 
 Command impact by state
-- `scan`: requires `sensors >= limited` and `sensord` running.
-- `route solve`: requires `sensors >= limited` and `sensord` running (plus power/range conditions).
-- `ship survey`: requires `sensors >= limited` and `sensord` running (plus `data_core >= limited` + `datad`).
-- OFFLINE or stopped `sensord`: sensor telemetry unavailable.
+- `scan`: requires `sensors >= limited` + `sensord` running.
+- `route solve`: requires `sensors >= limited` + `sensord` running (+ power/range gating).
+- `ship survey`: requires sensors stack plus data stack availability.
+- OFFLINE or stopped `sensord`: no active sensor telemetry.
 
-Relevant commands
-- `boot sensord`, `diag sensors`, `scan`, `route solve`, `ship survey`.
+Common symptoms
+- route solve interruptions, empty scans, degraded situational awareness.
+
+Recovery pattern
+- repair `sensors`,
+- boot `sensord`,
+- reattempt blocked scan/solve operations.
+
+Related commands
+- `boot sensord`, `diag sensors`, `scan`, `route solve`, `ship survey`

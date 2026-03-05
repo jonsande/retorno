@@ -1,5 +1,11 @@
-log
-- Copies lines from the command log (Textual panel).
-Usage: log copy [n]
-- copy: copy the last n lines to the clipboard (default: 50).
-- In the CLI (repl), this copies recent event log lines.
+log copy [n]
+
+Purpose
+- Copy recent operator/event log lines.
+
+Operational behavior
+- Copies last `n` lines (default bounded value) to clipboard/log sink.
+- Designed for sharing diagnostics or preserving volatile session output.
+
+Related commands
+- `logs`, `alerts`, `jobs`

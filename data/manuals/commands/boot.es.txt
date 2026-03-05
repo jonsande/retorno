@@ -1,5 +1,25 @@
 boot <service_name>
-- Inicia un servicio instalado.
-- Requiere dependencias satisfechas.
-- Si la calidad de energía es crítica (Q < 0.40), se bloquea el arranque de servicios no críticos.
-- El arranque se bloquea durante brownout.
+
+Propósito
+- Arrancar un daemon de servicio de subsistema (por ejemplo `sensord`, `datad`, `securityd`).
+
+Requisitos (gating)
+- El servicio debe existir y pertenecer a un subsistema instalado.
+- El subsistema objetivo debe ser recuperable (no destruido) y con dependencias satisfechas.
+- El estado energético debe permitir arranque:
+  - los arranques no críticos se bloquean en estado crítico de energía (incluido brownout activo),
+  - los arranques no críticos se bloquean con calidad crítica (`Q < 0.40`),
+  - los servicios críticos pueden seguir arrancando para recuperación de supervivencia.
+
+Comportamiento
+- `boot` encola un trabajo de arranque y completa tras el tiempo de boot del subsistema.
+- Si el servicio ya está en ejecución, no se encola trabajo nuevo.
+
+Bloqueos frecuentes
+- `service_missing`
+- `deps_unmet`
+- `critical_power_state` / `power_quality_critical`
+- `brownout_active`
+
+Comandos relacionados
+- `diag <system_id>`, `power status`, `shutdown <service_name>`, `jobs`

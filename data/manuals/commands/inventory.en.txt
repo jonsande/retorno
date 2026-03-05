@@ -1,4 +1,16 @@
 inventory
-- Shows last inventoried scrap and installed modules.
-- Alias: 'cargo'
-- If cargo changed, run 'cargo audit' or 'inventory audit' to refresh numbers.
+inventory audit
+
+Purpose
+- Read current cargo manifest snapshot and reconcile it when stale.
+
+Operational behavior
+- `inventory` shows last synchronized scrap/modules data.
+- `inventory audit` queues manifest reconciliation job.
+- `cargo` is an equivalent alias family.
+
+Usage notes
+- Run audit after salvage/install activity if counts seem inconsistent.
+
+Related commands
+- `cargo`, `inventory update`, `modules`, `jobs`

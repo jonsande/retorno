@@ -1,29 +1,19 @@
+ship status
+ship systems
 ship sectors
-ship survey <target>
+ship survey
 
-Descripción
-- `ship sectors`: muestra sectores internos de RETORNO y sus etiquetas.
-- `ship survey <target>`: telemetría concisa sobre un objetivo.
+Propósito
+- Proporcionar snapshots operativos de nivel nave y flujos de survey.
 
-Objetivo válido para `ship survey`
-- Cualquier `node_id` conocido por el mundo.
-- `RETORNO_SHIP`.
-- `state.ship.ship_id` activo.
+Comportamiento operativo
+- `ship status`: resumen compacto de salud/energía.
+- `ship systems`: tabla de subsistemas con estado/salud/servicio.
+- `ship sectors`: topología interna y ubicación.
+- `ship survey`: pipeline de survey estructurado (requiere disponibilidad de pila sensor/datos).
 
-Alias aceptados (ocultos en `help`)
-- `ship map` -> `ship sectors`
+Notas de uso
+- Usa `ship systems` + `alerts` para triage de fallos antes de operaciones largas.
 
-Dependencias
-- `ship sectors`: depende de `core_os`.
-- `ship survey <target>`: depende de:
-  - `core_os`
-  - `sensors >= limited`
-  - `sensord` en ejecución
-  - `data_core >= limited`
-  - `datad` en ejecución
-
-Salida v0 de `ship survey`
-- `id`, `name`, `kind`.
-- `sector` y `coords`.
-- `distance`.
-- Estado básico de conocimiento/ruta (`visited`, `known_contact`, `known_route_from_current`, `in_sensor_range`).
+Comandos relacionados
+- `status`, `diag <system_id>`, `power status`, `jobs`

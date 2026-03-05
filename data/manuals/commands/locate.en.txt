@@ -1,2 +1,11 @@
-locate <system_id>
-- Shows the ship sector or world coordinates for a system or node.
+locate <system_id|node_id>
+
+Purpose
+- Resolve operational location for a ship system or known world node.
+
+Operational behavior
+- For ship systems: returns ship sector placement.
+- For nodes: returns world-coordinate anchor.
+
+Related commands
+- `ship sectors`, `nav map graph [node_id]`, `diag <system_id>`

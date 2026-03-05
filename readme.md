@@ -89,6 +89,17 @@ Use **help --verbose** in-game for the current and complete command list.
 RETORNO is being prepared to support both Spanish and English.
 Commands and technical system names remain in English; diegetic texts (mail, logs, manuals, system messages) can change depending on language settings.
 
+## Manuals style
+
+Official manual templates and structure rules are documented in:
+- `docs/manuals_style_guide.md`
+
+Run style validation with:
+
+```bash
+python tests/manuals_style_check.py
+```
+
 ## Roadmap (summary)
 
 Systems already implemented or currently in development include:
@@ -105,4 +116,3 @@ Systems already implemented or currently in development include:
 ## Note
 
 RETORNO is still under construction. Mechanics, commands, balance, and world structure may change frequently as the project evolves.
-

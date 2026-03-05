@@ -1,4 +1,11 @@
-transit_sensor_pack
-- Enables useful in-transit scanning (`scan`).
-- Improves nearby signal detection without stopping travel.
-- Not required for `nav map contacts` (that command depends on core_os).
+MODULE DOSSIER — transit_sensor_pack
+
+Role
+- Sensor expansion package for useful scanning during transit.
+
+Operational effect
+- Improves near-signal acquisition while ship remains in transit posture.
+- Extends practical reconnaissance without forcing travel interruption.
+
+Integration notes
+- Not a dependency for `nav map contacts` (that command is `core_os`-side).

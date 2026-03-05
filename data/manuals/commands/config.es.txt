@@ -1,4 +1,15 @@
 config show
 config set lang <en|es>
-- Muestra o ajusta opciones de configuración.
-- Usa lang para cambiar el idioma.
+
+Propósito
+- Inspeccionar y modificar configuración de la interfaz de operador.
+
+Comportamiento operativo
+- `config show` imprime la configuración activa.
+- `config set lang <en|es>` cambia localización de comandos/interfaz.
+
+Notas de uso
+- El cambio de idioma afecta manuales, mensajes y preferencia de archivos localizados.
+
+Comandos relacionados
+- `status`, `man <topic>`, `cat <path>`

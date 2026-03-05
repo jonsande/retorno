@@ -2,7 +2,23 @@ power status
 power plan cruise|normal
 power on <system_id>
 power off <system_id>
-- Shows power network status.
-- plan sets CRUISE or NORMAL power plan.
-- on/off toggles manual power for a subsystem.
-- Hint: read /manuals/concepts/power.en.txt
+
+Purpose
+- Inspect and control electrical posture of RETORNO.
+
+Operational model
+- `power status`: shows SoC, `P_gen`, `P_load`, `Q`, brownout, and margins.
+- `power plan cruise|normal`: applies profile-level load policy.
+- `power on/off <system_id>`: manual power shedding/restoration for a subsystem.
+
+Requirements and limits
+- `power on <system_id>` requires recoverable system health and dependency chain satisfaction.
+- In unstable conditions, automatic policy may override subsystem states to preserve survivability.
+- In critical power state, only essential control actions are allowed.
+
+Operator guidance
+- Stabilize `Q` before complex operations.
+- Prefer shedding non-critical loads before touching critical systems.
+
+Related commands
+- `status`, `diag <system_id>`, `alerts`, `alerts explain <alert_key>`

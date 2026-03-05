@@ -1,4 +1,15 @@
 module inspect <module_id>
-- module and modules are equivalent for listing installed modules.
-- module installation is drone-operated: drone install <drone_id> <module_id>.
-- module inspect <module_id> shows module effects and description.
+
+Purpose
+- Inspect one installed module and its operational effects.
+
+Command family status
+- `module` and `modules` share the same installed-module context.
+- Installation workflow is external to this command family and is drone-operated.
+
+Operational behavior
+- `module inspect <module_id>` shows module effects and description/lore notes.
+- If the module is not installed, inspect will report unavailable context.
+
+Related commands
+- `modules`, `drone install <drone_id> <module_id>`, `debug modules`

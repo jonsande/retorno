@@ -1,5 +1,13 @@
-power_bus_instability
-- Inestabilidad detectada en el bus de distribución.
-- Suele asociarse a energy_distribution dañado.
-- Si persiste: apagados intermitentes, pérdida de sensores.
-Recomendado: repara `energy_distribution`, reduce carga.
+ALERTA — power_bus_instability
+
+Significado
+- La estabilidad del bus de distribución está degradada fuera de tolerancia normal.
+
+Impacto operativo
+- Puede aparecer comportamiento intermitente de subsistemas (dropouts, continuidad inestable).
+- Suele coexistir con `energy_distribution` dañado y `Q` baja.
+
+Respuesta inmediata
+- repara `energy_distribution`,
+- reduce carga no crítica,
+- monitoriza tendencia de estabilización de `Q`.

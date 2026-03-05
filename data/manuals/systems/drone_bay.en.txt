@@ -1,20 +1,60 @@
-drone_bay
-- Drone launch subsystem.
-- In emergencies use deploy!.
+SYSTEM SUMMARY — drone_bay
+Ref: OS-MAN/SYS/DRN-BAY
+
+drone_bay is the ship subsystem for drone handling, support, and lifecycle operations.
+
+Function
+- Handles deploy/recall/reboot/install workflows from the bay.
+- Recharges docked drone batteries.
+- Decontaminates docked drone radiation dose.
+- Applies passive integrity repair to docked drones (scrap cost applies).
+
+Operational dependencies
+- For bay support (charging, decontamination, passive repair):
+  - `drone_bay` must not be `OFFLINE`.
+  - `energy_distribution` must not be `OFFLINE`.
+- Battery charging also depends on instant power availability:
+  - enough net power (`P_gen - P_load`) for normal charging, or
+  - ship battery reserve (`SoC > 0`) for reduced charging.
+- drone_bay no longer requires nominal energy_distribution dependency to be powered on.
 
 Command impact by state
-- NOMINAL: normal support (deploy/recall/install/reboot ETA baseline, normal charging).
-- LIMITED: support degraded (affected operations slower, charging slower).
-- DAMAGED: support severely degraded (affected operations much slower, charging much slower, minor integrity risk on deploy/recall).
-- NOMINAL/LIMITED/DAMAGED/CRITICAL: docked drones are automatically decontaminated (slower with degraded bay states).
-- LIMITED: passive docked-drone integrity repairs are slower.
-- DAMAGED: passive docked-drone integrity repairs stay slow and consume more scrap.
-- CRITICAL: passive docked-drone integrity repairs are even slower, consume high scrap, and may fail with minor damage.
-- OFFLINE: no bay support. drone deploy is blocked; use drone deploy! for emergency launch.
-- OFFLINE: drone install is blocked (requires bay support). drone recall still works, but charging/decontamination remain unavailable.
-- While energy_distribution is OFFLINE, charging, decontamination, and passive bay repairs are unavailable even if drone_bay itself is online.
-- If docked drones need charge/repair and bay support cannot provide it, alert `drone_bay_maintenance_blocked` is raised.
+- NOMINAL:
+  - Baseline ETA for `drone deploy`, `drone recall`, `drone install`, `drone reboot`.
+  - Normal charging/decontamination/passive repair behavior.
+- LIMITED:
+  - Slower `deploy/recall/install/reboot`.
+  - Slower charging.
+  - Slower passive repair.
+- DAMAGED:
+  - Much slower `deploy/recall/install/reboot`.
+  - Much slower charging.
+  - Minor integrity loss risk during `deploy`/`recall`.
+  - Passive repair remains slow and costs more scrap.
+- CRITICAL:
+  - Same severe slowdown profile as degraded bay states.
+  - Minor integrity risk on `deploy`/`recall`.
+  - Passive repair is even slower, more expensive, and may fail with minor drone damage.
+- OFFLINE:
+  - Normal `drone deploy` is blocked.
+  - `drone install` is blocked.
+  - `drone recall` remains allowed (without maintenance support).
+  - No charging, no decontamination, no passive repair.
 
-Control vs bay support
-- Drone control depends on core_os minimum control link plus drone battery.
-- Bay state affects support functions (charging, deploy/recall/install/reboot timing), not remote control of already deployed drones.
+EMERGENCY ADVICE
+- If you must launch while bay support is down, use `drone deploy!`.
+- `deploy!` enables emergency override (including critical state and bay OFFLINE), but it does NOT bypass physical prerequisites:
+  - drone must exist and be `docked` (not `disabled`, not already deployed),
+  - minimum deploy integrity must be met,
+  - target must be valid (`ship_sector` or a `world_node` where ship is docked).
+- `deploy!` also does not bypass global terminal lockouts (`terminal_state`).
+- `deploy!` enqueues a risk job (glitch/failure). It can end with integrity loss or deploy failure.
+- If `energy_distribution` is `OFFLINE`, `deploy!` runs under emergency maintenance bypass and remains high-risk.
+
+Related alerts
+- `drone_bay_charging_unavailable`
+- `drone_bay_maintenance_blocked` (see `alerts explain drone_bay_maintenance_blocked`)
+
+Related commands
+- `drone deploy`, `drone deploy!`, `drone recall`, `drone reboot`, `drone install`
+- `diag drone_bay`, `alerts`, `alerts explain drone_bay_maintenance_blocked`

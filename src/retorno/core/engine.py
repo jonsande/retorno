@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 import hashlib
+from copy import deepcopy
 from typing import Iterable
 import difflib
 import math
@@ -39,7 +40,7 @@ from retorno.core.actions import (
     JobCancel,
 )
 from retorno.core.gamestate import GameState
-from retorno.core.lore import LoreContext, maybe_deliver_lore, piece_constraints_ok
+from retorno.core.lore import LoreContext, LoreDelivery, maybe_deliver_lore, piece_constraints_ok
 from retorno.core.deadnodes import evaluate_dead_nodes
 from retorno.core.power_policy import (
     is_action_allowed_in_critical_state,
@@ -2528,6 +2529,12 @@ class Engine:
 
             job.eta_s -= dt
             if job.eta_s <= 0:
+                failed_event = self._maybe_fail_repair_job(state, job)
+                if failed_event is not None:
+                    job.status = JobStatus.FAILED
+                    events.append(failed_event)
+                    completed.append(job_id)
+                    continue
                 job.status = JobStatus.COMPLETED
                 completed.append(job_id)
                 events.extend(self._apply_job_effect(state, job))
@@ -2667,6 +2674,65 @@ class Engine:
             return None
 
         return None
+
+    def _drain_repair_operator_battery(self, state: GameState, job: Job) -> None:
+        drone_id = str(job.params.get("drone_id", "") or "")
+        if not drone_id:
+            return
+        drone = state.ship.drones.get(drone_id)
+        if drone:
+            drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_REPAIR)
+
+    def _maybe_fail_repair_job(self, state: GameState, job: Job) -> Event | None:
+        if job.job_type not in {JobType.REPAIR_SYSTEM, JobType.REPAIR_DRONE, JobType.SELFTEST_REPAIR}:
+            return None
+        fail_p = max(0.0, min(1.0, float(Balance.REPAIR_JOB_FAIL_P_BASE)))
+        if fail_p <= 0.0 or self._rng(state).random() >= fail_p:
+            return None
+
+        consume_fraction = max(0.0, min(1.0, float(Balance.REPAIR_JOB_FAIL_SCRAP_CONSUME_FRACTION)))
+        repair_scrap = int(round(float(job.params.get("repair_scrap", 0) or 0)))
+        repair_scrap = max(0, repair_scrap)
+        scrap_consumed = int(round(repair_scrap * consume_fraction))
+        scrap_consumed = max(0, min(repair_scrap, scrap_consumed))
+        scrap_refunded = max(0, repair_scrap - scrap_consumed)
+        if scrap_refunded > 0:
+            state.ship.cargo_scrap += scrap_refunded
+
+        if job.job_type in {JobType.REPAIR_SYSTEM, JobType.REPAIR_DRONE}:
+            self._drain_repair_operator_battery(state, job)
+
+        target_kind = "ship"
+        target_id = state.ship.ship_id
+        if job.target and job.target.kind == "drone":
+            target_kind = "drone"
+            target_id = job.target.id
+        elif job.target and job.target.kind == "ship_system":
+            target_kind = "ship_system"
+            target_id = job.target.id
+
+        event = self._make_event(
+            state,
+            EventType.JOB_FAILED,
+            Severity.WARN,
+            SourceRef(kind=target_kind, id=target_id),
+            (
+                f"Repair failed for {target_id}. "
+                f"Consumed {scrap_consumed}/{repair_scrap} scrap and refunded {scrap_refunded}."
+            ),
+            data={
+                "job_id": job.job_id,
+                "job_type": job.job_type.value,
+                "message_key": "job_failed_repair_attempt",
+                "target_id": target_id,
+                "scrap_required": repair_scrap,
+                "scrap_consumed": scrap_consumed,
+                "scrap_refunded": scrap_refunded,
+                "consume_fraction": consume_fraction,
+            },
+        )
+        self._record_event(state.events, event)
+        return event
 
     def _location_fs_files(self, node_id: str) -> list[dict]:
         for loc in load_locations():
@@ -2976,6 +3042,51 @@ class Engine:
         year = state.clock.t / Balance.YEAR_S if Balance.YEAR_S else 0.0
         return LoreContext(node_id=node_id, region=region, dist_from_origin_ly=dist, year_since_wake=year)
 
+    def _collect_salvage_data_files(self, state: GameState, node_id: str, node: SpaceNode | None) -> tuple[list[dict], LoreDelivery]:
+        files = self._location_fs_files(node_id)
+        is_location = self._is_location_node(node_id)
+        is_procedural = not is_location
+        if not files and node and is_procedural:
+            files = self._procedural_fs_files(state, node)
+        files = self._maybe_inject_arc_content(state, node_id, node, files, is_procedural)
+        lore_ctx = self._build_lore_context(state, node_id)
+        lore_result = maybe_deliver_lore(state, "salvage_data", lore_ctx)
+        files.extend(lore_result.files)
+        return files, lore_result
+
+    def _project_mountable_data_paths(self, fs: dict[str, FSNode], mount_root: str, files: list[dict]) -> list[str]:
+        projected: set[str] = set()
+        for entry in files:
+            src_path = normalize_path(str(entry.get("path", "")))
+            if not src_path:
+                continue
+            if not (src_path.startswith("/mail") or src_path.startswith("/logs") or src_path.startswith("/data")):
+                continue
+            dest_path = normalize_path(mount_root + src_path)
+            if dest_path in fs:
+                continue
+            projected.add(dest_path)
+        return sorted(projected)
+
+    def _survey_recoverable_data_count(self, state: GameState, node_id: str) -> int:
+        # Survey must inspect recoverable data without mutating arc/lore state.
+        preview_state = deepcopy(state)
+        preview_node = preview_state.world.space.nodes.get(node_id)
+        files, _lore_result = self._collect_salvage_data_files(preview_state, node_id, preview_node)
+        mount_root = normalize_path(f"/remote/{node_id}")
+        return len(self._project_mountable_data_paths(state.os.fs, mount_root, files))
+
+    def _survey_reports_data_signatures(self, state: GameState, node_id: str, job_id: str, data_available: bool) -> bool:
+        if not data_available:
+            return False
+        miss_p = max(0.0, min(1.0, float(Balance.DRONE_SURVEY_DATA_FALSE_NEGATIVE_P)))
+        if miss_p <= 0.0:
+            return True
+        if miss_p >= 1.0:
+            return False
+        seed = self._hash64(state.meta.rng_seed, f"survey_data:{node_id}:{job_id}:{int(state.clock.t)}")
+        return random.Random(seed).random() >= miss_p
+
     def _clear_tmp_node(self, state: GameState) -> None:
         tmp_id = state.world.active_tmp_node_id
         if not tmp_id:
@@ -3028,10 +3139,7 @@ class Engine:
         if job.job_type == JobType.REPAIR_SYSTEM and job.target:
             system = state.ship.systems.get(job.target.id)
             if system:
-                drone_id = job.params.get("drone_id")
-                drone = state.ship.drones.get(drone_id) if drone_id else None
-                if drone:
-                    drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_REPAIR)
+                self._drain_repair_operator_battery(state, job)
                 default_repair = 0.25 if system.system_id == "energy_distribution" else 0.15
                 repair_amount = float(job.params.get("repair_amount", default_repair))
                 system.health = min(1.0, system.health + repair_amount)
@@ -3057,10 +3165,7 @@ class Engine:
         if job.job_type == JobType.REPAIR_DRONE and job.target:
             target_drone = state.ship.drones.get(job.target.id)
             if target_drone:
-                drone_id = job.params.get("drone_id")
-                operator = state.ship.drones.get(drone_id) if drone_id else None
-                if operator:
-                    operator.battery = max(0.0, operator.battery - Balance.DRONE_BATTERY_DRAIN_REPAIR)
+                self._drain_repair_operator_battery(state, job)
                 repair_amount = float(job.params.get("repair_amount", 0.15))
                 target_drone.integrity = min(1.0, target_drone.integrity + repair_amount)
                 events.append(
@@ -3468,34 +3573,14 @@ class Engine:
         if job.job_type == JobType.SALVAGE_DATA and job.target:
             node_id = job.params.get("node_id", job.target.id)
             node = state.world.space.nodes.get(node_id)
-            files = self._location_fs_files(node_id)
-            is_location = self._is_location_node(node_id)
-            is_procedural = not is_location
-            if not files and node and is_procedural:
-                files = self._procedural_fs_files(state, node)
-            files = self._maybe_inject_arc_content(state, node_id, node, files, is_procedural)
-            lore_ctx = self._build_lore_context(state, node_id)
-            lore_result = maybe_deliver_lore(state, "salvage_data", lore_ctx)
-            files.extend(lore_result.files)
+            files, lore_result = self._collect_salvage_data_files(state, node_id, node)
             mount_root = normalize_path(f"/remote/{node_id}")
             if "/remote" not in state.os.fs:
                 state.os.fs["/remote"] = FSNode(path="/remote", node_type=FSNodeType.DIR, access=AccessLevel.GUEST)
             if mount_root not in state.os.fs:
                 state.os.fs[mount_root] = FSNode(path=mount_root, node_type=FSNodeType.DIR, access=AccessLevel.GUEST)
-            mounted_candidates: list[str] = []
-            preexisting: set[str] = set()
-            for entry in files:
-                src_path = normalize_path(str(entry.get("path", "")))
-                if not src_path:
-                    continue
-                if not (src_path.startswith("/mail") or src_path.startswith("/logs") or src_path.startswith("/data")):
-                    continue
-                dest_path = normalize_path(mount_root + src_path)
-                mounted_candidates.append(dest_path)
-                if dest_path in state.os.fs:
-                    preexisting.add(dest_path)
+            mounted_paths = self._project_mountable_data_paths(state.os.fs, mount_root, files)
             count = mount_files(state.os.fs, mount_root, files)
-            mounted_paths = sorted({p for p in mounted_candidates if p not in preexisting and p in state.os.fs})
             drone_id = job.params.get("drone_id")
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
@@ -3526,7 +3611,13 @@ class Engine:
             scrap_available = int(node.salvage_scrap_available) if node else 0
             modules_detected = bool(node.salvage_modules_available) if node else False
             recoverable_drones = int(node.recoverable_drones_count) if node else 0
-            data_signatures_detected = bool(node and node.kind in {"station", "ship", "derelict", "relay"})
+            recoverable_data_files = self._survey_recoverable_data_count(state, node_id)
+            data_signatures_detected = self._survey_reports_data_signatures(
+                state,
+                node_id,
+                job.job_id,
+                recoverable_data_files > 0,
+            )
             uplink_detected = bool(node and node.kind in {"relay", "station", "waystation"})
             drone_id = job.params.get("drone_id")
             drone = state.ship.drones.get(drone_id) if drone_id else None
@@ -3546,6 +3637,7 @@ class Engine:
                         "scrap_available": scrap_available,
                         "modules_detected": modules_detected,
                         "recoverable_drones_count": recoverable_drones,
+                        "data_recoverable_files_count": recoverable_data_files,
                         "data_signatures_detected": data_signatures_detected,
                         "uplink_detected": uplink_detected,
                         "message_key": "job_completed_drone_survey",

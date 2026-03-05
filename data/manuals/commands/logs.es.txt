@@ -1,3 +1,13 @@
 logs
-- Muestra entradas recientes del registro de eventos.
-- Usa log copy [n] para copiar líneas recientes.
+
+Propósito
+- Mostrar la línea temporal reciente de eventos emitidos por sistemas y motor de jobs.
+
+Comportamiento operativo
+- Muestra eventos retenidos más recientes con contexto de severidad/origen.
+
+Notas de uso
+- Úsalo junto con `alerts` y `jobs` para triage de incidentes.
+
+Comandos relacionados
+- `log copy [n]`, `alerts`, `status`

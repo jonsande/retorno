@@ -1,6 +1,26 @@
 uplink
-- Establece un uplink de datos con el relay/waystation actual.
-- Requiere estar acoplado y data_core + datad operativos.
-- Puede revelar nuevas rutas de tablas de navegación en caché.
-- Escribe un registro en /logs/nav/ con los enlaces descubiertos.
-- Se bloquea si la calidad de energía es demasiado baja (Q < 0.55) o hay brownout activo.
+
+Propósito
+- Establecer un enlace de datos con el relay/station/waystation actual para ingerir inteligencia de navegación.
+
+Requisitos (gating)
+- La nave debe estar acoplada en un tipo de nodo elegible.
+- `data_core >= limited` y `datad` en ejecución.
+- Energía suficientemente estable para operación de enlace:
+  - bloqueado con `Q < 0.55`,
+  - bloqueado durante brownout,
+  - bloqueado en estado crítico de energía.
+
+Comportamiento
+- Descarga intel de rutas/contactos desde cachés remotas.
+- Actualiza enlaces conocidos y puede abrir nuevos caminos alcanzables.
+- Escribe artefactos de log de navegación en `/logs/nav/`.
+
+Bloqueos frecuentes
+- `not_docked`
+- tipo de nodo no elegible
+- `deps_unmet` / servicio detenido
+- `power_quality_low` / `brownout_active` / `critical_power_state`
+
+Comandos relacionados
+- `route solve <node_id>`, `nav map routes`, `intel`, `logs`

@@ -14,30 +14,68 @@ drone reboot <drone_id>
 drone recall <drone_id>
 drone status [drone_id]
 
+Propósito
+- Superficie unificada de operación para despliegue, movimiento, mantenimiento, recuperación y telemetría de drones.
+
 Campos de status
-- status: docked / deployed / disabled
-- loc: ubicación actual (ship_sector o world_node)
-- battery: carga (0..1)
-- integrity: integridad estructural (0..1)
-- dose: radiación acumulada (rad)
-- dose muestra también banda textual: `bajo / elevado / alto / extremo`
+- status: `docked / deployed / disabled`
+- loc: ubicación actual (`ship_sector` o `world_node`)
+- battery: carga (`0..1`)
+- integrity: integridad estructural (`0..1`)
+- dose: dosis radiológica acumulada (`rad`) + banda textual (`bajo/elevado/alto/extremo`)
+
+Requisitos operativos clave
+- `deploy` / `deploy!`:
+  - dron existente, acoplado y no deshabilitado,
+  - integridad mínima de despliegue,
+  - destino válido (sector de nave o nodo donde la nave esté acoplada).
+- `recall`:
+  - dron desplegado,
+  - batería e integridad mínimas,
+  - si está en `world_node`, la nave debe seguir acoplada en ese nodo.
+- `repair`:
+  - dron operador desplegado,
+  - batería mínima,
+  - si el objetivo es dron: co-localización exacta con el operador.
+- `install`:
+  - dron desplegado, módulo en inventario y chatarra suficiente,
+  - requiere soporte de bahía (se bloquea con `drone_bay OFFLINE`).
+
+Impacto de `drone_bay` por estado (estructura compartida)
+- NOMINAL: ETAs base en `deploy/recall/install/reboot`; recarga/descontaminación/reparación pasiva normal.
+- LIMITED: mismas operaciones más lentas; recarga más lenta; reparación pasiva más lenta.
+- DAMAGED: ralentización severa; riesgo leve de daño de integridad en `deploy/recall`; reparación pasiva más cara.
+- CRITICAL: perfil severo de DAMAGED + reparación pasiva con riesgo de fallo y daño leve.
+- OFFLINE: bloquea `deploy` normal e `install`; `recall` sigue permitido; sin recarga/descontaminación/reparación pasiva.
+- Nota de dependencia global: con `energy_distribution OFFLINE`, no hay recarga/descontaminación/reparación pasiva aunque `drone_bay` esté online.
+
+CONSEJO DE EMERGENCIA
+- Si la bahía está caída y necesitas salida inmediata, usa `drone deploy!`.
+- `deploy!` permite override de emergencia (incluido estado crítico), pero conserva dependencias físicas:
+  - dron válido/acoplado/no deshabilitado,
+  - integridad mínima,
+  - destino válido y acoplamiento de nave si el destino es `world_node`.
+- `deploy!` no evita bloqueos globales del terminal (`terminal_state`).
+- `deploy!` no es gratuito: usa un job con probabilidad de glitch/fallo y puede causar pérdida de integridad.
+- Con `energy_distribution OFFLINE`, `deploy!` opera en bypass de mantenimiento de emergencia y el riesgo persiste.
 
 Notas operativas
-- Las acciones consumen batería (deploy/move/repair/install/salvage/recall/reboot).
-- Los drones desplegados también consumen batería en reposo.
-- Los drones desplegados/no acoplados acumulan dosis por radiación ambiental.
-- Convención de escudo (`shield_factor`): <1 mejor, =1 base, >1 peor (afecta a la dosis radiológica entrante).
-- La dosis ahora acelera el desgaste de integridad del dron (por bandas de exposición).
-- La recarga ocurre en drone_bay mientras haya soporte de bahía/distribución.
-- Los drones acoplados se descontaminan automáticamente en drone_bay (más lento si la bahía está degradada).
-- Si hay drones acoplados con batería/integridad pendiente y no se puede mantenerlos, se activa `drone_bay_maintenance_blocked` (ver `alerts explain drone_bay_maintenance_blocked`).
-- `drone repair` acepta sistemas de nave y drones como objetivo.
-- Para reparar otro dron, el dron operador debe estar desplegado y en la misma ubicación que el dron objetivo.
-- `drone move <drone_id> <ship_sector>` permite mover un dron desde un world_node a un sector de nave cuando la nave está acoplada en ese mismo nodo.
+- Las acciones consumen batería (`deploy/move/repair/install/salvage/recall/reboot`).
+- `drone survey` informa de posibles firmas de datos recuperables, no de certeza.
+- Si no hay archivos de datos montables, survey informa de que no hay firmas.
+- Los falsos negativos cuando sí existen archivos se controlan con `Balance.DRONE_SURVEY_DATA_FALSE_NEGATIVE_P`.
+- Los drones desplegados consumen batería en reposo.
+- Los drones desplegados/no acoplados acumulan radiación ambiental.
+- Convención de escudo (`shield_factor`): `<1` mejor, `=1` base, `>1` peor.
+- La dosis acelera desgaste de integridad por bandas de exposición.
+- Si hay drones acoplados con batería/integridad pendiente y el soporte no alcanza, se activa `drone_bay_maintenance_blocked`.
+- `drone repair` acepta sistemas de nave y drones.
+- Jobs de reparación tienen probabilidad base baja de fallo (`Balance.REPAIR_JOB_FAIL_P_BASE`).
+- En fallo de reparación se consume una fracción configurable de chatarra y el resto se reembolsa (`Balance.REPAIR_JOB_FAIL_SCRAP_CONSUME_FRACTION`).
+- `drone move <drone_id> <ship_sector>` permite mover un dron desde un `world_node` a un sector de nave cuando la nave está acoplada en ese nodo.
 - `drone move <drone_id> RETORNO_SHIP` es alias de volver a la nave vía `DRN-BAY`.
 - `drone autorecall <drone_id> on|off` activa/desactiva auto-recall por batería baja.
-- `drone autorecall <drone_id> <porcentaje>` fija el umbral de batería (%) para auto-recall.
-- Con drone_bay LIMITED/DAMAGED se ralentizan deploy/recall/install/reboot y la recarga.
-- Con drone_bay OFFLINE se bloquean deploy normal e install; usa deploy! para emergencia.
-- Evita agotar la batería antes del recall; un dron sin batería puede quedar varado.
-- El deploy de emergencia puede fallar y dañar integridad.
+- `drone autorecall <drone_id> <porcentaje>` fija el umbral (%) para auto-recall.
+
+Comandos relacionados
+- `ship systems`, `diag drone_bay`, `alerts explain drone_bay_maintenance_blocked`, `jobs`

@@ -1,18 +1,21 @@
 nav map contacts
 
 Estado del comando
-- `contacts` existe como alias de compatibilidad.
+- `contacts` es alias de compatibilidad.
 - Comando canónico: `nav map contacts`.
 
-Alias aceptados (ocultos en `help`)
+Formas alias aceptadas
 - `contacts` -> `nav map contacts`
 - `nav contacts` -> `nav map contacts`
 
-Dependencias
-- Depende solo de `core_os` (igual que todo `nav map *`).
-- No depende de `sensors` ni de `data_core`.
+Comportamiento operativo
+- Lista contactos conocidos relativos al contexto de navegación actual.
+- Incluye indicadores de disponibilidad de ruta y estado de visita.
+- En tránsito, la salida usa caché de contactos conocidos.
 
-Formato de salida
-- Cabecera: `=== CONTACTS ===`
-- Muestra contactos conocidos, distancia estimada y estado `route/no_route`, `visited/unvisited`.
-- En tránsito usa caché de conocimiento conocida (`in transit; using cached known contacts`).
+Dependencias
+- Depende de la capa de comandos de `core_os`.
+- No requiere `sensors` ni `data_core`.
+
+Comandos relacionados
+- `nav map routes`, `nav map path <node_id>`, `route solve <node_id>`

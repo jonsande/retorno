@@ -1,2 +1,11 @@
 diag <system_id>
-- Muestra diagnósticos detallados de un sistema de la nave.
+
+Propósito
+- Mostrar snapshot diagnóstico de subsistema con detalle de salud/estado.
+
+Notas de uso
+- Usa ids canónicos (`power_core`, `life_support`, `drone_bay`, etc.).
+- Combina con `alerts explain` para interpretación accionable.
+
+Comandos relacionados
+- `status`, `about <system_id>`, `alerts`, `repair`

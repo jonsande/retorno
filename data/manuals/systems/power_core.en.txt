@@ -1,37 +1,34 @@
-SYSTEM BRIEF — power_core
+SYSTEM SUMMARY — power_core
 Ref: OS-MAN/SYS/CORE-PWR
 
-power_core provides primary generation to the ship.
+`power_core` is RETORNO's primary electrical generation source.
 
-Role
-- Converts stored/reactive mass into electrical output.
-- Stabilizes output within tolerances when the bus is healthy.
+Function
+- Converts reactor resources into ship-usable electrical output.
+- Provides baseline generation for all downstream subsystems.
 
-Output impact (by state)
+Output profile by state
 - OFFLINE: 0% generation
 - CRITICAL: 25% generation
 - DAMAGED: 50% generation
 - LIMITED: 75% generation
 - NOMINAL: 100% generation
 
-Health thresholds (default)
-- health <= 0.00 -> OFFLINE
-- health < 0.35  -> CRITICAL
-- health < 0.60  -> DAMAGED
-- health < 0.85  -> LIMITED
-- health >= 0.85 -> NOMINAL
+Health-state thresholds (default)
+- `health <= 0.00` -> OFFLINE
+- `health < 0.35` -> CRITICAL
+- `health < 0.60` -> DAMAGED
+- `health < 0.85` -> LIMITED
+- `health >= 0.85` -> NOMINAL
 
-What “degraded” means
-- Output may be throttled or noisy.
-- Net effect: lower P_gen, lower Q under load, faster aging elsewhere.
+Operational impact
+- Core degradation rapidly reduces electrical headroom and increases deficit/brownout risk.
+- Low generation propagates into lower `Q`, service blocks, and accelerated system stress.
 
-Command impact by state
-- CRITICAL/DAMAGED/LIMITED: reduced P_gen increases risk of low Q and brownout.
-- OFFLINE: zero generation. Expect brownout unless load is minimal.
+Recovery pattern
+- reduce non-critical load,
+- repair `power_core`,
+- rebuild battery reserve and stabilize `Q`.
 
-Typical recovery
-- Use a maintenance drone to repair power_core.
-- If you have modules, install generation patches (future: micro_reactor_patch).
-
-Relevant commands
-- power status, alerts explain power_core_degraded, diag power_core, repair <drone> power_core
+Related commands
+- `diag power_core`, `power status`, `drone repair <drone_id> power_core`, `alerts`

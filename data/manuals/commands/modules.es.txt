@@ -1,6 +1,16 @@
 modules
-- Lista sólo los módulos instalados.
-- Alias: module
-- Si no hay ninguno, instala uno con: drone install <drone_id> <module_id>
-- Inspecciona un módulo con: module inspect <module_id>
-- El catálogo completo está disponible con: debug modules
+
+Propósito
+- Listar módulos actualmente instalados en RETORNO.
+
+Comportamiento de familia de comandos
+- `modules` se centra solo en inventario instalado.
+- Alias: `module`.
+
+Notas operativas
+- Si la lista está vacía, instala vía flujo de drones.
+- Para detalle de un módulo, usa `module inspect <module_id>`.
+- Para visibilidad de catálogo completo (instalados + no instalados), usa listado debug de módulos.
+
+Comandos relacionados
+- `module inspect <module_id>`, `drone install <drone_id> <module_id>`, `debug modules`

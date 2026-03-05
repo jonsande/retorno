@@ -1,3 +1,14 @@
 job cancel <job_id>
-- Cancels an active job by id.
-- Use jobs to list active job ids.
+
+Purpose
+- Cancel one active queued/running job.
+
+Operational behavior
+- Removes job from active execution pipeline when cancellable.
+- Cancellation does not retroactively undo already-applied effects.
+
+Usage notes
+- Obtain ids via `jobs`.
+
+Related commands
+- `jobs`, `jobs all`

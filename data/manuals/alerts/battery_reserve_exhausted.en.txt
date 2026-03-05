@@ -1,4 +1,12 @@
-battery_reserve_exhausted
-- Battery SoC is 0.00 and load is fully covered by generation.
-- No reserve remains. Any additional load can trigger brownout.
-Recommended: reduce load, restore generation, and recharge batteries.
+ALERT — battery_reserve_exhausted
+
+Meaning
+- Ship battery reserve is depleted (`SoC = 0.00`).
+
+Operational impact
+- No electrical buffer remains for transient load spikes.
+- Any additional demand may trigger brownout and cascading restrictions.
+
+Immediate response
+- Shed non-critical load.
+- Recover generation and rebuild battery reserve as priority.

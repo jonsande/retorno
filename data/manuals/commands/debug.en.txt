@@ -5,7 +5,18 @@ debug arcs
 debug lore
 debug deadnodes
 debug modules
-- Enables or disables DEBUG mode (pauses/resumes auto-tick).
-- scenario resets the world to a preset.
-- seed sets the RNG seed.
-- arcs/lore/deadnodes/modules provide debug listings.
+
+Purpose
+- Operator/developer control surface for deterministic testing and scenario resets.
+
+Operational behavior
+- `debug on|off` toggles debug mode and auto-tick control.
+- `debug scenario ...` resets world state to preset.
+- `debug seed <n>` sets RNG seed.
+- listing commands expose internal debug registries.
+
+Usage notes
+- Intended for testing and balancing, not diegetic normal play.
+
+Related commands
+- `wait <seconds>`, `status`, `jobs`

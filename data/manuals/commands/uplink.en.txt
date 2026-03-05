@@ -1,6 +1,26 @@
 uplink
-- Establishes a data uplink with the current relay/waystation.
-- Requires docking at a relay/station and data_core + datad online.
-- May reveal new routes from cached navigation tables.
-- Writes a log under /logs/nav/ with discovered links.
-- Blocked if power quality is too low (Q < 0.55) or brownout is active.
+
+Purpose
+- Establish a data uplink with the current relay/station/waystation to ingest navigation intelligence.
+
+Requirements (gating)
+- Ship must be docked at an eligible node type.
+- `data_core >= limited` and `datad` running.
+- Power must be stable enough for data-link operations:
+  - blocked when `Q < 0.55`,
+  - blocked during brownout,
+  - blocked in critical power state.
+
+Behavior
+- Pulls route/contact intel from remote caches.
+- Updates known links and may unlock new reachable paths.
+- Writes navigation log artifacts under `/logs/nav/`.
+
+Common block reasons
+- `not_docked`
+- ineligible node type
+- `deps_unmet` / service not running
+- `power_quality_low` / `brownout_active` / `critical_power_state`
+
+Related commands
+- `route solve <node_id>`, `nav map routes`, `intel`, `logs`

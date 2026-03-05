@@ -1,7 +1,15 @@
-micro_reactor_patch
+DOSSIER DE MÓDULO — micro_reactor_patch
+
+Rol
 - Retroadaptación de microinyectores para núcleos fatigados.
+
+Efecto operativo
 - Mejora mezcla de combustible y balance térmico.
-- Aporta un aumento estable de generación.
-- Requiere calibración cuidadosa tras instalar.
-- No recomendado si el core está en estado crítico.
-Lore: Los ingenieros lo llamaban "parche susurro".
+- Aporta ganancia de generación modesta pero estable.
+
+Notas de integración
+- Requiere calibración cuidadosa tras instalación.
+- No recomendable como estrategia principal con núcleo cerca de degradación terminal.
+
+Nota de campo
+- Apodo de ingeniería: "parche susurro".

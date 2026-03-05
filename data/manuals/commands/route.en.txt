@@ -1,5 +1,7 @@
 route solve <node_id>
 - Attempts to resolve/add a known route from your current node to `<node_id>`.
+Purpose
+- Compute and store missing navigable links from current position to a known target node.
 
 Behavior
 - If the route is already known from your current node, no job is queued:
@@ -28,3 +30,6 @@ Common block reasons
 Notes
 - `route solve` does not start travel; use `nav <node_id>` to travel.
 - Known route status is relative to your current node.
+
+Related commands
+- `nav map routes`, `nav map path <node_id>`, `nav <node_id>`, `scan`

@@ -1,2 +1,11 @@
 diag <system_id>
-- Shows detailed diagnostics for a ship system.
+
+Purpose
+- Show subsystem diagnostic snapshot and health/state details.
+
+Usage notes
+- Use canonical system ids (`power_core`, `life_support`, `drone_bay`, etc.).
+- Combine with `alerts explain` for actionable interpretation.
+
+Related commands
+- `status`, `about <system_id>`, `alerts`, `repair`

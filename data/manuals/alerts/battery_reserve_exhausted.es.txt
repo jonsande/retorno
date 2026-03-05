@@ -1,4 +1,12 @@
-battery_reserve_exhausted
-- SoC de batería en 0.00 y la carga está cubierta por la generación.
-- No queda reserva. Cualquier carga extra puede causar brownout.
-Recomendado: reduce carga, restaura generación y recarga baterías.
+ALERTA — battery_reserve_exhausted
+
+Significado
+- La reserva de batería de nave está agotada (`SoC = 0.00`).
+
+Impacto operativo
+- No queda colchón eléctrico para picos transitorios de carga.
+- Cualquier demanda adicional puede activar brownout y restricciones en cascada.
+
+Respuesta inmediata
+- Recorta carga no crítica.
+- Recupera generación y reconstruye reserva de batería como prioridad.

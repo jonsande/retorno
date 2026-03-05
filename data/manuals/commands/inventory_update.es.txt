@@ -1,3 +1,14 @@
 inventory update
-- Ejecuta un trabajo de inventariado para sincronizar cantidades.
-- Tarda un tiempo; encola un job en el sistema.
+
+Propósito
+- Forzar un job de sincronización de manifiesto de bodega.
+
+Comportamiento operativo
+- Encola trabajo temporizado de inventariado.
+- Actualiza contadores de bodega al completar.
+
+Notas de uso
+- Úsalo cuando sospeches desvío de manifiesto.
+
+Comandos relacionados
+- `inventory`, `cargo audit`, `jobs`

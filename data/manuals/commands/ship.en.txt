@@ -1,29 +1,19 @@
+ship status
+ship systems
 ship sectors
-ship survey <target>
+ship survey
 
-Description
-- `ship sectors`: show RETORNO internal sectors and their tags.
-- `ship survey <target>`: concise telemetry for one target.
+Purpose
+- Provide ship-level operational snapshots and survey workflows.
 
-Valid `ship survey` target
-- Any world `node_id`.
-- `RETORNO_SHIP`.
-- Active `state.ship.ship_id`.
+Operational behavior
+- `ship status`: condensed ship health/power overview.
+- `ship systems`: subsystem table with state/health/service context.
+- `ship sectors`: internal topology and placement.
+- `ship survey`: structured survey job/event pipeline (requires sensor/data stack availability).
 
-Accepted aliases (hidden in `help`)
-- `ship map` -> `ship sectors`
+Usage notes
+- Use `ship systems` + `alerts` to triage failures before long operations.
 
-Dependencies
-- `ship sectors`: depends on `core_os`.
-- `ship survey <target>` depends on:
-  - `core_os`
-  - `sensors >= limited`
-  - `sensord` running
-  - `data_core >= limited`
-  - `datad` running
-
-`ship survey` v0 output
-- `id`, `name`, `kind`.
-- `sector` and `coords`.
-- `distance`.
-- Basic availability/intel flags (`visited`, `known_contact`, `known_route_from_current`, `in_sensor_range`).
+Related commands
+- `status`, `diag <system_id>`, `power status`, `jobs`

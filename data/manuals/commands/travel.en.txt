@@ -1,11 +1,17 @@
 travel <node_id>
 travel --no-cruise <node_id>
 travel abort
-- Alias of nav. Prefer: nav <node_id> | nav --no-cruise <node_id> | nav abort.
-- Start interstellar transit to the target node.
-- By default, travel auto-sets CRUISE for efficiency.
-- Use --no-cruise to keep the current mode (advanced; higher wear).
-- travel abort cancels the current transit and returns to the origin.
-- Shows ETA in years; ship goes in-transit until arrival.
-- Operational commands are blocked during transit.
-- If you are docked, undock first (`undock`) before traveling.
+
+Purpose
+- Compatibility alias family for transit commands.
+
+Command status
+- Canonical command namespace: `nav`.
+
+Equivalent forms
+- `travel <node_id>` -> `nav <node_id>`
+- `travel --no-cruise <node_id>` -> `nav --no-cruise <node_id>`
+- `travel abort` -> `nav abort`
+
+Related commands
+- `nav <node_id>`, `nav abort`, `hibernate`

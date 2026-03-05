@@ -1,2 +1,11 @@
-locate <system_id>
-- Muestra el sector de la nave o coordenadas de un sistema o nodo.
+locate <system_id|node_id>
+
+Propósito
+- Resolver ubicación operativa de un sistema de nave o nodo mundial conocido.
+
+Comportamiento operativo
+- Para sistemas de nave: devuelve sector interno.
+- Para nodos: devuelve anclaje de coordenadas mundiales.
+
+Comandos relacionados
+- `ship sectors`, `nav map graph [node_id]`, `diag <system_id>`

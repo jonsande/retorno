@@ -1,3 +1,13 @@
 wait <segundos>
-- Avanza el tiempo un número de segundos.
+
+Propósito
+- Avanzar tiempo de simulación manualmente (flujo debug).
+
+Requisitos
 - Disponible solo en modo DEBUG.
+
+Comportamiento operativo
+- Aplica avance directo de tiempo para pruebas de progresión determinista.
+
+Comandos relacionados
+- `debug on`, `status`, `jobs`

@@ -1,7 +1,13 @@
 status
-- Shows ship status, power, systems, and installed modules.
-- Includes `hull` (0..1 structural integrity).
-- Includes `radiation` with two values:
-  - `env`: effective environmental radiation at current location/transit.
-  - `internal`: radiation leaking into internal systems (depends on hull state).
-- Both (`env` and `internal`) also show a text band: `low / elevated / high / extreme`.
+
+Purpose
+- Show consolidated mission-critical snapshot: power, systems, transit posture, and alert context.
+
+Operational behavior
+- Designed as first-look command after wake, incident, or major action.
+
+Usage notes
+- Use as entry point, then drill down with `alerts`, `diag`, `jobs`, and domain commands.
+
+Related commands
+- `alerts`, `power status`, `ship systems`, `drone status [drone_id]`

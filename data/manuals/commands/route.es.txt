@@ -1,5 +1,7 @@
 route solve <node_id>
 - Intenta resolver/añadir una ruta conocida desde tu nodo actual hasta `<node_id>`.
+Propósito
+- Calcular y registrar enlaces navegables ausentes desde la posición actual hasta un nodo objetivo conocido.
 
 Comportamiento
 - Si la ruta ya es conocida desde tu nodo actual, no encola trabajo:
@@ -28,3 +30,6 @@ Bloqueos frecuentes
 Notas
 - `route solve` no inicia viaje; para viajar usa `nav <node_id>`.
 - La ruta conocida es relativa al nodo actual.
+
+Comandos relacionados
+- `nav map routes`, `nav map path <node_id>`, `nav <node_id>`, `scan`

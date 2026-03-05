@@ -3,6 +3,24 @@ drone salvage module <drone_id> [node_id]
 drone salvage drone <drone_id> <node_id>
 drone salvage drones <drone_id> <node_id>
 drone salvage data <drone_id> <node_id>
-- Salvage scrap, modules, recoverable drones, or data from a node.
-- Drone must be deployed at the node.
-- If node_id is omitted, uses the drone's current node.
+
+Purpose
+- Run drone recovery operations for materials, modules, recoverable drones, and data signatures.
+
+Requirements (gating)
+- Operator drone must be deployed, valid, and with minimum battery for task execution.
+- Target node must be valid and context-compatible with drone location/ship docking state.
+- Action-specific salvage availability must exist (scrap/module/drone/data).
+
+Behavior
+- Salvage actions queue timed jobs (duration depends on action and payload).
+- Successful salvage updates cargo/intel/world depletion state.
+- Salvage operations consume drone battery and carry operational risk from environment/degradation.
+
+Common block reasons
+- drone not deployed / low battery / missing target
+- ship not docked at drone world-node location when required
+- no eligible salvage left for requested action
+
+Related commands
+- `drone survey <drone_id> <node_id>`, `inventory`, `modules`, `intel`, `jobs`

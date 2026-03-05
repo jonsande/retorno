@@ -1,9 +1,17 @@
-low_power_quality
-- Power quality below nominal range.
-- Causes: low SoC, sustained deficit, distribution damage.
-- If persistent: system degradation accelerates.
-Escalation:
-- Q < 0.55: complex ops blocked (uplink, route solve, auth recover).
-- Q < 0.40: hibernate and non-critical boots blocked.
-- Q < 0.25: ship sheds non-critical systems; collapse risk.
-Recommended: stabilize distribution, reduce load, restore SoC.
+ALERT — low_power_quality
+
+Meaning
+- Power-quality factor `Q` is below stable nominal range.
+
+Typical causes
+- low SoC, sustained net deficit, damaged `energy_distribution`.
+
+Escalation impact
+- `Q < 0.55`: complex operations blocked (`uplink`, `route solve`, `auth recover`).
+- `Q < 0.40`: hibernate and non-critical boot blocked.
+- `Q < 0.25`: non-critical shedding/collapse pressure increases.
+
+Immediate response
+- stabilize distribution,
+- reduce non-critical load,
+- rebuild SoC reserve.

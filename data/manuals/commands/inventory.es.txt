@@ -1,4 +1,16 @@
 inventory
-- Muestra la chatarra y módulos según el último inventario.
-- Alias: 'cargo'
-- Si hubo cambios en bodega, ejecuta 'cargo audit' o 'inventory audit' para inventariar.
+inventory audit
+
+Propósito
+- Consultar snapshot actual de manifiesto de bodega y reconciliarlo cuando quede obsoleto.
+
+Comportamiento operativo
+- `inventory` muestra datos de chatarra/módulos del último sync.
+- `inventory audit` encola trabajo de reconciliación de manifiesto.
+- `cargo` es familia alias equivalente.
+
+Notas de uso
+- Ejecuta audit tras actividad de salvage/install si los conteos no cuadran.
+
+Comandos relacionados
+- `cargo`, `inventory update`, `modules`, `jobs`

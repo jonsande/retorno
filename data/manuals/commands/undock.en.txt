@@ -1,9 +1,21 @@
 undock
-- Leave dock and return to in-orbit state at the current node.
-- Requirements:
-- Ship must be currently docked at the current node.
-- Ship must not be in transit.
-- If there are drones outside the ship (deployed/disabled in world nodes), a confirmation warning is required before undocking.
-- If power state is critical, undock can be blocked as a non-essential action.
-- Undock queues a job; undock duration is configured by `Balance.UNDOCK_TIME_S`.
-- Undock can be interrupted if context changes before completion, or cancelled with `job cancel <job_id>`.
+
+Purpose
+- Release the ship from a docked node and return to local orbital posture.
+
+Requirements (gating)
+- Ship must currently be docked.
+- Action must pass current power-state restrictions.
+
+Behavior
+- Undock queues a timed job (`Balance.UNDOCK_TIME_S`).
+- Job can be interrupted if dock state changes during execution.
+- `job cancel <job_id>` can abort the active undock job.
+
+Common block reasons
+- `not_docked`
+- `critical_power_state`
+- context changed before completion (job interruption)
+
+Related commands
+- `dock <node_id>`, `jobs`, `job cancel <job_id>`, `status`

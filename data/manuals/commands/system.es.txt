@@ -1,3 +1,12 @@
 system on <system_id>
 system off <system_id>
-- Alias de power on/off.
+
+Propósito
+- Pasarela de compatibilidad para control de energía por subsistema.
+
+Estado del comando
+- El espacio canónico de control es `power on/off <system_id>`.
+- `system on/off` se mantiene como forma de compatibilidad.
+
+Comandos relacionados
+- `power on <system_id>`, `power off <system_id>`, `diag <system_id>`

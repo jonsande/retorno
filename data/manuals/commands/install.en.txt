@@ -1,3 +1,14 @@
 install
-- Legacy command removed.
-- Use: drone install <drone_id> <module_id>
+
+Command status
+- Legacy command removed from active workflow.
+- Installation is drone-operated.
+
+Canonical replacement
+- `drone install <drone_id> <module_id>`
+
+Operational note
+- Module installation now follows drone job flow and bay support gating.
+
+Related commands
+- `module inspect <module_id>`, `modules`, `drone status [drone_id]`

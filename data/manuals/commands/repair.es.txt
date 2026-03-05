@@ -1,8 +1,26 @@
 drone repair <drone_id> <target_id>
 repair <system_id> --selftest
 
-Notas
-- La reparación con dron consume chatarra según el amount de reparación.
-- La auto‑reparación es más lenta y requiere el módulo Self-Test Rig.
-- La auto‑reparación también consume chatarra, pero menos por unidad de salud.
-- Las reparaciones requieren drones desplegados.
+Propósito
+- Restaurar salud de sistemas de nave o integridad de drones mediante flujos activos de reparación.
+
+Modos de reparación
+- `drone repair <drone_id> <target_id>`: reparación de campo por dron operador desplegado.
+- `repair <system_id> --selftest`: ciclo interno de auto-reparación (requiere `selftest_rig`).
+
+Requisitos (gating)
+- La reparación con dron requiere operador desplegado, batería mínima y objetivo válido.
+- La reparación dron-a-dron requiere co-localización exacta entre operador y objetivo.
+- Ambos modos requieren chatarra suficiente para la reserva inicial.
+
+Resultados de job
+- Los jobs de reparación tienen probabilidad base baja de fallo (`Balance.REPAIR_JOB_FAIL_P_BASE`).
+- En fallo, solo se consume una fracción configurable de la chatarra reservada; el resto se reembolsa (`Balance.REPAIR_JOB_FAIL_SCRAP_CONSUME_FRACTION`).
+
+Notas operativas
+- La reparación con dron consume batería del operador y chatarra reservada.
+- La auto-reparación es más lenta y más eficiente en chatarra por unidad de salud.
+- En estado crítico de energía, reparar sistemas no críticos está permitido pero con advertencia de riesgo operativo.
+
+Comandos relacionados
+- `diag <system_id>`, `drone status [drone_id]`, `jobs`, `alerts`

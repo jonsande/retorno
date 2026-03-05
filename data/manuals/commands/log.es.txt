@@ -1,5 +1,11 @@
-log
-- Copia líneas del log de comandos (panel de Textual).
-Uso: log copy [n]
-- copy: copia las últimas n líneas al portapapeles (por defecto: 50).
-- En la CLI (repl), copia líneas del registro de eventos recientes.
+log copy [n]
+
+Propósito
+- Copiar líneas recientes de log de operador/eventos.
+
+Comportamiento operativo
+- Copia últimas `n` líneas (valor por defecto acotado) a portapapeles/sink de log.
+- Diseñado para compartir diagnóstico o preservar salida volátil de sesión.
+
+Comandos relacionados
+- `logs`, `alerts`, `jobs`

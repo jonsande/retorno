@@ -1,6 +1,14 @@
 mail inbox
 mail read <id|latest>
-- Lista el contenido de la bandeja de entrada.
-- mail read <id> abre un mensaje concreto (usa ids de mail inbox o ls /mail/inbox).
-- mail read latest abre el mensaje más reciente.
-- Si existe versión localizada, se prefiere automáticamente.
+
+Propósito
+- Acceder a artefactos de correo de misión y su contenido.
+
+Comportamiento operativo
+- `mail inbox` lista ids/asuntos disponibles.
+- `mail read <id>` abre un mensaje.
+- `mail read latest` abre el mensaje más reciente.
+- Si existe variante localizada, se prioriza automáticamente.
+
+Comandos relacionados
+- `ls /mail/inbox`, `cat <path>`, `logs`

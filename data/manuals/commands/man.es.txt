@@ -1,3 +1,11 @@
-man <comando>
-- Muestra el manual de un comando, sistema, módulo o alerta.
-- Usa: ls /manuals/commands para ver manuales disponibles.
+man <topic>
+
+Propósito
+- Abrir entrada de manual para comando, sistema, concepto, módulo o alerta.
+
+Notas de uso
+- El topic se resuelve por claves de manual en espacios `/manuals/*`.
+- Si dudas de entradas disponibles, lista primero en filesystem.
+
+Comandos relacionados
+- `about <id>`, `ls /manuals/commands`, `ls /manuals/systems`, `ls /manuals/concepts`

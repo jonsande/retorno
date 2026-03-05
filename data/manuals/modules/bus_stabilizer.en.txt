@@ -1,9 +1,15 @@
-bus_stabilizer
-- Phase-lock filter for aging distribution busses.
+MODULE DOSSIER — bus_stabilizer
+
+Role
+- Phase-control and noise-damping module for aging distribution buses.
+
+Operational effect
 - Dampens transient spikes and line noise.
-- Restores smoother load-sharing across subsystems.
-- Common in long-haul retrofit kits.
-- Installation requires brief bus re-sync.
+- Improves load-sharing smoothness and grid quality resilience.
+
+Integration notes
+- Installation may require brief bus resynchronization.
 - Side effect: slightly higher idle draw.
-- Recommended when Q is unstable.
-Lore: These units were nicknamed "calmers" by deck crews.
+
+Field note
+- Deck crews nicknamed these units "calmers".

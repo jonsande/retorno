@@ -1,5 +1,12 @@
-low_soc_notice
-- Carga de batería baja (SoC < 0.25).
-- Riesgo: menor margen de recuperación con carga sostenida.
-- Recomendado: reduce consumo no crítico y recarga antes de operaciones pesadas.
-- Si SoC cae por debajo de 0.10, escala a low_soc_warning.
+ALERTA — low_soc_notice
+
+Significado
+- La carga de batería es baja (`SoC < 0.25`).
+
+Impacto operativo
+- Se reduce el margen de recuperación frente a carga sostenida.
+- Si continúa la descarga, es probable escalar a `low_soc_warning`.
+
+Respuesta inmediata
+- reduce consumo no crítico,
+- prioriza recarga antes de operaciones pesadas.

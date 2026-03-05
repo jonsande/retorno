@@ -1,2 +1,11 @@
-about <system_id>
-- Muestra una descripción breve de un sistema, módulo o alerta.
+about <system_id|module_id|alert_key>
+
+Propósito
+- Mostrar una ficha operativa breve de un sistema, módulo o clave de alerta.
+
+Notas de uso
+- Usa ids canónicos (por ejemplo `energy_distribution`, `selftest_rig`, `low_power_quality`).
+- Si no existe entrada, valida nombres con `status`, `modules` o `alerts`.
+
+Comandos relacionados
+- `man <topic>`, `diag <system_id>`, `alerts explain <alert_key>`

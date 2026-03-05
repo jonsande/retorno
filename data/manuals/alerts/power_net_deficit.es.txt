@@ -1,5 +1,13 @@
-power_net_deficit
-- La carga supera la generación (más el límite de descarga).
-- Causas típicas: carga alta, baja generación, core dañado.
-- Si persiste: apagones, apagados forzados.
-Recomendado: reduce consumo, aumenta generación, recarga baterías.
+ALERTA — power_net_deficit
+
+Significado
+- La carga efectiva supera el sobre de entrega de generación/descarga.
+
+Impacto operativo
+- Aumenta presión de brownout.
+- Puede activarse shedding automático y degradación forzada de subsistemas.
+
+Respuesta inmediata
+- recorta carga no crítica,
+- recupera salida de `power_core`,
+- reconstruye margen de batería.

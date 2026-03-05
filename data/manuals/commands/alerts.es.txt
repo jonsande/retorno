@@ -1,6 +1,16 @@
 alerts
-- Lista alertas activas.
-- Las críticas requieren atención.
 alerts explain <alert_key>
-- Muestra explicación y valores actuales.
-- Ejemplo útil: `alerts explain drone_bay_maintenance_blocked`.
+
+Propósito
+- Inspeccionar alertas activas y leer diagnóstico específico por alerta.
+
+Comportamiento operativo
+- `alerts` lista alertas activas con su severidad.
+- `alerts explain <alert_key>` detalla condiciones, bloqueos actuales y guía de recuperación.
+
+Notas de uso
+- Prioriza primero alertas CRITICAL.
+- Para mantenimiento de bahía usa `alerts explain drone_bay_maintenance_blocked`.
+
+Comandos relacionados
+- `status`, `power status`, `logs`

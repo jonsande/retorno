@@ -1,3 +1,11 @@
 ls [<path>]
-- Lista el contenido de un directorio.
-- La ruta por defecto es /.
+
+Propósito
+- Listar entradas de directorio del árbol de filesystem montado.
+
+Comportamiento operativo
+- La ruta por defecto es raíz (`/`).
+- Permite explorar manuales, logs, inbox y otros contenidos montados.
+
+Comandos relacionados
+- `cat <path>`, `mail inbox`, `man <topic>`

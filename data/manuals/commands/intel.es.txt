@@ -1,5 +1,8 @@
 intel
 - Lista la inteligencia de navegación conocida (más reciente primero).
+Propósito
+- Gestionar registros de inteligencia de navegación (inspección, importación y exportación).
+
 Uso: intel | intel <amount> | intel all
 - Columnas:
   ID: identificador del item de intel.
@@ -29,3 +32,6 @@ intel import <path>
 
 intel export <path>
 - Exporta la intel actual a un archivo en /logs/nav o /data/nav.
+
+Comandos relacionados
+- `uplink`, `nav map routes`, `route solve <node_id>`, `cat <path>`

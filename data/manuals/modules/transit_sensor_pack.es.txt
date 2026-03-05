@@ -1,4 +1,11 @@
-transit_sensor_pack
-- Habilita barrido útil (`scan`) durante tránsito.
-- Mejora detección de señales cercanas sin detener viaje.
-- No es requisito para `nav map contacts` (ese comando depende de core_os).
+DOSSIER DE MÓDULO — transit_sensor_pack
+
+Rol
+- Paquete de expansión sensorial para escaneo útil durante tránsito.
+
+Efecto operativo
+- Mejora adquisición de señales cercanas mientras la nave permanece en postura de tránsito.
+- Extiende reconocimiento práctico sin forzar interrupción de viaje.
+
+Notas de integración
+- No es dependencia de `nav map contacts` (ese comando depende de `core_os`).

@@ -46,6 +46,6 @@ Ejemplos
 - auth recover ops
 - auth recover sec
 
-Relacionado
+Comandos relacionados
 - jobs (seguir progreso)
 - power status (ver P_load)

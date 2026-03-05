@@ -36,3 +36,6 @@ Dependencias y gating
   - `DAMAGED`: bloquea lo anterior y también `nav <node_id>` y `nav --no-cruise <node_id>`.
   - `CRITICAL`: solo set de recuperación de emergencia.
   - `OFFLINE`: terminal mínima de supervivencia.
+
+Comandos relacionados
+- `route solve <node_id>`, `dock <node_id>`, `undock`, `hibernate until_arrival`, `intel`

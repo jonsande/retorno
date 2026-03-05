@@ -116,6 +116,40 @@ def main() -> None:
     engine.tick(state, Balance.REPAIR_TIME_S + 1.0)
     assert state.ship.drones["D2"].integrity > 0.5, "Expected D2 integrity increase from drone-to-drone repair"
 
+    # Repair jobs can fail and consume only a configured fraction of the queued scrap.
+    old_repair_fail_cfg = (
+        Balance.REPAIR_JOB_FAIL_P_BASE,
+        Balance.REPAIR_JOB_FAIL_SCRAP_CONSUME_FRACTION,
+    )
+    try:
+        Balance.REPAIR_JOB_FAIL_P_BASE = 1.0
+        Balance.REPAIR_JOB_FAIL_SCRAP_CONSUME_FRACTION = 0.25
+        state = _fresh_state()
+        _prepare_deployed_drone(state, "D1")
+        state.ship.systems["sensors"].health = 0.2
+        pre_health = state.ship.systems["sensors"].health
+        state.ship.cargo_scrap = 100
+        queued = engine.apply_action(state, Repair(drone_id="D1", system_id="sensors"))
+        assert any(e.type == EventType.JOB_QUEUED for e in queued), queued
+        queued_job = state.jobs.jobs[state.jobs.active_job_ids[-1]]
+        repair_scrap = int(queued_job.params.get("repair_scrap", 0))
+        engine.tick(state, Balance.REPAIR_TIME_S + 1.0)
+        assert state.ship.systems["sensors"].health <= pre_health, "Repair failure must not heal target"
+        assert state.ship.drones["D1"].battery <= 1.0 - Balance.DRONE_BATTERY_DRAIN_REPAIR
+        expected_scrap = 100 - int(round(repair_scrap * Balance.REPAIR_JOB_FAIL_SCRAP_CONSUME_FRACTION))
+        assert state.ship.cargo_scrap == expected_scrap, (
+            f"Unexpected scrap after failed repair: {state.ship.cargo_scrap} != {expected_scrap}"
+        )
+        assert any(
+            e.type == EventType.JOB_FAILED and e.data.get("message_key") == "job_failed_repair_attempt"
+            for e in state.events.recent
+        ), "Expected repair failure warning event"
+    finally:
+        (
+            Balance.REPAIR_JOB_FAIL_P_BASE,
+            Balance.REPAIR_JOB_FAIL_SCRAP_CONSUME_FRACTION,
+        ) = old_repair_fail_cfg
+
     # Drone-to-drone repair blocked if target not co-located.
     state = _fresh_state()
     _add_d2(state)

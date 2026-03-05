@@ -1,8 +1,8 @@
 BUGS
 
-- [ ] En CURL_12 he hecho drone survey y he obtenido el mensaje "recoverable data signatures detected". Sin embargo, después he hecho "drone salvage data D1 CURL_12" y he recibido "Data salvaged: 0 files mounted at /remote/CURL_12/". ¿Cómo es posible? ¿Qué está sucediendo?
+- [ ] En CURL_12 hice drone survey y obtuve el mensaje "recoverable data signatures detected". Sin embargo, después hice "drone salvage data D1 CURL_12" y he recibido "Data salvaged: 0 files mounted at /remote/CURL_12/". ¿Cómo es posible? ¿Qué está sucediendo?
 
-- [-] He hecho un viaje de 15 minutos ETA con el dron D1 en su bahía y no se le ha recargado la batería. [P.D. No es un bug, pero hay que ajustar cosas (o mejor dicho: informar mejor al usuario):
+- [x] He hecho un viaje de 15 minutos ETA con el dron D1 en su bahía y no se le ha recargado la batería. [P.D. No es un bug, pero hay que ajustar cosas (o mejor dicho: informar mejor al usuario):
 
 ahora mismo la recarga del dron está condicionada por energía, no solo por estar “docked”.
 

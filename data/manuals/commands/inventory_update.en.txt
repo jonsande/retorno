@@ -1,3 +1,14 @@
 inventory update
-- Runs a cargo inventory job to sync counts.
-- Takes time; queues a job in the system.
+
+Purpose
+- Force a cargo-manifest synchronization job.
+
+Operational behavior
+- Queues a timed inventory job.
+- Updates stored cargo counters after completion.
+
+Usage notes
+- Use when manifest drift is suspected.
+
+Related commands
+- `inventory`, `cargo audit`, `jobs`

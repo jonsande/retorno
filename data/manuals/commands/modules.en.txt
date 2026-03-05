@@ -1,6 +1,16 @@
 modules
-- Lists installed modules only.
-- Alias: module
-- If none are installed, install one with: drone install <drone_id> <module_id>
-- Inspect a module with: module inspect <module_id>
-- Full module catalog is available via: debug modules
+
+Purpose
+- List currently installed modules on RETORNO.
+
+Command family behavior
+- `modules` focuses on installed inventory only.
+- Alias: `module`.
+
+Operational notes
+- If list is empty, install via drone workflow.
+- For module-level detail, use `module inspect <module_id>`.
+- For full catalog visibility (installed + not installed), use debug module listing.
+
+Related commands
+- `module inspect <module_id>`, `drone install <drone_id> <module_id>`, `debug modules`

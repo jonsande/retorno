@@ -1,2 +1,11 @@
-about <system_id>
-- Shows a short description of a system, module, or alert key.
+about <system_id|module_id|alert_key>
+
+Purpose
+- Show a short operational brief for a system, module, or alert key.
+
+Usage notes
+- Use canonical ids (for example `energy_distribution`, `selftest_rig`, `low_power_quality`).
+- If no entry exists, verify naming via `status`, `modules`, or `alerts`.
+
+Related commands
+- `man <topic>`, `diag <system_id>`, `alerts explain <alert_key>`

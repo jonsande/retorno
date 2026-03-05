@@ -1,3 +1,11 @@
 ls [<path>]
-- Lists directory contents.
-- Default path is /.
+
+Purpose
+- List directory entries in mounted filesystem tree.
+
+Operational behavior
+- Default path is root (`/`).
+- Supports browsing manuals, logs, inbox, and other mounted content.
+
+Related commands
+- `cat <path>`, `mail inbox`, `man <topic>`
