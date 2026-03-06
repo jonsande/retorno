@@ -6,8 +6,6 @@
     "kind": "link",
     "line": "LINK: BLACKOUT_12 -> VAULT_09",
     "preferred_sources": ["mail", "log"],
-    "mail_path_template": "/mail/inbox/02xx.blackout.{lang}.txt",
-    "log_path_template": "/logs/records/blackout_01.{lang}.txt",
     "mail_from": "Grid Control",
     "mail_subject": "Blackout attachment",
     "log_header": "BLACKOUT LOG // attachment",

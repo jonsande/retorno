@@ -190,9 +190,9 @@ class Balance:
     # Max indirect attempts before falling back to direct strategy.
     DEADNODE_MAX_INDIRECT_ATTEMPTS = 2
 
-    # Lore singles: base probability per eligible trigger that a single will be attempted.
-    # This is checked before weights are applied. Higher values = more frequent singles
-    # across uplink/dock/salvage_data triggers. Weights only affect which single is chosen.
+    # Legacy fallback for non-forced lore injection probability.
+    # The scheduler now uses LORE_NON_FORCED_INJECT_P as the primary knob; this value is
+    # only used as fallback when that knob is missing.
     LORE_SINGLES_BASE_P = 0.05
     # Enables/disables periodic lore scheduler evaluations in engine.tick.
     # Keep enabled for the node-pool model where non-forced lore is injected by cycle.

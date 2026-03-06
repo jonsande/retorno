@@ -5,7 +5,6 @@ import hashlib
 from typing import Iterable
 import difflib
 import math
-from pathlib import Path
 
 from retorno.core.actions import (
     Action,
@@ -41,12 +40,12 @@ from retorno.core.actions import (
 from retorno.core.gamestate import GameState
 from retorno.core.lore import (
     LoreContext,
+    build_procedural_salvage_mail_content,
     build_lore_context,
     close_window_on_orbit_entry,
     collect_node_salvage_data_files,
     maybe_deliver_lore,
     mount_projection_breakdown,
-    piece_constraints_ok,
     project_mountable_data_paths,
     recompute_node_completion,
     run_lore_scheduler_tick,
@@ -63,7 +62,7 @@ from retorno.model.drones import DroneLocation, DroneState, DroneStatus
 from retorno.model.events import AlertState, Event, EventManagerState, EventType, Severity, SourceRef
 from retorno.model.jobs import Job, JobManagerState, JobStatus, JobType, RiskProfile, TargetRef
 from retorno.model.world import add_known_link, SpaceNode, sector_id_for_pos
-from retorno.runtime.data_loader import load_locations, load_modules, load_arcs
+from retorno.runtime.data_loader import load_locations, load_modules
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path, mount_files
 from retorno.model.systems import Dependency, ShipSystem, SystemState
 from retorno.config.balance import Balance
@@ -2755,27 +2754,6 @@ class Engine:
                 return list(loc.get("fs_files") or [])
         return []
 
-    def _is_location_node(self, node_id: str) -> bool:
-        for loc in load_locations():
-            node_cfg = loc.get("node", {})
-            if node_cfg.get("node_id") == node_id:
-                return True
-        return False
-
-    def _get_arc_state(self, state: GameState, arc_id: str) -> dict:
-        arc_state = state.world.arc_placements.get(arc_id)
-        if not arc_state:
-            arc_state = {
-                "primary": {"placed": False, "node_id": None, "path": None, "source": None},
-                "secondary": {},  # doc_id -> {node_id, path}
-                "counters": {"uplink_attempts": 0, "procedural_candidates": 0},
-                "discovered": set(),
-            }
-            state.world.arc_placements[arc_id] = arc_state
-        if not isinstance(arc_state.get("discovered"), set):
-            arc_state["discovered"] = set(arc_state.get("discovered") or [])
-        return arc_state
-
     def _hash64(self, seed: int, text: str) -> int:
         h = hashlib.blake2b(digest_size=8)
         h.update(str(seed).encode("utf-8"))
@@ -2806,193 +2784,6 @@ class Engine:
         state.world.fine_ranges_km[to_id] = fine_km
         return fine_km
 
-    def _hop_distance_from_start(self, state: GameState, target_id: str, max_hops: int) -> int | None:
-        start_id = "UNKNOWN_00" if "UNKNOWN_00" in state.world.space.nodes else state.world.current_node_id
-        if start_id not in state.world.space.nodes or target_id not in state.world.space.nodes:
-            return None
-        visited = {start_id}
-        queue = [(start_id, 0)]
-        while queue:
-            nid, dist = queue.pop(0)
-            if nid == target_id:
-                return dist
-            if dist >= max_hops:
-                continue
-            node = state.world.space.nodes.get(nid)
-            if not node:
-                continue
-            for nxt in node.links:
-                if nxt in visited:
-                    continue
-                if nxt not in state.world.space.nodes:
-                    continue
-                visited.add(nxt)
-                queue.append((nxt, dist + 1))
-        return None
-
-    def _maybe_inject_arc_content(
-        self,
-        state: GameState,
-        node_id: str,
-        node: SpaceNode | None,
-        base_files: list[dict],
-        is_procedural: bool,
-    ) -> list[dict]:
-        files = list(base_files)
-        existing_paths = {f.get("path") for f in files}
-        arcs = load_arcs()
-        if not arcs or not node:
-            return files
-        arc_ctx = self._build_lore_context(state, node_id)
-        for arc in arcs:
-            arc_id = arc.get("arc_id")
-            if not arc_id:
-                continue
-            arc_state = self._get_arc_state(state, arc_id)
-            primary = arc.get("primary_intel", {})
-            category = primary.get("category", "lore_intel")
-            if category not in {"lore_intel", ""}:
-                continue
-            rules = arc.get("placement_rules", {}).get("primary", {})
-            avoid_ids = set(rules.get("avoid_node_ids", []))
-            require_kinds = set(rules.get("require_kind_any", []))
-            max_hops = int(rules.get("max_hops_from_start", 0) or 0)
-            candidates = set(rules.get("candidates", []))
-            is_candidate = False
-            if node_id in avoid_ids:
-                is_candidate = False
-            elif node_id.lower() in candidates or node_id in candidates:
-                is_candidate = True
-            elif is_procedural:
-                if node.kind == "station" and "procedural_station" in candidates:
-                    is_candidate = True
-                if node.kind == "relay" and "procedural_relay" in candidates:
-                    is_candidate = True
-                if node.kind == "derelict" and "procedural_derelict" in candidates:
-                    is_candidate = True
-            if require_kinds and node.kind not in require_kinds:
-                is_candidate = False
-            if is_candidate and max_hops > 0:
-                hop = self._hop_distance_from_start(state, node_id, max_hops)
-                if hop is None:
-                    start = state.world.space.nodes.get("UNKNOWN_00")
-                    if start:
-                        dx = node.x_ly - start.x_ly
-                        dy = node.y_ly - start.y_ly
-                        dz = node.z_ly - start.z_ly
-                        if (dx * dx + dy * dy + dz * dz) ** 0.5 > 20.0:
-                            is_candidate = False
-                elif hop > max_hops:
-                    is_candidate = False
-
-            primary_state = arc_state["primary"]
-            primary_id = primary.get("id", "primary")
-            primary_key = f"{arc_id}:{primary_id}"
-            if primary_state.get("placed") and primary_state.get("node_id") == node_id:
-                path = primary_state.get("path")
-                content = primary_state.get("content")
-                if path and path not in existing_paths and content:
-                    files.append({"path": path, "access": AccessLevel.GUEST.value, "content": content})
-                    existing_paths.add(path)
-                if primary_key not in state.world.lore.delivered:
-                    state.world.lore.delivered.add(primary_key)
-            elif is_candidate and not primary_state.get("placed") and piece_constraints_ok(primary, arc_ctx):
-                if is_procedural:
-                    arc_state["counters"]["procedural_candidates"] += 1
-                seed = self._hash64(state.meta.rng_seed, f"arc:{arc_id}:{node_id}:primary")
-                rng = random.Random(seed)
-                chance = 0.25
-                if rng.random() < chance:
-                    pref_sources = primary.get("preferred_sources", ["mail", "log"])
-                    source = rng.choice(pref_sources) if pref_sources else "log"
-                    if source == "mail":
-                        suffix = seed % 100
-                        template = primary.get("mail_path_template", "/mail/inbox/02xx.{arc_id}.{lang}.txt")
-                        path = (
-                            template.replace("{lang}", state.os.locale.value)
-                            .replace("{arc_id}", arc_id)
-                            .replace("02xx", f"02{suffix:02d}")
-                        )
-                        mail_from = primary.get("mail_from", "Network Ops")
-                        mail_subject = primary.get("mail_subject", "Arc attachment")
-                        content = (
-                            f"FROM: {mail_from}\n"
-                            f"SUBJ: {mail_subject}\n\n"
-                            "NAV:\n"
-                            "[NAV ATTACHMENT BEGIN]\n"
-                            f"{primary.get('line')}\n"
-                            "[NAV ATTACHMENT END]\n"
-                        )
-                    else:
-                        template = primary.get("log_path_template", "/logs/records/{arc_id}.{lang}.txt")
-                        path = template.replace("{lang}", state.os.locale.value).replace("{arc_id}", arc_id)
-                        log_header = primary.get("log_header", "ARC LOG // attachment")
-                        content = (
-                            f"{log_header}\n\n"
-                            "[NAV ATTACHMENT BEGIN]\n"
-                            f"{primary.get('line')}\n"
-                            "[NAV ATTACHMENT END]\n"
-                        )
-                    files.append({"path": path, "access": AccessLevel.GUEST.value, "content": content})
-                    existing_paths.add(path)
-                    primary_state.update({"placed": True, "node_id": node_id, "path": path, "source": source, "content": content})
-                    if primary_key not in state.world.lore.delivered:
-                        state.world.lore.delivered.add(primary_key)
-
-            sec_rules = arc.get("placement_rules", {}).get("secondary", {})
-            sec_candidates = set(sec_rules.get("candidates", []))
-            sec_count = int(sec_rules.get("count", 0) or 0)
-            if is_procedural and sec_count > 0:
-                sec_is_candidate = False
-                if node.kind == "station" and "procedural_station" in sec_candidates:
-                    sec_is_candidate = True
-                if node.kind == "derelict" and "procedural_derelict" in sec_candidates:
-                    sec_is_candidate = True
-                if sec_is_candidate:
-                    placed_count = len(arc_state["secondary"])
-                    for doc in arc.get("secondary_lore_docs", []):
-                        doc_id = doc.get("id")
-                        if not doc_id or placed_count >= sec_count:
-                            break
-                        if doc_id in arc_state["secondary"]:
-                            continue
-                        if not piece_constraints_ok(doc, arc_ctx):
-                            continue
-                        seed = self._hash64(state.meta.rng_seed, f"arc:{arc_id}:{node_id}:{doc_id}")
-                        rng = random.Random(seed)
-                        if rng.random() < 0.30:
-                            lang = state.os.locale.value
-                            template = doc.get("path_template", "")
-                            path = template.replace("{lang}", lang)
-                            if "02xx" in path:
-                                path = path.replace("02xx", f"02{seed % 100:02d}")
-                            content_ref = doc.get(f"content_ref_{lang}") or doc.get("content_ref_en")
-                            content = ""
-                            if content_ref:
-                                try:
-                                    content = (Path(__file__).resolve().parents[3] / "data" / content_ref).read_text(encoding="utf-8")
-                                except Exception:
-                                    content = ""
-                            if path and path not in existing_paths:
-                                files.append({"path": path, "access": AccessLevel.GUEST.value, "content": content})
-                                existing_paths.add(path)
-                                arc_state["secondary"][doc_id] = {"node_id": node_id, "path": path, "content": content}
-                                placed_count += 1
-                                sec_key = f"{arc_id}:{doc_id}"
-                                if sec_key not in state.world.lore.delivered:
-                                    state.world.lore.delivered.add(sec_key)
-                    for doc_id, info in arc_state["secondary"].items():
-                        if info.get("node_id") == node_id:
-                            path = info.get("path")
-                            content = info.get("content")
-                            if path and path not in existing_paths and content:
-                                files.append({"path": path, "access": AccessLevel.GUEST.value, "content": content})
-                                existing_paths.add(path)
-                            sec_key = f"{arc_id}:{doc_id}"
-                            if sec_key not in state.world.lore.delivered:
-                                state.world.lore.delivered.add(sec_key)
-        return files
-
     def _procedural_fs_files(self, state: GameState, node) -> list[dict]:
         h = hashlib.blake2b(digest_size=8)
         h.update(str(state.meta.rng_seed).encode("utf-8"))
@@ -3008,23 +2799,21 @@ class Engine:
         if node.links:
             link = sorted(node.links)[0]
             link_line = f"LINK: {node.node_id} -> {link}\n"
+        has_link_intel = False
 
         # Nav log (common)
         p_log = Balance.SALVAGE_DATA_LOG_P_STATION_SHIP if node.kind in {"station", "ship"} else Balance.SALVAGE_DATA_LOG_P_OTHER
         if rng.random() < p_log:
             content = link_line or f"NODE: {node.node_id}\n"
             _add("/logs/nav.log", content)
+            if "LINK:" in content:
+                has_link_intel = True
 
         # Mail (occasional)
         p_mail = Balance.SALVAGE_DATA_MAIL_P_STATION_SHIP if node.kind in {"station", "ship"} else Balance.SALVAGE_DATA_MAIL_P_OTHER
         if rng.random() < p_mail:
             lang = state.os.locale.value
-            content = (
-                f"FROM: {node.name}\n"
-                "SUBJ: Recovered Data Cache\n\n"
-                f"Automated report from {node.name} ({node.kind}).\n"
-                f"Region: {node.region}\n"
-            )
+            content = build_procedural_salvage_mail_content(state, node)
             _add(f"/mail/inbox/0001.{lang}.txt", content)
 
         # Nav fragment (rare)
@@ -3035,11 +2824,17 @@ class Engine:
         )
         if rng.random() < p_frag:
             frag_id = f"{rng.getrandbits(16):04x}"
-            content = link_line or f"NODE: {node.node_id}\n"
+            if link_line and has_link_intel:
+                # Avoid semantic duplication when nav.log already carries this route intel.
+                content = f"NODE: {node.node_id}\n"
+            else:
+                content = link_line or f"NODE: {node.node_id}\n"
             _add(f"/data/nav/fragments/frag_{frag_id}.txt", content)
+            if "LINK:" in content:
+                has_link_intel = True
 
         # Guarantee at least one LINK if links exist.
-        if link_line and not any("LINK:" in f.get("content", "") for f in files):
+        if link_line and not has_link_intel:
             frag_id = f"{rng.getrandbits(16):04x}"
             _add(f"/data/nav/fragments/frag_{frag_id}.txt", link_line)
 

@@ -71,12 +71,48 @@ def _ensure_dir(fs: dict, path: str) -> None:
         fs[path] = FSNode(path=path, node_type=FSNodeType.DIR, access=AccessLevel.GUEST)
 
 
-def deliver_ship_mail(state, content_ref: str, lang: str) -> str:
+def _mail_envelope_content(
+    content: str,
+    *,
+    mail_from: str | None = None,
+    mail_subject: str | None = None,
+) -> str:
+    lines = content.splitlines()
+    probe = [ln.strip() for ln in lines[:12]]
+    has_from = any(ln.upper().startswith("FROM:") for ln in probe)
+    has_subj = any(ln.upper().startswith("SUBJ:") for ln in probe)
+
+    headers: list[str] = []
+    if mail_from and not has_from:
+        headers.append(f"FROM: {mail_from}")
+    if mail_subject and not has_subj:
+        headers.append(f"SUBJ: {mail_subject}")
+    if not headers:
+        return content
+    body = content.lstrip("\n")
+    if body:
+        return "\n".join(headers) + "\n\n" + body
+    return "\n".join(headers) + "\n"
+
+
+def deliver_ship_mail(
+    state,
+    content_ref: str,
+    lang: str,
+    *,
+    mail_from: str | None = None,
+    mail_subject: str | None = None,
+) -> str:
     _ensure_dir(state.os.fs, "/mail")
     _ensure_dir(state.os.fs, "/mail/inbox")
     seq = state.events.next_event_seq
     path = normalize_path(f"/mail/inbox/{seq:04d}.{lang}.txt")
     content = _content_from_ref(content_ref)
+    content = _mail_envelope_content(
+        content,
+        mail_from=mail_from,
+        mail_subject=mail_subject,
+    )
     state.os.fs[path] = FSNode(path=path, node_type=FSNodeType.FILE, content=content, access=AccessLevel.GUEST)
     register_mail(state.os, path, state.clock.t)
     return path
@@ -122,6 +158,18 @@ def _location_node_ids() -> set[str]:
         if nid:
             out.add(nid)
     return out
+
+
+def _location_uplink_table(node_id: str) -> dict | None:
+    for loc in load_locations():
+        node_cfg = loc.get("node", {})
+        if str(node_cfg.get("node_id", "")).strip() != node_id:
+            continue
+        uplink_table = loc.get("uplink_table")
+        if isinstance(uplink_table, dict):
+            return uplink_table
+        return None
+    return None
 
 
 def _location_fs_files(node_id: str) -> list[dict]:
@@ -214,6 +262,17 @@ def _precompute_uplink_route_pool_for_node(state, node_id: str, max_new: int = 3
     hub_kinds = {"relay", "station", "waystation"}
     deterministic = Balance.DETERMINISTIC_LORE_INTEL
     candidates: dict[str, int] = {}
+    selected: list[str] = []
+    uplink_cfg = _location_uplink_table(node_id) or {}
+    authored_pool = uplink_cfg.get("authored_candidates") or []
+    try:
+        min_authored = int(uplink_cfg.get("min_authored", 0) or 0)
+    except Exception:
+        min_authored = 0
+    try:
+        max_authored = int(uplink_cfg.get("max_authored", 0) or 0)
+    except Exception:
+        max_authored = 0
 
     def _add_candidate(nid: str, weight: int) -> None:
         if nid == node_id or nid in routes or nid in locked_primary_targets:
@@ -252,13 +311,70 @@ def _precompute_uplink_route_pool_for_node(state, node_id: str, max_new: int = 3
         if nid not in authored_ids and n.kind in hub_kinds and sid in neighbor_sectors:
             _add_candidate(nid, 4)
 
-    if not candidates:
+    max_authored = max(0, min(max_new, max_authored))
+    min_authored = max(0, min(max_new, min_authored))
+    if max_authored < min_authored:
+        max_authored = min_authored
+
+    authored_weights: list[tuple[str, int]] = []
+    for entry in authored_pool:
+        if not isinstance(entry, dict):
+            continue
+        dest = str(entry.get("node_id", "")).strip()
+        if not dest or dest == node_id or dest in routes or dest in locked_primary_targets:
+            continue
+        if dest not in authored_ids or dest not in state.world.space.nodes:
+            continue
+        try:
+            weight = int(entry.get("weight", 1))
+        except Exception:
+            weight = 1
+        authored_weights.append((dest, max(1, weight)))
+
+    if not candidates and not authored_weights:
         return []
 
-    seed = _stable_seed64(state.meta.rng_seed, "uplink_pool", node_id, int(state.clock.t), len(candidates))
+    seed = _stable_seed64(
+        state.meta.rng_seed,
+        "uplink_pool",
+        node_id,
+        int(state.clock.t),
+        len(candidates),
+        len(authored_weights),
+    )
     rng = random.Random(seed)
+
+    authored_pick_count = min(max_authored, len(authored_weights))
+    authored_pool_weighted = sorted(authored_weights) if deterministic else list(authored_weights)
+    while authored_pool_weighted and len(selected) < authored_pick_count:
+        total = sum(weight for _, weight in authored_pool_weighted)
+        if total <= 0:
+            break
+        roll = rng.uniform(0, total)
+        upto = 0.0
+        picked_index = 0
+        for i, (_, weight) in enumerate(authored_pool_weighted):
+            upto += weight
+            if roll <= upto:
+                picked_index = i
+                break
+        dest, _weight = authored_pool_weighted.pop(picked_index)
+        if dest in selected or dest == node_id:
+            continue
+        selected.append(dest)
+
+    if min_authored > 0 and len(selected) < min_authored:
+        for dest, _weight in authored_pool_weighted:
+            if dest in selected or dest == node_id:
+                continue
+            selected.append(dest)
+            if len(selected) >= min_authored:
+                break
+
+    for dest in selected:
+        candidates.pop(dest, None)
+
     pool = sorted(candidates.items()) if deterministic else list(candidates.items())
-    selected: list[str] = []
     while pool and len(selected) < max_new:
         total = sum(weight for _, weight in pool)
         if total <= 0:
@@ -291,6 +407,7 @@ def _procedural_fs_files(state, node: SpaceNode) -> list[dict]:
     if node.links:
         link = sorted(node.links)[0]
         link_line = f"LINK: {node.node_id} -> {link}\n"
+    has_link_intel = False
 
     p_log = (
         Balance.SALVAGE_DATA_LOG_P_STATION_SHIP
@@ -300,6 +417,8 @@ def _procedural_fs_files(state, node: SpaceNode) -> list[dict]:
     if rng.random() < p_log:
         content = link_line or f"NODE: {node.node_id}\n"
         _add("/logs/nav.log", content)
+        if "LINK:" in content:
+            has_link_intel = True
 
     p_mail = (
         Balance.SALVAGE_DATA_MAIL_P_STATION_SHIP
@@ -308,12 +427,7 @@ def _procedural_fs_files(state, node: SpaceNode) -> list[dict]:
     )
     if rng.random() < p_mail:
         lang = state.os.locale.value
-        content = (
-            f"FROM: {node.name}\n"
-            "SUBJ: Recovered Data Cache\n\n"
-            f"Automated report from {node.name} ({node.kind}).\n"
-            f"Region: {node.region}\n"
-        )
+        content = build_procedural_salvage_mail_content(state, node)
         _add(f"/mail/inbox/0001.{lang}.txt", content)
 
     p_frag = (
@@ -323,14 +437,210 @@ def _procedural_fs_files(state, node: SpaceNode) -> list[dict]:
     )
     if rng.random() < p_frag:
         frag_id = f"{rng.getrandbits(16):04x}"
-        content = link_line or f"NODE: {node.node_id}\n"
+        if link_line and has_link_intel:
+            # Avoid semantic duplication when nav.log already carries this route intel.
+            content = f"NODE: {node.node_id}\n"
+        else:
+            content = link_line or f"NODE: {node.node_id}\n"
         _add(f"/data/nav/fragments/frag_{frag_id}.txt", content)
+        if "LINK:" in content:
+            has_link_intel = True
 
-    if link_line and not any("LINK:" in f.get("content", "") for f in files):
+    if link_line and not has_link_intel:
         frag_id = f"{rng.getrandbits(16):04x}"
         _add(f"/data/nav/fragments/frag_{frag_id}.txt", link_line)
 
     return files
+
+
+def _dominant_peer_kind(state, node: SpaceNode) -> str:
+    counts: dict[str, int] = {}
+    for peer_id in sorted(node.links):
+        peer = state.world.space.nodes.get(peer_id)
+        kind = str(getattr(peer, "kind", "") or "unknown").strip().lower() or "unknown"
+        counts[kind] = counts.get(kind, 0) + 1
+    if not counts:
+        return "none"
+    return sorted(counts.items(), key=lambda item: (-item[1], item[0]))[0][0]
+
+
+def build_procedural_salvage_mail_content(state, node: SpaceNode) -> str:
+    lang = str(getattr(state.os.locale, "value", "en") or "en").lower()
+    seed = _stable_seed64(getattr(state.meta, "rng_seed", 0), node.node_id, "salvage_mail_v1")
+    rng = random.Random(seed)
+
+    subject_by_kind = {
+        "station": {"en": "Recovered Waystation Cache", "es": "Cache recuperada de estación"},
+        "ship": {"en": "Recovered Vessel Cache", "es": "Cache recuperada de nave"},
+        "derelict": {"en": "Recovered Derelict Cache", "es": "Cache recuperada de derrelicto"},
+    }
+    subject = subject_by_kind.get(node.kind, {"en": "Recovered Data Cache", "es": "Cache de datos recuperada"})
+    report_id = f"{node.node_id}-{rng.getrandbits(20):05X}"
+    cache_integrity = int(rng.uniform(58.0, 98.0))
+    sync_lag_h = int(rng.uniform(2.0, 180.0))
+    clock_drift_ms = rng.randint(-420, 420)
+    peers_total = len(node.links)
+    peers_responsive = min(peers_total, int(round(peers_total * rng.uniform(0.35, 0.90))))
+    handshake_age_h = int(rng.uniform(1.0, 72.0))
+    route_fragments = 1 if peers_total > 0 else 0
+    signal_quality = rng.choice(["low", "degraded", "nominal", "strong"])
+    signal_quality_es = {
+        "low": "baja",
+        "degraded": "degradada",
+        "nominal": "nominal",
+        "strong": "alta",
+    }[signal_quality]
+    dominant_peer_kind = _dominant_peer_kind(state, node)
+    dominant_peer_kind_es = {
+        "station": "estación",
+        "ship": "nave",
+        "relay": "relé",
+        "waystation": "estación intermedia",
+        "derelict": "derrelicto",
+        "none": "ninguna",
+        "unknown": "desconocida",
+    }.get(dominant_peer_kind, dominant_peer_kind)
+
+    if node.radiation_rad_per_s < 0.002:
+        rad_band_en, rad_band_es = "low", "baja"
+    elif node.radiation_rad_per_s < 0.01:
+        rad_band_en, rad_band_es = "elevated", "elevada"
+    else:
+        rad_band_en, rad_band_es = "high", "alta"
+
+    traffic_bias = rng.choice(["inbound", "outbound", "mixed"])
+    traffic_bias_es = {"inbound": "entrante", "outbound": "saliente", "mixed": "mixto"}[traffic_bias]
+    intro_by_kind_en = {
+        "station": "Maintenance relay resumed from cold storage; publishing cached telemetry snapshot.",
+        "ship": "Vessel bus came online in degraded mode; exporting retained bridge telemetry.",
+        "derelict": "Passive recorder woke on salvage power; partial black-box telemetry attached.",
+    }
+    intro_by_kind_es = {
+        "station": "Relé de mantenimiento reanudado desde frío; publicando instantánea de telemetría en caché.",
+        "ship": "Bus de nave reactivado en modo degradado; exportando telemetría retenida de puente.",
+        "derelict": "Registrador pasivo reactivado por energía de salvage; telemetría parcial de caja negra adjunta.",
+    }
+    closure_by_kind_en = {
+        "station": "Advisory: prioritize relay-class contacts for faster route reconstruction.",
+        "ship": "Advisory: cross-check nav fragments before committing long-burn transfer windows.",
+        "derelict": "Advisory: expect stale beacons and broken timing; validate routes incrementally.",
+    }
+    closure_by_kind_es = {
+        "station": "Aviso: prioriza contactos tipo relé para reconstruir rutas más rápido.",
+        "ship": "Aviso: contrasta fragmentos nav antes de comprometer ventanas de transferencia largas.",
+        "derelict": "Aviso: espera balizas obsoletas y tiempos rotos; valida rutas de forma incremental.",
+    }
+    region_hints_en = {
+        "bulge": [
+            "Traffic cadence trends coreward; short-hop relays are likely nearby.",
+            "Beacon drift suggests an inner-lane handoff window.",
+        ],
+        "disk": [
+            "Lane timing looks cyclical; check adjacent sectors after fresh survey pings.",
+            "Transit rhythm matches regular corridor traffic rather than deep-space drift.",
+        ],
+        "halo": [
+            "Sparse beacons; long silent intervals likely mask viable links.",
+            "Outer-lane packets arrive bursty; repeated salvage passes may reveal more.",
+        ],
+    }
+    region_hints_es = {
+        "bulge": [
+            "La cadencia del tráfico apunta hacia el núcleo; es probable que haya relés de salto corto cerca.",
+            "La deriva de balizas sugiere una ventana de relevo en carriles internos.",
+        ],
+        "disk": [
+            "El patrón de carriles parece cíclico; revisa sectores adyacentes tras nuevos sondeos.",
+            "El ritmo de tránsito encaja con tráfico regular de corredor, no con deriva profunda.",
+        ],
+        "halo": [
+            "Balizas escasas; intervalos largos de silencio pueden ocultar enlaces viables.",
+            "Los paquetes de carriles externos llegan en ráfagas; repetir salvage puede revelar más.",
+        ],
+    }
+    generic_hint_en = "Telemetry confidence is moderate; corroborate with logs/fragments before committing route fuel."
+    generic_hint_es = "La confianza de telemetría es moderada; contrástala con logs/fragmentos antes de gastar ruta."
+    hints_en = region_hints_en.get(node.region or "", region_hints_en["disk"])
+    hints_es = region_hints_es.get(node.region or "", region_hints_es["disk"])
+    soft_hint_en = rng.choice(hints_en)
+    soft_hint_es = rng.choice(hints_es)
+    intro_en = intro_by_kind_en.get(node.kind, "Automated subsystem resumed; exporting cached telemetry.")
+    intro_es = intro_by_kind_es.get(node.kind, "Subsistema automático reanudado; exportando telemetría en caché.")
+    close_en = closure_by_kind_en.get(node.kind, "Advisory: corroborate cache output with independent scans.")
+    close_es = closure_by_kind_es.get(node.kind, "Aviso: corrobora la salida de caché con escaneos independientes.")
+    corruption_line_en = ""
+    corruption_line_es = ""
+    if cache_integrity < 70:
+        corruption_line_en = "Integrity flags: segment loss detected; checksum repaired with parity gaps.\n"
+        corruption_line_es = "Banderas de integridad: pérdida de segmentos detectada; checksum reparado con huecos de paridad.\n"
+    elif cache_integrity < 82:
+        corruption_line_en = "Integrity flags: minor frame jitter detected; packet order reconstructed.\n"
+        corruption_line_es = "Banderas de integridad: jitter leve de tramas detectado; orden de paquetes reconstruido.\n"
+
+    def _maybe_truncate_line(text: str, chance: float = 0.12) -> str:
+        if not text or rng.random() >= chance:
+            return text
+        clean = text.rstrip("\n")
+        if len(clean) < 36:
+            return text
+        keep = rng.randint(20, max(20, len(clean) - 8))
+        return clean[:keep].rstrip() + " [...]\n"
+
+    soft_hint_en = _maybe_truncate_line(soft_hint_en + "\n").rstrip("\n")
+    soft_hint_es = _maybe_truncate_line(soft_hint_es + "\n").rstrip("\n")
+    generic_hint_en = _maybe_truncate_line(generic_hint_en + "\n", chance=0.08).rstrip("\n")
+    generic_hint_es = _maybe_truncate_line(generic_hint_es + "\n", chance=0.08).rstrip("\n")
+
+    if lang == "es":
+        return (
+            f"FROM: {node.name}\n"
+            f"SUBJ: {subject['es']}\n\n"
+            f"Informe automático de telemetría desde {node.name} ({node.kind}).\n"
+            f"{intro_es}\n"
+            f"Región: {node.region}\n"
+            f"ID de informe: {report_id}\n"
+            f"Integridad de caché: {cache_integrity}%\n"
+            f"Retardo de sincronización: {sync_lag_h}h\n"
+            f"Deriva de reloj: {clock_drift_ms:+d} ms\n"
+            f"Banda de radiación: {rad_band_es} ({node.radiation_rad_per_s:.3f} rad/s)\n"
+            f"Calidad de señal: {signal_quality_es}\n\n"
+            f"{corruption_line_es}"
+            "Estado de red resumido:\n"
+            f"- peers indexados: {peers_total}\n"
+            f"- peers con respuesta: {peers_responsive}\n"
+            f"- fragmentos de ruta en caché: {route_fragments}\n"
+            f"- último handshake válido: hace {handshake_age_h}h\n"
+            f"- clase de peer dominante: {dominant_peer_kind_es}\n"
+            f"- sesgo de tráfico observado: {traffic_bias_es}\n\n"
+            f"Pista: {soft_hint_es}\n"
+            f"Nota: {generic_hint_es}\n"
+            f"{close_es}\n"
+        )
+
+    return (
+        f"FROM: {node.name}\n"
+        f"SUBJ: {subject['en']}\n\n"
+        f"Automated telemetry report from {node.name} ({node.kind}).\n"
+        f"{intro_en}\n"
+        f"Region: {node.region}\n"
+        f"Report ID: {report_id}\n"
+        f"Cache integrity: {cache_integrity}%\n"
+        f"Sync lag: {sync_lag_h}h\n"
+        f"Clock drift: {clock_drift_ms:+d} ms\n"
+        f"Radiation envelope: {rad_band_en} ({node.radiation_rad_per_s:.3f} rad/s)\n"
+        f"Signal quality: {signal_quality}\n\n"
+        f"{corruption_line_en}"
+        "Network summary:\n"
+        f"- indexed peers: {peers_total}\n"
+        f"- responsive peers: {peers_responsive}\n"
+        f"- route fragments in cache: {route_fragments}\n"
+        f"- last successful handshake: {handshake_age_h}h ago\n"
+        f"- dominant peer class: {dominant_peer_kind}\n"
+        f"- observed traffic bias: {traffic_bias}\n\n"
+        f"Hint: {soft_hint_en}\n"
+        f"Note: {generic_hint_en}\n"
+        f"{close_en}\n"
+    )
 
 
 def build_lore_context(state, node_id: str) -> LoreContext:
@@ -564,6 +874,41 @@ def _soft_force_roll(state, piece: dict, seq: int) -> bool:
     return random.Random(seed).random() < p
 
 
+def _hard_force_ready(state, piece: dict) -> bool:
+    cons = piece.get("constraints") or {}
+    year = state.clock.t / Balance.YEAR_S if Balance.YEAR_S else 0.0
+    min_year = cons.get("min_year")
+    max_year = cons.get("max_year")
+    if min_year is not None and year < float(min_year):
+        return False
+    if max_year is not None and year > float(max_year):
+        return False
+    return True
+
+
+def _secondary_count_limit(piece_entry: dict) -> int | None:
+    if piece_entry.get("role") != "secondary":
+        return None
+    rules = piece_entry.get("placement_rules") or {}
+    raw = rules.get("count")
+    if raw is None:
+        return None
+    try:
+        return max(0, int(raw))
+    except Exception:
+        return None
+
+
+def _secondary_assigned_count(state, arc_id: str) -> int:
+    if not arc_id:
+        return 0
+    arc_state = state.world.arc_placements.get(arc_id, {})
+    secondary = arc_state.get("secondary")
+    if isinstance(secondary, dict):
+        return len(secondary)
+    return 0
+
+
 def _default_channels_for_piece(piece: dict, *, single: bool) -> list[str]:
     if single:
         allowed = piece.get("channels") or ["captured_signal"]
@@ -634,6 +979,14 @@ def _iter_all_pieces() -> list[dict]:
         )
 
     return pieces
+
+
+def list_lore_piece_entries() -> list[dict]:
+    """Public helper for debug/inspection views.
+
+    Returns normalized piece entries with canonical `piece_key` values.
+    """
+    return _iter_all_pieces()
 
 
 def _piece_index() -> dict[str, dict]:
@@ -748,10 +1101,36 @@ def _candidate_nodes_for_piece(state, piece_entry: dict) -> list[str]:
 
 
 def _pick_channel_for_node(piece_entry: dict, node: SpaceNode | None) -> str | None:
-    for channel in piece_entry.get("channels", []):
-        if _channel_feasible_for_node(channel, node):
-            return channel
-    return None
+    channels = [ch for ch in piece_entry.get("channels", []) if _channel_feasible_for_node(ch, node)]
+    if not channels:
+        return None
+
+    piece = piece_entry.get("piece") or {}
+    preferred_sources = piece.get("preferred_sources") or []
+    if isinstance(preferred_sources, str):
+        preferred_sources = [preferred_sources]
+    preferred_sources = [str(src).strip().lower() for src in preferred_sources if str(src).strip()]
+
+    source_to_channels = {
+        "mail": ["ship_os_mail"],
+        "ship_os_mail": ["ship_os_mail"],
+        "log": ["salvage_data"],
+        "salvage": ["salvage_data"],
+        "salvage_data": ["salvage_data"],
+        "signal": ["captured_signal"],
+        "captured_signal": ["captured_signal"],
+        "broadcast": ["station_broadcast"],
+        "station_broadcast": ["station_broadcast"],
+        "uplink": ["uplink_only"],
+        "uplink_only": ["uplink_only"],
+    }
+    for source in preferred_sources:
+        for preferred_channel in source_to_channels.get(source, []):
+            if preferred_channel in channels:
+                return preferred_channel
+
+    # Fallback to configured channel order when no preferred source can be honored.
+    return channels[0]
 
 
 def _content_ref_for_piece(piece: dict, lang: str) -> str | None:
@@ -794,6 +1173,13 @@ def _file_for_salvage_piece(piece_entry: dict, lang: str) -> dict | None:
     content = _content_from_ref(content_ref)
     if not content and piece.get("line"):
         content = str(piece.get("line")) + "\n"
+    log_header = str(piece.get("log_header", "") or "").strip()
+    if log_header and normalize_path(path).startswith("/logs/"):
+        first_lines = [ln.strip() for ln in content.splitlines()[:8]]
+        has_header = any(ln == log_header for ln in first_lines)
+        if not has_header:
+            body = content.lstrip("\n")
+            content = f"{log_header}\n\n{body}" if body else f"{log_header}\n"
 
     return {"path": path, "access": AccessLevel.GUEST.value, "content": content}
 
@@ -838,26 +1224,106 @@ def _seed_hidden_forced_breadcrumb(state, hidden_node_id: str, piece_key: str) -
     recompute_node_completion(state, reveal_node_id)
 
 
-def _spawn_ad_hoc_candidate_for_forced_piece(state, piece_entry: dict) -> str | None:
-    anchor_id = state.world.current_node_id
-    anchor = state.world.space.nodes.get(anchor_id)
-    if not anchor and state.world.space.nodes:
-        anchor_id = sorted(state.world.space.nodes.keys())[0]
-        anchor = state.world.space.nodes.get(anchor_id)
-    if not anchor:
+def _float_constraint(value, default: float | None = None) -> float | None:
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except Exception:
+        return default
+
+
+def _sample_ad_hoc_coords(
+    rng: random.Random,
+    piece: dict,
+    anchor: SpaceNode,
+) -> tuple[float, float, float] | None:
+    cons = piece.get("constraints") or {}
+    min_dist = max(0.0, _float_constraint(cons.get("min_dist_ly"), 0.0) or 0.0)
+    max_dist = _float_constraint(cons.get("max_dist_ly"))
+    regions_any = [str(r).strip() for r in (cons.get("regions_any") or []) if str(r).strip()]
+
+    if max_dist is not None and max_dist < min_dist:
         return None
 
+    # If piece declares spatial constraints, sample globally so they can be met exactly.
+    has_global_constraints = bool(regions_any) or (cons.get("min_dist_ly") is not None) or (cons.get("max_dist_ly") is not None)
+    if has_global_constraints:
+        hi = max_dist if max_dist is not None else max(min_dist + 20.0, 40.0)
+        if hi < min_dist:
+            return None
+        for _ in range(128):
+            dist = rng.uniform(min_dist, hi)
+            theta = rng.uniform(0.0, math.tau)
+            z_span = max(0.2, min(5.0, dist * 0.2))
+            z = rng.uniform(-z_span, z_span)
+            planar_sq = max(0.0, dist * dist - z * z)
+            planar = math.sqrt(planar_sq)
+            x = math.cos(theta) * planar
+            y = math.sin(theta) * planar
+            region = region_for_pos(x, y, z)
+            if regions_any and region not in regions_any:
+                continue
+            return (x, y, z)
+        return None
+
+    # No global constraints: keep ad-hoc node near the selected anchor.
+    theta = rng.uniform(0.0, math.tau)
+    dist = rng.uniform(0.4, 2.0)
+    dx = math.cos(theta) * dist
+    dy = math.sin(theta) * dist
+    dz = rng.uniform(-0.1, 0.1)
+    return (anchor.x_ly + dx, anchor.y_ly + dy, anchor.z_ly + dz)
+
+
+def _eligible_ad_hoc_anchors(state, max_hops: int) -> list[SpaceNode]:
+    out: list[SpaceNode] = []
+    for node_id in sorted(state.world.space.nodes.keys()):
+        node = state.world.space.nodes.get(node_id)
+        if not node:
+            continue
+        if max_hops > 0:
+            hop = _hop_distance_from_start(state, node_id, max_hops)
+            if hop is None or (hop + 1) > max_hops:
+                continue
+        out.append(node)
+    return out
+
+
+def _pick_anchor_for_coords(anchors: list[SpaceNode], x: float, y: float, z: float) -> SpaceNode | None:
+    if not anchors:
+        return None
+    ranked = sorted(
+        anchors,
+        key=lambda a: ((a.x_ly - x) ** 2 + (a.y_ly - y) ** 2 + (a.z_ly - z) ** 2, a.node_id),
+    )
+    return ranked[0] if ranked else None
+
+
+def _spawn_ad_hoc_candidate_for_forced_piece(state, piece_entry: dict) -> str | None:
+    if not state.world.space.nodes:
+        return None
+
+    piece = piece_entry.get("piece") or {}
     rules = piece_entry.get("placement_rules") or {}
+    candidates_cfg = set(str(x) for x in (rules.get("candidates") or []))
+    max_hops = int(rules.get("max_hops_from_start", 0) or 0)
     require_kinds = [str(x) for x in (rules.get("require_kind_any") or []) if str(x)]
     allowed_kinds = [k for k in require_kinds if k in {"station", "relay", "derelict", "ship", "waystation"}]
     if not allowed_kinds:
-        candidates_cfg = set(str(x) for x in (rules.get("candidates") or []))
-        if "procedural_relay" in candidates_cfg:
-            allowed_kinds = ["relay"]
-        elif "procedural_derelict" in candidates_cfg:
-            allowed_kinds = ["derelict"]
-        else:
-            allowed_kinds = ["station"]
+        token_to_kind = {
+            "procedural_station": "station",
+            "procedural_relay": "relay",
+            "procedural_derelict": "derelict",
+            "procedural_ship": "ship",
+        }
+        derived = [token_to_kind[tok] for tok in sorted(candidates_cfg) if tok in token_to_kind]
+        allowed_kinds = sorted(set(derived)) if derived else ["station"]
+
+    anchors = _eligible_ad_hoc_anchors(state, max_hops)
+    if not anchors:
+        return None
+    default_anchor = state.world.space.nodes.get(state.world.current_node_id) or anchors[0]
 
     seed = _stable_seed64(
         state.meta.rng_seed,
@@ -866,23 +1332,55 @@ def _spawn_ad_hoc_candidate_for_forced_piece(state, piece_entry: dict) -> str | 
         state.world.lore_placements.eval_seq,
     )
     rng = random.Random(seed)
+
+    authored = _location_node_ids()
     kind = allowed_kinds[int(seed % len(allowed_kinds))]
+    x_y_z = _sample_ad_hoc_coords(rng, piece, default_anchor)
+    if not x_y_z:
+        return None
+    x, y, z = x_y_z
+    region = region_for_pos(x, y, z)
+    dist_from_origin = math.sqrt(x * x + y * y + z * z)
+    year = state.clock.t / Balance.YEAR_S if Balance.YEAR_S else 0.0
+    temp_node = SpaceNode(
+        node_id="__ADHOC_CANDIDATE__",
+        name="",
+        kind=kind,
+        radiation_rad_per_s=0.0,
+        radiation_base=0.0,
+        region=region,
+        x_ly=x,
+        y_ly=y,
+        z_ly=z,
+    )
+    if not _node_matches_candidates(temp_node.node_id, temp_node, candidates_cfg, authored):
+        return None
+    if not piece_constraints_ok(
+        piece,
+        LoreContext(
+            node_id=temp_node.node_id,
+            region=region,
+            dist_from_origin_ly=dist_from_origin,
+            year_since_wake=year,
+        ),
+    ):
+        return None
+
+    anchor = _pick_anchor_for_coords(anchors, x, y, z)
+    if not anchor:
+        return None
+
     node_id = _generate_node_id(state, kind, rng)
-    theta = rng.uniform(0.0, math.tau)
-    dist = rng.uniform(0.4, 2.0)
-    dx = math.cos(theta) * dist
-    dy = math.sin(theta) * dist
-    dz = rng.uniform(-0.1, 0.1)
     node = SpaceNode(
         node_id=node_id,
         name=_name_from_node_id(node_id, kind),
         kind=kind,
         radiation_rad_per_s=0.0,
         radiation_base=0.0,
-        region=anchor.region or region_for_pos(anchor.x_ly, anchor.y_ly, anchor.z_ly),
-        x_ly=anchor.x_ly + dx,
-        y_ly=anchor.y_ly + dy,
-        z_ly=anchor.z_ly + dz,
+        region=region,
+        x_ly=x,
+        y_ly=y,
+        z_ly=z,
     )
     node.links.add(anchor.node_id)
     anchor.links.add(node.node_id)
@@ -924,6 +1422,11 @@ def _register_arc_placement(state, piece_entry: dict, node_id: str, file_path: s
 def _assign_piece_to_node(state, piece_entry: dict, node_id: str) -> bool:
     piece_key = piece_entry["piece_key"]
     if piece_key in state.world.lore_placements.piece_to_node:
+        return False
+
+    sec_limit = _secondary_count_limit(piece_entry)
+    arc_id = str(piece_entry.get("arc_id") or "")
+    if sec_limit is not None and _secondary_assigned_count(state, arc_id) >= sec_limit:
         return False
 
     pool = state.world.node_pools.get(node_id)
@@ -987,29 +1490,38 @@ def _deliver_piece(
             except Exception:
                 left = right = ""
             if left and right:
-                if add_known_link(state.world, left, right, bidirectional=True):
-                    state.world.known_nodes.add(left)
-                    state.world.known_nodes.add(right)
-                    state.world.known_contacts.add(left)
-                    state.world.known_contacts.add(right)
-                    record_intel(
-                        state.world,
-                        t=state.clock.t,
-                        kind="link",
-                        from_id=left,
-                        to_id=right,
-                        confidence=float(piece.get("confidence", 0.6)),
-                        source_kind="uplink_only",
-                        source_ref=ctx.node_id,
-                    )
-                    if is_primary:
-                        _mark_primary_unlocked(state, arc_id, piece)
+                add_known_link(state.world, left, right, bidirectional=True)
+                state.world.known_nodes.add(left)
+                state.world.known_nodes.add(right)
+                state.world.known_contacts.add(left)
+                state.world.known_contacts.add(right)
+                record_intel(
+                    state.world,
+                    t=state.clock.t,
+                    kind="link",
+                    from_id=left,
+                    to_id=right,
+                    confidence=float(piece.get("confidence", 0.6)),
+                    source_kind="uplink_only",
+                    source_ref=ctx.node_id,
+                )
+                if is_primary:
+                    # Unlock primary even when LINK was already known beforehand.
+                    _mark_primary_unlocked(state, arc_id, piece)
         return LoreDelivery(delivered_files, events)
 
     content_ref = _content_ref_for_piece(piece, lang)
 
     if channel == "ship_os_mail":
-        path = deliver_ship_mail(state, content_ref or "", lang)
+        mail_from = str(piece.get("mail_from", "") or "").strip() or None
+        mail_subject = str(piece.get("mail_subject", "") or "").strip() or None
+        path = deliver_ship_mail(
+            state,
+            content_ref or "",
+            lang,
+            mail_from=mail_from,
+            mail_subject=mail_subject,
+        )
         state.world.lore.delivery_log.append(f"mail:{piece_id}:{path}")
         msg = {
             "en": f"mail_received :: New mail received: {path}",
@@ -1144,6 +1656,8 @@ def _evaluate_forced_pieces(state, piece_entries: list[dict]) -> None:
             should_place = _deadline_reached(state, piece)
         elif policy == "soft":
             should_place = _soft_force_roll(state, piece, state.world.lore_placements.eval_seq)
+        elif policy == "hard":
+            should_place = _hard_force_ready(state, piece)
 
         if not should_place:
             continue
@@ -1169,8 +1683,20 @@ def _evaluate_forced_pieces(state, piece_entries: list[dict]) -> None:
         _assign_piece_to_node(state, piece_entry, selected)
 
 
+def _non_forced_piece_probability(piece_entry: dict) -> float:
+    base = max(0.0, min(1.0, float(getattr(Balance, "LORE_NON_FORCED_INJECT_P", Balance.LORE_SINGLES_BASE_P))))
+    if piece_entry.get("role") != "single":
+        return base
+    piece = piece_entry.get("piece") or {}
+    try:
+        weight = float(piece.get("weight", 1.0))
+    except Exception:
+        weight = 1.0
+    weight = max(0.0, weight)
+    return max(0.0, min(1.0, base * weight))
+
+
 def _evaluate_non_forced_pieces(state, piece_entries: list[dict]) -> None:
-    inject_p = max(0.0, min(1.0, float(getattr(Balance, "LORE_NON_FORCED_INJECT_P", Balance.LORE_SINGLES_BASE_P))))
     for piece_entry in piece_entries:
         if piece_entry.get("force", False):
             continue
@@ -1178,6 +1704,9 @@ def _evaluate_non_forced_pieces(state, piece_entries: list[dict]) -> None:
         if piece_key in state.world.lore_placements.piece_to_node:
             continue
 
+        inject_p = _non_forced_piece_probability(piece_entry)
+        if inject_p <= 0.0:
+            continue
         roll_seed = _stable_seed64(
             state.meta.rng_seed,
             "non_forced_eval",

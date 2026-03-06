@@ -17,6 +17,7 @@ from pathlib import Path
 from retorno.core.engine import Engine
 from retorno.core.lore import (
     build_lore_context,
+    list_lore_piece_entries,
     maybe_deliver_lore,
     recompute_node_completion,
     sync_node_pools_for_known_nodes,
@@ -2010,28 +2011,52 @@ def render_modules_catalog(state) -> None:
 def render_debug_arcs(state) -> None:
     print("\n=== DEBUG ARCS ===")
     arcs = load_arcs()
+    placements = state.world.lore_placements.piece_to_node
+    channels = state.world.lore_placements.piece_channel_bindings
+    delivered = state.world.lore.delivered
     if not arcs:
         print("(none)")
     else:
-        placements = state.world.arc_placements
+        legacy = state.world.arc_placements
         for arc in arcs:
             arc_id = arc.get("arc_id", "?")
-            st = placements.get(arc_id, {})
-            primary = st.get("primary", {})
-            secondary = st.get("secondary", {})
-            counters = st.get("counters", {})
+            st = legacy.get(arc_id, {})
+            primary_piece = arc.get("primary_intel") or {}
             print(f"- {arc_id}:")
-            if primary.get("placed"):
-                print(f"  primary: {primary.get('node_id')} path={primary.get('path')}")
+            if primary_piece:
+                primary_id = primary_piece.get("id") or "primary"
+                primary_key = f"arc:{arc_id}:{primary_id}"
+                node_id = placements.get(primary_key)
+                channel = channels.get(primary_key, "-")
+                status = "delivered" if primary_key in delivered else ("assigned" if node_id else "unplaced")
+                if node_id:
+                    print(f"  primary: {node_id} channel={channel} status={status}")
+                else:
+                    print("  primary: (unplaced)")
             else:
-                print("  primary: (unplaced)")
-            if secondary:
-                for doc_id, info in secondary.items():
-                    print(f"  secondary: {doc_id} -> {info.get('node_id')} path={info.get('path')}")
+                print("  primary: (none)")
+            secondary_docs = arc.get("secondary_lore_docs", []) or []
+            if secondary_docs:
+                for doc in secondary_docs:
+                    doc_id = doc.get("id") or "secondary"
+                    doc_key = f"arc:{arc_id}:{doc_id}"
+                    node_id = placements.get(doc_key)
+                    channel = channels.get(doc_key, "-")
+                    status = "delivered" if doc_key in delivered else ("assigned" if node_id else "unplaced")
+                    if node_id:
+                        print(f"  secondary: {doc_id} -> {node_id} channel={channel} status={status}")
+                    else:
+                        print(f"  secondary: {doc_id} -> (unplaced)")
             else:
                 print("  secondary: (none)")
-            if counters:
-                print(f"  counters: {counters}")
+            if st:
+                counters = st.get("counters", {})
+                if counters:
+                    print(f"  legacy_counters: {counters}")
+        print(
+            f"- scheduler: eval_seq={state.world.lore_placements.eval_seq} "
+            f"next_non_forced_eval_t={state.world.lore_placements.next_non_forced_eval_t:.1f}s"
+        )
     print(f"- mobility_failsafe_count: {state.world.mobility_failsafe_count}")
     print(f"- mobility_no_new_uplink_count: {state.world.mobility_no_new_uplink_count}")
     if state.world.mobility_hints:
@@ -2053,44 +2078,76 @@ def render_debug_lore(state) -> None:
     counters = state.world.lore.counters
     print(f"- counters: {counters}")
     print(f"- last_delivery_t: {state.world.lore.last_delivery_t:.1f}s")
-    pending = []
-    arcs = load_arcs()
-    for arc in arcs:
-        arc_id = arc.get("arc_id", "?")
-        primary = arc.get("primary_intel", {})
-        pieces = []
-        if primary:
-            pieces.append(primary)
-        for doc in arc.get("secondary_lore_docs", []) or []:
-            pieces.append(doc)
-        for piece in pieces:
-            if not piece.get("force"):
-                continue
-            policy = piece.get("force_policy", "none")
-            if policy == "none":
-                continue
-            pid = piece.get("id") or "primary"
-            key = f"{arc_id}:{pid}"
-            if key in state.world.lore.delivered:
-                continue
-            pending.append(
-                {
-                    "key": key,
-                    "policy": policy,
-                    "deadline": piece.get("force_deadline"),
-                    "allowed": piece.get("allowed_channels"),
-                    "constraints": piece.get("constraints"),
-                }
-            )
-    if pending:
-        print("- forced_pending:")
-        for item in pending:
-            print(
-                f"  {item['key']} policy={item['policy']} "
-                f"deadline={item['deadline']} allowed={item['allowed']} constraints={item['constraints']}"
-            )
+    placements = state.world.lore_placements
+    print(f"- placements_count: {len(placements.piece_to_node)}")
+    print(
+        f"- scheduler: eval_seq={placements.eval_seq} "
+        f"next_non_forced_eval_t={placements.next_non_forced_eval_t:.1f}s"
+    )
+    if placements.piece_to_node:
+        print("- assigned_recent:")
+        assigned_recent = sorted(placements.piece_to_node.items())[-10:]
+        for piece_key, node_id in assigned_recent:
+            channel = placements.piece_channel_bindings.get(piece_key, "-")
+            status = "delivered" if piece_key in state.world.lore.delivered else "pending"
+            print(f"  {piece_key} -> {node_id} channel={channel} status={status}")
+
+    pending_forced_unplaced: list[dict] = []
+    pending_forced_assigned: list[dict] = []
+    for entry in list_lore_piece_entries():
+        piece = entry.get("piece") or {}
+        if not entry.get("force", False):
+            continue
+        policy = str(piece.get("force_policy", "none") or "none")
+        if policy == "none":
+            continue
+        piece_key = entry.get("piece_key")
+        if not piece_key or piece_key in state.world.lore.delivered:
+            continue
+        item = {
+            "key": piece_key,
+            "policy": policy,
+            "deadline": piece.get("force_deadline"),
+            "allowed": entry.get("channels"),
+            "constraints": piece.get("constraints"),
+            "node_id": placements.piece_to_node.get(piece_key),
+            "channel": placements.piece_channel_bindings.get(piece_key),
+        }
+        if item["node_id"]:
+            pending_forced_assigned.append(item)
+        else:
+            pending_forced_unplaced.append(item)
+
+    if pending_forced_unplaced or pending_forced_assigned:
+        if pending_forced_unplaced:
+            print("- forced_pending_unplaced:")
+            for item in pending_forced_unplaced:
+                print(
+                    f"  {item['key']} policy={item['policy']} "
+                    f"deadline={item['deadline']} allowed={item['allowed']} constraints={item['constraints']}"
+                )
+        if pending_forced_assigned:
+            print("- forced_pending_assigned:")
+            for item in pending_forced_assigned:
+                print(
+                    f"  {item['key']} node={item['node_id']} channel={item['channel']} policy={item['policy']}"
+                )
     else:
         print("- forced_pending: (none)")
+
+    current_node_id = state.world.current_node_id
+    pool = state.world.node_pools.get(current_node_id)
+    if pool:
+        pending_push = sorted(pid for pid in pool.pending_push_piece_ids if pid not in pool.delivered_piece_ids)
+        print(
+            f"- current_pool[{current_node_id}]: window_open={pool.window_open} "
+            f"node_cleaned={pool.node_cleaned} scrap_complete={pool.scrap_complete} "
+            f"data_complete={pool.data_complete} extras_complete={pool.extras_complete} "
+            f"uplink_data_consumed={pool.uplink_data_consumed}"
+        )
+        if pending_push:
+            print(f"  pending_push_count={len(pending_push)}")
+
     if state.world.dead_nodes:
         print("- dead_nodes:")
         for node_id, st in state.world.dead_nodes.items():
@@ -2369,222 +2426,6 @@ def _state_rank(state: SystemState) -> int:
         SystemState.UPGRADED: 5,
     }
     return order[state]
-
-
-def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> list[str]:
-    """Return up to max_new new route destinations discovered via uplink.
-
-    Selection uses weighted candidates in this order (unless an authored uplink_table is provided):
-    1) Known contacts without routes (hubs favored: station/waystation/relay weight=10,
-       ships/derelicts weight=2).
-    2) Hubs in the same sector (weight=6).
-    3) Hubs in neighboring sectors (weight=5), generating neighbor sectors if needed.
-    4) Extra derelicts (weight=1).
-
-    Additional rules:
-    - Never add self-links.
-    - Prefer (guarantee) one visible hub without a route if available.
-    - Adds links bidirectionally and updates known_nodes/known_contacts.
-    - If the current authored hub defines uplink_table, select those authored hubs first
-      (min_authored..max_authored) using their weights, then fill remaining slots normally.
-    - Returns the list of newly added destination node_ids.
-    """
-    if max_new <= 0:
-        return []
-    node = state.world.space.nodes.get(current_id)
-    if node:
-        x, y, z = node.x_ly, node.y_ly, node.z_ly
-    else:
-        x, y, z = state.world.current_pos_ly
-
-    sx = math.floor(x / SECTOR_SIZE_LY)
-    sy = math.floor(y / SECTOR_SIZE_LY)
-    sz = math.floor(z / SECTOR_SIZE_LY)
-    current_sector = f"S{sx:+04d}_{sy:+04d}_{sz:+04d}"
-
-    routes = state.world.known_links.get(current_id, set())
-    locked_primary_targets = _locked_primary_targets(state)
-    hub_kinds = {"relay", "station", "waystation"}
-    deterministic = Balance.DETERMINISTIC_LORE_INTEL
-    candidates: dict[str, int] = {}
-
-    def _add_candidate(nid: str, weight: int) -> None:
-        if nid == current_id or nid in routes or nid in locked_primary_targets:
-            return
-        prev = candidates.get(nid, 0)
-        if weight > prev:
-            candidates[nid] = weight
-
-    added: list[str] = []
-
-    # 0) Optional authored uplink table (only for authored hubs).
-    uplink_cfg = None
-    for loc in load_locations():
-        node_cfg = loc.get("node", {})
-        if node_cfg.get("node_id") == current_id:
-            uplink_cfg = loc.get("uplink_table")
-            break
-    if uplink_cfg and isinstance(uplink_cfg, dict):
-        authored_pool = uplink_cfg.get("authored_candidates") or []
-        min_auth = int(uplink_cfg.get("min_authored", 0) or 0)
-        max_auth = int(uplink_cfg.get("max_authored", 0) or 0)
-        if max_auth < min_auth:
-            max_auth = min_auth
-        if max_auth > max_new:
-            max_auth = max_new
-        # Build weighted list of valid authored hubs.
-        authored_weights: list[tuple[str, int]] = []
-        authored_ids = _authored_node_ids()
-        for entry in authored_pool:
-            node_id = entry.get("node_id") if isinstance(entry, dict) else None
-            weight = int(entry.get("weight", 1)) if isinstance(entry, dict) else 1
-            if not node_id or node_id == current_id or node_id in routes:
-                continue
-            if node_id in locked_primary_targets:
-                continue
-            if node_id not in authored_ids:
-                continue
-            if node_id not in state.world.space.nodes:
-                continue
-            authored_weights.append((node_id, max(1, weight)))
-        if authored_weights and max_auth > 0:
-            seed = _hash64(state.meta.rng_seed + state.meta.rng_counter, f"uplink_table:{current_id}")
-            state.meta.rng_counter += 1
-            rng = random.Random(seed)
-            pool = list(authored_weights)
-            picks: list[str] = []
-            while pool and len(picks) < max_auth:
-                total = sum(w for _, w in pool)
-                if total <= 0:
-                    break
-                roll = rng.uniform(0, total)
-                upto = 0.0
-                picked_index = 0
-                for i, (_, weight) in enumerate(pool):
-                    upto += weight
-                    if roll <= upto:
-                        picked_index = i
-                        break
-                dest, _weight = pool.pop(picked_index)
-                if dest in picks:
-                    continue
-                picks.append(dest)
-            # Ensure at least min_authored if possible.
-            if min_auth > 0 and len(picks) < min_auth:
-                for dest, _weight in pool:
-                    if dest in picks:
-                        continue
-                    picks.append(dest)
-                    if len(picks) >= min_auth:
-                        break
-            for dest in picks:
-                if add_known_link(state.world, current_id, dest, bidirectional=True):
-                    state.world.known_nodes.add(dest)
-                    state.world.known_contacts.add(dest)
-                    added.append(dest)
-        if state.os.debug_enabled and authored_pool:
-            print(f"[DEBUG] uplink_table applied: {current_id} -> {', '.join(added) if added else '(none)'}")
-
-    # 1) Known contacts without routes (weighted by kind).
-    known_nodes_iter = sorted(state.world.known_nodes) if deterministic else state.world.known_nodes
-    for nid in known_nodes_iter:
-        if nid == current_id or nid in routes:
-            continue
-        n = state.world.space.nodes.get(nid)
-        if n and n.kind in hub_kinds:
-            _add_candidate(nid, 10)
-        elif n and n.kind in {"ship", "derelict"}:
-            _add_candidate(nid, 2)
-        else:
-            _add_candidate(nid, 1)
-
-    # 2) Hubs in same sector.
-    space_nodes_iter = sorted(state.world.space.nodes) if deterministic else state.world.space.nodes
-    for nid in space_nodes_iter:
-        n = state.world.space.nodes[nid]
-        if not n.is_hub:
-            continue
-        if sector_id_for_pos(n.x_ly, n.y_ly, n.z_ly) == current_sector:
-            _add_candidate(nid, 6)
-
-    # 3) Hubs in neighboring sectors.
-    neighbor_sectors: list[str] = []
-    for dx in (-1, 0, 1):
-        for dy in (-1, 0, 1):
-            sector_id = f"S{sx+dx:+04d}_{sy+dy:+04d}_{sz:+04d}"
-            neighbor_sectors.append(sector_id)
-            ensure_sector_generated(state, sector_id)
-    space_nodes_iter = sorted(state.world.space.nodes) if deterministic else state.world.space.nodes
-    for nid in space_nodes_iter:
-        n = state.world.space.nodes[nid]
-        if not n.is_hub:
-            continue
-        sid = sector_id_for_pos(n.x_ly, n.y_ly, n.z_ly)
-        if sid in neighbor_sectors:
-            _add_candidate(nid, 5)
-
-    # 4) Extra derelicts.
-    space_nodes_iter = sorted(state.world.space.nodes) if deterministic else state.world.space.nodes
-    for nid in space_nodes_iter:
-        n = state.world.space.nodes[nid]
-        if n.kind == "derelict":
-            _add_candidate(nid, 1)
-
-    if not candidates and added:
-        return added
-    if not candidates and not added:
-        return []
-
-    seed = _hash64(state.meta.rng_seed + state.meta.rng_counter, current_id)
-    state.meta.rng_counter += 1
-    rng = random.Random(seed)
-
-    # Guarantee one visible hub without a route if available.
-    visible_hubs = []
-    known_nodes_iter = sorted(state.world.known_nodes) if deterministic else state.world.known_nodes
-    for nid in known_nodes_iter:
-        if nid == current_id or nid in routes:
-            continue
-        if nid in locked_primary_targets:
-            continue
-        n = state.world.space.nodes.get(nid)
-        if n and n.kind in hub_kinds:
-            dx = n.x_ly - x
-            dy = n.y_ly - y
-            dz = n.z_ly - z
-            dist = dx * dx + dy * dy + dz * dz
-            visible_hubs.append((dist, nid))
-    if visible_hubs and len(added) < max_new:
-        visible_hubs.sort()
-        picked = visible_hubs[0][1]
-        if add_known_link(state.world, current_id, picked, bidirectional=True):
-            state.world.known_nodes.add(picked)
-            state.world.known_contacts.add(picked)
-            added.append(picked)
-        candidates.pop(picked, None)
-
-    # Weighted selection without replacement.
-    pool = sorted(candidates.items()) if deterministic else list(candidates.items())
-    while pool and len(added) < max_new:
-        total = sum(weight for _, weight in pool)
-        if total <= 0:
-            break
-        roll = rng.uniform(0, total)
-        upto = 0.0
-        picked_index = 0
-        for i, (_, weight) in enumerate(pool):
-            upto += weight
-            if roll <= upto:
-                picked_index = i
-                break
-        dest, _weight = pool.pop(picked_index)
-        if dest == current_id:
-            continue
-        if add_known_link(state.world, current_id, dest, bidirectional=True):
-            state.world.known_nodes.add(dest)
-            state.world.known_contacts.add(dest)
-            added.append(dest)
-    return added
 
 
 def _authored_node_ids() -> set[str]:
@@ -2979,6 +2820,16 @@ def _handle_uplink(state) -> None:
         state.world.mobility_no_new_uplink_count = 0
     else:
         state.world.mobility_no_new_uplink_count += 1
+        no_local_unvisited = len(_known_routes_to_unvisited(state, current_node_id)) == 0
+        no_global_unvisited = not _has_global_unvisited_route_within_range(state)
+        if (
+            state.world.mobility_no_new_uplink_count >= Balance.UPLINK_FAILSAFE_N
+            and no_local_unvisited
+            and no_global_unvisited
+        ):
+            failover = _apply_mobility_failsafe(state, added)
+            if failover:
+                state.world.mobility_no_new_uplink_count = 0
 
     if added:
         for nid in added:
@@ -3015,7 +2866,10 @@ def _handle_uplink(state) -> None:
         }
     print(msg.get(locale, msg["en"]))
     lore_ctx = build_lore_context(state, current_node_id)
-    lore_result = maybe_deliver_lore(state, "uplink", lore_ctx)
+    lore_result = maybe_deliver_lore(state, "uplink", lore_ctx, count_trigger=False)
+    if added or lore_result.files or lore_result.events:
+        counters = state.world.lore.counters
+        counters["uplink_count"] = counters.get("uplink_count", 0) + 1
     if lore_result.events:
         render_events(state, [("cmd", e) for e in lore_result.events])
         for e in lore_result.events:
@@ -4486,6 +4340,37 @@ def render_cat(state, path: str) -> None:
             for msg in sorted(set(added)):
                 print(msg)
 
+
+def _mail_headers_from_content(content: str) -> tuple[str | None, str | None]:
+    sender: str | None = None
+    subject: str | None = None
+    for raw in content.splitlines()[:20]:
+        line = raw.strip()
+        if sender is None and line.upper().startswith("FROM:"):
+            sender = line.split(":", 1)[1].strip() or None
+            continue
+        if subject is None and line.upper().startswith("SUBJ:"):
+            subject = line.split(":", 1)[1].strip() or None
+            continue
+        if sender is not None and subject is not None:
+            break
+    return sender, subject
+
+
+def _mail_path_for_base(state, box: str, base: str, entries: list[str]) -> str | None:
+    locale = state.os.locale.value
+    preferred = f"{base}.{locale}.txt"
+    if preferred in entries:
+        return f"/mail/{box}/{preferred}"
+    generic = f"{base}.txt"
+    if generic in entries:
+        return f"/mail/{box}/{generic}"
+    for alt in ("en", "es"):
+        candidate = f"{base}.{alt}.txt"
+        if candidate in entries:
+            return f"/mail/{box}/{candidate}"
+    return None
+
 def render_mailbox(state, box: str) -> None:
     path = f"/mail/{box}"
     print(f"\n=== MAIL {box} ===")
@@ -4493,15 +4378,47 @@ def render_mailbox(state, box: str) -> None:
     if not entries:
         print("(empty)")
         return
+    notices = [name for name in entries if name.endswith(".notice.txt")]
+    for name in sorted(notices):
+        print(f"- {name}")
+
+    base_ids: set[str] = set()
     for name in entries:
+        if not name.endswith(".txt"):
+            continue
         if name.endswith(".notice.txt"):
-            print(f"- {name}")
             continue
-        if name.endswith(f".{state.os.locale.value}.txt"):
-            print(f"- {name}")
-            continue
-        if name.endswith(".txt") and f"{name[:-4]}.{state.os.locale.value}.txt" not in entries:
-            print(f"- {name}")
+        base = name[:-4]
+        if base.endswith(".en") or base.endswith(".es"):
+            base = base[:-3]
+        if base:
+            base_ids.add(base)
+    ordered = sorted(
+        base_ids,
+        key=lambda base: (
+            state.os.mail_received_t.get(base, -1.0),
+            state.os.mail_received_seq_map.get(base, -1),
+            base,
+        ),
+        reverse=True,
+    )
+    for base in ordered:
+        full_path = _mail_path_for_base(state, box, base, entries)
+        sender: str | None = None
+        subject: str | None = None
+        if full_path:
+            node = state.os.fs.get(full_path)
+            if node and node.node_type == FSNodeType.FILE:
+                sender, subject = _mail_headers_from_content(node.content or "")
+        tags: list[str] = []
+        if sender:
+            tags.append(f"from={sender}")
+        if subject:
+            tags.append(f"subj={subject}")
+        if tags:
+            print(f"- {base} ({', '.join(tags)})")
+        else:
+            print(f"- {base}")
 
 def _latest_mail_id(state, box: str) -> str | None:
     path = f"/mail/{box}"

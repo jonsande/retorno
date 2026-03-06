@@ -1229,7 +1229,7 @@ class RetornoTextualApp(App):
                                         break
                         self._log_lines(lines)
             else:
-                if action in {"HIBERNATE_DRONES", "HIBERNATE_WAKE", "HIBERNATE_NON_CRUISE"}:
+                if isinstance(action, str) and action in {"HIBERNATE_DRONES", "HIBERNATE_WAKE", "HIBERNATE_NON_CRUISE"}:
                     self._pending_hibernate_parsed = None
                     self._pending_hibernate_requires_non_cruise = False
                     self._pending_wake_on_low_battery = False

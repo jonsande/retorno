@@ -11,12 +11,14 @@ Requirements (gating)
   - blocked during brownout,
   - blocked in critical power state.
 
-Behavior
+Operational behavior
 - Pulls route/contact intel from remote caches.
 - Updates known links and may unlock new reachable paths.
 - Writes navigation log artifacts under `/logs/nav/`.
 - Node uplink data is single-use: after a successful pull on a node, repeated `uplink` at that same node returns no new data.
 - The uplink route pool for a node is fixed when that node becomes a known contact.
+- Authored hubs with `uplink_table` prioritize configured authored candidates (`min_authored..max_authored`) before generic procedural picks.
+- If repeated uplinks across nodes yield no new routes, mobility failsafe can inject a weak-bearing fallback route (subject to failsafe thresholds/range rules).
 
 Common block reasons
 - `not_docked`
