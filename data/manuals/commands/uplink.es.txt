@@ -11,10 +11,14 @@ Requisitos (gating)
   - bloqueado durante brownout,
   - bloqueado en estado crítico de energía.
 
-Comportamiento
+Comportamiento operativo
 - Descarga intel de rutas/contactos desde cachés remotas.
 - Actualiza enlaces conocidos y puede abrir nuevos caminos alcanzables.
 - Escribe artefactos de log de navegación en `/logs/nav/`.
+- Los datos de uplink de un nodo son de un solo uso: tras una descarga exitosa en ese nodo, repetir `uplink` allí no devuelve datos nuevos.
+- El pool de rutas de uplink de un nodo queda fijado cuando ese nodo pasa a ser contacto conocido.
+- En hubs authored con `uplink_table`, el pool fijo prioriza candidatos authored configurados (`min_authored..max_authored`) antes de picks procedurales genéricos.
+- Si uplinks repetidos en distintos nodos no producen rutas nuevas, el failsafe de movilidad puede inyectar una ruta de respaldo por señal débil (según sus umbrales/reglas de alcance).
 
 Bloqueos frecuentes
 - `not_docked`

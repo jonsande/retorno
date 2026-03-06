@@ -446,6 +446,13 @@ def main() -> None:
 
     state = _fresh_state()
     state.ship.docked_node_id = state.world.current_node_id
+    docked_travel = engine.apply_action(state, parse_command("nav ECHO_7"))
+    _assert_blocked_reason(docked_travel, "ship_docked")
+    assert state.ship.in_transit is False
+    assert state.ship.docked_node_id == state.world.current_node_id
+
+    state = _fresh_state()
+    state.ship.docked_node_id = state.world.current_node_id
     undock_job = engine.apply_action(state, Undock())
     assert any(e.type == EventType.JOB_QUEUED for e in undock_job), undock_job
     assert abs(_active_job_eta(state, JobType.UNDOCK) - Balance.UNDOCK_TIME_S) < 1e-6

@@ -52,20 +52,20 @@ _PARSE_ERROR_MESSAGES = {
         "wait_number": "wait: <seconds> must be a number",
         "wait_gt0": "wait: <seconds> must be > 0",
         "debug_seed_int": "debug seed: <n> must be an integer",
-        "usage_debug": "Usage: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules",
+        "usage_debug": "Usage: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules | debug galaxy",
         "usage_dock": "Usage: dock <node_id>",
         "usage_undock": "Usage: undock",
         "usage_nav": "Usage: nav map sectors|graph [node_id]|path <node_id>|routes|contacts | nav <node_id> | nav --no-cruise <node_id> | nav abort",
         "usage_hibernate": "Usage: hibernate until_arrival | hibernate <years>",
         "hibernate_number": "hibernate: <years> must be a number",
         "hibernate_gt0": "hibernate: <years> must be > 0",
-        "usage_salvage": "Usage: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage drone(s) <drone_id> <node_id> | drone salvage data <drone_id> <node_id>",
+        "usage_salvage": "Usage: drone salvage scrap <drone_id> [node_id] <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage drone(s) <drone_id> [node_id] | drone salvage data <drone_id> [node_id]",
         "usage_salvage_scrap": "Usage: drone salvage scrap <drone_id> <node_id> <amount>",
         "salvage_amount_int": "salvage: amount must be an integer",
         "salvage_amount_gt0": "salvage: amount must be > 0",
         "salvage_missing_node": "Falta node_id. Ejemplo: drone salvage modules D1 ECHO_7",
-        "usage_salvage_drone": "Usage: drone salvage drone(s) <drone_id> <node_id>",
-        "usage_salvage_data": "Usage: drone salvage data <drone_id> <node_id>",
+        "usage_salvage_drone": "Usage: drone salvage drone(s) <drone_id> [node_id]",
+        "usage_salvage_data": "Usage: drone salvage data <drone_id> [node_id]",
         "usage_inventory": "Usage: inventory|cargo | inventory|cargo audit",
         "config_set_lang": "config set lang <en|es>",
         "usage_config": "Usage: config set lang <en|es> | config show",
@@ -97,20 +97,20 @@ _PARSE_ERROR_MESSAGES = {
         "usage_power_on": "Usage: power on <system_id>",
         "usage_power_off": "Usage: power off <system_id>",
         "usage_shutdown": "Usage: shutdown <system_id>",
-        "usage_drone": "Usage: drone status [drone_id] | drone deploy <drone_id> <sector_id> | drone move <drone_id> <target_id> | drone survey <drone_id> <node_id> | drone recall <drone_id> | drone autorecall <drone_id> <on|off|amount_percent> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id>",
+        "usage_drone": "Usage: drone status [drone_id] | drone deploy <drone_id> <sector_id> | drone move <drone_id> <target_id> | drone survey <drone_id> [node_id] | drone recall <drone_id> | drone autorecall <drone_id> <on|off|amount_percent> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id>",
         "usage_drone_status": "Usage: drone status [drone_id]",
         "usage_drone_recall": "Usage: drone recall <drone_id>",
         "usage_drone_reboot": "Usage: drone reboot <drone_id>",
         "usage_drone_repair": "Usage: drone repair <drone_id> <target_id>",
         "usage_drone_move": "Usage: drone move <drone_id> <target_id>",
-        "usage_drone_survey": "Usage: drone survey <drone_id> <node_id>",
+        "usage_drone_survey": "Usage: drone survey <drone_id> [node_id]",
         "usage_drone_autorecall": "Usage: drone autorecall <drone_id> <on|off|amount_percent>",
         "drone_autorecall_amount": "drone autorecall: amount must be a number in (0, 100]",
         "usage_drone_install": "Usage: drone install <drone_id> <module_id>",
-        "usage_drone_salvage": "Usage: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage drone(s) <drone_id> <node_id> | drone salvage data <drone_id> <node_id>",
+        "usage_drone_salvage": "Usage: drone salvage scrap <drone_id> [node_id] <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage drone(s) <drone_id> [node_id] | drone salvage data <drone_id> [node_id]",
         "usage_drone_salvage_scrap": "Usage: drone salvage scrap <drone_id> <node_id> <amount>",
-        "usage_drone_salvage_drone": "Usage: drone salvage drone(s) <drone_id> <node_id>",
-        "usage_drone_salvage_data": "Usage: drone salvage data <drone_id> <node_id>",
+        "usage_drone_salvage_drone": "Usage: drone salvage drone(s) <drone_id> [node_id]",
+        "usage_drone_salvage_data": "Usage: drone salvage data <drone_id> [node_id]",
         "usage_drone_deploy": "Usage: drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>",
         "unknown_drone_subcommand": "Unknown drone subcommand. Use: drone status | drone deploy ... | drone move ... | drone survey ... | drone recall ... | drone autorecall ...",
         "usage_repair": "Usage: drone repair <drone_id> <target_id> | repair <system_id> --selftest",
@@ -129,20 +129,20 @@ _PARSE_ERROR_MESSAGES = {
         "wait_number": "wait: <segundos> debe ser número",
         "wait_gt0": "wait: <segundos> debe ser > 0",
         "debug_seed_int": "debug seed: <n> debe ser entero",
-        "usage_debug": "Uso: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules",
+        "usage_debug": "Uso: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules | debug galaxy",
         "usage_dock": "Uso: dock <node_id>",
         "usage_undock": "Uso: undock",
         "usage_nav": "Uso: nav map sectors|graph [node_id]|path <node_id>|routes|contacts | nav <node_id> | nav --no-cruise <node_id> | nav abort",
         "usage_hibernate": "Uso: hibernate until_arrival | hibernate <años>",
         "hibernate_number": "hibernate: <años> debe ser número",
         "hibernate_gt0": "hibernate: <años> debe ser > 0",
-        "usage_salvage": "Uso: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage drone(s) <drone_id> <node_id> | drone salvage data <drone_id> <node_id>",
+        "usage_salvage": "Uso: drone salvage scrap <drone_id> [node_id] <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage drone(s) <drone_id> [node_id] | drone salvage data <drone_id> [node_id]",
         "usage_salvage_scrap": "Uso: drone salvage scrap <drone_id> <node_id> <amount>",
         "salvage_amount_int": "salvage: amount debe ser entero",
         "salvage_amount_gt0": "salvage: amount debe ser > 0",
         "salvage_missing_node": "Missing node_id. Example: drone salvage modules D1 ECHO_7",
-        "usage_salvage_drone": "Uso: drone salvage drone(s) <drone_id> <node_id>",
-        "usage_salvage_data": "Uso: drone salvage data <drone_id> <node_id>",
+        "usage_salvage_drone": "Uso: drone salvage drone(s) <drone_id> [node_id]",
+        "usage_salvage_data": "Uso: drone salvage data <drone_id> [node_id]",
         "usage_inventory": "Uso: inventory|cargo | inventory|cargo audit",
         "config_set_lang": "config set lang <en|es>",
         "usage_config": "Uso: config set lang <en|es> | config show",
@@ -174,20 +174,20 @@ _PARSE_ERROR_MESSAGES = {
         "usage_power_on": "Uso: power on <system_id>",
         "usage_power_off": "Uso: power off <system_id>",
         "usage_shutdown": "Uso: shutdown <system_id>",
-        "usage_drone": "Uso: drone status [drone_id] | drone deploy <drone_id> <sector_id> | drone move <drone_id> <target_id> | drone survey <drone_id> <node_id> | drone recall <drone_id> | drone autorecall <drone_id> <on|off|porcentaje> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id>",
+        "usage_drone": "Uso: drone status [drone_id] | drone deploy <drone_id> <sector_id> | drone move <drone_id> <target_id> | drone survey <drone_id> [node_id] | drone recall <drone_id> | drone autorecall <drone_id> <on|off|porcentaje> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id>",
         "usage_drone_status": "Uso: drone status [drone_id]",
         "usage_drone_recall": "Uso: drone recall <drone_id>",
         "usage_drone_reboot": "Uso: drone reboot <drone_id>",
         "usage_drone_repair": "Uso: drone repair <drone_id> <target_id>",
         "usage_drone_move": "Uso: drone move <drone_id> <target_id>",
-        "usage_drone_survey": "Uso: drone survey <drone_id> <node_id>",
+        "usage_drone_survey": "Uso: drone survey <drone_id> [node_id]",
         "usage_drone_autorecall": "Uso: drone autorecall <drone_id> <on|off|porcentaje>",
         "drone_autorecall_amount": "drone autorecall: el porcentaje debe ser número en (0, 100]",
         "usage_drone_install": "Uso: drone install <drone_id> <module_id>",
-        "usage_drone_salvage": "Uso: drone salvage scrap <drone_id> <node_id> <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage drone(s) <drone_id> <node_id> | drone salvage data <drone_id> <node_id>",
+        "usage_drone_salvage": "Uso: drone salvage scrap <drone_id> [node_id] <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage drone(s) <drone_id> [node_id] | drone salvage data <drone_id> [node_id]",
         "usage_drone_salvage_scrap": "Uso: drone salvage scrap <drone_id> <node_id> <amount>",
-        "usage_drone_salvage_drone": "Uso: drone salvage drone(s) <drone_id> <node_id>",
-        "usage_drone_salvage_data": "Uso: drone salvage data <drone_id> <node_id>",
+        "usage_drone_salvage_drone": "Uso: drone salvage drone(s) <drone_id> [node_id]",
+        "usage_drone_salvage_data": "Uso: drone salvage data <drone_id> [node_id]",
         "usage_drone_deploy": "Uso: drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>",
         "unknown_drone_subcommand": "Subcomando drone desconocido. Usa: drone status | drone deploy ... | drone move ... | drone survey ... | drone recall ... | drone autorecall ...",
         "usage_repair": "Uso: drone repair <drone_id> <target_id> | repair <system_id> --selftest",
@@ -357,6 +357,8 @@ def parse_command(line: str):
             return ("DEBUG_LORE", None)
         if len(args) == 1 and args[0] == "deadnodes":
             return ("DEBUG_DEADNODES", None)
+        if len(args) == 1 and args[0] == "galaxy":
+            return ("DEBUG_GALAXY", None)
         if len(args) != 1 or args[0] not in {"on", "off", "status"}:
             raise ParseError("usage_debug")
         return ("DEBUG", args[0])
@@ -606,9 +608,11 @@ def parse_command(line: str):
                 raise ParseError("usage_drone_move")
             return DroneMove(drone_id=args[1], target_id=args[2])
         if sub == "survey":
-            if len(args) != 3:
+            if len(args) not in {2, 3}:
                 raise ParseError("usage_drone_survey")
-            return DroneSurvey(drone_id=args[1], node_id=args[2])
+            drone_id = args[1]
+            node_id = args[2] if len(args) == 3 else None
+            return DroneSurvey(drone_id=drone_id, node_id=node_id)
         if sub == "autorecall":
             if len(args) != 3:
                 raise ParseError("usage_drone_autorecall")
@@ -659,16 +663,16 @@ def parse_command(line: str):
                 node_id = rest[1] if len(rest) == 2 else None
                 return SalvageModule(drone_id=drone_id, node_id=node_id)
             if kind in {"drone", "drones"}:
-                if len(rest) != 2:
+                if len(rest) not in {1, 2}:
                     raise ParseError("usage_drone_salvage_drone")
                 drone_id = rest[0]
-                node_id = rest[1]
+                node_id = rest[1] if len(rest) == 2 else None
                 return SalvageDrone(drone_id=drone_id, node_id=node_id)
             if kind == "data":
-                if len(rest) != 2:
+                if len(rest) not in {1, 2}:
                     raise ParseError("usage_drone_salvage_data")
                 drone_id = rest[0]
-                node_id = rest[1]
+                node_id = rest[1] if len(rest) == 2 else None
                 return SalvageData(drone_id=drone_id, node_id=node_id)
             raise ParseError("usage_drone_salvage")
         emergency = False

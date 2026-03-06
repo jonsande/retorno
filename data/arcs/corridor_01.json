@@ -6,8 +6,6 @@
     "kind": "link",
     "line": "LINK: HARBOR_12 -> ARCHIVE_01",
     "preferred_sources": ["mail", "log"],
-    "mail_path_template": "/mail/inbox/02xx.corridor.{lang}.txt",
-    "log_path_template": "/logs/records/corridor_01.{lang}.txt",
     "mail_from": "Network Ops",
     "mail_subject": "Corridor attachment",
     "log_header": "CORRIDOR LOG // attachment",

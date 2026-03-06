@@ -64,6 +64,7 @@ Operational notes
 - `drone survey` reports possible recoverable data signatures, not certainty.
 - If no mountable data files exist, survey reports no signatures.
 - False negatives when files do exist are controlled by `Balance.DRONE_SURVEY_DATA_FALSE_NEGATIVE_P`.
+- Survey also reports depletion flags per category: `scrap_complete`, `data_complete`, `extras_complete`, and `node_cleaned`.
 - Deployed drones drain battery while idle.
 - Deployed/non-docked drones accumulate environmental radiation.
 - Shield convention (`shield_factor`): `<1` better, `=1` baseline, `>1` worse.

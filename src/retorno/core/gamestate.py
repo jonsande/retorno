@@ -13,7 +13,7 @@ from retorno.model.world import WorldState
 
 @dataclass(slots=True)
 class MetaState:
-    save_version: int = 1
+    save_version: int = 2
     rng_seed: int = Balance.DEFAULT_RNG_SEED
     rng_counter: int = 0
     prologue_complete: bool = False

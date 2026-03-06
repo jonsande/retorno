@@ -16,6 +16,8 @@ Behavior
 - Salvage actions queue timed jobs (duration depends on action and payload).
 - Successful salvage updates cargo/intel/world depletion state.
 - Salvage operations consume drone battery and carry operational risk from environment/degradation.
+- `drone salvage data` reports explicit counters: `new`, `already_mounted`, `total`.
+- `new` are files mounted in this operation; `already_mounted` were already present at `/remote/<node_id>/`.
 
 Common block reasons
 - drone not deployed / low battery / missing target

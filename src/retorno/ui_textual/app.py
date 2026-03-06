@@ -589,14 +589,10 @@ class RetornoTextualApp(App):
 
         systems = list(state.ship.systems.keys())
         drones = list(state.ship.drones.keys())
-        sectors = [s for s in state.ship.sectors.keys() if s != "UNKNOWN_00"]
-        contacts = sorted(
-            c
-            for c in (
-                state.world.known_nodes if hasattr(state.world, "known_nodes") and state.world.known_nodes else state.world.known_contacts
-            )
-            if c != "UNKNOWN_00"
-        )
+        contacts = repl._known_contact_ids_for_completion(state)
+        drone_local_world_targets = repl._drone_local_world_node_targets_for_completion(state)
+        drone_move_targets = repl._drone_move_targets_for_completion(state)
+        drone_deploy_targets = repl._drone_deploy_targets_for_completion(state)
         modules = list(set(state.ship.cargo_modules or state.ship.manifest_modules))
         services = []
         for sys in state.ship.systems.values():
@@ -712,7 +708,7 @@ class RetornoTextualApp(App):
                 return [c for c in ["all", "5", "10", "20", "50"] if c.startswith(text)]
         if cmd == "debug":
             if len(tokens) == 2:
-                return [c for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "modules"] if c.startswith(text)]
+                return [c for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "modules", "galaxy"] if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "scenario":
                 return [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
         if cmd == "module":
@@ -792,10 +788,11 @@ class RetornoTextualApp(App):
             if len(tokens) == 3 and tokens[1] in {"status", "deploy", "deploy!", "reboot", "recall", "autorecall", "repair", "move", "install", "survey"}:
                 return [d for d in drones if d.startswith(text)]
             if len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
-                return [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
+                return [t for t in drone_deploy_targets if t.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "move":
                 ship_aliases = [state.ship.ship_id] if state.ship.ship_id.startswith(text) else []
-                return [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)] + ship_aliases
+                local_targets = [t for t in drone_move_targets if t.startswith(text)]
+                return list(dict.fromkeys(local_targets + ship_aliases))
             if len(tokens) == 4 and tokens[1] == "autorecall":
                 return [c for c in ["on", "off", "10"] if c.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "install":
@@ -803,20 +800,20 @@ class RetornoTextualApp(App):
             if len(tokens) == 4 and tokens[1] == "repair":
                 return [x for x in sorted(set(systems) | set(drones)) if x.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "survey":
-                return [c for c in contacts if c.startswith(text)]
+                return [c for c in drone_local_world_targets if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "salvage":
                 return [c for c in ["scrap", "module", "modules", "drone", "drones", "data"] if c.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "salvage":
                 return [d for d in drones if d.startswith(text)]
             if len(tokens) == 5 and tokens[1] == "salvage":
-                return [c for c in contacts if c.startswith(text)]
+                return [c for c in drone_local_world_targets if c.startswith(text)]
         if cmd == "salvage":
             if len(tokens) == 2:
                 return [c for c in ["scrap", "module", "modules", "drone", "drones", "data"] if c.startswith(text)]
             if len(tokens) == 3:
                 return [d for d in drones if d.startswith(text)]
             if len(tokens) == 4:
-                return [c for c in contacts if c.startswith(text)]
+                return [c for c in drone_local_world_targets if c.startswith(text)]
         if cmd == "route":
             if len(tokens) == 2:
                 return [c for c in ["solve"] if c.startswith(text)]
@@ -1229,7 +1226,7 @@ class RetornoTextualApp(App):
                                         break
                         self._log_lines(lines)
             else:
-                if action in {"HIBERNATE_DRONES", "HIBERNATE_WAKE", "HIBERNATE_NON_CRUISE"}:
+                if isinstance(action, str) and action in {"HIBERNATE_DRONES", "HIBERNATE_WAKE", "HIBERNATE_NON_CRUISE"}:
                     self._pending_hibernate_parsed = None
                     self._pending_hibernate_requires_non_cruise = False
                     self._pending_wake_on_low_battery = False
@@ -1547,6 +1544,13 @@ class RetornoTextualApp(App):
                     self._log_line("debug modules: available only in DEBUG mode. Use: debug on")
                     return
                 self._log_lines(presenter.build_command_output(repl.render_modules_catalog, state))
+            return
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_GALAXY":
+            with self.loop.with_lock() as state:
+                if not state.os.debug_enabled:
+                    self._log_line("debug galaxy: available only in DEBUG mode. Use: debug on")
+                    return
+                self._log_lines(presenter.build_command_output(repl.render_debug_galaxy, state))
             return
 
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SEED":

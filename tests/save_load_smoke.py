@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import hashlib
+import pickle
 
 from retorno.bootstrap import create_initial_state_prologue
 from retorno.core.engine import Engine
@@ -76,6 +78,18 @@ def main() -> None:
             pass
         else:
             raise AssertionError("Expected invalid user id to raise SaveLoadError")
+
+        # Legacy V1 save header must fail with explicit incompatibility.
+        legacy_path = Path(tmp_dir) / "legacy_v1.dat"
+        legacy_blob = pickle.dumps(state, protocol=pickle.HIGHEST_PROTOCOL)
+        legacy_checksum = hashlib.sha256(legacy_blob).hexdigest().encode("ascii")
+        legacy_path.write_bytes(b"RETORNO_SAVE_V1\n" + legacy_checksum + b"\n" + legacy_blob)
+        try:
+            load_single_slot(legacy_path)
+        except SaveLoadError as exc:
+            assert "incompatible" in str(exc).lower(), f"Expected incompatibility message, got: {exc}"
+        else:
+            raise AssertionError("Expected legacy V1 save load to fail as incompatible")
 
     print("SAVE/LOAD SMOKE PASSED")
 

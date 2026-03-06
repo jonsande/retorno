@@ -6,10 +6,11 @@ from tempfile import TemporaryDirectory
 from retorno.bootstrap import create_initial_state_sandbox, create_initial_state_prologue
 from retorno.cli.parser import parse_command
 from retorno.config.balance import Balance
-from retorno.core.actions import DroneDeploy, DroneSurvey, SalvageDrone
+from retorno.core.actions import DroneDeploy, DroneSurvey, SalvageDrone, SalvageScrap
 from retorno.core.engine import Engine
 from retorno.io.save_load import load_single_slot, save_single_slot
 from retorno.model.drones import DroneLocation, DroneStatus
+from retorno.model.events import EventType
 from retorno.model.world import SpaceNode
 from retorno.worldgen.generator import ensure_sector_generated
 
@@ -30,6 +31,13 @@ def _recoverable_map_for_sector(state, sector_id: str) -> dict[str, int]:
         if sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly) == sector_id:
             out[node_id] = int(getattr(node, "recoverable_drones_count", 0))
     return out
+
+
+def _assert_event_type(events, event_type: EventType):
+    for e in events:
+        if getattr(e, "type", None) == event_type:
+            return e
+    raise AssertionError(f"Expected event {event_type.value}; got {[getattr(e, 'type', None) for e in events]}")
 
 
 def main() -> None:
@@ -64,6 +72,24 @@ def main() -> None:
     assert bool(survey_data.get("data_signatures_detected", False)) is True
     assert node.recoverable_drones_count == 2, "Survey must not consume recoverable drones"
 
+    survey_action_default_node = parse_command("drone survey D1")
+    assert isinstance(survey_action_default_node, DroneSurvey), (
+        f"Unexpected survey parse without node_id: {survey_action_default_node!r}"
+    )
+    assert survey_action_default_node.node_id is None
+    survey_default_queue_events = engine.apply_action(state, survey_action_default_node)
+    assert survey_default_queue_events, "Expected survey job queued when node_id is omitted"
+    survey_default_tick_events = engine.tick(state, 30.0)
+    survey_default_data = _assert_any_event(survey_default_tick_events, "job_completed_drone_survey")
+    assert survey_default_data.get("node_id") == "ECHO_7"
+
+    scrap_default_node = parse_command("drone salvage scrap D1 5")
+    assert isinstance(scrap_default_node, SalvageScrap), (
+        f"Unexpected salvage scrap parse without node_id: {scrap_default_node!r}"
+    )
+    assert scrap_default_node.node_id is None
+    assert scrap_default_node.amount == 5
+
     Balance.DRONE_SURVEY_DATA_FALSE_NEGATIVE_P = 1.0
     survey_queue_events_2 = engine.apply_action(state, survey_action)
     assert survey_queue_events_2, "Expected second survey job queued"
@@ -72,6 +98,48 @@ def main() -> None:
     assert int(survey_data_2.get("data_recoverable_files_count", 0)) > 0
     assert bool(survey_data_2.get("data_signatures_detected", True)) is False
     Balance.DRONE_SURVEY_DATA_FALSE_NEGATIVE_P = old_false_negative
+    assert "scrap_complete" in survey_data_2
+    assert "data_complete" in survey_data_2
+    assert "extras_complete" in survey_data_2
+    assert "node_cleaned" in survey_data_2
+
+    # Salvage data counters should clearly separate new vs already mounted files.
+    old_non_forced_p = Balance.LORE_NON_FORCED_INJECT_P
+    Balance.LORE_NON_FORCED_INJECT_P = 0.0
+    try:
+        salvage_count_before = int(state.world.lore.counters.get("salvage_data_count", 0))
+        salvage_data_action = parse_command("drone salvage data D1")
+        assert salvage_data_action is not None, "Expected salvage data action parse"
+        assert getattr(salvage_data_action, "node_id", "MISSING") is None
+        queue_salvage_data = engine.apply_action(state, salvage_data_action)
+        assert queue_salvage_data, "Expected salvage data job queued"
+        salvage_data_tick = engine.tick(state, 60.0)
+        data_ev_1 = _assert_event_type(salvage_data_tick, EventType.DATA_SALVAGED)
+        data_1 = data_ev_1.data
+        assert int(data_1.get("files_new_count", -1)) >= 0
+        assert int(data_1.get("files_already_mounted_count", -1)) >= 0
+        assert int(data_1.get("files_total_eligible_count", -1)) >= 0
+        assert int(data_1.get("files_new_count", 0)) + int(data_1.get("files_already_mounted_count", 0)) == int(
+            data_1.get("files_total_eligible_count", -1)
+        )
+        salvage_count_after_first = int(state.world.lore.counters.get("salvage_data_count", 0))
+        assert salvage_count_after_first == salvage_count_before + 1, (
+            "First salvage_data with new data should increment salvage_data_count"
+        )
+
+        queue_salvage_data_2 = engine.apply_action(state, salvage_data_action)
+        assert queue_salvage_data_2, "Expected second salvage data job queued"
+        salvage_data_tick_2 = engine.tick(state, 60.0)
+        data_ev_2 = _assert_event_type(salvage_data_tick_2, EventType.DATA_SALVAGED)
+        data_2 = data_ev_2.data
+        assert int(data_2.get("files_new_count", -1)) == 0
+        assert int(data_2.get("files_already_mounted_count", -1)) == int(data_2.get("files_total_eligible_count", -2))
+        salvage_count_after_second = int(state.world.lore.counters.get("salvage_data_count", 0))
+        assert salvage_count_after_second == salvage_count_after_first, (
+            "Repeated salvage_data without new data should not increment salvage_data_count"
+        )
+    finally:
+        Balance.LORE_NON_FORCED_INJECT_P = old_non_forced_p
 
     # No recoverable files => survey must report no data signatures.
     empty_state = create_initial_state_sandbox()
@@ -127,10 +195,11 @@ def main() -> None:
         ) = old_cfg
 
     state.ship.drones["D1"].battery = 1.0
-    parsed_singular = parse_command("drone salvage drone D1 ECHO_7")
+    parsed_singular = parse_command("drone salvage drone D1")
     parsed_plural = parse_command("drone salvage drones D1 ECHO_7")
     assert isinstance(parsed_singular, SalvageDrone), f"Unexpected singular parse: {parsed_singular!r}"
     assert isinstance(parsed_plural, SalvageDrone), f"Unexpected plural parse: {parsed_plural!r}"
+    assert parsed_singular.node_id is None
 
     salvage_queue_events = engine.apply_action(state, parsed_singular)
     assert salvage_queue_events, "Expected salvage drone job queued"

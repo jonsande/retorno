@@ -9,7 +9,8 @@ from pathlib import Path
 
 from retorno.core.gamestate import GameState
 
-_SAVE_MAGIC = b"RETORNO_SAVE_V1"
+_SAVE_MAGIC = b"RETORNO_SAVE_V2"
+_LEGACY_SAVE_MAGICS = {b"RETORNO_SAVE_V1"}
 _DEFAULT_SLOT_FILENAME = "savegame.dat"
 _BACKUP_SUFFIX = ".bak"
 _USER_RE = re.compile(r"^[a-z0-9](?:[a-z0-9._-]{0,30}[a-z0-9])?$")
@@ -137,6 +138,10 @@ def _load_from_file(path: Path) -> GameState:
     payload = raw[second_nl + 1 :]
 
     if magic != _SAVE_MAGIC:
+        if magic in _LEGACY_SAVE_MAGICS:
+            raise SaveLoadError(
+                "Save incompatible with data-pool refactor; start a new game."
+            )
         raise SaveLoadError(f"Unknown save format in {path}")
 
     payload_hash = hashlib.sha256(payload).hexdigest().encode("ascii")
@@ -150,6 +155,10 @@ def _load_from_file(path: Path) -> GameState:
 
     if not isinstance(loaded, GameState):
         raise SaveLoadError(f"Save file {path} does not contain a GameState")
+    if int(getattr(loaded.meta, "save_version", 0)) < 2:
+        raise SaveLoadError(
+            "Save incompatible with data-pool refactor; start a new game."
+        )
 
     return loaded
 

@@ -5,7 +5,7 @@ Propósito
 - Acceder a artefactos de correo de misión y su contenido.
 
 Comportamiento operativo
-- `mail inbox` lista ids/asuntos disponibles.
+- `mail inbox` lista ids disponibles y, cuando existen, remitente/asunto leídos de las cabeceras del mensaje (`FROM:`/`SUBJ:`).
 - `mail read <id>` abre un mensaje.
 - `mail read latest` abre el mensaje más reciente.
 - Si existe variante localizada, se prioriza automáticamente.

@@ -5,6 +5,12 @@ class Balance:
     DEFAULT_RNG_SEED = 36892
     DAY_S = 86400.0
     YEAR_S = 365.0 * DAY_S
+    # Galaxy radial model (ly). Region is computed against this center.
+    GALAXY_CENTER_X_LY = -8.0
+    GALAXY_CENTER_Y_LY = 0.0
+    GALAXY_CENTER_Z_LY = 0.0
+    GALAXY_BULGE_RADIUS_LY = 5.0
+    GALAXY_DISK_OUTER_RADIUS_LY = 15.0
     HIBERNATE_CHUNK_S = 7 * DAY_S
     HIBERNATE_WAKE_CHECK_S = 1 * 60 * 60
     HIBERNATE_WAKE_EVENT_TYPES = {"drone_low_battery"}
@@ -190,10 +196,19 @@ class Balance:
     # Max indirect attempts before falling back to direct strategy.
     DEADNODE_MAX_INDIRECT_ATTEMPTS = 2
 
-    # Lore singles: base probability per eligible trigger that a single will be attempted.
-    # This is checked before weights are applied. Higher values = more frequent singles
-    # across uplink/dock/salvage_data triggers. Weights only affect which single is chosen.
+    # Legacy fallback for non-forced lore injection probability.
+    # The scheduler now uses LORE_NON_FORCED_INJECT_P as the primary knob; this value is
+    # only used as fallback when that knob is missing.
     LORE_SINGLES_BASE_P = 0.05
+    # Enables/disables periodic lore scheduler evaluations in engine.tick.
+    # Keep enabled for the node-pool model where non-forced lore is injected by cycle.
+    LORE_SCHEDULER_ENABLED = True
+    # Period (in in-game years) between non-forced lore injection evaluations.
+    # Lower values mean more frequent checks; 1.0 means "once per in-game year".
+    LORE_NON_FORCED_INTERVAL_YEARS = 1.0
+    # Probability applied at each non-forced scheduler cycle for every eligible piece.
+    # This controls how often optional lore gets assigned to candidate node pools.
+    LORE_NON_FORCED_INJECT_P = 0.05
     # Toggle deterministic lore/intel behavior across processes for equal seed/state/action sequence.
     # False restores legacy process-dependent behavior for lore seed derivation and set iteration order.
     DETERMINISTIC_LORE_INTEL = True
@@ -248,6 +263,23 @@ class Balance:
     DRONE_RAD_DECAY_MULT_WARN = 1.2
     DRONE_RAD_DECAY_MULT_HIGH = 1.8
     DRONE_RAD_DECAY_MULT_CRITICAL = 3.0
+    # Procedural node ambient radiation (rad/s).
+    # Authored locations keep their explicit radiation values.
+    PROCEDURAL_RAD_BASE = 0.00082
+    PROCEDURAL_RAD_MIN = 0.0001
+    PROCEDURAL_RAD_REGION_MULT = {
+        "bulge": 2.2,
+        "disk": 1.0,
+        "halo": 0.55,
+    }
+    PROCEDURAL_RAD_KIND_MULT = {
+        "ship": 1.8,  # WRECK_* ids are generated as kind="ship".
+    }
+    PROCEDURAL_RAD_VARIATION_MIN = 0.50
+    PROCEDURAL_RAD_VARIATION_MAX = 1.70
+    PROCEDURAL_RAD_SPIKE_CHANCE = 0.16
+    PROCEDURAL_RAD_SPIKE_MULT_MIN = 2.80
+    PROCEDURAL_RAD_SPIKE_MULT_MAX = 11.50
     # Radiation level thresholds (4-band): low / elevated / high / extreme.
     # Values are ">= threshold"; below elevated is considered low.
     RAD_LEVEL_ENV_ELEVATED = 0.001

@@ -5,7 +5,7 @@ Purpose
 - Access mission mailbox artifacts and message payloads.
 
 Operational behavior
-- `mail inbox` lists available message ids/subjects.
+- `mail inbox` lists available message ids and, when present, sender/subject parsed from message headers (`FROM:`/`SUBJ:`).
 - `mail read <id>` opens one message.
 - `mail read latest` opens most recent inbox message.
 - Localized variant is preferred when available.

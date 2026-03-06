@@ -15,14 +15,20 @@ import time
 import tty
 from pathlib import Path
 from retorno.core.engine import Engine
-from retorno.core.lore import LoreContext, maybe_deliver_lore
+from retorno.core.lore import (
+    build_lore_context,
+    list_lore_piece_entries,
+    maybe_deliver_lore,
+    recompute_node_completion,
+    sync_node_pools_for_known_nodes,
+)
 from retorno.core.deadnodes import evaluate_dead_nodes
 from retorno.core.actions import Action, AuthRecover, Hibernate, RouteSolve, Status
 from retorno.runtime.loop import GameLoop
 from retorno.core.power_policy import is_parsed_command_allowed_in_core_os_critical
 from retorno.model.events import Event, EventType, Severity, SourceRef
 from retorno.model.jobs import JobStatus, JobType
-from retorno.runtime.data_loader import load_modules, load_arcs, load_locations
+from retorno.runtime.data_loader import load_modules, load_arcs, load_locations, load_worldgen_templates
 from retorno.runtime.startup import load_startup_sequence_lines
 from retorno.config.balance import Balance
 from retorno.io.save_load import (
@@ -39,7 +45,7 @@ from retorno.model.drones import DroneStatus
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, list_dir, normalize_path, read_file, required_access_label
 from retorno.model.world import SECTOR_SIZE_LY, sector_id_for_pos, add_known_link, record_intel
 from retorno.model.world import SpaceNode, region_for_pos
-from retorno.worldgen.generator import ensure_sector_generated
+from retorno.worldgen.generator import ensure_sector_generated, procedural_radiation_for_node
 from retorno.util.timefmt import format_elapsed_long, format_elapsed_short
 
 
@@ -252,17 +258,17 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ("drone deploy <drone_id> <sector_id>", "deploy drone to sector", "despliega dron a sector"),
                 ("drone deploy! <drone_id> <sector_id>", "emergency deploy override", "despliegue de emergencia"),
                 ("drone move <drone_id> <target_id>", "move drone to target", "mueve dron a objetivo"),
-                ("drone survey <drone_id> <node_id>", "survey salvage signatures at node", "inspecciona señales de salvage en nodo"),
+                ("drone survey <drone_id> [node_id]", "survey salvage signatures at node", "inspecciona señales de salvage en nodo"),
                 ("drone autorecall <drone_id> on", "enable automatic recall", "activa autorretorno"),
                 ("drone autorecall <drone_id> off", "disable automatic recall", "desactiva autorretorno"),
                 ("drone autorecall <drone_id> <percent>", "set recall battery threshold", "ajusta umbral de batería para retorno"),
                 ("drone repair <drone_id> <target_id>", "repair target with drone", "repara objetivo con dron"),
                 ("drone install <drone_id> <module_id>", "install module using drone", "instala módulo usando dron"),
-                ("drone salvage scrap <drone_id> <node_id> <amount>", "salvage scrap from node", "recupera chatarra del nodo"),
+                ("drone salvage scrap <drone_id> [node_id] <amount>", "salvage scrap from node", "recupera chatarra del nodo"),
                 ("drone salvage module <drone_id> [node_id]", "salvage module from node", "recupera módulo del nodo"),
-                ("drone salvage drone <drone_id> <node_id>", "recover all drones from node", "recupera todos los drones del nodo"),
-                ("drone salvage drones <drone_id> <node_id>", "alias of salvage drone", "alias de salvage drone"),
-                ("drone salvage data <drone_id> <node_id>", "salvage data from node", "recupera datos del nodo"),
+                ("drone salvage drone <drone_id> [node_id]", "recover all drones from node", "recupera todos los drones del nodo"),
+                ("drone salvage drones <drone_id> [node_id]", "alias of salvage drone", "alias de salvage drone"),
+                ("drone salvage data <drone_id> [node_id]", "salvage data from node", "recupera datos del nodo"),
                 ("drone reboot <drone_id>", "reboot drone", "reinicia dron"),
                 ("drone recall <drone_id>", "recall drone to ship", "retorna dron a la nave"),
             ],
@@ -708,6 +714,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Action blocked: ship not docked at {node_id}",
             "es": "Acción bloqueada: nave no acoplada en {node_id}",
         },
+        "ship_docked": {
+            "en": "Action blocked: ship is docked at {node_id}. Use 'undock' before starting travel.",
+            "es": "Acción bloqueada: la nave está acoplada en {node_id}. Usa 'undock' antes de iniciar el viaje.",
+        },
         "scrap_empty": {
             "en": "No scrap available",
             "es": "No hay chatarra disponible",
@@ -958,15 +968,25 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             continue
         if e.type == EventType.DATA_SALVAGED:
             print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message}")
-            mounted_paths = e.data.get("mounted_paths") if isinstance(e.data, dict) else None
-            if isinstance(mounted_paths, list) and mounted_paths:
+            mounted_paths_new = e.data.get("mounted_paths_new") if isinstance(e.data, dict) else None
+            mounted_paths_existing = e.data.get("mounted_paths_existing") if isinstance(e.data, dict) else None
+            if isinstance(mounted_paths_new, list) and mounted_paths_new:
                 locale = state.os.locale.value
                 title = {
                     "en": "Recovered documents:",
                     "es": "Documentos recuperados:",
                 }.get(locale, "Recovered documents:")
                 print(title)
-                for path in mounted_paths:
+                for path in mounted_paths_new:
+                    print(f"- {path}")
+            if isinstance(mounted_paths_existing, list) and mounted_paths_existing:
+                locale = state.os.locale.value
+                title = {
+                    "en": "Already mounted documents:",
+                    "es": "Documentos ya montados:",
+                }.get(locale, "Already mounted documents:")
+                print(title)
+                for path in mounted_paths_existing:
                     print(f"- {path}")
             tip = None
             if isinstance(e.data, dict):
@@ -1073,6 +1093,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                 modules_detected = bool(e.data.get("modules_detected", False))
                 recoverable_drones = int(e.data.get("recoverable_drones_count", 0) or 0)
                 data_signatures = bool(e.data.get("data_signatures_detected", False))
+                scrap_complete = bool(e.data.get("scrap_complete", False))
+                data_complete = bool(e.data.get("data_complete", False))
+                extras_complete = bool(e.data.get("extras_complete", False))
+                node_cleaned = bool(e.data.get("node_cleaned", False))
                 uplink_detected = bool(e.data.get("uplink_detected", False))
                 if locale == "es":
                     print("=== SURVEY ===")
@@ -1092,6 +1116,12 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                         if uplink_detected
                         else "sin infraestructura con capacidad uplink"
                     )
+                    print(
+                        f"agotamiento: chatarra={'sí' if scrap_complete else 'no'}, "
+                        f"datos={'sí' if data_complete else 'no'}, "
+                        f"extras={'sí' if extras_complete else 'no'}"
+                    )
+                    print("nodo limpio" if node_cleaned else "nodo no limpio")
                 else:
                     print("=== SURVEY ===")
                     print(f"scrap detected: {scrap}")
@@ -1110,6 +1140,12 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                         if uplink_detected
                         else "no uplink-capable infrastructure detected"
                     )
+                    print(
+                        f"depletion: scrap={'yes' if scrap_complete else 'no'}, "
+                        f"data={'yes' if data_complete else 'no'}, "
+                        f"extras={'yes' if extras_complete else 'no'}"
+                    )
+                    print("node cleaned" if node_cleaned else "node not cleaned")
             continue
         if e.type == EventType.BOOT_BLOCKED:
             locale = state.os.locale.value
@@ -1979,28 +2015,52 @@ def render_modules_catalog(state) -> None:
 def render_debug_arcs(state) -> None:
     print("\n=== DEBUG ARCS ===")
     arcs = load_arcs()
+    placements = state.world.lore_placements.piece_to_node
+    channels = state.world.lore_placements.piece_channel_bindings
+    delivered = state.world.lore.delivered
     if not arcs:
         print("(none)")
     else:
-        placements = state.world.arc_placements
+        legacy = state.world.arc_placements
         for arc in arcs:
             arc_id = arc.get("arc_id", "?")
-            st = placements.get(arc_id, {})
-            primary = st.get("primary", {})
-            secondary = st.get("secondary", {})
-            counters = st.get("counters", {})
+            st = legacy.get(arc_id, {})
+            primary_piece = arc.get("primary_intel") or {}
             print(f"- {arc_id}:")
-            if primary.get("placed"):
-                print(f"  primary: {primary.get('node_id')} path={primary.get('path')}")
+            if primary_piece:
+                primary_id = primary_piece.get("id") or "primary"
+                primary_key = f"arc:{arc_id}:{primary_id}"
+                node_id = placements.get(primary_key)
+                channel = channels.get(primary_key, "-")
+                status = "delivered" if primary_key in delivered else ("assigned" if node_id else "unplaced")
+                if node_id:
+                    print(f"  primary: {node_id} channel={channel} status={status}")
+                else:
+                    print("  primary: (unplaced)")
             else:
-                print("  primary: (unplaced)")
-            if secondary:
-                for doc_id, info in secondary.items():
-                    print(f"  secondary: {doc_id} -> {info.get('node_id')} path={info.get('path')}")
+                print("  primary: (none)")
+            secondary_docs = arc.get("secondary_lore_docs", []) or []
+            if secondary_docs:
+                for doc in secondary_docs:
+                    doc_id = doc.get("id") or "secondary"
+                    doc_key = f"arc:{arc_id}:{doc_id}"
+                    node_id = placements.get(doc_key)
+                    channel = channels.get(doc_key, "-")
+                    status = "delivered" if doc_key in delivered else ("assigned" if node_id else "unplaced")
+                    if node_id:
+                        print(f"  secondary: {doc_id} -> {node_id} channel={channel} status={status}")
+                    else:
+                        print(f"  secondary: {doc_id} -> (unplaced)")
             else:
                 print("  secondary: (none)")
-            if counters:
-                print(f"  counters: {counters}")
+            if st:
+                counters = st.get("counters", {})
+                if counters:
+                    print(f"  legacy_counters: {counters}")
+        print(
+            f"- scheduler: eval_seq={state.world.lore_placements.eval_seq} "
+            f"next_non_forced_eval_t={state.world.lore_placements.next_non_forced_eval_t:.1f}s"
+        )
     print(f"- mobility_failsafe_count: {state.world.mobility_failsafe_count}")
     print(f"- mobility_no_new_uplink_count: {state.world.mobility_no_new_uplink_count}")
     if state.world.mobility_hints:
@@ -2022,44 +2082,76 @@ def render_debug_lore(state) -> None:
     counters = state.world.lore.counters
     print(f"- counters: {counters}")
     print(f"- last_delivery_t: {state.world.lore.last_delivery_t:.1f}s")
-    pending = []
-    arcs = load_arcs()
-    for arc in arcs:
-        arc_id = arc.get("arc_id", "?")
-        primary = arc.get("primary_intel", {})
-        pieces = []
-        if primary:
-            pieces.append(primary)
-        for doc in arc.get("secondary_lore_docs", []) or []:
-            pieces.append(doc)
-        for piece in pieces:
-            if not piece.get("force"):
-                continue
-            policy = piece.get("force_policy", "none")
-            if policy == "none":
-                continue
-            pid = piece.get("id") or "primary"
-            key = f"{arc_id}:{pid}"
-            if key in state.world.lore.delivered:
-                continue
-            pending.append(
-                {
-                    "key": key,
-                    "policy": policy,
-                    "deadline": piece.get("force_deadline"),
-                    "allowed": piece.get("allowed_channels"),
-                    "constraints": piece.get("constraints"),
-                }
-            )
-    if pending:
-        print("- forced_pending:")
-        for item in pending:
-            print(
-                f"  {item['key']} policy={item['policy']} "
-                f"deadline={item['deadline']} allowed={item['allowed']} constraints={item['constraints']}"
-            )
+    placements = state.world.lore_placements
+    print(f"- placements_count: {len(placements.piece_to_node)}")
+    print(
+        f"- scheduler: eval_seq={placements.eval_seq} "
+        f"next_non_forced_eval_t={placements.next_non_forced_eval_t:.1f}s"
+    )
+    if placements.piece_to_node:
+        print("- assigned_recent:")
+        assigned_recent = sorted(placements.piece_to_node.items())[-10:]
+        for piece_key, node_id in assigned_recent:
+            channel = placements.piece_channel_bindings.get(piece_key, "-")
+            status = "delivered" if piece_key in state.world.lore.delivered else "pending"
+            print(f"  {piece_key} -> {node_id} channel={channel} status={status}")
+
+    pending_forced_unplaced: list[dict] = []
+    pending_forced_assigned: list[dict] = []
+    for entry in list_lore_piece_entries():
+        piece = entry.get("piece") or {}
+        if not entry.get("force", False):
+            continue
+        policy = str(piece.get("force_policy", "none") or "none")
+        if policy == "none":
+            continue
+        piece_key = entry.get("piece_key")
+        if not piece_key or piece_key in state.world.lore.delivered:
+            continue
+        item = {
+            "key": piece_key,
+            "policy": policy,
+            "deadline": piece.get("force_deadline"),
+            "allowed": entry.get("channels"),
+            "constraints": piece.get("constraints"),
+            "node_id": placements.piece_to_node.get(piece_key),
+            "channel": placements.piece_channel_bindings.get(piece_key),
+        }
+        if item["node_id"]:
+            pending_forced_assigned.append(item)
+        else:
+            pending_forced_unplaced.append(item)
+
+    if pending_forced_unplaced or pending_forced_assigned:
+        if pending_forced_unplaced:
+            print("- forced_pending_unplaced:")
+            for item in pending_forced_unplaced:
+                print(
+                    f"  {item['key']} policy={item['policy']} "
+                    f"deadline={item['deadline']} allowed={item['allowed']} constraints={item['constraints']}"
+                )
+        if pending_forced_assigned:
+            print("- forced_pending_assigned:")
+            for item in pending_forced_assigned:
+                print(
+                    f"  {item['key']} node={item['node_id']} channel={item['channel']} policy={item['policy']}"
+                )
     else:
         print("- forced_pending: (none)")
+
+    current_node_id = state.world.current_node_id
+    pool = state.world.node_pools.get(current_node_id)
+    if pool:
+        pending_push = sorted(pid for pid in pool.pending_push_piece_ids if pid not in pool.delivered_piece_ids)
+        print(
+            f"- current_pool[{current_node_id}]: window_open={pool.window_open} "
+            f"node_cleaned={pool.node_cleaned} scrap_complete={pool.scrap_complete} "
+            f"data_complete={pool.data_complete} extras_complete={pool.extras_complete} "
+            f"uplink_data_consumed={pool.uplink_data_consumed}"
+        )
+        if pending_push:
+            print(f"  pending_push_count={len(pending_push)}")
+
     if state.world.dead_nodes:
         print("- dead_nodes:")
         for node_id, st in state.world.dead_nodes.items():
@@ -2095,6 +2187,203 @@ def render_debug_deadnodes(state) -> None:
         print("log:")
         for line in state.world.deadnode_log[-10:]:
             print(f"- {line}")
+
+
+def _galactic_radius_ly(x_ly: float, y_ly: float, z_ly: float) -> float:
+    cx = float(Balance.GALAXY_CENTER_X_LY)
+    cy = float(Balance.GALAXY_CENTER_Y_LY)
+    cz = float(Balance.GALAXY_CENTER_Z_LY)
+    dx = x_ly - cx
+    dy = y_ly - cy
+    dz = z_ly - cz
+    return (dx * dx + dy * dy + dz * dz) ** 0.5
+
+
+def _sector_center_ly(sector_id: str) -> tuple[float, float, float] | None:
+    coords = _sector_coords_from_id(sector_id)
+    if coords is None:
+        return None
+    sx, sy, sz = coords
+    half = SECTOR_SIZE_LY * 0.5
+    return (
+        sx * SECTOR_SIZE_LY + half,
+        sy * SECTOR_SIZE_LY + half,
+        sz * SECTOR_SIZE_LY + half,
+    )
+
+
+def _sector_region(sector_id: str) -> str:
+    center = _sector_center_ly(sector_id)
+    if center is None:
+        return "unknown"
+    x, y, z = center
+    return region_for_pos(x, y, z)
+
+
+def _neighbor_sectors_2d(sector_id: str) -> list[str]:
+    coords = _sector_coords_from_id(sector_id)
+    if coords is None:
+        return []
+    sx, sy, sz = coords
+    out: list[str] = []
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            if dx == 0 and dy == 0:
+                continue
+            out.append(f"S{sx+dx:+04d}_{sy+dy:+04d}_{sz:+04d}")
+    return out
+
+
+def _radiation_band_id(value: float) -> str:
+    v = max(0.0, float(value))
+    if v >= Balance.RAD_LEVEL_ENV_EXTREME:
+        return "extreme"
+    if v >= Balance.RAD_LEVEL_ENV_HIGH:
+        return "high"
+    if v >= Balance.RAD_LEVEL_ENV_ELEVATED:
+        return "elevated"
+    return "low"
+
+
+def render_debug_galaxy(state) -> None:
+    print("\n=== DEBUG GALAXY ===")
+    cx = float(Balance.GALAXY_CENTER_X_LY)
+    cy = float(Balance.GALAXY_CENTER_Y_LY)
+    cz = float(Balance.GALAXY_CENTER_Z_LY)
+    bulge_r = float(Balance.GALAXY_BULGE_RADIUS_LY)
+    disk_r = float(Balance.GALAXY_DISK_OUTER_RADIUS_LY)
+    print(f"- model: center=({cx:.2f},{cy:.2f},{cz:.2f}) bulge<{bulge_r:.2f}ly disk<{disk_r:.2f}ly halo>=disk")
+
+    px, py, pz = state.world.current_pos_ly
+    pr = _galactic_radius_ly(px, py, pz)
+    pregion = region_for_pos(px, py, pz)
+    psector = sector_id_for_pos(px, py, pz)
+    print(
+        f"- player: node={state.world.current_node_id} sector={psector} "
+        f"pos=({px:.2f},{py:.2f},{pz:.2f}) r_gc={pr:.2f}ly region={pregion}"
+    )
+    if pregion == "bulge":
+        print(f"- margin: to_disk={max(0.0, bulge_r - pr):.2f}ly (inside bulge)")
+    elif pregion == "disk":
+        print(
+            f"- margin: to_bulge={max(0.0, pr - bulge_r):.2f}ly "
+            f"to_halo={max(0.0, disk_r - pr):.2f}ly (inside disk)"
+        )
+    else:
+        print(f"- margin: beyond_disk={max(0.0, pr - disk_r):.2f}ly (inside halo)")
+
+    sector_ids: set[str] = set(state.world.generated_sectors)
+    for node in state.world.space.nodes.values():
+        sector_ids.add(sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly))
+    sector_ids.add(psector)
+
+    region_counts: dict[str, int] = {"bulge": 0, "disk": 0, "halo": 0, "unknown": 0}
+    for sid in sector_ids:
+        region = _sector_region(sid)
+        region_counts[region] = region_counts.get(region, 0) + 1
+    print(
+        f"- sectors_seen: total={len(sector_ids)} "
+        f"bulge={region_counts.get('bulge', 0)} disk={region_counts.get('disk', 0)} halo={region_counts.get('halo', 0)}"
+    )
+
+    transitions: dict[tuple[str, str], int] = {}
+    for sid in sorted(sector_ids):
+        r1 = _sector_region(sid)
+        for nid in _neighbor_sectors_2d(sid):
+            if nid not in sector_ids or sid >= nid:
+                continue
+            r2 = _sector_region(nid)
+            key = tuple(sorted((r1, r2)))
+            transitions[key] = transitions.get(key, 0) + 1
+    same = sum(v for k, v in transitions.items() if k[0] == k[1])
+    bd = transitions.get(("bulge", "disk"), 0)
+    dh = transitions.get(("disk", "halo"), 0)
+    bh = transitions.get(("bulge", "halo"), 0)
+    print(f"- sector_adjacency: same_region={same} bulge<->disk={bd} disk<->halo={dh} bulge<->halo={bh}")
+    if bh > 0:
+        print("! warning: bulge<->halo direct adjacency detected (coherence risk)")
+    if state.world.current_node_id == "UNKNOWN_00" and pregion != "disk":
+        print("! warning: prologue start node UNKNOWN_00 is not in disk")
+
+    authored_ids = _authored_node_ids()
+    proc_values: list[float] = []
+    authored_count = 0
+    procedural_count = 0
+    by_region: dict[str, list[float]] = {}
+    by_kind: dict[str, list[float]] = {}
+    for node in state.world.space.nodes.values():
+        is_authored = node.node_id in authored_ids
+        if is_authored:
+            authored_count += 1
+            continue
+        procedural_count += 1
+        val = max(0.0, float(node.radiation_rad_per_s))
+        proc_values.append(val)
+        reg = node.region or region_for_pos(node.x_ly, node.y_ly, node.z_ly)
+        by_region.setdefault(reg, []).append(val)
+        by_kind.setdefault(node.kind or "unknown", []).append(val)
+    print(f"- nodes: total={len(state.world.space.nodes)} authored={authored_count} procedural={procedural_count}")
+
+    if proc_values:
+        pmin = min(proc_values)
+        pmax = max(proc_values)
+        pavg = sum(proc_values) / len(proc_values)
+        bands: dict[str, int] = {"low": 0, "elevated": 0, "high": 0, "extreme": 0}
+        for v in proc_values:
+            bands[_radiation_band_id(v)] += 1
+        print(
+            f"- procedural_rad_live: min={pmin:.4f} max={pmax:.4f} mean={pavg:.4f} rad/s "
+            f"| low={bands['low']} elevated={bands['elevated']} high={bands['high']} extreme={bands['extreme']}"
+        )
+        for reg in sorted(by_region.keys()):
+            vals = by_region[reg]
+            avg = sum(vals) / len(vals)
+            print(f"  region[{reg}]: n={len(vals)} mean={avg:.4f} min={min(vals):.4f} max={max(vals):.4f}")
+        for kind in sorted(by_kind.keys()):
+            vals = by_kind[kind]
+            avg = sum(vals) / len(vals)
+            print(f"  kind[{kind}]: n={len(vals)} mean={avg:.4f} min={min(vals):.4f} max={max(vals):.4f}")
+    else:
+        print("- procedural_rad_live: (no procedural nodes loaded)")
+
+    # Deterministic synthetic estimate for the current seed/model.
+    templates = load_worldgen_templates()
+    weights = {k: float(v) for k, v in region_counts.items() if k in {"bulge", "disk", "halo"} and float(v) > 0.0}
+    if not weights:
+        weights = {"disk": 1.0}
+    total_w = sum(weights.values())
+    if total_w <= 0.0:
+        weights = {"disk": 1.0}
+        total_w = 1.0
+    acc: list[tuple[str, float]] = []
+    running = 0.0
+    for reg, w in sorted(weights.items()):
+        running += w / total_w
+        acc.append((reg, running))
+    rng = random.Random(state.meta.rng_seed ^ 0xA5A5A5A5)
+    syn_count = 6000
+    syn_bands: dict[str, int] = {"low": 0, "elevated": 0, "high": 0, "extreme": 0}
+    for i in range(syn_count):
+        r = rng.random()
+        reg = acc[-1][0]
+        for name, cutoff in acc:
+            if r <= cutoff:
+                reg = name
+                break
+        tmpl = templates.get(reg) or templates.get("disk") or {}
+        kind_weights = tmpl.get("kind_weights", {}) or {}
+        ship_w = max(0.0, float(kind_weights.get("ship", 0.10)))
+        total_kind = sum(max(0.0, float(v)) for v in kind_weights.values()) or 1.0
+        kind = "ship" if rng.random() < (ship_w / total_kind) else "station"
+        value = procedural_radiation_for_node(state.meta.rng_seed, f"SYN_{reg}_{kind}_{i:05d}", kind, reg)
+        syn_bands[_radiation_band_id(value)] += 1
+    print(
+        "- procedural_rad_synth[seed]: "
+        f"low={100.0*syn_bands['low']/syn_count:.2f}% "
+        f"elevated={100.0*syn_bands['elevated']/syn_count:.2f}% "
+        f"high={100.0*syn_bands['high']/syn_count:.2f}% "
+        f"extreme={100.0*syn_bands['extreme']/syn_count:.2f}%"
+    )
 
 def _render_contacts_table(state) -> None:
     current_id = state.world.current_node_id
@@ -2340,222 +2629,6 @@ def _state_rank(state: SystemState) -> int:
     return order[state]
 
 
-def _discover_routes_via_uplink(state, current_id: str, max_new: int = 3) -> list[str]:
-    """Return up to max_new new route destinations discovered via uplink.
-
-    Selection uses weighted candidates in this order (unless an authored uplink_table is provided):
-    1) Known contacts without routes (hubs favored: station/waystation/relay weight=10,
-       ships/derelicts weight=2).
-    2) Hubs in the same sector (weight=6).
-    3) Hubs in neighboring sectors (weight=5), generating neighbor sectors if needed.
-    4) Extra derelicts (weight=1).
-
-    Additional rules:
-    - Never add self-links.
-    - Prefer (guarantee) one visible hub without a route if available.
-    - Adds links bidirectionally and updates known_nodes/known_contacts.
-    - If the current authored hub defines uplink_table, select those authored hubs first
-      (min_authored..max_authored) using their weights, then fill remaining slots normally.
-    - Returns the list of newly added destination node_ids.
-    """
-    if max_new <= 0:
-        return []
-    node = state.world.space.nodes.get(current_id)
-    if node:
-        x, y, z = node.x_ly, node.y_ly, node.z_ly
-    else:
-        x, y, z = state.world.current_pos_ly
-
-    sx = math.floor(x / SECTOR_SIZE_LY)
-    sy = math.floor(y / SECTOR_SIZE_LY)
-    sz = math.floor(z / SECTOR_SIZE_LY)
-    current_sector = f"S{sx:+04d}_{sy:+04d}_{sz:+04d}"
-
-    routes = state.world.known_links.get(current_id, set())
-    locked_primary_targets = _locked_primary_targets(state)
-    hub_kinds = {"relay", "station", "waystation"}
-    deterministic = Balance.DETERMINISTIC_LORE_INTEL
-    candidates: dict[str, int] = {}
-
-    def _add_candidate(nid: str, weight: int) -> None:
-        if nid == current_id or nid in routes or nid in locked_primary_targets:
-            return
-        prev = candidates.get(nid, 0)
-        if weight > prev:
-            candidates[nid] = weight
-
-    added: list[str] = []
-
-    # 0) Optional authored uplink table (only for authored hubs).
-    uplink_cfg = None
-    for loc in load_locations():
-        node_cfg = loc.get("node", {})
-        if node_cfg.get("node_id") == current_id:
-            uplink_cfg = loc.get("uplink_table")
-            break
-    if uplink_cfg and isinstance(uplink_cfg, dict):
-        authored_pool = uplink_cfg.get("authored_candidates") or []
-        min_auth = int(uplink_cfg.get("min_authored", 0) or 0)
-        max_auth = int(uplink_cfg.get("max_authored", 0) or 0)
-        if max_auth < min_auth:
-            max_auth = min_auth
-        if max_auth > max_new:
-            max_auth = max_new
-        # Build weighted list of valid authored hubs.
-        authored_weights: list[tuple[str, int]] = []
-        authored_ids = _authored_node_ids()
-        for entry in authored_pool:
-            node_id = entry.get("node_id") if isinstance(entry, dict) else None
-            weight = int(entry.get("weight", 1)) if isinstance(entry, dict) else 1
-            if not node_id or node_id == current_id or node_id in routes:
-                continue
-            if node_id in locked_primary_targets:
-                continue
-            if node_id not in authored_ids:
-                continue
-            if node_id not in state.world.space.nodes:
-                continue
-            authored_weights.append((node_id, max(1, weight)))
-        if authored_weights and max_auth > 0:
-            seed = _hash64(state.meta.rng_seed + state.meta.rng_counter, f"uplink_table:{current_id}")
-            state.meta.rng_counter += 1
-            rng = random.Random(seed)
-            pool = list(authored_weights)
-            picks: list[str] = []
-            while pool and len(picks) < max_auth:
-                total = sum(w for _, w in pool)
-                if total <= 0:
-                    break
-                roll = rng.uniform(0, total)
-                upto = 0.0
-                picked_index = 0
-                for i, (_, weight) in enumerate(pool):
-                    upto += weight
-                    if roll <= upto:
-                        picked_index = i
-                        break
-                dest, _weight = pool.pop(picked_index)
-                if dest in picks:
-                    continue
-                picks.append(dest)
-            # Ensure at least min_authored if possible.
-            if min_auth > 0 and len(picks) < min_auth:
-                for dest, _weight in pool:
-                    if dest in picks:
-                        continue
-                    picks.append(dest)
-                    if len(picks) >= min_auth:
-                        break
-            for dest in picks:
-                if add_known_link(state.world, current_id, dest, bidirectional=True):
-                    state.world.known_nodes.add(dest)
-                    state.world.known_contacts.add(dest)
-                    added.append(dest)
-        if state.os.debug_enabled and authored_pool:
-            print(f"[DEBUG] uplink_table applied: {current_id} -> {', '.join(added) if added else '(none)'}")
-
-    # 1) Known contacts without routes (weighted by kind).
-    known_nodes_iter = sorted(state.world.known_nodes) if deterministic else state.world.known_nodes
-    for nid in known_nodes_iter:
-        if nid == current_id or nid in routes:
-            continue
-        n = state.world.space.nodes.get(nid)
-        if n and n.kind in hub_kinds:
-            _add_candidate(nid, 10)
-        elif n and n.kind in {"ship", "derelict"}:
-            _add_candidate(nid, 2)
-        else:
-            _add_candidate(nid, 1)
-
-    # 2) Hubs in same sector.
-    space_nodes_iter = sorted(state.world.space.nodes) if deterministic else state.world.space.nodes
-    for nid in space_nodes_iter:
-        n = state.world.space.nodes[nid]
-        if not n.is_hub:
-            continue
-        if sector_id_for_pos(n.x_ly, n.y_ly, n.z_ly) == current_sector:
-            _add_candidate(nid, 6)
-
-    # 3) Hubs in neighboring sectors.
-    neighbor_sectors: list[str] = []
-    for dx in (-1, 0, 1):
-        for dy in (-1, 0, 1):
-            sector_id = f"S{sx+dx:+04d}_{sy+dy:+04d}_{sz:+04d}"
-            neighbor_sectors.append(sector_id)
-            ensure_sector_generated(state, sector_id)
-    space_nodes_iter = sorted(state.world.space.nodes) if deterministic else state.world.space.nodes
-    for nid in space_nodes_iter:
-        n = state.world.space.nodes[nid]
-        if not n.is_hub:
-            continue
-        sid = sector_id_for_pos(n.x_ly, n.y_ly, n.z_ly)
-        if sid in neighbor_sectors:
-            _add_candidate(nid, 5)
-
-    # 4) Extra derelicts.
-    space_nodes_iter = sorted(state.world.space.nodes) if deterministic else state.world.space.nodes
-    for nid in space_nodes_iter:
-        n = state.world.space.nodes[nid]
-        if n.kind == "derelict":
-            _add_candidate(nid, 1)
-
-    if not candidates and added:
-        return added
-    if not candidates and not added:
-        return []
-
-    seed = _hash64(state.meta.rng_seed + state.meta.rng_counter, current_id)
-    state.meta.rng_counter += 1
-    rng = random.Random(seed)
-
-    # Guarantee one visible hub without a route if available.
-    visible_hubs = []
-    known_nodes_iter = sorted(state.world.known_nodes) if deterministic else state.world.known_nodes
-    for nid in known_nodes_iter:
-        if nid == current_id or nid in routes:
-            continue
-        if nid in locked_primary_targets:
-            continue
-        n = state.world.space.nodes.get(nid)
-        if n and n.kind in hub_kinds:
-            dx = n.x_ly - x
-            dy = n.y_ly - y
-            dz = n.z_ly - z
-            dist = dx * dx + dy * dy + dz * dz
-            visible_hubs.append((dist, nid))
-    if visible_hubs and len(added) < max_new:
-        visible_hubs.sort()
-        picked = visible_hubs[0][1]
-        if add_known_link(state.world, current_id, picked, bidirectional=True):
-            state.world.known_nodes.add(picked)
-            state.world.known_contacts.add(picked)
-            added.append(picked)
-        candidates.pop(picked, None)
-
-    # Weighted selection without replacement.
-    pool = sorted(candidates.items()) if deterministic else list(candidates.items())
-    while pool and len(added) < max_new:
-        total = sum(weight for _, weight in pool)
-        if total <= 0:
-            break
-        roll = rng.uniform(0, total)
-        upto = 0.0
-        picked_index = 0
-        for i, (_, weight) in enumerate(pool):
-            upto += weight
-            if roll <= upto:
-                picked_index = i
-                break
-        dest, _weight = pool.pop(picked_index)
-        if dest == current_id:
-            continue
-        if add_known_link(state.world, current_id, dest, bidirectional=True):
-            state.world.known_nodes.add(dest)
-            state.world.known_contacts.add(dest)
-            added.append(dest)
-    return added
-
-
 def _authored_node_ids() -> set[str]:
     node_ids: set[str] = set()
     for loc in load_locations():
@@ -2762,6 +2835,7 @@ def _terminal_state_allows(parsed) -> bool:
             "DEBUG_LORE",
             "DEBUG_DEADNODES",
             "DEBUG_MODULES",
+            "DEBUG_GALAXY",
             "DEBUG_SEED",
             "DEBUG_SCENARIO",
         }:
@@ -2914,38 +2988,67 @@ def _handle_uplink(state) -> None:
     if reason:
         print(blocked.get(locale, blocked["en"]).get(reason, blocked["en"]["not_relay"]))
         return
-    added = _discover_routes_via_uplink(state, state.world.current_node_id, max_new=3)
+    sync_node_pools_for_known_nodes(state)
+    current_node_id = state.world.current_node_id
+    pool = state.world.node_pools.get(current_node_id)
+    if pool and pool.uplink_data_consumed:
+        msg = {
+            "en": "uplink_complete :: node data already exhausted",
+            "es": "uplink_complete :: datos del nodo ya agotados",
+        }
+        print(msg.get(locale, msg["en"]))
+        events_out: list[tuple[str, Event]] = []
+        _emit_runtime_event(
+            state,
+            events_out,
+            "cmd",
+            EventType.UPLINK_COMPLETE,
+            Severity.INFO,
+            SourceRef(kind="ship_system", id="data_core"),
+            msg.get(locale, msg["en"]),
+            data={"routes": []},
+        )
+        return
+    fixed_pool = list(pool.uplink_route_pool) if pool else []
+    added: list[str] = []
+    for dest in fixed_pool:
+        if not dest or dest == current_node_id:
+            continue
+        if add_known_link(state.world, current_node_id, dest, bidirectional=True):
+            added.append(dest)
+        state.world.known_nodes.add(dest)
+        state.world.known_contacts.add(dest)
     if added:
         state.world.mobility_no_new_uplink_count = 0
     else:
         state.world.mobility_no_new_uplink_count += 1
-
-    stuck = not _has_global_unvisited_route_within_range(state)
-    signal_added: set[str] = set()
-    if not added and (stuck or state.world.mobility_no_new_uplink_count >= Balance.UPLINK_FAILSAFE_N):
-        dest = _apply_mobility_failsafe(state, added)
-        if dest:
-            signal_added.add(dest)
-            state.world.mobility_no_new_uplink_count = 0
+        no_local_unvisited = len(_known_routes_to_unvisited(state, current_node_id)) == 0
+        no_global_unvisited = not _has_global_unvisited_route_within_range(state)
+        if (
+            state.world.mobility_no_new_uplink_count >= Balance.UPLINK_FAILSAFE_N
+            and no_local_unvisited
+            and no_global_unvisited
+        ):
+            failover = _apply_mobility_failsafe(state, added)
+            if failover:
+                state.world.mobility_no_new_uplink_count = 0
 
     if added:
         for nid in added:
-            if nid in signal_added:
-                continue
             record_intel(
                 state.world,
                 t=state.clock.t,
                 kind="link",
-                from_id=state.world.current_node_id,
+                from_id=current_node_id,
                 to_id=nid,
                 confidence=0.9,
                 source_kind="uplink",
-                source_ref=state.world.current_node_id,
+                source_ref=current_node_id,
             )
     if "/logs/nav" not in state.os.fs:
         state.os.fs["/logs/nav"] = FSNode(path="/logs/nav", node_type=FSNodeType.DIR, access=AccessLevel.GUEST)
     seq = state.events.next_event_seq
-    log_path = f"/logs/nav/uplink_{state.world.current_node_id}_{seq:05d}.txt"
+    log_path = f"/logs/nav/uplink_{current_node_id}_{seq:05d}.txt"
     log_content = "".join(f"LINK: {nid}\n" for nid in added)
     state.os.fs[log_path] = FSNode(
         path=log_path,
@@ -2964,21 +3067,11 @@ def _handle_uplink(state) -> None:
             "es": "uplink_complete :: no se encontraron rutas nuevas",
         }
     print(msg.get(locale, msg["en"]))
-    node = state.world.space.nodes.get(state.world.current_node_id)
-    if node:
-        region = node.region or region_for_pos(node.x_ly, node.y_ly, node.z_ly)
-        dist = math.sqrt(node.x_ly * node.x_ly + node.y_ly * node.y_ly + node.z_ly * node.z_ly)
-    else:
-        region = ""
-        dist = 0.0
-    year = state.clock.t / Balance.YEAR_S if Balance.YEAR_S else 0.0
-    lore_ctx = LoreContext(
-        node_id=state.world.current_node_id,
-        region=region,
-        dist_from_origin_ly=dist,
-        year_since_wake=year,
-    )
-    lore_result = maybe_deliver_lore(state, "uplink", lore_ctx)
+    lore_ctx = build_lore_context(state, current_node_id)
+    lore_result = maybe_deliver_lore(state, "uplink", lore_ctx, count_trigger=False)
+    if added or lore_result.files or lore_result.events:
+        counters = state.world.lore.counters
+        counters["uplink_count"] = counters.get("uplink_count", 0) + 1
     if lore_result.events:
         render_events(state, [("cmd", e) for e in lore_result.events])
         for e in lore_result.events:
@@ -2992,6 +3085,9 @@ def _handle_uplink(state) -> None:
             state.events.recent.append(e)
         if len(state.events.recent) > 50:
             state.events.recent = state.events.recent[-50:]
+    if pool:
+        pool.uplink_data_consumed = True
+        recompute_node_completion(state, current_node_id)
     events_out: list[tuple[str, Event]] = []
     _emit_runtime_event(
         state,
@@ -3359,16 +3455,19 @@ def _handle_intel_import(state, path: str) -> None:
             h.update(coord_txt.encode("utf-8"))
             nid = f"NAV_{int.from_bytes(h.digest(), 'big'):08x}"
             if nid not in state.world.space.nodes:
+                region = region_for_pos(x, y, z)
                 node = SpaceNode(
                     node_id=nid,
                     name="Nav Point",
                     kind="nav_point",
-                    radiation_rad_per_s=0.0,
+                    radiation_rad_per_s=procedural_radiation_for_node(
+                        state.meta.rng_seed, nid, "nav_point", region
+                    ),
                     x_ly=x,
                     y_ly=y,
                     z_ly=z,
                 )
-                node.region = region_for_pos(x, y, z)
+                node.region = region
                 state.world.space.nodes[nid] = node
             if nid not in state.world.known_nodes:
                 state.world.known_intel[nid] = {"source": path, "coord": [x, y, z]}
@@ -3500,16 +3599,19 @@ def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str
             h.update(coord_txt.encode("utf-8"))
             nid = f"NAV_{int.from_bytes(h.digest(), 'big'):08x}"
             if nid not in state.world.space.nodes:
+                region = region_for_pos(x, y, z)
                 node = SpaceNode(
                     node_id=nid,
                     name="Nav Point",
                     kind="nav_point",
-                    radiation_rad_per_s=0.0,
+                    radiation_rad_per_s=procedural_radiation_for_node(
+                        state.meta.rng_seed, nid, "nav_point", region
+                    ),
                     x_ly=x,
                     y_ly=y,
                     z_ly=z,
                 )
-                node.region = region_for_pos(x, y, z)
+                node.region = region
                 state.world.space.nodes[nid] = node
             if nid not in state.world.known_nodes:
                 state.world.known_intel[nid] = {"source": source_path, "coord": [x, y, z]}
@@ -4446,6 +4548,37 @@ def render_cat(state, path: str) -> None:
             for msg in sorted(set(added)):
                 print(msg)
 
+
+def _mail_headers_from_content(content: str) -> tuple[str | None, str | None]:
+    sender: str | None = None
+    subject: str | None = None
+    for raw in content.splitlines()[:20]:
+        line = raw.strip()
+        if sender is None and line.upper().startswith("FROM:"):
+            sender = line.split(":", 1)[1].strip() or None
+            continue
+        if subject is None and line.upper().startswith("SUBJ:"):
+            subject = line.split(":", 1)[1].strip() or None
+            continue
+        if sender is not None and subject is not None:
+            break
+    return sender, subject
+
+
+def _mail_path_for_base(state, box: str, base: str, entries: list[str]) -> str | None:
+    locale = state.os.locale.value
+    preferred = f"{base}.{locale}.txt"
+    if preferred in entries:
+        return f"/mail/{box}/{preferred}"
+    generic = f"{base}.txt"
+    if generic in entries:
+        return f"/mail/{box}/{generic}"
+    for alt in ("en", "es"):
+        candidate = f"{base}.{alt}.txt"
+        if candidate in entries:
+            return f"/mail/{box}/{candidate}"
+    return None
+
 def render_mailbox(state, box: str) -> None:
     path = f"/mail/{box}"
     print(f"\n=== MAIL {box} ===")
@@ -4453,15 +4586,47 @@ def render_mailbox(state, box: str) -> None:
     if not entries:
         print("(empty)")
         return
+    notices = [name for name in entries if name.endswith(".notice.txt")]
+    for name in sorted(notices):
+        print(f"- {name}")
+
+    base_ids: set[str] = set()
     for name in entries:
+        if not name.endswith(".txt"):
+            continue
         if name.endswith(".notice.txt"):
-            print(f"- {name}")
             continue
-        if name.endswith(f".{state.os.locale.value}.txt"):
-            print(f"- {name}")
-            continue
-        if name.endswith(".txt") and f"{name[:-4]}.{state.os.locale.value}.txt" not in entries:
-            print(f"- {name}")
+        base = name[:-4]
+        if base.endswith(".en") or base.endswith(".es"):
+            base = base[:-3]
+        if base:
+            base_ids.add(base)
+    ordered = sorted(
+        base_ids,
+        key=lambda base: (
+            state.os.mail_received_t.get(base, -1.0),
+            state.os.mail_received_seq_map.get(base, -1),
+            base,
+        ),
+        reverse=True,
+    )
+    for base in ordered:
+        full_path = _mail_path_for_base(state, box, base, entries)
+        sender: str | None = None
+        subject: str | None = None
+        if full_path:
+            node = state.os.fs.get(full_path)
+            if node and node.node_type == FSNodeType.FILE:
+                sender, subject = _mail_headers_from_content(node.content or "")
+        tags: list[str] = []
+        if sender:
+            tags.append(f"from={sender}")
+        if subject:
+            tags.append(f"subj={subject}")
+        if tags:
+            print(f"- {base} ({', '.join(tags)})")
+        else:
+            print(f"- {base}")
 
 def _latest_mail_id(state, box: str) -> str | None:
     path = f"/mail/{box}"
@@ -4962,6 +5127,49 @@ def render_alert_explain(state, alert_key: str) -> None:
         print("- energy_distribution must not be OFFLINE")
         print("- Decontamination does not require positive net power or scrap")
 
+
+def _known_contact_ids_for_completion(state) -> list[str]:
+    known_ids = (
+        state.world.known_nodes
+        if hasattr(state.world, "known_nodes") and state.world.known_nodes
+        else state.world.known_contacts
+    )
+    return sorted(c for c in known_ids if c != "UNKNOWN_00")
+
+
+def _drone_local_world_node_targets_for_completion(state) -> list[str]:
+    # Drone world interactions are local to the ship position (orbit/docked node).
+    candidates: list[str] = []
+    current_node_id = getattr(state.world, "current_node_id", "")
+    if current_node_id and current_node_id != "UNKNOWN_00":
+        node = state.world.space.nodes.get(current_node_id)
+        if node and node.kind != "transit":
+            candidates.append(current_node_id)
+    docked_node_id = getattr(state.ship, "docked_node_id", None)
+    if (
+        docked_node_id
+        and docked_node_id != "UNKNOWN_00"
+        and docked_node_id in state.world.space.nodes
+    ):
+        candidates.append(docked_node_id)
+    return list(dict.fromkeys(candidates))
+
+
+def _drone_ship_sector_targets_for_completion(state) -> list[str]:
+    return sorted(s for s in state.ship.sectors.keys() if s != "UNKNOWN_00")
+
+
+def _drone_move_targets_for_completion(state) -> list[str]:
+    # Single extension point for future docked-node interiors.
+    targets = _drone_local_world_node_targets_for_completion(state) + _drone_ship_sector_targets_for_completion(state)
+    return list(dict.fromkeys(targets))
+
+
+def _drone_deploy_targets_for_completion(state) -> list[str]:
+    # Same contextual targeting as move for now; separated for future divergence.
+    return _drone_move_targets_for_completion(state)
+
+
 def main() -> None:
     from retorno.cli.parser import ParseError, parse_command, format_parse_error
 
@@ -5122,16 +5330,10 @@ def main() -> None:
                 with loop.with_lock() as locked_state:
                     systems = list(locked_state.ship.systems.keys())
                     drones = list(locked_state.ship.drones.keys())
-                    sectors = [s for s in locked_state.ship.sectors.keys() if s != "UNKNOWN_00"]
-                    contacts = sorted(
-                        c
-                        for c in (
-                            locked_state.world.known_nodes
-                            if hasattr(locked_state.world, "known_nodes") and locked_state.world.known_nodes
-                            else locked_state.world.known_contacts
-                        )
-                        if c != "UNKNOWN_00"
-                    )
+                    contacts = _known_contact_ids_for_completion(locked_state)
+                    drone_local_world_targets = _drone_local_world_node_targets_for_completion(locked_state)
+                    drone_move_targets = _drone_move_targets_for_completion(locked_state)
+                    drone_deploy_targets = _drone_deploy_targets_for_completion(locked_state)
                     modules = list(set(locked_state.ship.cargo_modules or locked_state.ship.manifest_modules))
                     services = []
                     for sys in locked_state.ship.systems.values():
@@ -5231,7 +5433,7 @@ def main() -> None:
                         candidates = [c for c in ["cruise", "normal"] if c.startswith(text)]
                 elif cmd == "debug":
                     if len(tokens) == 2:
-                        candidates = [c for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "modules"] if c.startswith(text)]
+                        candidates = [c for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "modules", "galaxy"] if c.startswith(text)]
                     elif len(tokens) == 3 and tokens[1] == "scenario":
                         candidates = [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
                 elif cmd == "module":
@@ -5351,14 +5553,11 @@ def main() -> None:
                     elif len(tokens) == 3 and tokens[1] in {"status", "deploy", "deploy!", "reboot", "recall", "autorecall", "repair", "move", "install", "survey"}:
                         candidates = [d for d in drones if d.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
-                        candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
+                        candidates = [t for t in drone_deploy_targets if t.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "move":
                         ship_aliases = [locked_state.ship.ship_id] if locked_state.ship.ship_id.startswith(text) else []
-                        candidates = (
-                            [s for s in sectors if s.startswith(text)]
-                            + [c for c in contacts if c.startswith(text)]
-                            + ship_aliases
-                        )
+                        local_targets = [t for t in drone_move_targets if t.startswith(text)]
+                        candidates = list(dict.fromkeys(local_targets + ship_aliases))
                     elif len(tokens) == 4 and tokens[1] == "autorecall":
                         candidates = [c for c in ["on", "off", "10"] if c.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "install":
@@ -5366,20 +5565,20 @@ def main() -> None:
                     elif len(tokens) == 4 and tokens[1] == "repair":
                         candidates = [x for x in sorted(set(systems) | set(drones)) if x.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "survey":
-                        candidates = [c for c in contacts if c.startswith(text)]
+                        candidates = [c for c in drone_local_world_targets if c.startswith(text)]
                     elif len(tokens) == 3 and tokens[1] == "salvage":
                         candidates = [c for c in ["scrap", "module", "modules", "drone", "drones", "data"] if c.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "salvage":
                         candidates = [d for d in drones if d.startswith(text)]
                     elif len(tokens) == 5 and tokens[1] == "salvage":
-                        candidates = [c for c in contacts if c.startswith(text)]
+                        candidates = [c for c in drone_local_world_targets if c.startswith(text)]
                 elif cmd == "salvage":
                     if len(tokens) == 2:
                         candidates = [c for c in ["scrap", "module", "modules", "drone", "drones", "data"] if c.startswith(text)]
                     elif len(tokens) == 3:
                         candidates = [d for d in drones if d.startswith(text)]
                     elif len(tokens) == 4:
-                        candidates = [c for c in contacts if c.startswith(text)]
+                        candidates = [c for c in drone_local_world_targets if c.startswith(text)]
                 elif cmd == "route":
                     if len(tokens) == 2:
                         candidates = [c for c in ["solve"] if c.startswith(text)]
@@ -5583,6 +5782,13 @@ def main() -> None:
                     print("debug modules: available only in DEBUG mode. Use: debug on")
                     continue
                 render_modules_catalog(locked_state)
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_GALAXY":
+            with loop.with_lock() as locked_state:
+                if not locked_state.os.debug_enabled:
+                    print("debug galaxy: available only in DEBUG mode. Use: debug on")
+                    continue
+                render_debug_galaxy(locked_state)
             continue
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SEED":
             with loop.with_lock() as locked_state:

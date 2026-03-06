@@ -1,10 +1,10 @@
-- energy_distribution: Δhealth=-0.019 now=0.931
-SoC: start=0.365 end=1.000
-> dock DERELICT_30D4D3
-[CMD] [INFO] job_queued :: J32 dock target=world_node:DERELICT_30D4D3 ETA=12s
-completions: CURL_12 DERELICT_30D4D3 ECHO_7 HARBOR_12 MOURN_ANCHOR WRECK_B0C2BC
-[AUTO] [INFO] docked :: Docked at DERELICT_30D4D3
-[AUTO] [INFO] broadcast_received :: broadcast_received :: Station broadcast: /logs/broadcasts/DERELICT_30D4D3_0129.en.txt
-> cat /logs/broadcasts/DERELICT_30D4D3_0129.en.txt
-=== CAT /logs/broadcasts/DERELICT_30D4D3_0129.en.txt ===
+[CMD] [INFO] job_queued :: J10 recall_drone target=drone:D1 ETA=25s
+> wait 25
+[STEP] Drone recalled: D1
+[STEP] [WARN] drone_bay_maintenance_blocked :: Docked drones need maintenance but bay support conditions are not met (charge_needed=1, repair_needed=1)
+> wait 400
+> wait 400
+> wait 400
+[STEP] [INFO] arrived :: Arrived at ECHO_7 (from UNKNOWN_00)
+completions: BRG-01 CRG-01 CURL_12 DRN-BAY ECHO_7 PWR-A2 WRECK_B0C2BC
 > log copy 10

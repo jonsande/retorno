@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import MISSING, dataclass, field, fields
 from typing import Optional, Tuple
+from retorno.config.balance import Balance
 
 
 @dataclass(slots=True)
@@ -76,6 +77,7 @@ class WorldState:
     known_contacts: set[str] = field(default_factory=set)
     known_nodes: set[str] = field(default_factory=set)
     known_intel: dict[str, dict] = field(default_factory=dict)
+    forced_hidden_nodes: set[str] = field(default_factory=set)
     intel: list[IntelItem] = field(default_factory=list)
     next_intel_seq: int = 1
     next_tmp_seq: int = 1
@@ -96,8 +98,36 @@ class WorldState:
     visited_nodes: set[str] = field(default_factory=set)
     fine_ranges_km: dict[str, float] = field(default_factory=dict)
     lore: "LoreSchedulerState" = field(default_factory=lambda: LoreSchedulerState())
+    node_pools: dict[str, "NodePoolState"] = field(default_factory=dict)
+    lore_placements: "LorePlacementState" = field(default_factory=lambda: LorePlacementState())
     dead_nodes: dict[str, "DeadNodeState"] = field(default_factory=dict)
     deadnode_log: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class NodePoolState:
+    initialized_t: float = 0.0
+    window_open: bool = True
+    window_closed_t: float | None = None
+    window_closed_reason: str | None = None
+    base_files: list[dict] = field(default_factory=list)
+    injected_files: list[dict] = field(default_factory=list)
+    pending_push_piece_ids: set[str] = field(default_factory=set)
+    delivered_piece_ids: set[str] = field(default_factory=set)
+    uplink_route_pool: list[str] = field(default_factory=list)
+    uplink_data_consumed: bool = False
+    scrap_complete: bool = False
+    data_complete: bool = False
+    extras_complete: bool = False
+    node_cleaned: bool = False
+
+
+@dataclass(slots=True)
+class LorePlacementState:
+    piece_to_node: dict[str, str] = field(default_factory=dict)
+    piece_channel_bindings: dict[str, str] = field(default_factory=dict)
+    next_non_forced_eval_t: float = 0.0
+    eval_seq: int = 0
 
 
 @dataclass(slots=True)
@@ -140,12 +170,14 @@ def sector_id_for_pos(x_ly: float, y_ly: float, z_ly: float) -> str:
 
 
 def region_for_pos(x_ly: float, y_ly: float, z_ly: float) -> str:
-    # Simple radial split for v0: bulge (inner), disk (mid), halo (outer)
     import math
-    r = math.sqrt(x_ly * x_ly + y_ly * y_ly + z_ly * z_ly)
-    if r < 5.0:
+    dx = x_ly - float(Balance.GALAXY_CENTER_X_LY)
+    dy = y_ly - float(Balance.GALAXY_CENTER_Y_LY)
+    dz = z_ly - float(Balance.GALAXY_CENTER_Z_LY)
+    r = math.sqrt(dx * dx + dy * dy + dz * dz)
+    if r < float(Balance.GALAXY_BULGE_RADIUS_LY):
         return "bulge"
-    if r < 15.0:
+    if r < float(Balance.GALAXY_DISK_OUTER_RADIUS_LY):
         return "disk"
     return "halo"
 
