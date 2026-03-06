@@ -5,6 +5,12 @@ class Balance:
     DEFAULT_RNG_SEED = 36892
     DAY_S = 86400.0
     YEAR_S = 365.0 * DAY_S
+    # Galaxy radial model (ly). Region is computed against this center.
+    GALAXY_CENTER_X_LY = -8.0
+    GALAXY_CENTER_Y_LY = 0.0
+    GALAXY_CENTER_Z_LY = 0.0
+    GALAXY_BULGE_RADIUS_LY = 5.0
+    GALAXY_DISK_OUTER_RADIUS_LY = 15.0
     HIBERNATE_CHUNK_S = 7 * DAY_S
     HIBERNATE_WAKE_CHECK_S = 1 * 60 * 60
     HIBERNATE_WAKE_EVENT_TYPES = {"drone_low_battery"}
@@ -257,6 +263,23 @@ class Balance:
     DRONE_RAD_DECAY_MULT_WARN = 1.2
     DRONE_RAD_DECAY_MULT_HIGH = 1.8
     DRONE_RAD_DECAY_MULT_CRITICAL = 3.0
+    # Procedural node ambient radiation (rad/s).
+    # Authored locations keep their explicit radiation values.
+    PROCEDURAL_RAD_BASE = 0.00082
+    PROCEDURAL_RAD_MIN = 0.0001
+    PROCEDURAL_RAD_REGION_MULT = {
+        "bulge": 2.2,
+        "disk": 1.0,
+        "halo": 0.55,
+    }
+    PROCEDURAL_RAD_KIND_MULT = {
+        "ship": 1.8,  # WRECK_* ids are generated as kind="ship".
+    }
+    PROCEDURAL_RAD_VARIATION_MIN = 0.50
+    PROCEDURAL_RAD_VARIATION_MAX = 1.70
+    PROCEDURAL_RAD_SPIKE_CHANCE = 0.16
+    PROCEDURAL_RAD_SPIKE_MULT_MIN = 2.80
+    PROCEDURAL_RAD_SPIKE_MULT_MAX = 11.50
     # Radiation level thresholds (4-band): low / elevated / high / extreme.
     # Values are ">= threshold"; below elevated is considered low.
     RAD_LEVEL_ENV_ELEVATED = 0.001

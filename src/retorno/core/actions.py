@@ -110,19 +110,19 @@ class SalvageModule(Action):
 @dataclass(slots=True)
 class SalvageData(Action):
     drone_id: str
-    node_id: str
+    node_id: str | None
 
 
 @dataclass(slots=True)
 class DroneSurvey(Action):
     drone_id: str
-    node_id: str
+    node_id: str | None
 
 
 @dataclass(slots=True)
 class SalvageDrone(Action):
     drone_id: str
-    node_id: str
+    node_id: str | None
 
 
 @dataclass(slots=True)

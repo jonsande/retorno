@@ -13,6 +13,11 @@ Environmental source
 - Out of transit: current node ambient radiation.
 - In transit: average ambient radiation between origin and destination nodes.
 - Docking does not create a separate transfer model; docked exposure follows node ambient conditions.
+- Authored nodes (`data/locations`): `radiation_rad_per_s` is respected as configured.
+- Procedural nodes: `env_rad` is computed from a configurable base + region/type modifiers and deterministic per-seed variation.
+  - Region: `bulge` > `disk` > `halo`.
+  - Type: `wreck` nodes (kind `ship`) apply a higher multiplier.
+  - Floor: procedural nodes are forced to a positive minimum (`> 0`).
 
 Hull interaction
 - Hull integrity (`hull`) is global ship protection state (`0..1`).

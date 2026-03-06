@@ -5,6 +5,7 @@ debug arcs
 debug lore
 debug deadnodes
 debug modules
+debug galaxy
 
 Purpose
 - Operator/developer control surface for deterministic testing and scenario resets.
@@ -14,6 +15,7 @@ Operational behavior
 - `debug scenario ...` resets world state to preset.
 - `debug seed <n>` sets RNG seed.
 - listing commands expose internal debug registries.
+- `debug galaxy` prints galactic position, sector-neighborhood coherence, and procedural-radiation distribution.
 
 Usage notes
 - Intended for testing and balancing, not diegetic normal play.

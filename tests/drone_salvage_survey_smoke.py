@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 from retorno.bootstrap import create_initial_state_sandbox, create_initial_state_prologue
 from retorno.cli.parser import parse_command
 from retorno.config.balance import Balance
-from retorno.core.actions import DroneDeploy, DroneSurvey, SalvageDrone
+from retorno.core.actions import DroneDeploy, DroneSurvey, SalvageDrone, SalvageScrap
 from retorno.core.engine import Engine
 from retorno.io.save_load import load_single_slot, save_single_slot
 from retorno.model.drones import DroneLocation, DroneStatus
@@ -72,6 +72,24 @@ def main() -> None:
     assert bool(survey_data.get("data_signatures_detected", False)) is True
     assert node.recoverable_drones_count == 2, "Survey must not consume recoverable drones"
 
+    survey_action_default_node = parse_command("drone survey D1")
+    assert isinstance(survey_action_default_node, DroneSurvey), (
+        f"Unexpected survey parse without node_id: {survey_action_default_node!r}"
+    )
+    assert survey_action_default_node.node_id is None
+    survey_default_queue_events = engine.apply_action(state, survey_action_default_node)
+    assert survey_default_queue_events, "Expected survey job queued when node_id is omitted"
+    survey_default_tick_events = engine.tick(state, 30.0)
+    survey_default_data = _assert_any_event(survey_default_tick_events, "job_completed_drone_survey")
+    assert survey_default_data.get("node_id") == "ECHO_7"
+
+    scrap_default_node = parse_command("drone salvage scrap D1 5")
+    assert isinstance(scrap_default_node, SalvageScrap), (
+        f"Unexpected salvage scrap parse without node_id: {scrap_default_node!r}"
+    )
+    assert scrap_default_node.node_id is None
+    assert scrap_default_node.amount == 5
+
     Balance.DRONE_SURVEY_DATA_FALSE_NEGATIVE_P = 1.0
     survey_queue_events_2 = engine.apply_action(state, survey_action)
     assert survey_queue_events_2, "Expected second survey job queued"
@@ -90,8 +108,9 @@ def main() -> None:
     Balance.LORE_NON_FORCED_INJECT_P = 0.0
     try:
         salvage_count_before = int(state.world.lore.counters.get("salvage_data_count", 0))
-        salvage_data_action = parse_command("drone salvage data D1 ECHO_7")
+        salvage_data_action = parse_command("drone salvage data D1")
         assert salvage_data_action is not None, "Expected salvage data action parse"
+        assert getattr(salvage_data_action, "node_id", "MISSING") is None
         queue_salvage_data = engine.apply_action(state, salvage_data_action)
         assert queue_salvage_data, "Expected salvage data job queued"
         salvage_data_tick = engine.tick(state, 60.0)
@@ -176,10 +195,11 @@ def main() -> None:
         ) = old_cfg
 
     state.ship.drones["D1"].battery = 1.0
-    parsed_singular = parse_command("drone salvage drone D1 ECHO_7")
+    parsed_singular = parse_command("drone salvage drone D1")
     parsed_plural = parse_command("drone salvage drones D1 ECHO_7")
     assert isinstance(parsed_singular, SalvageDrone), f"Unexpected singular parse: {parsed_singular!r}"
     assert isinstance(parsed_plural, SalvageDrone), f"Unexpected plural parse: {parsed_plural!r}"
+    assert parsed_singular.node_id is None
 
     salvage_queue_events = engine.apply_action(state, parsed_singular)
     assert salvage_queue_events, "Expected salvage drone job queued"

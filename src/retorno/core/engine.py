@@ -209,6 +209,17 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
+            if state.ship.docked_node_id:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    "Travel blocked: ship is docked. Undock before starting travel.",
+                    data={"message_key": "boot_blocked", "reason": "ship_docked", "node_id": state.ship.docked_node_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
             target = state.world.space.nodes.get(action.node_id)
             if not target:
                 event = self._make_event(
@@ -438,11 +449,12 @@ class Engine:
             tmp_id = f"NAV_PT_{rng.getrandbits(16):04X}"
             while tmp_id in state.world.space.nodes:
                 tmp_id = f"NAV_PT_{rng.getrandbits(16):04X}"
+            transit_env_rad = self._compute_env_radiation_rad_per_s(state)
             tmp_node = SpaceNode(
                 node_id=tmp_id,
                 name="Nav Point",
                 kind="transit",
-                radiation_rad_per_s=0.0,
+                radiation_rad_per_s=max(Balance.PROCEDURAL_RAD_MIN, transit_env_rad),
                 x_ly=x,
                 y_ly=y,
                 z_ly=z,
@@ -1913,7 +1925,18 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            node_id = action.node_id
+            node_id = action.node_id or self._drone_world_node(drone)
+            if not node_id:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Survey blocked: {drone.drone_id} not at a node",
+                    data={"message_key": "boot_blocked", "reason": "not_docked", "drone_id": drone.drone_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
             node = state.world.space.nodes.get(node_id)
             if not node:
                 event = self._make_event(
@@ -2004,7 +2027,18 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            node_id = action.node_id
+            node_id = action.node_id or self._drone_world_node(drone)
+            if not node_id:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Salvage blocked: {drone.drone_id} not at a node",
+                    data={"message_key": "boot_blocked", "reason": "not_docked", "drone_id": drone.drone_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
             node = state.world.space.nodes.get(node_id)
             if not node:
                 event = self._make_event(
@@ -2345,7 +2379,18 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            node_id = action.node_id
+            node_id = action.node_id or self._drone_world_node(drone)
+            if not node_id:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Salvage blocked: {drone.drone_id} not at a node",
+                    data={"message_key": "boot_blocked", "reason": "not_docked", "drone_id": drone.drone_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
             node = state.world.space.nodes.get(node_id)
             if not node:
                 event = self._make_event(

@@ -20,7 +20,12 @@ from retorno.model.world import (
     sector_id_for_pos,
 )
 from retorno.runtime.data_loader import load_arcs, load_locations, load_singles
-from retorno.worldgen.generator import _generate_node_id, _name_from_node_id, ensure_sector_generated
+from retorno.worldgen.generator import (
+    _generate_node_id,
+    _name_from_node_id,
+    ensure_sector_generated,
+    procedural_radiation_for_node,
+)
 
 
 @dataclass(slots=True)
@@ -1346,7 +1351,9 @@ def _spawn_ad_hoc_candidate_for_forced_piece(state, piece_entry: dict) -> str | 
         node_id="__ADHOC_CANDIDATE__",
         name="",
         kind=kind,
-        radiation_rad_per_s=0.0,
+        radiation_rad_per_s=procedural_radiation_for_node(
+            state.meta.rng_seed, "__ADHOC_CANDIDATE__", kind, region
+        ),
         radiation_base=0.0,
         region=region,
         x_ly=x,
@@ -1375,7 +1382,7 @@ def _spawn_ad_hoc_candidate_for_forced_piece(state, piece_entry: dict) -> str | 
         node_id=node_id,
         name=_name_from_node_id(node_id, kind),
         kind=kind,
-        radiation_rad_per_s=0.0,
+        radiation_rad_per_s=procedural_radiation_for_node(state.meta.rng_seed, node_id, kind, region),
         radiation_base=0.0,
         region=region,
         x_ly=x,

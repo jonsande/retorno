@@ -28,7 +28,7 @@ from retorno.runtime.loop import GameLoop
 from retorno.core.power_policy import is_parsed_command_allowed_in_core_os_critical
 from retorno.model.events import Event, EventType, Severity, SourceRef
 from retorno.model.jobs import JobStatus, JobType
-from retorno.runtime.data_loader import load_modules, load_arcs, load_locations
+from retorno.runtime.data_loader import load_modules, load_arcs, load_locations, load_worldgen_templates
 from retorno.runtime.startup import load_startup_sequence_lines
 from retorno.config.balance import Balance
 from retorno.io.save_load import (
@@ -45,7 +45,7 @@ from retorno.model.drones import DroneStatus
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, list_dir, normalize_path, read_file, required_access_label
 from retorno.model.world import SECTOR_SIZE_LY, sector_id_for_pos, add_known_link, record_intel
 from retorno.model.world import SpaceNode, region_for_pos
-from retorno.worldgen.generator import ensure_sector_generated
+from retorno.worldgen.generator import ensure_sector_generated, procedural_radiation_for_node
 from retorno.util.timefmt import format_elapsed_long, format_elapsed_short
 
 
@@ -258,17 +258,17 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ("drone deploy <drone_id> <sector_id>", "deploy drone to sector", "despliega dron a sector"),
                 ("drone deploy! <drone_id> <sector_id>", "emergency deploy override", "despliegue de emergencia"),
                 ("drone move <drone_id> <target_id>", "move drone to target", "mueve dron a objetivo"),
-                ("drone survey <drone_id> <node_id>", "survey salvage signatures at node", "inspecciona señales de salvage en nodo"),
+                ("drone survey <drone_id> [node_id]", "survey salvage signatures at node", "inspecciona señales de salvage en nodo"),
                 ("drone autorecall <drone_id> on", "enable automatic recall", "activa autorretorno"),
                 ("drone autorecall <drone_id> off", "disable automatic recall", "desactiva autorretorno"),
                 ("drone autorecall <drone_id> <percent>", "set recall battery threshold", "ajusta umbral de batería para retorno"),
                 ("drone repair <drone_id> <target_id>", "repair target with drone", "repara objetivo con dron"),
                 ("drone install <drone_id> <module_id>", "install module using drone", "instala módulo usando dron"),
-                ("drone salvage scrap <drone_id> <node_id> <amount>", "salvage scrap from node", "recupera chatarra del nodo"),
+                ("drone salvage scrap <drone_id> [node_id] <amount>", "salvage scrap from node", "recupera chatarra del nodo"),
                 ("drone salvage module <drone_id> [node_id]", "salvage module from node", "recupera módulo del nodo"),
-                ("drone salvage drone <drone_id> <node_id>", "recover all drones from node", "recupera todos los drones del nodo"),
-                ("drone salvage drones <drone_id> <node_id>", "alias of salvage drone", "alias de salvage drone"),
-                ("drone salvage data <drone_id> <node_id>", "salvage data from node", "recupera datos del nodo"),
+                ("drone salvage drone <drone_id> [node_id]", "recover all drones from node", "recupera todos los drones del nodo"),
+                ("drone salvage drones <drone_id> [node_id]", "alias of salvage drone", "alias de salvage drone"),
+                ("drone salvage data <drone_id> [node_id]", "salvage data from node", "recupera datos del nodo"),
                 ("drone reboot <drone_id>", "reboot drone", "reinicia dron"),
                 ("drone recall <drone_id>", "recall drone to ship", "retorna dron a la nave"),
             ],
@@ -713,6 +713,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "ship_not_docked": {
             "en": "Action blocked: ship not docked at {node_id}",
             "es": "Acción bloqueada: nave no acoplada en {node_id}",
+        },
+        "ship_docked": {
+            "en": "Action blocked: ship is docked at {node_id}. Use 'undock' before starting travel.",
+            "es": "Acción bloqueada: la nave está acoplada en {node_id}. Usa 'undock' antes de iniciar el viaje.",
         },
         "scrap_empty": {
             "en": "No scrap available",
@@ -2184,6 +2188,203 @@ def render_debug_deadnodes(state) -> None:
         for line in state.world.deadnode_log[-10:]:
             print(f"- {line}")
 
+
+def _galactic_radius_ly(x_ly: float, y_ly: float, z_ly: float) -> float:
+    cx = float(Balance.GALAXY_CENTER_X_LY)
+    cy = float(Balance.GALAXY_CENTER_Y_LY)
+    cz = float(Balance.GALAXY_CENTER_Z_LY)
+    dx = x_ly - cx
+    dy = y_ly - cy
+    dz = z_ly - cz
+    return (dx * dx + dy * dy + dz * dz) ** 0.5
+
+
+def _sector_center_ly(sector_id: str) -> tuple[float, float, float] | None:
+    coords = _sector_coords_from_id(sector_id)
+    if coords is None:
+        return None
+    sx, sy, sz = coords
+    half = SECTOR_SIZE_LY * 0.5
+    return (
+        sx * SECTOR_SIZE_LY + half,
+        sy * SECTOR_SIZE_LY + half,
+        sz * SECTOR_SIZE_LY + half,
+    )
+
+
+def _sector_region(sector_id: str) -> str:
+    center = _sector_center_ly(sector_id)
+    if center is None:
+        return "unknown"
+    x, y, z = center
+    return region_for_pos(x, y, z)
+
+
+def _neighbor_sectors_2d(sector_id: str) -> list[str]:
+    coords = _sector_coords_from_id(sector_id)
+    if coords is None:
+        return []
+    sx, sy, sz = coords
+    out: list[str] = []
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            if dx == 0 and dy == 0:
+                continue
+            out.append(f"S{sx+dx:+04d}_{sy+dy:+04d}_{sz:+04d}")
+    return out
+
+
+def _radiation_band_id(value: float) -> str:
+    v = max(0.0, float(value))
+    if v >= Balance.RAD_LEVEL_ENV_EXTREME:
+        return "extreme"
+    if v >= Balance.RAD_LEVEL_ENV_HIGH:
+        return "high"
+    if v >= Balance.RAD_LEVEL_ENV_ELEVATED:
+        return "elevated"
+    return "low"
+
+
+def render_debug_galaxy(state) -> None:
+    print("\n=== DEBUG GALAXY ===")
+    cx = float(Balance.GALAXY_CENTER_X_LY)
+    cy = float(Balance.GALAXY_CENTER_Y_LY)
+    cz = float(Balance.GALAXY_CENTER_Z_LY)
+    bulge_r = float(Balance.GALAXY_BULGE_RADIUS_LY)
+    disk_r = float(Balance.GALAXY_DISK_OUTER_RADIUS_LY)
+    print(f"- model: center=({cx:.2f},{cy:.2f},{cz:.2f}) bulge<{bulge_r:.2f}ly disk<{disk_r:.2f}ly halo>=disk")
+
+    px, py, pz = state.world.current_pos_ly
+    pr = _galactic_radius_ly(px, py, pz)
+    pregion = region_for_pos(px, py, pz)
+    psector = sector_id_for_pos(px, py, pz)
+    print(
+        f"- player: node={state.world.current_node_id} sector={psector} "
+        f"pos=({px:.2f},{py:.2f},{pz:.2f}) r_gc={pr:.2f}ly region={pregion}"
+    )
+    if pregion == "bulge":
+        print(f"- margin: to_disk={max(0.0, bulge_r - pr):.2f}ly (inside bulge)")
+    elif pregion == "disk":
+        print(
+            f"- margin: to_bulge={max(0.0, pr - bulge_r):.2f}ly "
+            f"to_halo={max(0.0, disk_r - pr):.2f}ly (inside disk)"
+        )
+    else:
+        print(f"- margin: beyond_disk={max(0.0, pr - disk_r):.2f}ly (inside halo)")
+
+    sector_ids: set[str] = set(state.world.generated_sectors)
+    for node in state.world.space.nodes.values():
+        sector_ids.add(sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly))
+    sector_ids.add(psector)
+
+    region_counts: dict[str, int] = {"bulge": 0, "disk": 0, "halo": 0, "unknown": 0}
+    for sid in sector_ids:
+        region = _sector_region(sid)
+        region_counts[region] = region_counts.get(region, 0) + 1
+    print(
+        f"- sectors_seen: total={len(sector_ids)} "
+        f"bulge={region_counts.get('bulge', 0)} disk={region_counts.get('disk', 0)} halo={region_counts.get('halo', 0)}"
+    )
+
+    transitions: dict[tuple[str, str], int] = {}
+    for sid in sorted(sector_ids):
+        r1 = _sector_region(sid)
+        for nid in _neighbor_sectors_2d(sid):
+            if nid not in sector_ids or sid >= nid:
+                continue
+            r2 = _sector_region(nid)
+            key = tuple(sorted((r1, r2)))
+            transitions[key] = transitions.get(key, 0) + 1
+    same = sum(v for k, v in transitions.items() if k[0] == k[1])
+    bd = transitions.get(("bulge", "disk"), 0)
+    dh = transitions.get(("disk", "halo"), 0)
+    bh = transitions.get(("bulge", "halo"), 0)
+    print(f"- sector_adjacency: same_region={same} bulge<->disk={bd} disk<->halo={dh} bulge<->halo={bh}")
+    if bh > 0:
+        print("! warning: bulge<->halo direct adjacency detected (coherence risk)")
+    if state.world.current_node_id == "UNKNOWN_00" and pregion != "disk":
+        print("! warning: prologue start node UNKNOWN_00 is not in disk")
+
+    authored_ids = _authored_node_ids()
+    proc_values: list[float] = []
+    authored_count = 0
+    procedural_count = 0
+    by_region: dict[str, list[float]] = {}
+    by_kind: dict[str, list[float]] = {}
+    for node in state.world.space.nodes.values():
+        is_authored = node.node_id in authored_ids
+        if is_authored:
+            authored_count += 1
+            continue
+        procedural_count += 1
+        val = max(0.0, float(node.radiation_rad_per_s))
+        proc_values.append(val)
+        reg = node.region or region_for_pos(node.x_ly, node.y_ly, node.z_ly)
+        by_region.setdefault(reg, []).append(val)
+        by_kind.setdefault(node.kind or "unknown", []).append(val)
+    print(f"- nodes: total={len(state.world.space.nodes)} authored={authored_count} procedural={procedural_count}")
+
+    if proc_values:
+        pmin = min(proc_values)
+        pmax = max(proc_values)
+        pavg = sum(proc_values) / len(proc_values)
+        bands: dict[str, int] = {"low": 0, "elevated": 0, "high": 0, "extreme": 0}
+        for v in proc_values:
+            bands[_radiation_band_id(v)] += 1
+        print(
+            f"- procedural_rad_live: min={pmin:.4f} max={pmax:.4f} mean={pavg:.4f} rad/s "
+            f"| low={bands['low']} elevated={bands['elevated']} high={bands['high']} extreme={bands['extreme']}"
+        )
+        for reg in sorted(by_region.keys()):
+            vals = by_region[reg]
+            avg = sum(vals) / len(vals)
+            print(f"  region[{reg}]: n={len(vals)} mean={avg:.4f} min={min(vals):.4f} max={max(vals):.4f}")
+        for kind in sorted(by_kind.keys()):
+            vals = by_kind[kind]
+            avg = sum(vals) / len(vals)
+            print(f"  kind[{kind}]: n={len(vals)} mean={avg:.4f} min={min(vals):.4f} max={max(vals):.4f}")
+    else:
+        print("- procedural_rad_live: (no procedural nodes loaded)")
+
+    # Deterministic synthetic estimate for the current seed/model.
+    templates = load_worldgen_templates()
+    weights = {k: float(v) for k, v in region_counts.items() if k in {"bulge", "disk", "halo"} and float(v) > 0.0}
+    if not weights:
+        weights = {"disk": 1.0}
+    total_w = sum(weights.values())
+    if total_w <= 0.0:
+        weights = {"disk": 1.0}
+        total_w = 1.0
+    acc: list[tuple[str, float]] = []
+    running = 0.0
+    for reg, w in sorted(weights.items()):
+        running += w / total_w
+        acc.append((reg, running))
+    rng = random.Random(state.meta.rng_seed ^ 0xA5A5A5A5)
+    syn_count = 6000
+    syn_bands: dict[str, int] = {"low": 0, "elevated": 0, "high": 0, "extreme": 0}
+    for i in range(syn_count):
+        r = rng.random()
+        reg = acc[-1][0]
+        for name, cutoff in acc:
+            if r <= cutoff:
+                reg = name
+                break
+        tmpl = templates.get(reg) or templates.get("disk") or {}
+        kind_weights = tmpl.get("kind_weights", {}) or {}
+        ship_w = max(0.0, float(kind_weights.get("ship", 0.10)))
+        total_kind = sum(max(0.0, float(v)) for v in kind_weights.values()) or 1.0
+        kind = "ship" if rng.random() < (ship_w / total_kind) else "station"
+        value = procedural_radiation_for_node(state.meta.rng_seed, f"SYN_{reg}_{kind}_{i:05d}", kind, reg)
+        syn_bands[_radiation_band_id(value)] += 1
+    print(
+        "- procedural_rad_synth[seed]: "
+        f"low={100.0*syn_bands['low']/syn_count:.2f}% "
+        f"elevated={100.0*syn_bands['elevated']/syn_count:.2f}% "
+        f"high={100.0*syn_bands['high']/syn_count:.2f}% "
+        f"extreme={100.0*syn_bands['extreme']/syn_count:.2f}%"
+    )
+
 def _render_contacts_table(state) -> None:
     current_id = state.world.current_node_id
     if state.ship.in_transit:
@@ -2634,6 +2835,7 @@ def _terminal_state_allows(parsed) -> bool:
             "DEBUG_LORE",
             "DEBUG_DEADNODES",
             "DEBUG_MODULES",
+            "DEBUG_GALAXY",
             "DEBUG_SEED",
             "DEBUG_SCENARIO",
         }:
@@ -3253,16 +3455,19 @@ def _handle_intel_import(state, path: str) -> None:
             h.update(coord_txt.encode("utf-8"))
             nid = f"NAV_{int.from_bytes(h.digest(), 'big'):08x}"
             if nid not in state.world.space.nodes:
+                region = region_for_pos(x, y, z)
                 node = SpaceNode(
                     node_id=nid,
                     name="Nav Point",
                     kind="nav_point",
-                    radiation_rad_per_s=0.0,
+                    radiation_rad_per_s=procedural_radiation_for_node(
+                        state.meta.rng_seed, nid, "nav_point", region
+                    ),
                     x_ly=x,
                     y_ly=y,
                     z_ly=z,
                 )
-                node.region = region_for_pos(x, y, z)
+                node.region = region
                 state.world.space.nodes[nid] = node
             if nid not in state.world.known_nodes:
                 state.world.known_intel[nid] = {"source": path, "coord": [x, y, z]}
@@ -3394,16 +3599,19 @@ def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str
             h.update(coord_txt.encode("utf-8"))
             nid = f"NAV_{int.from_bytes(h.digest(), 'big'):08x}"
             if nid not in state.world.space.nodes:
+                region = region_for_pos(x, y, z)
                 node = SpaceNode(
                     node_id=nid,
                     name="Nav Point",
                     kind="nav_point",
-                    radiation_rad_per_s=0.0,
+                    radiation_rad_per_s=procedural_radiation_for_node(
+                        state.meta.rng_seed, nid, "nav_point", region
+                    ),
                     x_ly=x,
                     y_ly=y,
                     z_ly=z,
                 )
-                node.region = region_for_pos(x, y, z)
+                node.region = region
                 state.world.space.nodes[nid] = node
             if nid not in state.world.known_nodes:
                 state.world.known_intel[nid] = {"source": source_path, "coord": [x, y, z]}
@@ -4919,6 +5127,49 @@ def render_alert_explain(state, alert_key: str) -> None:
         print("- energy_distribution must not be OFFLINE")
         print("- Decontamination does not require positive net power or scrap")
 
+
+def _known_contact_ids_for_completion(state) -> list[str]:
+    known_ids = (
+        state.world.known_nodes
+        if hasattr(state.world, "known_nodes") and state.world.known_nodes
+        else state.world.known_contacts
+    )
+    return sorted(c for c in known_ids if c != "UNKNOWN_00")
+
+
+def _drone_local_world_node_targets_for_completion(state) -> list[str]:
+    # Drone world interactions are local to the ship position (orbit/docked node).
+    candidates: list[str] = []
+    current_node_id = getattr(state.world, "current_node_id", "")
+    if current_node_id and current_node_id != "UNKNOWN_00":
+        node = state.world.space.nodes.get(current_node_id)
+        if node and node.kind != "transit":
+            candidates.append(current_node_id)
+    docked_node_id = getattr(state.ship, "docked_node_id", None)
+    if (
+        docked_node_id
+        and docked_node_id != "UNKNOWN_00"
+        and docked_node_id in state.world.space.nodes
+    ):
+        candidates.append(docked_node_id)
+    return list(dict.fromkeys(candidates))
+
+
+def _drone_ship_sector_targets_for_completion(state) -> list[str]:
+    return sorted(s for s in state.ship.sectors.keys() if s != "UNKNOWN_00")
+
+
+def _drone_move_targets_for_completion(state) -> list[str]:
+    # Single extension point for future docked-node interiors.
+    targets = _drone_local_world_node_targets_for_completion(state) + _drone_ship_sector_targets_for_completion(state)
+    return list(dict.fromkeys(targets))
+
+
+def _drone_deploy_targets_for_completion(state) -> list[str]:
+    # Same contextual targeting as move for now; separated for future divergence.
+    return _drone_move_targets_for_completion(state)
+
+
 def main() -> None:
     from retorno.cli.parser import ParseError, parse_command, format_parse_error
 
@@ -5079,16 +5330,10 @@ def main() -> None:
                 with loop.with_lock() as locked_state:
                     systems = list(locked_state.ship.systems.keys())
                     drones = list(locked_state.ship.drones.keys())
-                    sectors = [s for s in locked_state.ship.sectors.keys() if s != "UNKNOWN_00"]
-                    contacts = sorted(
-                        c
-                        for c in (
-                            locked_state.world.known_nodes
-                            if hasattr(locked_state.world, "known_nodes") and locked_state.world.known_nodes
-                            else locked_state.world.known_contacts
-                        )
-                        if c != "UNKNOWN_00"
-                    )
+                    contacts = _known_contact_ids_for_completion(locked_state)
+                    drone_local_world_targets = _drone_local_world_node_targets_for_completion(locked_state)
+                    drone_move_targets = _drone_move_targets_for_completion(locked_state)
+                    drone_deploy_targets = _drone_deploy_targets_for_completion(locked_state)
                     modules = list(set(locked_state.ship.cargo_modules or locked_state.ship.manifest_modules))
                     services = []
                     for sys in locked_state.ship.systems.values():
@@ -5188,7 +5433,7 @@ def main() -> None:
                         candidates = [c for c in ["cruise", "normal"] if c.startswith(text)]
                 elif cmd == "debug":
                     if len(tokens) == 2:
-                        candidates = [c for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "modules"] if c.startswith(text)]
+                        candidates = [c for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "modules", "galaxy"] if c.startswith(text)]
                     elif len(tokens) == 3 and tokens[1] == "scenario":
                         candidates = [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
                 elif cmd == "module":
@@ -5308,14 +5553,11 @@ def main() -> None:
                     elif len(tokens) == 3 and tokens[1] in {"status", "deploy", "deploy!", "reboot", "recall", "autorecall", "repair", "move", "install", "survey"}:
                         candidates = [d for d in drones if d.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
-                        candidates = [s for s in sectors if s.startswith(text)] + [c for c in contacts if c.startswith(text)]
+                        candidates = [t for t in drone_deploy_targets if t.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "move":
                         ship_aliases = [locked_state.ship.ship_id] if locked_state.ship.ship_id.startswith(text) else []
-                        candidates = (
-                            [s for s in sectors if s.startswith(text)]
-                            + [c for c in contacts if c.startswith(text)]
-                            + ship_aliases
-                        )
+                        local_targets = [t for t in drone_move_targets if t.startswith(text)]
+                        candidates = list(dict.fromkeys(local_targets + ship_aliases))
                     elif len(tokens) == 4 and tokens[1] == "autorecall":
                         candidates = [c for c in ["on", "off", "10"] if c.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "install":
@@ -5323,20 +5565,20 @@ def main() -> None:
                     elif len(tokens) == 4 and tokens[1] == "repair":
                         candidates = [x for x in sorted(set(systems) | set(drones)) if x.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "survey":
-                        candidates = [c for c in contacts if c.startswith(text)]
+                        candidates = [c for c in drone_local_world_targets if c.startswith(text)]
                     elif len(tokens) == 3 and tokens[1] == "salvage":
                         candidates = [c for c in ["scrap", "module", "modules", "drone", "drones", "data"] if c.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "salvage":
                         candidates = [d for d in drones if d.startswith(text)]
                     elif len(tokens) == 5 and tokens[1] == "salvage":
-                        candidates = [c for c in contacts if c.startswith(text)]
+                        candidates = [c for c in drone_local_world_targets if c.startswith(text)]
                 elif cmd == "salvage":
                     if len(tokens) == 2:
                         candidates = [c for c in ["scrap", "module", "modules", "drone", "drones", "data"] if c.startswith(text)]
                     elif len(tokens) == 3:
                         candidates = [d for d in drones if d.startswith(text)]
                     elif len(tokens) == 4:
-                        candidates = [c for c in contacts if c.startswith(text)]
+                        candidates = [c for c in drone_local_world_targets if c.startswith(text)]
                 elif cmd == "route":
                     if len(tokens) == 2:
                         candidates = [c for c in ["solve"] if c.startswith(text)]
@@ -5540,6 +5782,13 @@ def main() -> None:
                     print("debug modules: available only in DEBUG mode. Use: debug on")
                     continue
                 render_modules_catalog(locked_state)
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_GALAXY":
+            with loop.with_lock() as locked_state:
+                if not locked_state.os.debug_enabled:
+                    print("debug galaxy: available only in DEBUG mode. Use: debug on")
+                    continue
+                render_debug_galaxy(locked_state)
             continue
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SEED":
             with loop.with_lock() as locked_state:

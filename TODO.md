@@ -152,6 +152,14 @@ Esto da variedad, pero no lo haría aún como primer sistema.
 
 === OTROS / SIN CATALOGAR ===
 
+- [ ] Módulo instalable que te habilita el comando "nav map galaxy". Ahora mismo se puede usar desde el principio, pero quiero modificar esto. Quiero que para poder usar ese comando se exija tener un módulo específico de nave instalado (hay que inventar ese módulo también). Si ejecutas esa orden sin tener el módulo instalado, se bloquea y se te advierte de que necesitas tener ese módulo instalado. 
+
+- [ ] No se debería permitir iniciar un viaje estando dockeado. Debería salir un mensaje de bloqueo advirtiendo que hace falta primero desdockear.
+
+- [ ] Las órdenes "drone survey" y "drone salvage *", si se escriben sin parámetro <node_id>, debe entenderse que el <node_id> por defecto es el <node_id> del lugar en que se encuentra el dron en cuestión. Así, si la localización es loc=world_node:WRECK_B0C2BC, y el usuario introduce "drone salvage scrap D1 45", esa orden se deberá entender como equivalente a "drone salvage scrap D1 WRECK_B0C2B 45".
+
+- [ ] Me encuentro en un nodo con id WRECK_B0C2BC. La radiación ambiente es 0.0000rad/s, es decir, no hay radiación. ¿Es habitual que haya localizaciones sin radiación? Esto no debería pasar. En todos los nodos debe haber radiación. El espacio exterior está lleno de radiación, siendo uno de los mayores desafíos para la exploración espacial. Cómo se configura y decide, acutalmente, qué nivel de radiación hay en cada localización?
+
 - [ ] Si la integridad de un sistema está al máximo, se debería bloquear el intento de repararlo.
 
 - [ ] El mensaje "uplink complete :: node data already exhausted" es quizá un poco confuso (puede dar a entender que tampoco hay data recuperable vía "salvage data"). Debería, mejor, ser "uplink complete :: uplink data already exhausted".

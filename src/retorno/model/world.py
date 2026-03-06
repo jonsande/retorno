@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import MISSING, dataclass, field, fields
 from typing import Optional, Tuple
+from retorno.config.balance import Balance
 
 
 @dataclass(slots=True)
@@ -169,12 +170,14 @@ def sector_id_for_pos(x_ly: float, y_ly: float, z_ly: float) -> str:
 
 
 def region_for_pos(x_ly: float, y_ly: float, z_ly: float) -> str:
-    # Simple radial split for v0: bulge (inner), disk (mid), halo (outer)
     import math
-    r = math.sqrt(x_ly * x_ly + y_ly * y_ly + z_ly * z_ly)
-    if r < 5.0:
+    dx = x_ly - float(Balance.GALAXY_CENTER_X_LY)
+    dy = y_ly - float(Balance.GALAXY_CENTER_Y_LY)
+    dz = z_ly - float(Balance.GALAXY_CENTER_Z_LY)
+    r = math.sqrt(dx * dx + dy * dy + dz * dz)
+    if r < float(Balance.GALAXY_BULGE_RADIUS_LY):
         return "bulge"
-    if r < 15.0:
+    if r < float(Balance.GALAXY_DISK_OUTER_RADIUS_LY):
         return "disk"
     return "halo"
 
