@@ -10,6 +10,7 @@ from retorno.core.actions import DroneDeploy, DroneSurvey, SalvageDrone
 from retorno.core.engine import Engine
 from retorno.io.save_load import load_single_slot, save_single_slot
 from retorno.model.drones import DroneLocation, DroneStatus
+from retorno.model.events import EventType
 from retorno.model.world import SpaceNode
 from retorno.worldgen.generator import ensure_sector_generated
 
@@ -30,6 +31,13 @@ def _recoverable_map_for_sector(state, sector_id: str) -> dict[str, int]:
         if sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly) == sector_id:
             out[node_id] = int(getattr(node, "recoverable_drones_count", 0))
     return out
+
+
+def _assert_event_type(events, event_type: EventType):
+    for e in events:
+        if getattr(e, "type", None) == event_type:
+            return e
+    raise AssertionError(f"Expected event {event_type.value}; got {[getattr(e, 'type', None) for e in events]}")
 
 
 def main() -> None:
@@ -72,6 +80,47 @@ def main() -> None:
     assert int(survey_data_2.get("data_recoverable_files_count", 0)) > 0
     assert bool(survey_data_2.get("data_signatures_detected", True)) is False
     Balance.DRONE_SURVEY_DATA_FALSE_NEGATIVE_P = old_false_negative
+    assert "scrap_complete" in survey_data_2
+    assert "data_complete" in survey_data_2
+    assert "extras_complete" in survey_data_2
+    assert "node_cleaned" in survey_data_2
+
+    # Salvage data counters should clearly separate new vs already mounted files.
+    old_non_forced_p = Balance.LORE_NON_FORCED_INJECT_P
+    Balance.LORE_NON_FORCED_INJECT_P = 0.0
+    try:
+        salvage_count_before = int(state.world.lore.counters.get("salvage_data_count", 0))
+        salvage_data_action = parse_command("drone salvage data D1 ECHO_7")
+        assert salvage_data_action is not None, "Expected salvage data action parse"
+        queue_salvage_data = engine.apply_action(state, salvage_data_action)
+        assert queue_salvage_data, "Expected salvage data job queued"
+        salvage_data_tick = engine.tick(state, 60.0)
+        data_ev_1 = _assert_event_type(salvage_data_tick, EventType.DATA_SALVAGED)
+        data_1 = data_ev_1.data
+        assert int(data_1.get("files_new_count", -1)) >= 0
+        assert int(data_1.get("files_already_mounted_count", -1)) >= 0
+        assert int(data_1.get("files_total_eligible_count", -1)) >= 0
+        assert int(data_1.get("files_new_count", 0)) + int(data_1.get("files_already_mounted_count", 0)) == int(
+            data_1.get("files_total_eligible_count", -1)
+        )
+        salvage_count_after_first = int(state.world.lore.counters.get("salvage_data_count", 0))
+        assert salvage_count_after_first == salvage_count_before + 1, (
+            "First salvage_data with new data should increment salvage_data_count"
+        )
+
+        queue_salvage_data_2 = engine.apply_action(state, salvage_data_action)
+        assert queue_salvage_data_2, "Expected second salvage data job queued"
+        salvage_data_tick_2 = engine.tick(state, 60.0)
+        data_ev_2 = _assert_event_type(salvage_data_tick_2, EventType.DATA_SALVAGED)
+        data_2 = data_ev_2.data
+        assert int(data_2.get("files_new_count", -1)) == 0
+        assert int(data_2.get("files_already_mounted_count", -1)) == int(data_2.get("files_total_eligible_count", -2))
+        salvage_count_after_second = int(state.world.lore.counters.get("salvage_data_count", 0))
+        assert salvage_count_after_second == salvage_count_after_first, (
+            "Repeated salvage_data without new data should not increment salvage_data_count"
+        )
+    finally:
+        Balance.LORE_NON_FORCED_INJECT_P = old_non_forced_p
 
     # No recoverable files => survey must report no data signatures.
     empty_state = create_initial_state_sandbox()

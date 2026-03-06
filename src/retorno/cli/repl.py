@@ -15,7 +15,12 @@ import time
 import tty
 from pathlib import Path
 from retorno.core.engine import Engine
-from retorno.core.lore import LoreContext, maybe_deliver_lore
+from retorno.core.lore import (
+    build_lore_context,
+    maybe_deliver_lore,
+    recompute_node_completion,
+    sync_node_pools_for_known_nodes,
+)
 from retorno.core.deadnodes import evaluate_dead_nodes
 from retorno.core.actions import Action, AuthRecover, Hibernate, RouteSolve, Status
 from retorno.runtime.loop import GameLoop
@@ -958,15 +963,25 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             continue
         if e.type == EventType.DATA_SALVAGED:
             print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message}")
-            mounted_paths = e.data.get("mounted_paths") if isinstance(e.data, dict) else None
-            if isinstance(mounted_paths, list) and mounted_paths:
+            mounted_paths_new = e.data.get("mounted_paths_new") if isinstance(e.data, dict) else None
+            mounted_paths_existing = e.data.get("mounted_paths_existing") if isinstance(e.data, dict) else None
+            if isinstance(mounted_paths_new, list) and mounted_paths_new:
                 locale = state.os.locale.value
                 title = {
                     "en": "Recovered documents:",
                     "es": "Documentos recuperados:",
                 }.get(locale, "Recovered documents:")
                 print(title)
-                for path in mounted_paths:
+                for path in mounted_paths_new:
+                    print(f"- {path}")
+            if isinstance(mounted_paths_existing, list) and mounted_paths_existing:
+                locale = state.os.locale.value
+                title = {
+                    "en": "Already mounted documents:",
+                    "es": "Documentos ya montados:",
+                }.get(locale, "Already mounted documents:")
+                print(title)
+                for path in mounted_paths_existing:
                     print(f"- {path}")
             tip = None
             if isinstance(e.data, dict):
@@ -1073,6 +1088,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                 modules_detected = bool(e.data.get("modules_detected", False))
                 recoverable_drones = int(e.data.get("recoverable_drones_count", 0) or 0)
                 data_signatures = bool(e.data.get("data_signatures_detected", False))
+                scrap_complete = bool(e.data.get("scrap_complete", False))
+                data_complete = bool(e.data.get("data_complete", False))
+                extras_complete = bool(e.data.get("extras_complete", False))
+                node_cleaned = bool(e.data.get("node_cleaned", False))
                 uplink_detected = bool(e.data.get("uplink_detected", False))
                 if locale == "es":
                     print("=== SURVEY ===")
@@ -1092,6 +1111,12 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                         if uplink_detected
                         else "sin infraestructura con capacidad uplink"
                     )
+                    print(
+                        f"agotamiento: chatarra={'sí' if scrap_complete else 'no'}, "
+                        f"datos={'sí' if data_complete else 'no'}, "
+                        f"extras={'sí' if extras_complete else 'no'}"
+                    )
+                    print("nodo limpio" if node_cleaned else "nodo no limpio")
                 else:
                     print("=== SURVEY ===")
                     print(f"scrap detected: {scrap}")
@@ -1110,6 +1135,12 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                         if uplink_detected
                         else "no uplink-capable infrastructure detected"
                     )
+                    print(
+                        f"depletion: scrap={'yes' if scrap_complete else 'no'}, "
+                        f"data={'yes' if data_complete else 'no'}, "
+                        f"extras={'yes' if extras_complete else 'no'}"
+                    )
+                    print("node cleaned" if node_cleaned else "node not cleaned")
             continue
         if e.type == EventType.BOOT_BLOCKED:
             locale = state.os.locale.value
@@ -2914,38 +2945,57 @@ def _handle_uplink(state) -> None:
     if reason:
         print(blocked.get(locale, blocked["en"]).get(reason, blocked["en"]["not_relay"]))
         return
-    added = _discover_routes_via_uplink(state, state.world.current_node_id, max_new=3)
+    sync_node_pools_for_known_nodes(state)
+    current_node_id = state.world.current_node_id
+    pool = state.world.node_pools.get(current_node_id)
+    if pool and pool.uplink_data_consumed:
+        msg = {
+            "en": "uplink_complete :: node data already exhausted",
+            "es": "uplink_complete :: datos del nodo ya agotados",
+        }
+        print(msg.get(locale, msg["en"]))
+        events_out: list[tuple[str, Event]] = []
+        _emit_runtime_event(
+            state,
+            events_out,
+            "cmd",
+            EventType.UPLINK_COMPLETE,
+            Severity.INFO,
+            SourceRef(kind="ship_system", id="data_core"),
+            msg.get(locale, msg["en"]),
+            data={"routes": []},
+        )
+        return
+    fixed_pool = list(pool.uplink_route_pool) if pool else []
+    added: list[str] = []
+    for dest in fixed_pool:
+        if not dest or dest == current_node_id:
+            continue
+        if add_known_link(state.world, current_node_id, dest, bidirectional=True):
+            added.append(dest)
+        state.world.known_nodes.add(dest)
+        state.world.known_contacts.add(dest)
     if added:
         state.world.mobility_no_new_uplink_count = 0
     else:
         state.world.mobility_no_new_uplink_count += 1
 
-    stuck = not _has_global_unvisited_route_within_range(state)
-    signal_added: set[str] = set()
-    if not added and (stuck or state.world.mobility_no_new_uplink_count >= Balance.UPLINK_FAILSAFE_N):
-        dest = _apply_mobility_failsafe(state, added)
-        if dest:
-            signal_added.add(dest)
-            state.world.mobility_no_new_uplink_count = 0
-
     if added:
         for nid in added:
-            if nid in signal_added:
-                continue
             record_intel(
                 state.world,
                 t=state.clock.t,
                 kind="link",
-                from_id=state.world.current_node_id,
+                from_id=current_node_id,
                 to_id=nid,
                 confidence=0.9,
                 source_kind="uplink",
-                source_ref=state.world.current_node_id,
+                source_ref=current_node_id,
             )
     if "/logs/nav" not in state.os.fs:
         state.os.fs["/logs/nav"] = FSNode(path="/logs/nav", node_type=FSNodeType.DIR, access=AccessLevel.GUEST)
     seq = state.events.next_event_seq
-    log_path = f"/logs/nav/uplink_{state.world.current_node_id}_{seq:05d}.txt"
+    log_path = f"/logs/nav/uplink_{current_node_id}_{seq:05d}.txt"
     log_content = "".join(f"LINK: {nid}\n" for nid in added)
     state.os.fs[log_path] = FSNode(
         path=log_path,
@@ -2964,20 +3014,7 @@ def _handle_uplink(state) -> None:
             "es": "uplink_complete :: no se encontraron rutas nuevas",
         }
     print(msg.get(locale, msg["en"]))
-    node = state.world.space.nodes.get(state.world.current_node_id)
-    if node:
-        region = node.region or region_for_pos(node.x_ly, node.y_ly, node.z_ly)
-        dist = math.sqrt(node.x_ly * node.x_ly + node.y_ly * node.y_ly + node.z_ly * node.z_ly)
-    else:
-        region = ""
-        dist = 0.0
-    year = state.clock.t / Balance.YEAR_S if Balance.YEAR_S else 0.0
-    lore_ctx = LoreContext(
-        node_id=state.world.current_node_id,
-        region=region,
-        dist_from_origin_ly=dist,
-        year_since_wake=year,
-    )
+    lore_ctx = build_lore_context(state, current_node_id)
     lore_result = maybe_deliver_lore(state, "uplink", lore_ctx)
     if lore_result.events:
         render_events(state, [("cmd", e) for e in lore_result.events])
@@ -2992,6 +3029,9 @@ def _handle_uplink(state) -> None:
             state.events.recent.append(e)
         if len(state.events.recent) > 50:
             state.events.recent = state.events.recent[-50:]
+    if pool:
+        pool.uplink_data_consumed = True
+        recompute_node_completion(state, current_node_id)
     events_out: list[tuple[str, Event]] = []
     _emit_runtime_event(
         state,

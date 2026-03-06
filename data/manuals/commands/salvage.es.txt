@@ -16,6 +16,8 @@ Comportamiento
 - Las acciones de salvage encolan trabajos temporizados (duración según acción y carga).
 - El salvage exitoso actualiza bodega/intel/estado de agotamiento del mundo.
 - Las operaciones consumen batería del dron y heredan riesgo operativo por entorno/degradación.
+- `drone salvage data` informa contadores explícitos: `new`, `already_mounted`, `total`.
+- `new` son archivos montados en esta operación; `already_mounted` ya existían en `/remote/<node_id>/`.
 
 Bloqueos frecuentes
 - dron no desplegado / batería baja / objetivo inexistente

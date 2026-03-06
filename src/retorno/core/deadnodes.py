@@ -169,13 +169,20 @@ def _create_bridge_node(state, dead_node_id: str, attempt: int) -> SpaceNode | N
 def evaluate_dead_nodes(state, trigger: str, debug: bool = False) -> list[Event]:
     if not Balance.DEADNODE_FAILSAFE_ENABLED:
         return []
+    pool = getattr(state.world, "node_pools", {}).get(state.world.current_node_id)
+    if pool and getattr(pool, "node_cleaned", False):
+        return []
     events: list[Event] = []
     uplinks_total = state.world.lore.counters.get("uplink_count", 0)
     year = state.clock.t / Balance.YEAR_S if Balance.YEAR_S else 0.0
     reachable = _reachable_nodes(state.world.known_links, state.world.current_node_id)
 
     candidates = []
-    for node_id in state.world.known_contacts:
+    source_nodes = set(state.world.known_contacts) | set(getattr(state.world, "forced_hidden_nodes", set()) or set())
+    for node_id in source_nodes:
+        node_pool = getattr(state.world, "node_pools", {}).get(node_id)
+        if node_pool and getattr(node_pool, "node_cleaned", False):
+            continue
         if _node_has_known_route(state.world.known_links, reachable, node_id):
             continue
         if _is_within_route_range(state, reachable, node_id):

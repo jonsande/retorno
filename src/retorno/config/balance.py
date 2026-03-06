@@ -194,6 +194,15 @@ class Balance:
     # This is checked before weights are applied. Higher values = more frequent singles
     # across uplink/dock/salvage_data triggers. Weights only affect which single is chosen.
     LORE_SINGLES_BASE_P = 0.05
+    # Enables/disables periodic lore scheduler evaluations in engine.tick.
+    # Keep enabled for the node-pool model where non-forced lore is injected by cycle.
+    LORE_SCHEDULER_ENABLED = True
+    # Period (in in-game years) between non-forced lore injection evaluations.
+    # Lower values mean more frequent checks; 1.0 means "once per in-game year".
+    LORE_NON_FORCED_INTERVAL_YEARS = 1.0
+    # Probability applied at each non-forced scheduler cycle for every eligible piece.
+    # This controls how often optional lore gets assigned to candidate node pools.
+    LORE_NON_FORCED_INJECT_P = 0.05
     # Toggle deterministic lore/intel behavior across processes for equal seed/state/action sequence.
     # False restores legacy process-dependent behavior for lore seed derivation and set iteration order.
     DETERMINISTIC_LORE_INTEL = True

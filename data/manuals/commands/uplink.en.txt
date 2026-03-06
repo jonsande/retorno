@@ -15,6 +15,8 @@ Behavior
 - Pulls route/contact intel from remote caches.
 - Updates known links and may unlock new reachable paths.
 - Writes navigation log artifacts under `/logs/nav/`.
+- Node uplink data is single-use: after a successful pull on a node, repeated `uplink` at that same node returns no new data.
+- The uplink route pool for a node is fixed when that node becomes a known contact.
 
 Common block reasons
 - `not_docked`

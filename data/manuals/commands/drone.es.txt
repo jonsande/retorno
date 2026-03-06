@@ -64,6 +64,7 @@ Notas operativas
 - `drone survey` informa de posibles firmas de datos recuperables, no de certeza.
 - Si no hay archivos de datos montables, survey informa de que no hay firmas.
 - Los falsos negativos cuando sí existen archivos se controlan con `Balance.DRONE_SURVEY_DATA_FALSE_NEGATIVE_P`.
+- Survey también informa banderas de agotamiento por categoría: `scrap_complete`, `data_complete`, `extras_complete` y `node_cleaned`.
 - Los drones desplegados consumen batería en reposo.
 - Los drones desplegados/no acoplados acumulan radiación ambiental.
 - Convención de escudo (`shield_factor`): `<1` mejor, `=1` base, `>1` peor.

@@ -140,6 +140,9 @@ Esto da variedad, pero no lo haría aún como primer sistema.
 - [ ] Posibilidad de apagar/encender el sonido ambiente.
 
 - [ ] Reproductor de música clásica (Sibelius, Mahler, Buckner, etc.).
+  - [ ] Sibelius sinfonía No.2 D mayor, op. 43
+  - [ ] Mahler sinfonía No.5 (o 4?)
+  - [ ] Strauss Blue Danube
 
 - [ ] Ruido de estática.
 
@@ -148,6 +151,10 @@ Esto da variedad, pero no lo haría aún como primer sistema.
 
 
 === OTROS / SIN CATALOGAR ===
+
+- [ ] El mensaje "uplink complete :: node data already exhausted" es quizá un poco confuso (puede dar a entender que tampoco hay data recuperable vía "salvage data"). Debería, mejor, ser "uplink complete :: uplink data already exhausted".
+
+- [!] Cuando se inicia un viaje, la radiación de entorno durante el viaje se calcula (si no me equivoco) como media entre la radiación de entorno del origen y del destino. Ahora bien: ahora mismo, la radiación de entorno durante el viaje (es decir, la media aludida) se aplica nada más iniciar el viaje. Me gustaría cambiar esto. Me gustaría que el cambio fuera progresivo. La media entre la radiación de entorno del origen y del destino debería ser la radiación de entorno existente exactamente en el punto intermedio entre entre el origen y el destino (es decir, en el punto en que se está a la misma distancia del origen que del destino). En otras palabras, la radiación de entorno debe ir progresando con el viaje, hasta llegar el nivel de radiación del destino. Esto nos permitirá, en un segundo paso, diseñar un sistema de interrupción de la hibernación en el momento del viaje en que se traspasase un cierto umbral de radiación ambiente.
 
 - [x] Mensaje advirtiendo cuándo no está cargando la batería de los drones en bahía, y recordando las condiciones que se tienen que cumplir.
 

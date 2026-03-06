@@ -15,6 +15,8 @@ Comportamiento
 - Descarga intel de rutas/contactos desde cachés remotas.
 - Actualiza enlaces conocidos y puede abrir nuevos caminos alcanzables.
 - Escribe artefactos de log de navegación en `/logs/nav/`.
+- Los datos de uplink de un nodo son de un solo uso: tras una descarga exitosa en ese nodo, repetir `uplink` allí no devuelve datos nuevos.
+- El pool de rutas de uplink de un nodo queda fijado cuando ese nodo pasa a ser contacto conocido.
 
 Bloqueos frecuentes
 - `not_docked`

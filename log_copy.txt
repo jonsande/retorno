@@ -1,10 +1,242 @@
-- energy_distribution: Δhealth=-0.019 now=0.931
-SoC: start=0.365 end=1.000
-> dock DERELICT_30D4D3
-[CMD] [INFO] job_queued :: J32 dock target=world_node:DERELICT_30D4D3 ETA=12s
-completions: CURL_12 DERELICT_30D4D3 ECHO_7 HARBOR_12 MOURN_ANCHOR WRECK_B0C2BC
-[AUTO] [INFO] docked :: Docked at DERELICT_30D4D3
-[AUTO] [INFO] broadcast_received :: broadcast_received :: Station broadcast: /logs/broadcasts/DERELICT_30D4D3_0129.en.txt
-> cat /logs/broadcasts/DERELICT_30D4D3_0129.en.txt
-=== CAT /logs/broadcasts/DERELICT_30D4D3_0129.en.txt ===
-> log copy 10
+[INFO] Started new game (save slot ignored by --new-game/RETORNO_NEW_GAME).
+[core_os] wake schedule integrity: FAIL (chronometry desync)
+[core_os] Multiple wake timers unreadable or outside valid bounds.
+[core_os] No authorized medical staff response detected.
+[core_os] Entering autonomous emergency recovery protocol.
+> drone deploy! D1 PWR-A2
+[CMD] [INFO] job_queued :: J1 deploy_drone target=ship_sector:PWR-A2 ETA=13s (EMERGENCY)
+AUTONOMOUS RECOVERY PROTOCOL engaged
+CRYO VAULT status scan... ok
+TARGET selected: Sarcophagus-05
+Decryo sequence: INIT (emergency profile)
+Thermal gradient stabilized
+Neurochemical thaw: PARTIAL
+Motor pathway recovery: FAIL (indeterminate system fault)
+Host vitals: nominal
+Conscious Interface Recovery Protocol (CIRP): ARMED
+Neural terminal link: ONLINE
+Manual operations required
+Timebase fault detected: internal clock invalid
+Chronology reset: Year 1 / Day 1 / 00:00:00
+Awaiting operator input
+
+[INFO] new mail detected.
+Tip: use 'mail inbox' to list messages.
+Tip: use 'mail read <id|latest>' or 'cat <path>' to read.
+Tip: if you still don't remember the command instructions, manuals are under /manuals (try: ls /manuals/commands, man <topic>).
+Tip: use 'config set lang' to change ship_os languaje
+Tip: use 'help' to see available commands.
+Tip: use TAB key for list and autocomplete available commands, id's, paths, etc.
+[AUTO] Drone deployed to PWR-A2
+> drone repair D1 energy_distribution
+[CMD] [INFO] job_queued :: J2 repair_system target=ship_system:energy_distribution ETA=45s
+> drone repair D1 power_core
+[CMD] [INFO] job_queued :: J3 repair_system target=ship_system:power_core ETA=45s
+> drone repair D1 power_core
+[CMD] [INFO] job_queued :: J4 repair_system target=ship_system:power_core ETA=45s
+> power off data_core
+[CMD] [WARN] system_state_changed :: data_core: nominal -> offline (cause=manual_shed, health=n/a)
+> power off security
+[CMD] [WARN] system_state_changed :: security: nominal -> offline (cause=manual_shed, health=n/a)
+[AUTO] [WARN] system_state_changed :: energy_distribution: damaged -> nominal (cause=repair, health=0.95)
+[AUTO] Repair completed for energy_distribution
+> scan
+[WARN] scan: sensord not running (try: boot sensord)
+=== SCAN ===
+(no signals detected)
+> boot sensord
+[CMD] [INFO] job_queued :: J5 boot_service target=service:sensord ETA=8s
+[AUTO] Service booted: sensord
+[AUTO] [INFO] signal_detected :: Signal detected: ECHO_7
+> nav contacts
+=== CONTACTS ===
+- ECHO-7 Relay Station (station) id=ECHO_7 dist=0.0000ly no_route unvisited
+- Unknown (origin) id=UNKNOWN_00 dist=0.0000ly route visited
+[AUTO] [WARN] system_state_changed :: power_core: damaged -> limited (cause=repair, health=0.75)
+[AUTO] Repair completed for power_core
+> scan
+=== SCAN ===
+- CURL-12 Waystation (station) id=CURL_12
+- Unknown (origin) id=UNKNOWN_00
+- Wreck B0C2BC (ship) id=WRECK_B0C2BC
+[INFO] (scan) fine range fixed: CURL_12 (3.86kmi)
+(scan) new: CURL_12, WRECK_B0C2BC
+> nav contacts
+=== CONTACTS ===
+- CURL-12 Waystation (station) id=CURL_12 dist=3.86kmi no_route unvisited
+- ECHO-7 Relay Station (station) id=ECHO_7 dist=0.0000ly no_route unvisited
+- Unknown (origin) id=UNKNOWN_00 dist=0.0000ly route visited
+- Wreck B0C2BC (ship) id=WRECK_B0C2BC dist=2.44ly no_route unvisited
+> scan
+=== SCAN ===
+- ECHO-7 Relay Station (station) id=ECHO_7
+- Unknown (origin) id=UNKNOWN_00
+[INFO] (scan) fine range fixed: ECHO_7 (14.49kmi)
+> nav contacts
+=== CONTACTS ===
+- CURL-12 Waystation (station) id=CURL_12 dist=3.86kmi no_route unvisited
+- ECHO-7 Relay Station (station) id=ECHO_7 dist=14.49kmi no_route unvisited
+- Unknown (origin) id=UNKNOWN_00 dist=0.0000ly route visited
+- Wreck B0C2BC (ship) id=WRECK_B0C2BC dist=2.44ly no_route unvisited
+[AUTO] [WARN] system_state_changed :: power_core: limited -> nominal (cause=repair, health=0.90)
+[AUTO] Repair completed for power_core
+> nav ECHO_7
+WARNING: confirm nav to ECHO_7. Continue? [y/N]
+> nav ECHO_7
+[CMD] [WARN] boot_blocked :: Action blocked: no known route to ECHO_7. Try: route solve <node_id> (if in range), or acquire intel at other hubs.
+> route solve ECHO_7
+[CMD] [INFO] job_queued :: J6 route_solve target=world_node:ECHO_7 ETA=1m 40s
+> debug on
+DEBUG mode enabled
+> wait 60
+> debug off
+DEBUG mode disabled
+[AUTO] Route solved: UNKNOWN_00 -> ECHO_7
+> power off sensors
+[CMD] [WARN] system_state_changed :: sensors: limited -> offline (cause=manual_shed, health=n/a)
+completions: --no-cruise CURL_12 ECHO_7 WRECK_B0C2BC abort contacts graph map routes sectors
+> nav ECHO_7
+WARNING: confirm nav to ECHO_7. Continue? [y/N]
+> nav ECHO_7
+[CMD] [INFO] travel_profile_set :: Travel profile set: CRUISE (auto). Use 'nav --no-cruise <node_id>' to override.
+[CMD] [INFO] travel_started :: To ECHO_7 dist=14.49kmi ETA=19m 25s (hint: nav abort)
+(nav) confirmed: en route to ECHO_7
+[AUTO] [WARN] radiation :: ship ambient radiation: low -> elevated (0.0013rad/s)
+> debug on
+DEBUG mode enabled
+> wait 300
+> wait 300
+[STEP] [WARN] radiation :: D1 drone dose: low -> elevated (1.001)
+> wait 100
+> wait 100
+[STEP] [INFO] arrived :: Arrived at ECHO_7 (from UNKNOWN_00)
+> debug off
+DEBUG mode disabled
+> dock ECHO_7
+[CMD] [INFO] job_queued :: J7 dock target=world_node:ECHO_7 ETA=1m 0s
+> debug on
+DEBUG mode enabled
+completions: arcs deadnodes lore modules off on scenario seed status
+> debug lore
+=== DEBUG LORE ===
+- delivered_count: 0
+- counters: {'uplink_count': 0, 'dock_count': 0, 'salvage_data_count': 0, 'signal_count': 0}
+- last_delivery_t: 0.0s
+- forced_pending:
+  carnaval_cache_01:ancora_to_carnaval_cache_doc policy=deadline deadline={'max_docks': 2, 'max_uplinks': 3} allowed=['station_broadcast', 'captured_signal', 'ship_os_mail'] constraints={'min_year': 0.0, 'max_dist_ly': 40.0, 'regions_any': ['disk', 'halo']}
+  corridor_01:corridor_01_to_archive policy=deadline deadline={'max_uplinks': 4, 'max_docks': 3} allowed=['uplink_only', 'station_broadcast', 'salvage_data'] constraints={'min_year': 0.2, 'max_year': 8.0, 'min_dist_ly': 2.0, 'max_dist_ly': 25.0, 'regions_any': ['bulge', 'disk']}
+> debug arcs
+=== DEBUG ARCS ===
+- carnaval_cache_01:
+  primary: (unplaced)
+  secondary: (none)
+- corridor_01:
+  primary: (unplaced)
+  secondary: (none)
+- example_unforced:
+  primary: (unplaced)
+  secondary: (none)
+- mobility_failsafe_count: 0
+- mobility_no_new_uplink_count: 0
+> debug off
+DEBUG mode disabled
+[AUTO] [INFO] docked :: Docked at ECHO_7
+> uplink
+[INFO] Battery low: SoC=0.38. Consider reducing load.
+Uplink blocked: data_core offline. Try: power on data_core; boot datad
+> power on data_core
+[CMD] [WARN] system_state_changed :: data_core: offline -> nominal (cause=manual_restore, health=0.90)
+[CMD] [INFO] system_power_restored :: Power restored: data_core (offline -> nominal)
+> boot datad
+[CMD] [INFO] job_queued :: J8 boot_service target=service:datad ETA=5s
+[AUTO] Service booted: datad
+> uplink
+[INFO] Battery low: SoC=0.38. Consider reducing load.
+uplink_complete :: routes added: CURL_12, DERELICT_3AE227, HARBOR_12
+Log written to /logs/nav/uplink_ECHO_7_00037.txt
+> debug on
+DEBUG mode enabled
+> debug lore
+=== DEBUG LORE ===
+- delivered_count: 0
+- counters: {'uplink_count': 1, 'dock_count': 1, 'salvage_data_count': 0, 'signal_count': 0}
+- last_delivery_t: 0.0s
+- forced_pending:
+  carnaval_cache_01:ancora_to_carnaval_cache_doc policy=deadline deadline={'max_docks': 2, 'max_uplinks': 3} allowed=['station_broadcast', 'captured_signal', 'ship_os_mail'] constraints={'min_year': 0.0, 'max_dist_ly': 40.0, 'regions_any': ['disk', 'halo']}
+  corridor_01:corridor_01_to_archive policy=deadline deadline={'max_uplinks': 4, 'max_docks': 3} allowed=['uplink_only', 'station_broadcast', 'salvage_data'] constraints={'min_year': 0.2, 'max_year': 8.0, 'min_dist_ly': 2.0, 'max_dist_ly': 25.0, 'regions_any': ['bulge', 'disk']}
+> debug arcs
+=== DEBUG ARCS ===
+- carnaval_cache_01:
+  primary: (unplaced)
+  secondary: (none)
+- corridor_01:
+  primary: (unplaced)
+  secondary: (none)
+- example_unforced:
+  primary: (unplaced)
+  secondary: (none)
+- mobility_failsafe_count: 0
+- mobility_no_new_uplink_count: 0
+> debug off
+DEBUG mode disabled
+> uplink
+[INFO] Battery low: SoC=0.38. Consider reducing load.
+uplink_complete :: routes added: MOURN_ANCHOR, SABLE_CHAPEL, VEIL_GARDEN
+Log written to /logs/nav/uplink_ECHO_7_00038.txt
+> debug on
+DEBUG mode enabled
+> debug lore
+=== DEBUG LORE ===
+- delivered_count: 0
+- counters: {'uplink_count': 2, 'dock_count': 1, 'salvage_data_count': 0, 'signal_count': 0}
+- last_delivery_t: 0.0s
+- forced_pending:
+  carnaval_cache_01:ancora_to_carnaval_cache_doc policy=deadline deadline={'max_docks': 2, 'max_uplinks': 3} allowed=['station_broadcast', 'captured_signal', 'ship_os_mail'] constraints={'min_year': 0.0, 'max_dist_ly': 40.0, 'regions_any': ['disk', 'halo']}
+  corridor_01:corridor_01_to_archive policy=deadline deadline={'max_uplinks': 4, 'max_docks': 3} allowed=['uplink_only', 'station_broadcast', 'salvage_data'] constraints={'min_year': 0.2, 'max_year': 8.0, 'min_dist_ly': 2.0, 'max_dist_ly': 25.0, 'regions_any': ['bulge', 'disk']}
+> uplink
+[INFO] Battery low: SoC=0.39. Consider reducing load.
+uplink_complete :: routes added: ANCORA, DERELICT_2CF39C, DERELICT_A70E39
+Log written to /logs/nav/uplink_ECHO_7_00039.txt
+> debug lore
+=== DEBUG LORE ===
+- delivered_count: 0
+- counters: {'uplink_count': 3, 'dock_count': 1, 'salvage_data_count': 0, 'signal_count': 0}
+- last_delivery_t: 0.0s
+- forced_pending:
+  carnaval_cache_01:ancora_to_carnaval_cache_doc policy=deadline deadline={'max_docks': 2, 'max_uplinks': 3} allowed=['station_broadcast', 'captured_signal', 'ship_os_mail'] constraints={'min_year': 0.0, 'max_dist_ly': 40.0, 'regions_any': ['disk', 'halo']}
+  corridor_01:corridor_01_to_archive policy=deadline deadline={'max_uplinks': 4, 'max_docks': 3} allowed=['uplink_only', 'station_broadcast', 'salvage_data'] constraints={'min_year': 0.2, 'max_year': 8.0, 'min_dist_ly': 2.0, 'max_dist_ly': 25.0, 'regions_any': ['bulge', 'disk']}
+> uplink
+[INFO] Battery low: SoC=0.39. Consider reducing load.
+uplink_complete :: routes added: DERELICT_01A4E7, DERELICT_B140EB, DERELICT_C3116A
+Log written to /logs/nav/uplink_ECHO_7_00040.txt
+> debug lore
+=== DEBUG LORE ===
+- delivered_count: 0
+- counters: {'uplink_count': 4, 'dock_count': 1, 'salvage_data_count': 0, 'signal_count': 0}
+- last_delivery_t: 0.0s
+- forced_pending:
+  carnaval_cache_01:ancora_to_carnaval_cache_doc policy=deadline deadline={'max_docks': 2, 'max_uplinks': 3} allowed=['station_broadcast', 'captured_signal', 'ship_os_mail'] constraints={'min_year': 0.0, 'max_dist_ly': 40.0, 'regions_any': ['disk', 'halo']}
+  corridor_01:corridor_01_to_archive policy=deadline deadline={'max_uplinks': 4, 'max_docks': 3} allowed=['uplink_only', 'station_broadcast', 'salvage_data'] constraints={'min_year': 0.2, 'max_year': 8.0, 'min_dist_ly': 2.0, 'max_dist_ly': 25.0, 'regions_any': ['bulge', 'disk']}
+> ls /logs/nav/
+=== LS /logs/nav ===
+- uplink_ECHO_7_00037.txt
+- uplink_ECHO_7_00038.txt
+- uplink_ECHO_7_00039.txt
+- uplink_ECHO_7_00040.txt
+completions: /logs/nav/uplink_ECHO_7_00037.txt /logs/nav/uplink_ECHO_7_00038.txt /logs/nav/uplink_ECHO_7_00039.txt
+> cat /logs/nav/uplink_ECHO_7_00037.txt
+=== CAT /logs/nav/uplink_ECHO_7_00037.txt ===
+LINK: CURL_12
+LINK: DERELICT_3AE227
+LINK: HARBOR_12
+> cat /logs/nav/uplink_ECHO_7_00038.txt
+=== CAT /logs/nav/uplink_ECHO_7_00038.txt ===
+LINK: SABLE_CHAPEL
+LINK: VEIL_GARDEN
+LINK: MOURN_ANCHOR
+> cat /logs/nav/uplink_ECHO_7_00039.txt
+=== CAT /logs/nav/uplink_ECHO_7_00039.txt ===
+LINK: DERELICT_2CF39C
+LINK: ANCORA
+LINK: DERELICT_A70E39
+> log copy 500
