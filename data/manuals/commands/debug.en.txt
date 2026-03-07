@@ -6,6 +6,7 @@ debug lore
 debug deadnodes
 debug modules
 debug galaxy
+debug galaxy map <sector|local|regional|global>
 
 Purpose
 - Operator/developer control surface for deterministic testing and scenario resets.
@@ -16,6 +17,7 @@ Operational behavior
 - `debug seed <n>` sets RNG seed.
 - listing commands expose internal debug registries.
 - `debug galaxy` prints galactic position, sector-neighborhood coherence, and procedural-radiation distribution.
+- `debug galaxy map <scale>` renders the galaxy ASCII map at selected scale using all loaded nodes.
 
 Usage notes
 - Intended for testing and balancing, not diegetic normal play.

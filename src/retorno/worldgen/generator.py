@@ -188,6 +188,19 @@ def _pick_hub(nodes: list[SpaceNode]) -> SpaceNode | None:
 
 
 def _generate_links_for_sector(state: GameState, sector_id: str, rng: random.Random) -> None:
+    max_hop = float(Balance.MAX_ROUTE_HOP_LY)
+
+    def _link_with_cap(a: SpaceNode, b: SpaceNode) -> bool:
+        dx = a.x_ly - b.x_ly
+        dy = a.y_ly - b.y_ly
+        dz = a.z_ly - b.z_ly
+        dist = (dx * dx + dy * dy + dz * dz) ** 0.5
+        if dist > max_hop:
+            return False
+        a.links.add(b.node_id)
+        b.links.add(a.node_id)
+        return True
+
     nodes = _sector_nodes(state, sector_id)
     if not nodes:
         return
@@ -198,8 +211,7 @@ def _generate_links_for_sector(state: GameState, sector_id: str, rng: random.Ran
     for node in nodes:
         if node.node_id == hub.node_id:
             continue
-        node.links.add(hub.node_id)
-        hub.links.add(node.node_id)
+        _link_with_cap(node, hub)
 
     # Optional extra links inside sector
     for node in nodes:
@@ -208,8 +220,7 @@ def _generate_links_for_sector(state: GameState, sector_id: str, rng: random.Ran
         if rng.random() < 0.10:
             target = rng.choice(nodes)
             if target.node_id != node.node_id:
-                node.links.add(target.node_id)
-                target.links.add(node.node_id)
+                _link_with_cap(node, target)
 
     # Link hub to neighbor sector hubs (2D neighbors only)
     try:
@@ -232,8 +243,7 @@ def _generate_links_for_sector(state: GameState, sector_id: str, rng: random.Ran
                     neighbors.append(neighbor_hub)
     neighbors = sorted(neighbors, key=lambda n: (n.x_ly - hub.x_ly) ** 2 + (n.y_ly - hub.y_ly) ** 2)
     for neighbor in neighbors[:2]:
-        hub.links.add(neighbor.node_id)
-        neighbor.links.add(hub.node_id)
+        _link_with_cap(hub, neighbor)
 
 
 _GREEK_SUFFIXES = [

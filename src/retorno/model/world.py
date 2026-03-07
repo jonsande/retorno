@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import MISSING, dataclass, field, fields
 from typing import Optional, Tuple
 from retorno.config.balance import Balance
+from retorno.model.galaxy import galactic_region_for_op_pos
 
 
 @dataclass(slots=True)
@@ -170,16 +171,27 @@ def sector_id_for_pos(x_ly: float, y_ly: float, z_ly: float) -> str:
 
 
 def region_for_pos(x_ly: float, y_ly: float, z_ly: float) -> str:
-    import math
-    dx = x_ly - float(Balance.GALAXY_CENTER_X_LY)
-    dy = y_ly - float(Balance.GALAXY_CENTER_Y_LY)
-    dz = z_ly - float(Balance.GALAXY_CENTER_Z_LY)
-    r = math.sqrt(dx * dx + dy * dy + dz * dz)
-    if r < float(Balance.GALAXY_BULGE_RADIUS_LY):
-        return "bulge"
-    if r < float(Balance.GALAXY_DISK_OUTER_RADIUS_LY):
-        return "disk"
-    return "halo"
+    # Phase 2 semantics: gameplay/worldgen/lore regions follow the physical model.
+    return galactic_region_for_op_pos(x_ly, y_ly, z_ly)
+
+
+def distance_between_nodes_ly(state: WorldState, from_id: str, to_id: str) -> float | None:
+    src = state.space.nodes.get(from_id)
+    dst = state.space.nodes.get(to_id)
+    if not src or not dst:
+        return None
+    dx = src.x_ly - dst.x_ly
+    dy = src.y_ly - dst.y_ly
+    dz = src.z_ly - dst.z_ly
+    return (dx * dx + dy * dy + dz * dz) ** 0.5
+
+
+def is_hop_within_cap(state: WorldState, from_id: str, to_id: str, max_hop_ly: float | None = None) -> bool:
+    cap = float(Balance.MAX_ROUTE_HOP_LY if max_hop_ly is None else max_hop_ly)
+    dist = distance_between_nodes_ly(state, from_id, to_id)
+    if dist is None:
+        return True
+    return dist <= cap
 
 
 def add_known_link(

@@ -1,14 +1,17 @@
 nav map sectors
+nav map galaxy [sector|local|regional|global]
 nav map graph [node_id]
 nav map path <node_id>
 nav map routes
 nav map contacts
+nav galaxy [sector|local|regional|global]
 nav <node_id>
 nav --no-cruise <node_id>
 nav abort
 
 Descripción
 - `nav map sectors`: lista sectores del mundo conocidos y coordenadas de sector.
+- `nav map galaxy [escala]`: muestra el mapa galáctico en la escala seleccionada (`sector=10ly`, `local=100ly`, `regional=10000ly`, `global=500000ly`) usando nodos conocidos + posición actual.
 - `nav map graph`: muestra el grafo global de nodos/rutas conocidas.
 - `nav map graph <node_id>`: enfoca el grafo en un nodo conocido.
 - `nav map path <node_id>`: calcula la mejor ruta conocida desde el nodo actual.
@@ -20,6 +23,8 @@ Descripción
 
 Aliases aceptados (no aparecen en `help`)
 - `nav sectors` -> `nav map sectors`
+- `nav galaxy` -> `nav map galaxy`
+- `nav galaxy <scale>` -> `nav map galaxy <scale>`
 - `nav graph` y `graph` -> `nav map graph`
 - `nav graph <node_id>` y `graph <node_id>` -> `nav map graph <node_id>`
 - `map path <node_id>` y `path <node_id>` -> `nav map path <node_id>`
@@ -30,6 +35,7 @@ Aliases aceptados (no aparecen en `help`)
 Dependencias y gating
 - `nav map *`: depende solo de `core_os`.
 - `nav <node_id>` y `nav --no-cruise <node_id>`: dependen de `core_os` y de que exista ruta/viaje válido.
+- Cap duro de salto de tránsito: cualquier salto por encima de `MAX_ROUTE_HOP_LY` se bloquea (por defecto `45ly`).
 - Estado `core_os`:
   - `NOMINAL/UPGRADED`: control completo.
   - `LIMITED`: bloquea `uplink`, `route solve`, `auth recover`.
@@ -38,4 +44,4 @@ Dependencias y gating
   - `OFFLINE`: terminal mínima de supervivencia.
 
 Comandos relacionados
-- `route solve <node_id>`, `dock <node_id>`, `undock`, `hibernate until_arrival`, `intel`
+- `route solve <node_id>`, `dock <node_id>`, `undock`, `hibernate until_arrival`, `intel`, `debug galaxy map <scale>`

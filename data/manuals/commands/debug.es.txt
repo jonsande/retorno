@@ -6,6 +6,7 @@ debug lore
 debug deadnodes
 debug modules
 debug galaxy
+debug galaxy map <sector|local|regional|global>
 
 Propósito
 - Superficie de control para pruebas deterministas y resets de escenario.
@@ -16,6 +17,7 @@ Comportamiento operativo
 - `debug seed <n>` fija semilla RNG.
 - Los comandos de listado exponen registros internos de depuración.
 - `debug galaxy` emite informe de posición galáctica, vecindad de sectores y distribución de radiación procedural.
+- `debug galaxy map <scale>` dibuja el mapa ASCII galáctico en la escala indicada usando todos los nodos cargados.
 
 Notas de uso
 - Pensado para testing/balanceo, no para flujo diegético normal.

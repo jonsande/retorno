@@ -13,6 +13,7 @@ Navigation blocks
 - Direct routes from current position: `nav map routes`.
 - Known contacts from current position: `nav map contacts`.
 - Known world sectors: `nav map sectors`.
+- Galactic situational view (physical layer): `nav map galaxy [sector|local|regional|global]`.
 - Transit: `nav <node_id>`, `nav --no-cruise <node_id>`, `nav abort`.
 
 How route knowledge is acquired
@@ -32,7 +33,10 @@ Coordinates vs IDs
 Operational notes
 - Knowing a contact is not the same as knowing a route to it.
 - `nav map *` depends on `core_os` only (not on `sensors` or `data_core`).
+- Region semantics (bulge/disk/halo) are evaluated on the physical galactic layer.
+- `nav map galaxy` uses four fixed radii: `10ly`, `100ly`, `10000ly`, `500000ly`.
+- Single-hop travel and route publication are guarded by `MAX_ROUTE_HOP_LY` (default `45ly`).
 - `ship survey <target>` gives point telemetry, but requires active `sensors` + `data_core`.
 
 Relevant commands
-- `nav`, `ship survey`, `scan`, `route solve`, `uplink`, `intel import`, `dock`, `undock`.
+- `nav`, `nav galaxy`, `ship survey`, `scan`, `route solve`, `uplink`, `intel import`, `debug galaxy map <scale>`, `dock`, `undock`.

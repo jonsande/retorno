@@ -6,7 +6,7 @@ from retorno.model.events import AlertState, Event, EventType, Severity, SourceR
 from retorno.model.ship import PowerNetworkState, ShipSector
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, normalize_path, register_mail, _normalize_access
 from retorno.model.systems import Dependency, ServiceState, ShipSystem, SystemState
-from retorno.model.world import SpaceNode, region_for_pos, sector_id_for_pos, add_known_link
+from retorno.model.world import SpaceNode, add_known_link, is_hop_within_cap, region_for_pos, sector_id_for_pos
 from retorno.worldgen.generator import ensure_sector_generated
 from retorno.runtime.data_loader import load_modules, load_locations
 from retorno.config.balance import Balance
@@ -197,14 +197,16 @@ def create_initial_state_prologue() -> GameState:
                 if not current_node.is_hub:
                     hub = next((n for n in state.world.space.nodes.values() if n.is_hub and sector_id_for_pos(n.x_ly, n.y_ly, n.z_ly) == sector_id), None)
                     if hub:
-                        add_known_link(state.world, current_node.node_id, hub.node_id, bidirectional=True)
-                        state.world.known_contacts.add(hub.node_id)
-                        state.world.known_nodes.add(hub.node_id)
+                        if is_hop_within_cap(state.world, current_node.node_id, hub.node_id):
+                            add_known_link(state.world, current_node.node_id, hub.node_id, bidirectional=True)
+                            state.world.known_contacts.add(hub.node_id)
+                            state.world.known_nodes.add(hub.node_id)
                 else:
                     dest = sorted(current_node.links)[0]
-                    add_known_link(state.world, current_node.node_id, dest, bidirectional=True)
-                    state.world.known_contacts.add(dest)
-                    state.world.known_nodes.add(dest)
+                    if is_hop_within_cap(state.world, current_node.node_id, dest):
+                        add_known_link(state.world, current_node.node_id, dest, bidirectional=True)
+                        state.world.known_contacts.add(dest)
+                        state.world.known_nodes.add(dest)
 
     _bootstrap_os(state)
     _bootstrap_alerts(state)

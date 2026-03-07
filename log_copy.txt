@@ -1,10 +1,20 @@
-[CMD] [INFO] job_queued :: J10 recall_drone target=drone:D1 ETA=25s
-> wait 25
-[STEP] Drone recalled: D1
-[STEP] [WARN] drone_bay_maintenance_blocked :: Docked drones need maintenance but bay support conditions are not met (charge_needed=1, repair_needed=1)
-> wait 400
-> wait 400
-> wait 400
-[STEP] [INFO] arrived :: Arrived at ECHO_7 (from UNKNOWN_00)
-completions: BRG-01 CRG-01 CURL_12 DRN-BAY ECHO_7 PWR-A2 WRECK_B0C2BC
-> log copy 10
+> drone deploy D1 ECHO_7
+[CMD] [WARN] boot_blocked :: Action blocked: drone bay offline; use 'drone deploy!' for emergency launch
+> power on power_core
+> drone deploy D1 ECHO_7
+[CMD] [WARN] boot_blocked :: Action blocked: drone bay offline; use 'drone deploy!' for emergency launch
+> power on drone_bay
+[CMD] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=manual_restore, health=0.90)
+[CMD] [INFO] system_power_restored :: Power restored: drone_bay (offline -> nominal)
+> scan
+=== SCAN ===
+- ECHO-7 Relay Station (station) id=ECHO_7
+> scan
+=== SCAN ===
+- CURL-12 Waystation (station) id=CURL_12
+- ECHO-7 Relay Station (station) id=ECHO_7
+> scan
+=== SCAN ===
+- ECHO-7 Relay Station (station) id=ECHO_7
+- Wreck B0C2BC (ship) id=WRECK_B0C2BC
+> log copy 20

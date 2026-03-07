@@ -130,6 +130,12 @@ def _run_hard_force_case() -> None:
 
 def _run_hard_force_constraints_and_no_relax_case() -> None:
     state = create_initial_state_sandbox()
+    start_node = state.world.space.nodes.get("UNKNOWN_00")
+    assert start_node is not None
+    # Move start reference away from origin to verify dist constraints are evaluated from start-node.
+    start_node.x_ly = 100.0
+    start_node.y_ly = 0.0
+    start_node.z_ly = 0.0
     arcs = [
         {
             "arc_id": "smoke_hard_force_strict",
@@ -143,7 +149,7 @@ def _run_hard_force_constraints_and_no_relax_case() -> None:
                 "constraints": {
                     "min_dist_ly": 20.0,
                     "max_dist_ly": 22.0,
-                    "regions_any": ["halo"],
+                    "regions_any": ["disk"],
                 },
             },
             "secondary_lore_docs": [],
@@ -163,9 +169,12 @@ def _run_hard_force_constraints_and_no_relax_case() -> None:
     node_id = state.world.lore_placements.piece_to_node[piece_key]
     node = state.world.space.nodes.get(node_id)
     assert node is not None, "strict hard piece node should exist"
-    dist = (node.x_ly * node.x_ly + node.y_ly * node.y_ly + node.z_ly * node.z_ly) ** 0.5
+    dx = node.x_ly - start_node.x_ly
+    dy = node.y_ly - start_node.y_ly
+    dz = node.z_ly - start_node.z_ly
+    dist = (dx * dx + dy * dy + dz * dz) ** 0.5
     assert 20.0 <= dist <= 22.0, f"ad-hoc node must respect dist constraints, got dist={dist}"
-    assert region_for_pos(node.x_ly, node.y_ly, node.z_ly) == "halo", "ad-hoc node must respect region constraints"
+    assert region_for_pos(node.x_ly, node.y_ly, node.z_ly) == "disk", "ad-hoc node must respect region constraints"
 
     # No-relax guard: when only explicit non-procedural candidates are configured and no
     # candidate is available, strict ad-hoc generation must not override those rules.

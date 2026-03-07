@@ -17,4 +17,4 @@ Guía operativa
 - Usa `nav map graph` y `nav map graph <node_id>` para cartografía del grafo mundial.
 
 Comandos relacionados
-- `nav map sectors`, `nav map graph [node_id]`, `nav map routes`, `nav map contacts`
+- `nav map sectors`, `nav map galaxy [sector|local|regional|global]`, `nav map graph [node_id]`, `nav map routes`, `nav map contacts`

@@ -5,12 +5,23 @@ class Balance:
     DEFAULT_RNG_SEED = 36892
     DAY_S = 86400.0
     YEAR_S = 365.0 * DAY_S
-    # Galaxy radial model (ly). Region is computed against this center.
-    GALAXY_CENTER_X_LY = -8.0
-    GALAXY_CENTER_Y_LY = 0.0
-    GALAXY_CENTER_Z_LY = 0.0
-    GALAXY_BULGE_RADIUS_LY = 5.0
-    GALAXY_DISK_OUTER_RADIUS_LY = 15.0
+    # Legacy operational region model (kept for diagnostics/backward checks).
+    GALAXY_OP_REGION_CENTER_X_LY = 0.0
+    GALAXY_OP_REGION_CENTER_Y_LY = 0.0
+    GALAXY_OP_REGION_CENTER_Z_LY = 0.0
+    GALAXY_OP_BULGE_RADIUS_LY = 5.0
+    GALAXY_OP_DISK_OUTER_RADIUS_LY = 15.0
+    # Physical galaxy model (effective galactic semantics).
+    GALAXY_PHYSICAL_CENTER_X_LY = 0.0
+    GALAXY_PHYSICAL_CENTER_Y_LY = 0.0
+    GALAXY_PHYSICAL_CENTER_Z_LY = 0.0
+    GALAXY_PHYSICAL_RADIUS_LY = 500000.0
+    GALAXY_PHYSICAL_BULGE_RADIUS_LY = 10000.0
+    GALAXY_PHYSICAL_DISK_OUTER_RADIUS_LY = 400000.0
+    GALAXY_OP_TO_PHYSICAL_SCALE = 1.0
+    GALAXY_OP_ORIGIN_PHYSICAL_X_LY = 250000.0
+    GALAXY_OP_ORIGIN_PHYSICAL_Y_LY = 0.0
+    GALAXY_OP_ORIGIN_PHYSICAL_Z_LY = 0.0
     HIBERNATE_CHUNK_S = 7 * DAY_S
     HIBERNATE_WAKE_CHECK_S = 1 * 60 * 60
     HIBERNATE_WAKE_EVENT_TYPES = {"drone_low_battery"}
@@ -171,6 +182,8 @@ class Balance:
     # Route solving
     ROUTE_SOLVE_MIN_S = 100.0
     ROUTE_SOLVE_MAX_S = 6800.0
+    # Hard cap for any single travel hop or operational link publication.
+    MAX_ROUTE_HOP_LY = 45.0
     UPLINK_FAILSAFE_N = 2
     # If no new routes to unvisited nodes exist within this distance from the current node,
     # the mobility failsafe may trigger (after N uplinks with no new routes).

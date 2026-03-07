@@ -15,6 +15,7 @@ from retorno.model.world import (
     NodePoolState,
     SpaceNode,
     add_known_link,
+    is_hop_within_cap,
     record_intel,
     region_for_pos,
     sector_id_for_pos,
@@ -652,7 +653,7 @@ def build_lore_context(state, node_id: str) -> LoreContext:
     node = state.world.space.nodes.get(node_id)
     if node:
         region = node.region or region_for_pos(node.x_ly, node.y_ly, node.z_ly)
-        dist = math.sqrt(node.x_ly * node.x_ly + node.y_ly * node.y_ly + node.z_ly * node.z_ly)
+        dist = _distance_from_start_ly(state, node.x_ly, node.y_ly, node.z_ly)
     else:
         region = ""
         dist = 0.0
@@ -1004,6 +1005,21 @@ def _start_node_for_hops(state) -> str:
     return state.world.current_node_id
 
 
+def _start_node_for_distance(state) -> SpaceNode | None:
+    start_id = _start_node_for_hops(state)
+    return state.world.space.nodes.get(start_id)
+
+
+def _distance_from_start_ly(state, x_ly: float, y_ly: float, z_ly: float) -> float:
+    start = _start_node_for_distance(state)
+    if not start:
+        return math.sqrt(x_ly * x_ly + y_ly * y_ly + z_ly * z_ly)
+    dx = x_ly - start.x_ly
+    dy = y_ly - start.y_ly
+    dz = z_ly - start.z_ly
+    return math.sqrt(dx * dx + dy * dy + dz * dz)
+
+
 def _hop_distance_from_start(state, target_id: str, max_hops: int) -> int | None:
     start_id = _start_node_for_hops(state)
     if start_id not in state.world.space.nodes or target_id not in state.world.space.nodes:
@@ -1239,6 +1255,7 @@ def _float_constraint(value, default: float | None = None) -> float | None:
 
 
 def _sample_ad_hoc_coords(
+    state,
     rng: random.Random,
     piece: dict,
     anchor: SpaceNode,
@@ -1251,21 +1268,27 @@ def _sample_ad_hoc_coords(
     if max_dist is not None and max_dist < min_dist:
         return None
 
-    # If piece declares spatial constraints, sample globally so they can be met exactly.
+    # If piece declares spatial constraints, sample around start-node reference so
+    # min/max lore distances remain semantically tied to run start.
     has_global_constraints = bool(regions_any) or (cons.get("min_dist_ly") is not None) or (cons.get("max_dist_ly") is not None)
     if has_global_constraints:
         hi = max_dist if max_dist is not None else max(min_dist + 20.0, 40.0)
         if hi < min_dist:
             return None
+        start = _start_node_for_distance(state)
+        sx = start.x_ly if start else 0.0
+        sy = start.y_ly if start else 0.0
+        sz = start.z_ly if start else 0.0
         for _ in range(128):
             dist = rng.uniform(min_dist, hi)
             theta = rng.uniform(0.0, math.tau)
             z_span = max(0.2, min(5.0, dist * 0.2))
-            z = rng.uniform(-z_span, z_span)
-            planar_sq = max(0.0, dist * dist - z * z)
+            dz = rng.uniform(-z_span, z_span)
+            z = sz + dz
+            planar_sq = max(0.0, dist * dist - dz * dz)
             planar = math.sqrt(planar_sq)
-            x = math.cos(theta) * planar
-            y = math.sin(theta) * planar
+            x = sx + math.cos(theta) * planar
+            y = sy + math.sin(theta) * planar
             region = region_for_pos(x, y, z)
             if regions_any and region not in regions_any:
                 continue
@@ -1340,12 +1363,12 @@ def _spawn_ad_hoc_candidate_for_forced_piece(state, piece_entry: dict) -> str | 
 
     authored = _location_node_ids()
     kind = allowed_kinds[int(seed % len(allowed_kinds))]
-    x_y_z = _sample_ad_hoc_coords(rng, piece, default_anchor)
+    x_y_z = _sample_ad_hoc_coords(state, rng, piece, default_anchor)
     if not x_y_z:
         return None
     x, y, z = x_y_z
     region = region_for_pos(x, y, z)
-    dist_from_origin = math.sqrt(x * x + y * y + z * z)
+    dist_from_origin = _distance_from_start_ly(state, x, y, z)
     year = state.clock.t / Balance.YEAR_S if Balance.YEAR_S else 0.0
     temp_node = SpaceNode(
         node_id="__ADHOC_CANDIDATE__",
@@ -1389,6 +1412,11 @@ def _spawn_ad_hoc_candidate_for_forced_piece(state, piece_entry: dict) -> str | 
         y_ly=y,
         z_ly=z,
     )
+    dx = anchor.x_ly - node.x_ly
+    dy = anchor.y_ly - node.y_ly
+    dz = anchor.z_ly - node.z_ly
+    if (dx * dx + dy * dy + dz * dz) ** 0.5 > float(Balance.MAX_ROUTE_HOP_LY):
+        return None
     node.links.add(anchor.node_id)
     anchor.links.add(node.node_id)
     state.world.space.nodes[node_id] = node
@@ -1497,24 +1525,25 @@ def _deliver_piece(
             except Exception:
                 left = right = ""
             if left and right:
-                add_known_link(state.world, left, right, bidirectional=True)
-                state.world.known_nodes.add(left)
-                state.world.known_nodes.add(right)
-                state.world.known_contacts.add(left)
-                state.world.known_contacts.add(right)
-                record_intel(
-                    state.world,
-                    t=state.clock.t,
-                    kind="link",
-                    from_id=left,
-                    to_id=right,
-                    confidence=float(piece.get("confidence", 0.6)),
-                    source_kind="uplink_only",
-                    source_ref=ctx.node_id,
-                )
-                if is_primary:
-                    # Unlock primary even when LINK was already known beforehand.
-                    _mark_primary_unlocked(state, arc_id, piece)
+                if is_hop_within_cap(state.world, left, right, float(Balance.MAX_ROUTE_HOP_LY)):
+                    add_known_link(state.world, left, right, bidirectional=True)
+                    state.world.known_nodes.add(left)
+                    state.world.known_nodes.add(right)
+                    state.world.known_contacts.add(left)
+                    state.world.known_contacts.add(right)
+                    record_intel(
+                        state.world,
+                        t=state.clock.t,
+                        kind="link",
+                        from_id=left,
+                        to_id=right,
+                        confidence=float(piece.get("confidence", 0.6)),
+                        source_kind="uplink_only",
+                        source_ref=ctx.node_id,
+                    )
+                    if is_primary:
+                        # Unlock primary even when LINK was already known beforehand.
+                        _mark_primary_unlocked(state, arc_id, piece)
         return LoreDelivery(delivered_files, events)
 
     content_ref = _content_ref_for_piece(piece, lang)

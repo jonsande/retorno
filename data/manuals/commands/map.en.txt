@@ -17,4 +17,4 @@ Operational guidance
 - Use `nav map graph` and `nav map graph <node_id>` for world graph operations.
 
 Related commands
-- `nav map sectors`, `nav map graph [node_id]`, `nav map routes`, `nav map contacts`
+- `nav map sectors`, `nav map galaxy [sector|local|regional|global]`, `nav map graph [node_id]`, `nav map routes`, `nav map contacts`

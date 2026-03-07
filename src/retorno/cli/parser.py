@@ -52,10 +52,10 @@ _PARSE_ERROR_MESSAGES = {
         "wait_number": "wait: <seconds> must be a number",
         "wait_gt0": "wait: <seconds> must be > 0",
         "debug_seed_int": "debug seed: <n> must be an integer",
-        "usage_debug": "Usage: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules | debug galaxy",
+        "usage_debug": "Usage: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules | debug galaxy | debug galaxy map <sector|local|regional|global>",
         "usage_dock": "Usage: dock <node_id>",
         "usage_undock": "Usage: undock",
-        "usage_nav": "Usage: nav map sectors|graph [node_id]|path <node_id>|routes|contacts | nav <node_id> | nav --no-cruise <node_id> | nav abort",
+        "usage_nav": "Usage: nav map sectors|graph [node_id]|path <node_id>|routes|contacts|galaxy [sector|local|regional|global] | nav <node_id> | nav --no-cruise <node_id> | nav abort",
         "usage_hibernate": "Usage: hibernate until_arrival | hibernate <years>",
         "hibernate_number": "hibernate: <years> must be a number",
         "hibernate_gt0": "hibernate: <years> must be > 0",
@@ -129,10 +129,10 @@ _PARSE_ERROR_MESSAGES = {
         "wait_number": "wait: <segundos> debe ser número",
         "wait_gt0": "wait: <segundos> debe ser > 0",
         "debug_seed_int": "debug seed: <n> debe ser entero",
-        "usage_debug": "Uso: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules | debug galaxy",
+        "usage_debug": "Uso: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules | debug galaxy | debug galaxy map <sector|local|regional|global>",
         "usage_dock": "Uso: dock <node_id>",
         "usage_undock": "Uso: undock",
-        "usage_nav": "Uso: nav map sectors|graph [node_id]|path <node_id>|routes|contacts | nav <node_id> | nav --no-cruise <node_id> | nav abort",
+        "usage_nav": "Uso: nav map sectors|graph [node_id]|path <node_id>|routes|contacts|galaxy [sector|local|regional|global] | nav <node_id> | nav --no-cruise <node_id> | nav abort",
         "usage_hibernate": "Uso: hibernate until_arrival | hibernate <años>",
         "hibernate_number": "hibernate: <años> debe ser número",
         "hibernate_gt0": "hibernate: <años> debe ser > 0",
@@ -258,19 +258,25 @@ def parse_command(line: str):
             raise ParseError("usage_job_cancel")
         return JobCancel(job_id=args[1])
 
+    galaxy_scales = {"sector", "local", "regional", "global"}
+
     if cmd in {"nav", "navigation", "travel"}:
         if len(args) == 0:
             raise ParseError("usage_nav")
         if args[0] == "map":
-            if len(args) == 2 and args[1] in {"sectors", "routes", "contacts", "graph"}:
+            if len(args) == 2 and args[1] in {"sectors", "routes", "contacts", "graph", "galaxy"}:
                 return ("NAV_MAP", args[1], None)
+            if len(args) == 3 and args[1] == "galaxy" and args[2] in galaxy_scales:
+                return ("NAV_MAP", "galaxy", args[2])
             if len(args) == 3 and args[1] == "graph":
                 return ("NAV_MAP", "graph", args[2])
             if len(args) == 3 and args[1] == "path":
                 return ("NAV_MAP", "path", args[2])
             raise ParseError("usage_nav")
-        if len(args) == 1 and args[0] in {"sectors", "routes", "contacts"}:
+        if len(args) == 1 and args[0] in {"sectors", "routes", "contacts", "galaxy"}:
             return ("NAV_MAP", args[0], None)
+        if len(args) == 2 and args[0] == "galaxy" and args[1] in galaxy_scales:
+            return ("NAV_MAP", "galaxy", args[1])
         if len(args) == 1 and args[0] == "graph":
             return ("NAV_MAP", "graph", None)
         if len(args) == 2 and args[0] == "graph":
@@ -359,6 +365,8 @@ def parse_command(line: str):
             return ("DEBUG_DEADNODES", None)
         if len(args) == 1 and args[0] == "galaxy":
             return ("DEBUG_GALAXY", None)
+        if len(args) == 3 and args[0] == "galaxy" and args[1] == "map" and args[2] in galaxy_scales:
+            return ("DEBUG_GALAXY_MAP", args[2])
         if len(args) != 1 or args[0] not in {"on", "off", "status"}:
             raise ParseError("usage_debug")
         return ("DEBUG", args[0])

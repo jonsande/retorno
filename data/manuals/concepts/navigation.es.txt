@@ -13,6 +13,7 @@ Bloques de navegación
 - Rutas directas desde posición actual: `nav map routes`.
 - Contactos conocidos desde posición actual: `nav map contacts`.
 - Sectores conocidos del mundo: `nav map sectors`.
+- Vista situacional galáctica (capa física): `nav map galaxy [sector|local|regional|global]`.
 - Tránsito: `nav <node_id>`, `nav --no-cruise <node_id>`, `nav abort`.
 
 Adquisición de conocimiento de rutas
@@ -32,7 +33,10 @@ Coordenadas vs IDs
 Notas operativas
 - Conocer un contacto no implica conocer ruta hacia él.
 - `nav map *` depende de `core_os` (no de `sensors` ni `data_core`).
+- La semántica de regiones (bulge/disk/halo) se evalúa en la capa física galáctica.
+- `nav map galaxy` usa cuatro radios fijos: `10ly`, `100ly`, `10000ly`, `500000ly`.
+- El tránsito por salto y la publicación de rutas quedan protegidos por `MAX_ROUTE_HOP_LY` (por defecto `45ly`).
 - `ship survey <target>` aporta telemetría puntual, pero sí requiere `sensors`+`data_core` activos.
 
 Comandos relacionados
-- `nav`, `ship survey`, `scan`, `route solve`, `uplink`, `intel import`, `dock`, `undock`.
+- `nav`, `nav galaxy`, `ship survey`, `scan`, `route solve`, `uplink`, `intel import`, `debug galaxy map <scale>`, `dock`, `undock`.

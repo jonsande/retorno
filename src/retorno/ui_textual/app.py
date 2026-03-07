@@ -654,16 +654,20 @@ class RetornoTextualApp(App):
             if len(tokens) == 2:
                 base_opts = ["map", "abort", "--no-cruise"]
                 if cmd == "nav":
-                    base_opts.extend(["sectors", "routes", "contacts", "graph"])
+                    base_opts.extend(["sectors", "routes", "contacts", "graph", "galaxy"])
                 return [c for c in base_opts if c.startswith(text)] + _travel_targets(text)
             if len(tokens) == 3 and tokens[1] == "map":
-                return [c for c in ["sectors", "graph", "path", "routes", "contacts"] if c.startswith(text)]
+                return [c for c in ["sectors", "graph", "path", "routes", "contacts", "galaxy"] if c.startswith(text)]
+            if len(tokens) == 4 and tokens[1] == "map" and tokens[2] == "galaxy":
+                return [c for c in ["sector", "local", "regional", "global"] if c.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "map" and tokens[2] in {"graph", "path"}:
                 return _travel_targets(text)
             if len(tokens) == 3 and tokens[1] == "--no-cruise":
                 return _travel_targets(text)
             if len(tokens) == 3 and tokens[1] == "graph":
                 return _travel_targets(text)
+            if len(tokens) == 3 and tokens[1] == "galaxy":
+                return [c for c in ["sector", "local", "regional", "global"] if c.startswith(text)]
             return _travel_targets(text)
         if cmd == "map":
             if len(tokens) == 2:
@@ -711,6 +715,10 @@ class RetornoTextualApp(App):
                 return [c for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "modules", "galaxy"] if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "scenario":
                 return [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] == "galaxy":
+                return [c for c in ["map"] if c.startswith(text)]
+            if len(tokens) == 4 and tokens[1] == "galaxy" and tokens[2] == "map":
+                return [c for c in ["sector", "local", "regional", "global"] if c.startswith(text)]
         if cmd == "module":
             if len(tokens) == 2:
                 return [c for c in ["inspect"] if c.startswith(text)]
@@ -1295,6 +1303,7 @@ class RetornoTextualApp(App):
                 "MAIL_READ",
                 "JOBS",
                 "DEBUG_MODULES",
+                "DEBUG_GALAXY_MAP",
                 "NAV_MAP",
                 "SHIP_SURVEY",
                 "DRONE_STATUS",
@@ -1551,6 +1560,15 @@ class RetornoTextualApp(App):
                     self._log_line("debug galaxy: available only in DEBUG mode. Use: debug on")
                     return
                 self._log_lines(presenter.build_command_output(repl.render_debug_galaxy, state))
+            return
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_GALAXY_MAP":
+            with self.loop.with_lock() as state:
+                if not state.os.debug_enabled:
+                    self._log_line("debug galaxy map: available only in DEBUG mode. Use: debug on")
+                    return
+                self._log_lines(
+                    presenter.build_command_output(repl.render_debug_galaxy_map, state, parsed[1])
+                )
             return
 
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SEED":

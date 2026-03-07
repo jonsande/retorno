@@ -61,7 +61,7 @@ from retorno.core.power_policy import (
 from retorno.model.drones import DroneLocation, DroneState, DroneStatus
 from retorno.model.events import AlertState, Event, EventManagerState, EventType, Severity, SourceRef
 from retorno.model.jobs import Job, JobManagerState, JobStatus, JobType, RiskProfile, TargetRef
-from retorno.model.world import add_known_link, SpaceNode, sector_id_for_pos
+from retorno.model.world import add_known_link, is_hop_within_cap, SpaceNode, sector_id_for_pos
 from retorno.runtime.data_loader import load_locations, load_modules
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path, mount_files
 from retorno.model.systems import Dependency, ShipSystem, SystemState
@@ -298,6 +298,23 @@ class Engine:
                 self._record_event(state.events, event)
                 return [event]
             distance_ly = self._distance_between_nodes(state, current_id, action.node_id)
+            if distance_ly > float(Balance.MAX_ROUTE_HOP_LY):
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    f"Travel blocked: route hop exceeds cap ({distance_ly:.2f}ly > {Balance.MAX_ROUTE_HOP_LY:.1f}ly)",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "hop_cap_exceeded",
+                        "node_id": action.node_id,
+                        "distance_ly": distance_ly,
+                        "max_hop_ly": float(Balance.MAX_ROUTE_HOP_LY),
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
             fine_km = state.world.fine_ranges_km.get(action.node_id)
             same_sector = False
             from_node = state.world.space.nodes.get(current_id)
@@ -1075,6 +1092,23 @@ class Engine:
                 self._record_event(state.events, event)
                 return [event]
             distance_ly = self._distance_between_nodes(state, current_id, action.node_id)
+            if distance_ly > float(Balance.MAX_ROUTE_HOP_LY):
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=action.node_id),
+                    f"Route solve blocked: hop exceeds cap ({distance_ly:.2f}ly > {Balance.MAX_ROUTE_HOP_LY:.1f}ly)",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "hop_cap_exceeded",
+                        "node_id": action.node_id,
+                        "distance_ly": distance_ly,
+                        "max_hop_ly": float(Balance.MAX_ROUTE_HOP_LY),
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
             if distance_ly > state.ship.sensors_range_ly:
                 event = self._make_event(
                     state,
@@ -3535,7 +3569,31 @@ class Engine:
         if job.job_type == JobType.ROUTE_SOLVE and job.target:
             node_id = job.params.get("node_id", job.target.id)
             from_id = job.params.get("from_id", state.world.current_node_id)
-            if add_known_link(state.world, from_id, node_id, bidirectional=True):
+            link_added = False
+            if is_hop_within_cap(state.world, from_id, node_id, float(Balance.MAX_ROUTE_HOP_LY)):
+                link_added = add_known_link(state.world, from_id, node_id, bidirectional=True)
+            else:
+                events.append(
+                    self._make_event(
+                        state,
+                        EventType.BOOT_BLOCKED,
+                        Severity.WARN,
+                        SourceRef(kind="world", id=node_id),
+                        (
+                            f"Route solve rejected: hop exceeds cap "
+                            f"({float(job.params.get('distance_ly', 0.0)):.2f}ly > {Balance.MAX_ROUTE_HOP_LY:.1f}ly)"
+                        ),
+                        data={
+                            "message_key": "boot_blocked",
+                            "reason": "hop_cap_exceeded",
+                            "from_id": from_id,
+                            "node_id": node_id,
+                            "distance_ly": float(job.params.get("distance_ly", 0.0)),
+                            "max_hop_ly": float(Balance.MAX_ROUTE_HOP_LY),
+                        },
+                    )
+                )
+            if link_added:
                 state.world.known_nodes.add(node_id)
                 state.world.known_contacts.add(node_id)
             self._maybe_set_fine_range(state, from_id, node_id)

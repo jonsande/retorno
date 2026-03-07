@@ -11,6 +11,8 @@ from retorno.cli.parser import parse_command
 def main() -> None:
     parsed = parse_command("debug galaxy")
     assert isinstance(parsed, tuple) and parsed[0] == "DEBUG_GALAXY", parsed
+    parsed_map = parse_command("debug galaxy map regional")
+    assert parsed_map == ("DEBUG_GALAXY_MAP", "regional"), parsed_map
 
     state = create_initial_state_prologue()
     state.os.debug_enabled = True
@@ -22,6 +24,15 @@ def main() -> None:
     assert "player:" in out
     assert "sector_adjacency:" in out
     assert "procedural_rad_synth[seed]:" in out
+    assert "link_cap:" in out
+
+    buf_map = io.StringIO()
+    with redirect_stdout(buf_map):
+        repl.render_debug_galaxy_map(state, "regional")
+    out_map = buf_map.getvalue()
+    assert "DEBUG GALAXY MAP" in out_map
+    assert "NAV MAP GALAXY" in out_map
+    assert "@" in out_map
 
     print("DEBUG GALAXY SMOKE PASSED")
 

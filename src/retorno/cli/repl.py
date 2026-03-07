@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from retorno.bootstrap import create_initial_state_prologue, create_initial_state_sandbox
 import os
+import hashlib
 import math
 import random
 import readline
@@ -43,7 +44,21 @@ from retorno.io.save_load import (
 from retorno.model.systems import SystemState
 from retorno.model.drones import DroneStatus
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, list_dir, normalize_path, read_file, required_access_label
-from retorno.model.world import SECTOR_SIZE_LY, sector_id_for_pos, add_known_link, record_intel
+from retorno.model.galaxy import (
+    galactic_margins_for_op_pos,
+    galactic_radius,
+    galactic_region_for_op_pos,
+    legacy_operational_region_for_pos,
+    op_to_galactic_coords,
+)
+from retorno.model.world import (
+    SECTOR_SIZE_LY,
+    add_known_link,
+    distance_between_nodes_ly,
+    is_hop_within_cap,
+    record_intel,
+    sector_id_for_pos,
+)
 from retorno.model.world import SpaceNode, region_for_pos
 from retorno.worldgen.generator import ensure_sector_generated, procedural_radiation_for_node
 from retorno.util.timefmt import format_elapsed_long, format_elapsed_short
@@ -221,6 +236,16 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
             "Navegación",
             [
                 ("nav map sectors", "list known world sectors", "lista sectores del mundo conocidos"),
+                (
+                    "nav map galaxy [sector|local|regional|global]",
+                    "show galactic map at selected scale (known nodes)",
+                    "muestra mapa galáctico en escala seleccionada (nodos conocidos)",
+                ),
+                (
+                    "nav galaxy [sector|local|regional|global]",
+                    "alias of nav map galaxy",
+                    "alias de nav map galaxy",
+                ),
                 ("nav map graph [node_id]", "show known route graph", "muestra grafo de rutas conocido"),
                 ("nav map path <node_id>", "show best known path", "muestra mejor camino conocido"),
                 ("nav map routes", "list direct known routes", "lista rutas directas conocidas"),
@@ -234,6 +259,11 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ("route solve <node_id>", "compute route solution in range", "calcula solución de ruta en rango"),
                 ("hibernate until_arrival", "hibernate until transit arrival", "hiberna hasta la llegada"),
                 ("hibernate <years>", "hibernate for fixed years", "hiberna un número de años"),
+                (
+                    "debug galaxy map <sector|local|regional|global>",
+                    "render debug galaxy map (debug mode)",
+                    "muestra mapa galáctico debug (modo debug)",
+                ),
             ],
         ),
         (
@@ -2190,13 +2220,8 @@ def render_debug_deadnodes(state) -> None:
 
 
 def _galactic_radius_ly(x_ly: float, y_ly: float, z_ly: float) -> float:
-    cx = float(Balance.GALAXY_CENTER_X_LY)
-    cy = float(Balance.GALAXY_CENTER_Y_LY)
-    cz = float(Balance.GALAXY_CENTER_Z_LY)
-    dx = x_ly - cx
-    dy = y_ly - cy
-    dz = z_ly - cz
-    return (dx * dx + dy * dy + dz * dz) ** 0.5
+    gx, gy, gz = op_to_galactic_coords(x_ly, y_ly, z_ly)
+    return galactic_radius(gx, gy, gz)
 
 
 def _sector_center_ly(sector_id: str) -> tuple[float, float, float] | None:
@@ -2212,12 +2237,20 @@ def _sector_center_ly(sector_id: str) -> tuple[float, float, float] | None:
     )
 
 
-def _sector_region(sector_id: str) -> str:
+def _sector_region_operational(sector_id: str) -> str:
     center = _sector_center_ly(sector_id)
     if center is None:
         return "unknown"
     x, y, z = center
-    return region_for_pos(x, y, z)
+    return legacy_operational_region_for_pos(x, y, z)
+
+
+def _sector_region_physical(sector_id: str) -> str:
+    center = _sector_center_ly(sector_id)
+    if center is None:
+        return "unknown"
+    x, y, z = center
+    return galactic_region_for_op_pos(x, y, z)
 
 
 def _neighbor_sectors_2d(sector_id: str) -> list[str]:
@@ -2247,52 +2280,70 @@ def _radiation_band_id(value: float) -> str:
 
 def render_debug_galaxy(state) -> None:
     print("\n=== DEBUG GALAXY ===")
-    cx = float(Balance.GALAXY_CENTER_X_LY)
-    cy = float(Balance.GALAXY_CENTER_Y_LY)
-    cz = float(Balance.GALAXY_CENTER_Z_LY)
-    bulge_r = float(Balance.GALAXY_BULGE_RADIUS_LY)
-    disk_r = float(Balance.GALAXY_DISK_OUTER_RADIUS_LY)
-    print(f"- model: center=({cx:.2f},{cy:.2f},{cz:.2f}) bulge<{bulge_r:.2f}ly disk<{disk_r:.2f}ly halo>=disk")
+    op_cx = float(Balance.GALAXY_OP_REGION_CENTER_X_LY)
+    op_cy = float(Balance.GALAXY_OP_REGION_CENTER_Y_LY)
+    op_cz = float(Balance.GALAXY_OP_REGION_CENTER_Z_LY)
+    op_bulge_r = float(Balance.GALAXY_OP_BULGE_RADIUS_LY)
+    op_disk_r = float(Balance.GALAXY_OP_DISK_OUTER_RADIUS_LY)
+    print(
+        f"- model_operational: center=({op_cx:.2f},{op_cy:.2f},{op_cz:.2f}) "
+        f"bulge<{op_bulge_r:.2f}ly disk<{op_disk_r:.2f}ly halo>=disk"
+    )
+    ph_cx = float(Balance.GALAXY_PHYSICAL_CENTER_X_LY)
+    ph_cy = float(Balance.GALAXY_PHYSICAL_CENTER_Y_LY)
+    ph_cz = float(Balance.GALAXY_PHYSICAL_CENTER_Z_LY)
+    ph_bulge_r = float(Balance.GALAXY_PHYSICAL_BULGE_RADIUS_LY)
+    ph_disk_r = float(Balance.GALAXY_PHYSICAL_DISK_OUTER_RADIUS_LY)
+    ph_galaxy_r = float(Balance.GALAXY_PHYSICAL_RADIUS_LY)
+    print(
+        f"- model_physical: center=({ph_cx:.2f},{ph_cy:.2f},{ph_cz:.2f}) "
+        f"bulge<{ph_bulge_r:.2f}ly disk<{ph_disk_r:.2f}ly halo>=disk galaxy<= {ph_galaxy_r:.2f}ly"
+    )
 
     px, py, pz = state.world.current_pos_ly
+    op_region = legacy_operational_region_for_pos(px, py, pz)
+    gx, gy, gz = op_to_galactic_coords(px, py, pz)
     pr = _galactic_radius_ly(px, py, pz)
-    pregion = region_for_pos(px, py, pz)
+    phys_region = galactic_region_for_op_pos(px, py, pz)
+    margins = galactic_margins_for_op_pos(px, py, pz)
     psector = sector_id_for_pos(px, py, pz)
     print(
         f"- player: node={state.world.current_node_id} sector={psector} "
-        f"pos=({px:.2f},{py:.2f},{pz:.2f}) r_gc={pr:.2f}ly region={pregion}"
+        f"op_pos=({px:.2f},{py:.2f},{pz:.2f}) operational_region={op_region}"
     )
-    if pregion == "bulge":
-        print(f"- margin: to_disk={max(0.0, bulge_r - pr):.2f}ly (inside bulge)")
-    elif pregion == "disk":
-        print(
-            f"- margin: to_bulge={max(0.0, pr - bulge_r):.2f}ly "
-            f"to_halo={max(0.0, disk_r - pr):.2f}ly (inside disk)"
-        )
-    else:
-        print(f"- margin: beyond_disk={max(0.0, pr - disk_r):.2f}ly (inside halo)")
+    print(f"  physical_pos=({gx:.2f},{gy:.2f},{gz:.2f}) r_gc={pr:.2f}ly physical_region={phys_region}")
+    print(
+        f"  margin_physical: to_bulge={float(margins.get('distance_to_bulge_ly', 0.0)):.2f}ly "
+        f"to_halo={float(margins.get('distance_to_halo_ly', 0.0)):.2f}ly "
+        f"to_galaxy_edge={float(margins.get('distance_to_galaxy_edge_ly', 0.0)):.2f}ly "
+        f"inside_galaxy={bool(margins.get('inside_galaxy', True))}"
+    )
 
     sector_ids: set[str] = set(state.world.generated_sectors)
     for node in state.world.space.nodes.values():
         sector_ids.add(sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly))
     sector_ids.add(psector)
 
-    region_counts: dict[str, int] = {"bulge": 0, "disk": 0, "halo": 0, "unknown": 0}
+    op_region_counts: dict[str, int] = {"bulge": 0, "disk": 0, "halo": 0, "unknown": 0}
+    phys_region_counts: dict[str, int] = {"bulge": 0, "disk": 0, "halo": 0, "unknown": 0}
     for sid in sector_ids:
-        region = _sector_region(sid)
-        region_counts[region] = region_counts.get(region, 0) + 1
+        op_reg = _sector_region_operational(sid)
+        phys_reg = _sector_region_physical(sid)
+        op_region_counts[op_reg] = op_region_counts.get(op_reg, 0) + 1
+        phys_region_counts[phys_reg] = phys_region_counts.get(phys_reg, 0) + 1
     print(
         f"- sectors_seen: total={len(sector_ids)} "
-        f"bulge={region_counts.get('bulge', 0)} disk={region_counts.get('disk', 0)} halo={region_counts.get('halo', 0)}"
+        f"operational(b={op_region_counts.get('bulge', 0)},d={op_region_counts.get('disk', 0)},h={op_region_counts.get('halo', 0)}) "
+        f"physical(b={phys_region_counts.get('bulge', 0)},d={phys_region_counts.get('disk', 0)},h={phys_region_counts.get('halo', 0)})"
     )
 
     transitions: dict[tuple[str, str], int] = {}
     for sid in sorted(sector_ids):
-        r1 = _sector_region(sid)
+        r1 = _sector_region_physical(sid)
         for nid in _neighbor_sectors_2d(sid):
             if nid not in sector_ids or sid >= nid:
                 continue
-            r2 = _sector_region(nid)
+            r2 = _sector_region_physical(nid)
             key = tuple(sorted((r1, r2)))
             transitions[key] = transitions.get(key, 0) + 1
     same = sum(v for k, v in transitions.items() if k[0] == k[1])
@@ -2302,8 +2353,29 @@ def render_debug_galaxy(state) -> None:
     print(f"- sector_adjacency: same_region={same} bulge<->disk={bd} disk<->halo={dh} bulge<->halo={bh}")
     if bh > 0:
         print("! warning: bulge<->halo direct adjacency detected (coherence risk)")
-    if state.world.current_node_id == "UNKNOWN_00" and pregion != "disk":
-        print("! warning: prologue start node UNKNOWN_00 is not in disk")
+    capped = float(Balance.MAX_ROUTE_HOP_LY)
+    known_link_total = 0
+    known_link_over_cap = 0
+    for left, rights in state.world.known_links.items():
+        for right in rights:
+            if left >= right:
+                continue
+            dist = distance_between_nodes_ly(state.world, left, right)
+            if dist is None:
+                continue
+            known_link_total += 1
+            if dist > capped:
+                known_link_over_cap += 1
+    print(
+        f"- link_cap: max_hop={capped:.1f}ly known_links={known_link_total} over_cap={known_link_over_cap}"
+    )
+    if state.world.current_node_id == "UNKNOWN_00":
+        if phys_region != "disk":
+            print("! warning: prologue start node UNKNOWN_00 is not in physical disk")
+        margin_bulge = float(margins.get("distance_to_bulge_ly", 0.0))
+        margin_halo = float(margins.get("distance_to_halo_ly", 0.0))
+        if margin_bulge < 100000.0 or margin_halo < 100000.0:
+            print("! warning: prologue start node UNKNOWN_00 is too close to physical bulge/halo edge (<100k ly)")
 
     authored_ids = _authored_node_ids()
     proc_values: list[float] = []
@@ -2348,7 +2420,7 @@ def render_debug_galaxy(state) -> None:
 
     # Deterministic synthetic estimate for the current seed/model.
     templates = load_worldgen_templates()
-    weights = {k: float(v) for k, v in region_counts.items() if k in {"bulge", "disk", "halo"} and float(v) > 0.0}
+    weights = {k: float(v) for k, v in op_region_counts.items() if k in {"bulge", "disk", "halo"} and float(v) > 0.0}
     if not weights:
         weights = {"disk": 1.0}
     total_w = sum(weights.values())
@@ -2384,6 +2456,11 @@ def render_debug_galaxy(state) -> None:
         f"high={100.0*syn_bands['high']/syn_count:.2f}% "
         f"extreme={100.0*syn_bands['extreme']/syn_count:.2f}%"
     )
+
+
+def render_debug_galaxy_map(state, scale: str | None) -> None:
+    print("\n=== DEBUG GALAXY MAP ===")
+    render_nav_map_galaxy(state, scale, include_all_loaded=True)
 
 def _render_contacts_table(state) -> None:
     current_id = state.world.current_node_id
@@ -2639,6 +2716,62 @@ def _authored_node_ids() -> set[str]:
     return node_ids
 
 
+_GALAXY_MAP_SCALES: dict[str, float] = {
+    "sector": 10.0,
+    "local": 100.0,
+    "regional": 10000.0,
+    "global": 500000.0,
+}
+
+
+def _normalize_galaxy_scale(scale: str | None) -> str:
+    if not scale:
+        return "global"
+    name = str(scale).strip().lower()
+    if name in _GALAXY_MAP_SCALES:
+        return name
+    return "global"
+
+
+def _node_symbol_rank(node: SpaceNode, authored_ids: set[str]) -> tuple[int, int]:
+    kind_rank = {
+        "relay": 60,
+        "waystation": 60,
+        "hub": 60,
+        "station": 50,
+        "derelict": 40,
+        "ship": 40,
+        "wreck": 40,
+    }
+    authored_bonus = 1 if node.node_id in authored_ids else 0
+    return kind_rank.get((node.kind or "").lower(), 20), authored_bonus
+
+
+def _stable_cell_tiebreak(seed: int, scale: str, gx: int, gy: int, node_id: str) -> int:
+    h = hashlib.blake2b(digest_size=8)
+    h.update(str(seed).encode("utf-8"))
+    h.update(scale.encode("utf-8"))
+    h.update(f"{gx}:{gy}".encode("utf-8"))
+    h.update(node_id.encode("utf-8"))
+    return int.from_bytes(h.digest(), "big", signed=False)
+
+
+def _try_add_known_link_with_cap(
+    state,
+    from_id: str,
+    to_id: str,
+    *,
+    bidirectional: bool = False,
+) -> tuple[bool, bool, float | None]:
+    if not from_id or not to_id or from_id == to_id:
+        return False, False, None
+    dist = distance_between_nodes_ly(state.world, from_id, to_id)
+    if not is_hop_within_cap(state.world, from_id, to_id):
+        return False, True, dist
+    added = add_known_link(state.world, from_id, to_id, bidirectional=bidirectional)
+    return added, False, dist
+
+
 def _known_routes_to_unvisited(state, current_id: str) -> list[str]:
     routes = state.world.known_links.get(current_id, set())
     return [nid for nid in routes if nid not in state.world.visited_nodes]
@@ -2722,7 +2855,18 @@ def _apply_mobility_failsafe(state, added: list[str]) -> str | None:
     if not dest:
         return None
     current_id = state.world.current_node_id
-    if not add_known_link(state.world, current_id, dest, bidirectional=True):
+    added_link, blocked_by_cap, dist_ly = _try_add_known_link_with_cap(
+        state, current_id, dest, bidirectional=True
+    )
+    if blocked_by_cap:
+        locale = state.os.locale.value
+        msg = {
+            "en": f"signal_rejected :: {current_id} -> {dest} exceeds hop cap ({(dist_ly or 0.0):.2f}ly > {Balance.MAX_ROUTE_HOP_LY:.1f}ly)",
+            "es": f"signal_descartada :: {current_id} -> {dest} excede el cap de salto ({(dist_ly or 0.0):.2f}ly > {Balance.MAX_ROUTE_HOP_LY:.1f}ly)",
+        }
+        print(msg.get(locale, msg["en"]))
+        return None
+    if not added_link:
         return None
     state.world.known_nodes.add(dest)
     state.world.known_contacts.add(dest)
@@ -2836,6 +2980,7 @@ def _terminal_state_allows(parsed) -> bool:
             "DEBUG_DEADNODES",
             "DEBUG_MODULES",
             "DEBUG_GALAXY",
+            "DEBUG_GALAXY_MAP",
             "DEBUG_SEED",
             "DEBUG_SCENARIO",
         }:
@@ -3011,10 +3156,17 @@ def _handle_uplink(state) -> None:
         return
     fixed_pool = list(pool.uplink_route_pool) if pool else []
     added: list[str] = []
+    discarded_by_cap = 0
     for dest in fixed_pool:
         if not dest or dest == current_node_id:
             continue
-        if add_known_link(state.world, current_node_id, dest, bidirectional=True):
+        added_link, blocked_by_cap, _ = _try_add_known_link_with_cap(
+            state, current_node_id, dest, bidirectional=True
+        )
+        if blocked_by_cap:
+            discarded_by_cap += 1
+            continue
+        if added_link:
             added.append(dest)
         state.world.known_nodes.add(dest)
         state.world.known_contacts.add(dest)
@@ -3067,6 +3219,12 @@ def _handle_uplink(state) -> None:
             "es": "uplink_complete :: no se encontraron rutas nuevas",
         }
     print(msg.get(locale, msg["en"]))
+    if discarded_by_cap > 0:
+        cap_msg = {
+            "en": f"uplink_cap :: discarded {discarded_by_cap} route(s) above {Balance.MAX_ROUTE_HOP_LY:.1f}ly",
+            "es": f"uplink_cap :: descartadas {discarded_by_cap} ruta(s) por encima de {Balance.MAX_ROUTE_HOP_LY:.1f}ly",
+        }
+        print(cap_msg.get(locale, cap_msg["en"]))
     lore_ctx = build_lore_context(state, current_node_id)
     lore_result = maybe_deliver_lore(state, "uplink", lore_ctx, count_trigger=False)
     if added or lore_result.files or lore_result.events:
@@ -3265,7 +3423,26 @@ def _process_intel_token(state, token: str, source_path: str, messages: list[str
                         if nid.startswith("S") and ":" in nid:
                             sector_id = nid.split(":", 1)[0]
                             ensure_sector_generated(state, sector_id)
-                    if add_known_link(state.world, left, right, bidirectional=True):
+                    added_link, blocked_by_cap, dist_ly = _try_add_known_link_with_cap(
+                        state, left, right, bidirectional=True
+                    )
+                    if blocked_by_cap:
+                        state.world.known_nodes.add(left)
+                        state.world.known_nodes.add(right)
+                        state.world.known_contacts.add(left)
+                        state.world.known_contacts.add(right)
+                        messages.append(
+                            f"(intel) route skipped (hop cap): {left} -> {right}"
+                        )
+                        if state.os.debug_enabled:
+                            locale = state.os.locale.value
+                            msg = {
+                                "en": f"[DEBUG] intel link dropped by cap: {left}->{right} dist={(dist_ly or 0.0):.2f}ly",
+                                "es": f"[DEBUG] enlace intel descartado por cap: {left}->{right} dist={(dist_ly or 0.0):.2f}ly",
+                            }
+                            print(msg.get(locale, msg["en"]))
+                        return
+                    if added_link:
                         _mark_arc_discovered(state, left, right)
                         state.world.known_nodes.add(left)
                         state.world.known_nodes.add(right)
@@ -3343,6 +3520,7 @@ def _handle_intel_import(state, path: str) -> None:
 
     source_kind, confidence, source_ref = _infer_intel_source(path)
     added_msgs: list[str] = []
+    discarded_by_cap = 0
     blocks = _extract_intel_blocks(content)
     for block in blocks:
         _process_intel_token(state, block, path, added_msgs)
@@ -3402,7 +3580,17 @@ def _handle_intel_import(state, path: str) -> None:
                         if nid.startswith("S") and ":" in nid:
                             sector_id = nid.split(":", 1)[0]
                             ensure_sector_generated(state, sector_id)
-                    if add_known_link(state.world, left, right, bidirectional=True):
+                    added_link, blocked_by_cap, _ = _try_add_known_link_with_cap(
+                        state, left, right, bidirectional=True
+                    )
+                    if blocked_by_cap:
+                        discarded_by_cap += 1
+                        state.world.known_nodes.add(left)
+                        state.world.known_nodes.add(right)
+                        state.world.known_contacts.add(left)
+                        state.world.known_contacts.add(right)
+                        added_msgs.append(f"(intel) route skipped (hop cap): {left} -> {right}")
+                    if added_link:
                         _mark_arc_discovered(state, left, right)
                         state.world.known_nodes.add(left)
                         state.world.known_nodes.add(right)
@@ -3426,7 +3614,17 @@ def _handle_intel_import(state, path: str) -> None:
                     if to_id.startswith("S") and ":" in to_id:
                         sector_id = to_id.split(":", 1)[0]
                         ensure_sector_generated(state, sector_id)
-                    if add_known_link(state.world, from_id, to_id, bidirectional=True):
+                    added_link, blocked_by_cap, _ = _try_add_known_link_with_cap(
+                        state, from_id, to_id, bidirectional=True
+                    )
+                    if blocked_by_cap:
+                        discarded_by_cap += 1
+                        state.world.known_nodes.add(from_id)
+                        state.world.known_nodes.add(to_id)
+                        state.world.known_contacts.add(from_id)
+                        state.world.known_contacts.add(to_id)
+                        added_msgs.append(f"(intel) route skipped (hop cap): {from_id} -> {to_id}")
+                    if added_link:
                         _mark_arc_discovered(state, from_id, to_id)
                         state.world.known_nodes.add(from_id)
                         state.world.known_nodes.add(to_id)
@@ -3488,11 +3686,19 @@ def _handle_intel_import(state, path: str) -> None:
             print(msg)
     else:
         print("(intel) no usable intel found")
+    if discarded_by_cap > 0:
+        locale = state.os.locale.value
+        msg = {
+            "en": f"(intel) links skipped by hop cap: {discarded_by_cap} (>{Balance.MAX_ROUTE_HOP_LY:.1f}ly)",
+            "es": f"(intel) enlaces descartados por cap de salto: {discarded_by_cap} (>{Balance.MAX_ROUTE_HOP_LY:.1f}ly)",
+        }
+        print(msg.get(locale, msg["en"]))
 
 
 def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str]:
     source_kind, confidence, source_ref = _infer_intel_source(source_path)
     added_msgs: list[str] = []
+    discarded_by_cap = 0
     blocks = _extract_intel_blocks(text)
     for block in blocks:
         _process_intel_token(state, block, source_path, added_msgs)
@@ -3546,7 +3752,17 @@ def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str
                         if nid.startswith("S") and ":" in nid:
                             sector_id = nid.split(":", 1)[0]
                             ensure_sector_generated(state, sector_id)
-                    if add_known_link(state.world, left, right, bidirectional=True):
+                    added_link, blocked_by_cap, _ = _try_add_known_link_with_cap(
+                        state, left, right, bidirectional=True
+                    )
+                    if blocked_by_cap:
+                        discarded_by_cap += 1
+                        state.world.known_nodes.add(left)
+                        state.world.known_nodes.add(right)
+                        state.world.known_contacts.add(left)
+                        state.world.known_contacts.add(right)
+                        added_msgs.append(f"(intel) route skipped (hop cap): {left} -> {right}")
+                    if added_link:
                         _mark_arc_discovered(state, left, right)
                         state.world.known_nodes.add(left)
                         state.world.known_nodes.add(right)
@@ -3570,7 +3786,17 @@ def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str
                     if to_id.startswith("S") and ":" in to_id:
                         sector_id = to_id.split(":", 1)[0]
                         ensure_sector_generated(state, sector_id)
-                    if add_known_link(state.world, from_id, to_id, bidirectional=True):
+                    added_link, blocked_by_cap, _ = _try_add_known_link_with_cap(
+                        state, from_id, to_id, bidirectional=True
+                    )
+                    if blocked_by_cap:
+                        discarded_by_cap += 1
+                        state.world.known_nodes.add(from_id)
+                        state.world.known_nodes.add(to_id)
+                        state.world.known_contacts.add(from_id)
+                        state.world.known_contacts.add(to_id)
+                        added_msgs.append(f"(intel) route skipped (hop cap): {from_id} -> {to_id}")
+                    if added_link:
                         _mark_arc_discovered(state, from_id, to_id)
                         state.world.known_nodes.add(from_id)
                         state.world.known_nodes.add(to_id)
@@ -3627,6 +3853,10 @@ def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str
                     source_ref=source_ref,
                 )
                 added_msgs.append(f"(intel) node known: {nid}")
+    if discarded_by_cap > 0:
+        added_msgs.append(
+            f"(intel) links skipped by hop cap: {discarded_by_cap} (>{Balance.MAX_ROUTE_HOP_LY:.1f}ly)"
+        )
     return added_msgs
 
 def render_ship_sectors(state) -> None:
@@ -3885,19 +4115,189 @@ def render_nav_map_sectors(state) -> None:
         )
 
 
-def render_nav_map(state, mode: str, node_id: str | None = None) -> None:
+def _iter_nodes_for_galaxy_map(state, include_all_loaded: bool) -> list[SpaceNode]:
+    if include_all_loaded:
+        return list(state.world.space.nodes.values())
+    known_ids = _map_known_nodes(state)
+    out: list[SpaceNode] = []
+    for nid in sorted(known_ids):
+        node = state.world.space.nodes.get(nid)
+        if node:
+            out.append(node)
+    return out
+
+
+def render_nav_map_galaxy(state, scale: str | None = None, *, include_all_loaded: bool = False) -> None:
+    scale_name = _normalize_galaxy_scale(scale)
+    radius_ly = float(_GALAXY_MAP_SCALES[scale_name])
+    locale = state.os.locale.value
+    labels = {
+        "en": {
+            "title": "\n=== NAV MAP GALAXY ===",
+            "legend": "- legend: @ ship | b/d/h node by physical region | o bulge ring | . disk edge | # galaxy edge",
+            "meta": "- meta:",
+            "player_op": "- player_op_pos_ly:",
+            "player_phys": "- player_physical_pos_ly:",
+            "player_region": "- player_physical_region:",
+            "margins": "- margins_ly:",
+            "center": "center",
+            "radius": "radius",
+            "scale": "scale",
+            "visible": "visible_nodes",
+            "occluded": "occluded_nodes",
+            "outside": "outside_galaxy",
+        },
+        "es": {
+            "title": "\n=== NAV MAP GALAXY ===",
+            "legend": "- leyenda: @ nave | b/d/h nodo por region fisica | o anillo bulge | . borde disk | # borde galaxia",
+            "meta": "- meta:",
+            "player_op": "- jugador_pos_op_ly:",
+            "player_phys": "- jugador_pos_fisica_ly:",
+            "player_region": "- jugador_region_fisica:",
+            "margins": "- margenes_ly:",
+            "center": "centro",
+            "radius": "radio",
+            "scale": "escala",
+            "visible": "nodos_visibles",
+            "occluded": "nodos_ocultos",
+            "outside": "fuera_de_galaxia",
+        },
+    }
+    txt = labels.get(locale, labels["en"])
+    print(txt["title"])
+
+    width = 61
+    height = 31
+    cx = width // 2
+    cy = height // 2
+    half_w = max(1, width // 2)
+    half_h = max(1, height // 2)
+    grid: list[list[str]] = [[" " for _ in range(width)] for _ in range(height)]
+    priority: dict[str, int] = {" ": 0, "#": 1, ".": 2, "o": 3, "b": 4, "d": 4, "h": 4, "@": 9}
+
+    opx, opy, opz = state.world.current_pos_ly
+    ppx, ppy, ppz = op_to_galactic_coords(opx, opy, opz)
+    center_x = float(Balance.GALAXY_PHYSICAL_CENTER_X_LY) if scale_name == "global" else float(opx)
+    center_y = float(Balance.GALAXY_PHYSICAL_CENTER_Y_LY) if scale_name == "global" else float(opy)
+    center_kind = "physical" if scale_name == "global" else "operational"
+
+    def _paint(gx: int, gy: int, ch: str) -> None:
+        if gx < 0 or gx >= width or gy < 0 or gy >= height:
+            return
+        cur = grid[gy][gx]
+        if priority.get(ch, 0) >= priority.get(cur, 0):
+            grid[gy][gx] = ch
+
+    def _to_grid(px: float, py: float) -> tuple[int, int] | None:
+        if radius_ly <= 0.0:
+            return None
+        nx = (px - center_x) / radius_ly
+        ny = (py - center_y) / radius_ly
+        if abs(nx) > 1.0 or abs(ny) > 1.0:
+            return None
+        gx = int(round(cx + nx * half_w))
+        gy = int(round(cy - ny * half_h))
+        if gx < 0 or gx >= width or gy < 0 or gy >= height:
+            return None
+        return gx, gy
+
+    def _draw_ring(radius_ring_ly: float, ch: str) -> None:
+        if radius_ring_ly <= 0.0:
+            return
+        steps = 720
+        for i in range(steps):
+            ang = 2.0 * math.pi * (i / steps)
+            px = center_x + radius_ring_ly * math.cos(ang)
+            py = center_y + radius_ring_ly * math.sin(ang)
+            point = _to_grid(px, py)
+            if point:
+                _paint(point[0], point[1], ch)
+
+    if scale_name == "global":
+        _draw_ring(float(Balance.GALAXY_PHYSICAL_RADIUS_LY), "#")
+        _draw_ring(float(Balance.GALAXY_PHYSICAL_DISK_OUTER_RADIUS_LY), ".")
+        _draw_ring(float(Balance.GALAXY_PHYSICAL_BULGE_RADIUS_LY), "o")
+
+    authored_ids = _authored_node_ids()
+    nodes = _iter_nodes_for_galaxy_map(state, include_all_loaded=include_all_loaded)
+    buckets: dict[tuple[int, int], list[SpaceNode]] = {}
+    visible_nodes = 0
+    for node in nodes:
+        px = float(node.x_ly)
+        py = float(node.y_ly)
+        if scale_name == "global":
+            gpx, gpy, _ = op_to_galactic_coords(node.x_ly, node.y_ly, node.z_ly)
+            px = gpx
+            py = gpy
+        point = _to_grid(px, py)
+        if point is None:
+            continue
+        visible_nodes += 1
+        buckets.setdefault(point, []).append(node)
+
+    occluded_nodes = 0
+    marker_by_region = {"bulge": "b", "disk": "d", "halo": "h"}
+    for (gx, gy), cell_nodes in buckets.items():
+        if len(cell_nodes) > 1:
+            occluded_nodes += len(cell_nodes) - 1
+        winner = max(
+            cell_nodes,
+            key=lambda n: (
+                _node_symbol_rank(n, authored_ids),
+                _stable_cell_tiebreak(state.meta.rng_seed, scale_name, gx, gy, n.node_id),
+            ),
+        )
+        marker = marker_by_region.get(
+            galactic_region_for_op_pos(winner.x_ly, winner.y_ly, winner.z_ly),
+            "d",
+        )
+        _paint(gx, gy, marker)
+
+    player_point: tuple[int, int] | None
+    if scale_name == "global":
+        player_point = _to_grid(ppx, ppy)
+    else:
+        player_point = (cx, cy)
+    if player_point is None:
+        player_point = (cx, cy)
+    _paint(player_point[0], player_point[1], "@")
+
+    for row in grid:
+        print("".join(row))
+
+    margins = galactic_margins_for_op_pos(opx, opy, opz)
+    region = galactic_region_for_op_pos(opx, opy, opz)
+    margin_bulge = float(margins.get("distance_to_bulge_ly", 0.0))
+    margin_halo = float(margins.get("distance_to_halo_ly", 0.0))
+    in_galaxy = bool(margins.get("inside_galaxy", True))
+    center_txt = f"{center_kind}=({center_x:.2f},{center_y:.2f})"
+    print(
+        f"{txt['meta']} {txt['scale']}={scale_name} {txt['radius']}={radius_ly:.1f}ly "
+        f"{txt['center']}={center_txt} {txt['visible']}={visible_nodes} {txt['occluded']}={occluded_nodes}"
+    )
+    print(f"{txt['player_op']} ({opx:.2f}, {opy:.2f}, {opz:.2f})")
+    print(f"{txt['player_phys']} ({ppx:.2f}, {ppy:.2f}, {ppz:.2f})")
+    if in_galaxy:
+        print(f"{txt['player_region']} {region}")
+    else:
+        print(f"{txt['player_region']} {region} ({txt['outside']})")
+    print(f"{txt['margins']} to_bulge={margin_bulge:.2f} to_halo={margin_halo:.2f}")
+    print(txt["legend"])
+
+
+def render_nav_map(state, mode: str, map_arg: str | None = None) -> None:
     if mode == "graph":
-        render_map_graph(state, node_id=node_id)
+        render_map_graph(state, node_id=map_arg)
         return
     if mode == "path":
-        if not node_id:
+        if not map_arg:
             msg = {
                 "en": "nav map path: missing node_id",
                 "es": "nav map path: falta node_id",
             }
             print(msg.get(state.os.locale.value, msg["en"]))
             return
-        render_map_path(state, target_id=node_id)
+        render_map_path(state, target_id=map_arg)
         return
     if mode == "routes":
         render_nav_routes(state)
@@ -3907,6 +4307,9 @@ def render_nav_map(state, mode: str, node_id: str | None = None) -> None:
         return
     if mode == "sectors":
         render_nav_map_sectors(state)
+        return
+    if mode == "galaxy":
+        render_nav_map_galaxy(state, map_arg)
         return
     msg = {
         "en": "nav map: unknown mode",
@@ -5393,17 +5796,21 @@ def main() -> None:
                     if len(tokens) == 2:
                         base_opts = ["map", "abort", "--no-cruise"]
                         if cmd == "nav":
-                            base_opts.extend(["sectors", "routes", "contacts", "graph"])
+                            base_opts.extend(["sectors", "routes", "contacts", "graph", "galaxy"])
                         candidates = [c for c in base_opts if c.startswith(text)]
                         candidates += _travel_targets(text)
                     elif len(tokens) == 3 and tokens[1] == "map":
-                        candidates = [c for c in ["sectors", "graph", "path", "routes", "contacts"] if c.startswith(text)]
+                        candidates = [c for c in ["sectors", "graph", "path", "routes", "contacts", "galaxy"] if c.startswith(text)]
+                    elif len(tokens) == 4 and tokens[1] == "map" and tokens[2] == "galaxy":
+                        candidates = [c for c in ["sector", "local", "regional", "global"] if c.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "map" and tokens[2] in {"graph", "path"}:
                         candidates = _travel_targets(text)
                     elif len(tokens) == 3 and tokens[1] == "--no-cruise":
                         candidates = _travel_targets(text)
                     elif len(tokens) == 3 and tokens[1] == "graph":
                         candidates = _travel_targets(text)
+                    elif len(tokens) == 3 and tokens[1] == "galaxy":
+                        candidates = [c for c in ["sector", "local", "regional", "global"] if c.startswith(text)]
                     else:
                         candidates = _travel_targets(text)
                 elif cmd == "map":
@@ -5436,6 +5843,10 @@ def main() -> None:
                         candidates = [c for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "modules", "galaxy"] if c.startswith(text)]
                     elif len(tokens) == 3 and tokens[1] == "scenario":
                         candidates = [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "galaxy":
+                        candidates = [c for c in ["map"] if c.startswith(text)]
+                    elif len(tokens) == 4 and tokens[1] == "galaxy" and tokens[2] == "map":
+                        candidates = [c for c in ["sector", "local", "regional", "global"] if c.startswith(text)]
                 elif cmd == "module":
                     if len(tokens) == 2:
                         candidates = [c for c in ["inspect"] if c.startswith(text)]
@@ -5789,6 +6200,13 @@ def main() -> None:
                     print("debug galaxy: available only in DEBUG mode. Use: debug on")
                     continue
                 render_debug_galaxy(locked_state)
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_GALAXY_MAP":
+            with loop.with_lock() as locked_state:
+                if not locked_state.os.debug_enabled:
+                    print("debug galaxy map: available only in DEBUG mode. Use: debug on")
+                    continue
+                render_debug_galaxy_map(locked_state, parsed[1])
             continue
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SEED":
             with loop.with_lock() as locked_state:
