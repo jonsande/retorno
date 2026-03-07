@@ -13,6 +13,7 @@ Operational behavior
 - `until_arrival`: sleeps until current transit completes.
 - `<years>`: sleeps target duration in large chunks.
 - Wakes on critical events that require operator attention.
+- While in transit, hibernation also wakes when ambient radiation crosses the configured threshold (`HIBERNATE_WAKE_ENV_RAD_THRESHOLD_RAD_PER_S`).
 
 Related commands
 - `nav <node_id>`, `nav abort`, `status`, `alerts`

@@ -5137,6 +5137,60 @@ def _hibernate_interrupt_reason(state, step_events: list[Event], wake_on_low_bat
     return None
 
 
+def _hibernate_env_radiation_threshold() -> float:
+    return max(0.0, float(Balance.HIBERNATE_WAKE_ENV_RAD_THRESHOLD_RAD_PER_S))
+
+
+def _hibernate_env_radiation_wake_enabled() -> bool:
+    return bool(Balance.HIBERNATE_WAKE_ON_ENV_RAD_THRESHOLD)
+
+
+def _hibernate_transit_env_threshold_dt(state, max_dt_s: float) -> float | None:
+    if not _hibernate_env_radiation_wake_enabled():
+        return None
+    if max_dt_s <= 0.0 or not state.ship.in_transit:
+        return None
+    threshold = _hibernate_env_radiation_threshold()
+    if threshold <= 0.0:
+        return None
+    nodes = state.world.space.nodes
+    from_node = nodes.get(state.ship.transit_from)
+    to_node = nodes.get(state.ship.transit_to)
+    if not from_node or not to_node:
+        return None
+    from_rad = max(0.0, float(from_node.radiation_rad_per_s))
+    to_rad = max(0.0, float(to_node.radiation_rad_per_s))
+    # Wake is only meaningful when crossing upward into a dangerous band.
+    if to_rad <= from_rad:
+        return None
+    start_t = float(state.ship.transit_start_t)
+    end_t = float(state.ship.arrival_t)
+    now_t = float(state.clock.t)
+    if end_t <= start_t or now_t >= end_t:
+        return None
+    duration = end_t - start_t
+    slope = (to_rad - from_rad) / duration
+    if slope <= 0.0:
+        return None
+    progress_now = max(0.0, min(1.0, (now_t - start_t) / duration))
+    rad_now = from_rad + (to_rad - from_rad) * progress_now
+    if rad_now >= threshold:
+        return None
+    t_cross = start_t + (threshold - from_rad) / slope
+    if t_cross <= now_t:
+        return None
+    dt_cross = t_cross - now_t
+    if dt_cross <= 0.0 or dt_cross > max_dt_s:
+        return None
+    return dt_cross
+
+
+def _hibernate_reached_env_threshold(state) -> bool:
+    if not _hibernate_env_radiation_wake_enabled() or not state.ship.in_transit:
+        return False
+    return float(state.ship.radiation_env_rad_per_s) >= _hibernate_env_radiation_threshold()
+
+
 def _run_hibernate(loop, years: float, wake_on_low_battery: bool = False) -> None:
     total_s = max(0.0, years * Balance.YEAR_S)
     if total_s <= 0:
@@ -5178,10 +5232,18 @@ def _run_hibernate(loop, years: float, wake_on_low_battery: bool = False) -> Non
             step = Balance.HIBERNATE_CHUNK_S if remaining >= Balance.HIBERNATE_CHUNK_S else remaining
             if wake_on_low_battery:
                 step = min(step, Balance.HIBERNATE_WAKE_CHECK_S)
+            radiation_cross_dt = None
+            with loop.with_lock() as locked_state:
+                radiation_cross_dt = _hibernate_transit_env_threshold_dt(locked_state, step)
+            if radiation_cross_dt is not None:
+                step = min(step, max(1.0e-6, radiation_cross_dt))
             ev = loop.step(step)
             step_events.extend([("step", e) for e in ev])
             with loop.with_lock() as locked_state:
                 reason = _hibernate_interrupt_reason(locked_state, ev, wake_on_low_battery)
+                if not reason and radiation_cross_dt is not None and _hibernate_reached_env_threshold(locked_state):
+                    threshold = _hibernate_env_radiation_threshold()
+                    reason = f"env_radiation_threshold:{threshold:.4f}"
                 if reason:
                     woke_early = True
                     wake_t = locked_state.clock.t
@@ -5250,6 +5312,12 @@ def _run_hibernate(loop, years: float, wake_on_low_battery: bool = False) -> Non
                     msg = {
                         "en": f"Hibernation interrupted: critical system '{system_id}' reached {to_state}",
                         "es": f"Hibernación interrumpida: el sistema crítico '{system_id}' alcanzó {to_state}",
+                    }
+                elif wake_reason.startswith("env_radiation_threshold:"):
+                    threshold_txt = wake_reason.split(":", 1)[1]
+                    msg = {
+                        "en": f"Hibernation interrupted: ambient radiation reached threshold ({threshold_txt} rad/s)",
+                        "es": f"Hibernación interrumpida: la radiación ambiental alcanzó el umbral ({threshold_txt} rad/s)",
                     }
             if not msg:
                 msg = {

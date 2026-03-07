@@ -304,6 +304,9 @@ class Balance:
     RAD_LEVEL_DRONE_DOSE_ELEVATED = DRONE_RAD_DOSE_WARN
     RAD_LEVEL_DRONE_DOSE_HIGH = DRONE_RAD_DOSE_HIGH
     RAD_LEVEL_DRONE_DOSE_EXTREME = DRONE_RAD_DOSE_CRITICAL
+    # Hibernate wake guardrail for ambient radiation while in transit.
+    HIBERNATE_WAKE_ON_ENV_RAD_THRESHOLD = True
+    HIBERNATE_WAKE_ENV_RAD_THRESHOLD_RAD_PER_S = RAD_LEVEL_ENV_HIGH
     # Repair efficiency per scrap spent.
     DRONE_REPAIR_INTEGRITY_PER_SCRAP = 5.0
     # Thresholds for alerts and action gating.

@@ -13,6 +13,7 @@ Comportamiento operativo
 - `until_arrival`: duerme hasta completar el tránsito actual.
 - `<años>`: duerme la duración objetivo en bloques grandes.
 - Despierta ante eventos críticos que requieren intervención.
+- Durante el tránsito, la hibernación también despierta cuando la radiación ambiental cruza el umbral configurado (`HIBERNATE_WAKE_ENV_RAD_THRESHOLD_RAD_PER_S`).
 
 Comandos relacionados
 - `nav <node_id>`, `nav abort`, `status`, `alerts`
