@@ -1,16 +1,15 @@
 modules
 
 Propósito
-- Listar módulos actualmente instalados en RETORNO.
+- Mostrar el estado de modulos separado por scope y por ubicacion real.
 
-Comportamiento de familia de comandos
-- `modules` se centra solo en inventario instalado.
-- Alias: `module`.
-
-Notas operativas
-- Si la lista está vacía, instala vía flujo de drones.
-- Para detalle de un módulo, usa `module inspect <module_id>`.
-- Para visibilidad de catálogo completo (instalados + no instalados), usa listado debug de módulos.
+Comportamiento operativo
+- `modules` muestra tres vistas:
+  - modulos instalados en nave,
+  - modulos instalados en drones agrupados por `drone_id`,
+  - modulos en inventario agrupados por scope (`ship`/`drone`).
+- Para drones se muestra ocupacion de slots frente a capacidad.
+- La seccion de inventario usa vista de manifiesto; si esta desactualizada, ejecuta `cargo audit`.
 
 Comandos relacionados
-- `module inspect <module_id>`, `drone install <drone_id> <module_id>`, `debug modules`
+- `module inspect <module_id>`, `drone install <drone_id> <module_id>`, `drone uninstall <drone_id> <module_id>`, `cargo audit`

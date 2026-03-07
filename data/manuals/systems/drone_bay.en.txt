@@ -1,60 +1,58 @@
 SYSTEM SUMMARY — drone_bay
 Ref: OS-MAN/SYS/DRN-BAY
 
-drone_bay is the ship subsystem for drone handling, support, and lifecycle operations.
+drone_bay is the ship subsystem for drone handling, bay-assisted maintenance, and module bay operations.
 
 Function
-- Handles deploy/recall/reboot/install workflows from the bay.
-- Recharges docked drone batteries.
-- Decontaminates docked drone radiation dose.
-- Applies passive integrity repair to docked drones (scrap cost applies).
+- Handles bay-assisted drone workflows (`deploy`, `recall`, `reboot`, module operations).
+- Recharges docked drones.
+- Decontaminates docked drones.
+- Applies passive integrity repair to docked drones when support conditions are met.
 
 Operational dependencies
-- For bay support (charging, decontamination, passive repair):
-  - `drone_bay` must not be `OFFLINE`.
-  - `energy_distribution` must not be `OFFLINE`.
-- Battery charging also depends on instant power availability:
-  - enough net power (`P_gen - P_load`) for normal charging, or
-  - ship battery reserve (`SoC > 0`) for reduced charging.
-- drone_bay no longer requires nominal energy_distribution dependency to be powered on.
+- Bay maintenance support requires:
+  - `drone_bay` not `OFFLINE`,
+  - `energy_distribution` not `OFFLINE`.
+- Charging also depends on instantaneous power conditions (net generation / reserve).
+- Drone-module bay operations (`drone install` with `scope=drone`, `drone uninstall`) require:
+  - target drone docked in `drone_bay`,
+  - `drone_bay == NOMINAL`,
+  - `energy_distribution != OFFLINE`.
+- Ship-module install/uninstall (legacy operator flow) require bay support online (`drone_bay` not `OFFLINE`) but do not require `NOMINAL`.
 
 Command impact by state
 - NOMINAL:
-  - Baseline ETA for `drone deploy`, `drone recall`, `drone install`, `drone reboot`.
-  - Normal charging/decontamination/passive repair behavior.
+  - Baseline ETA for bay-assisted jobs.
+  - Drone-module bay operations allowed.
+  - Normal charge/decon/passive repair support.
 - LIMITED:
-  - Slower `deploy/recall/install/reboot`.
-  - Slower charging.
-  - Slower passive repair.
+  - Bay-assisted ETAs are slower.
+  - Drone-module bay operations blocked (`drone_bay_not_nominal`).
+  - Ship-module install/uninstall remain available with slowdown.
+  - Reduced maintenance throughput.
 - DAMAGED:
-  - Much slower `deploy/recall/install/reboot`.
-  - Much slower charging.
-  - Minor integrity loss risk during `deploy`/`recall`.
-  - Passive repair remains slow and costs more scrap.
+  - Bay-assisted ETAs significantly slower.
+  - Integrity-hit risk during bay-assisted movement phases (`deploy`/`recall`).
+  - Drone-module bay operations blocked (`drone_bay_not_nominal`).
+  - Ship-module install/uninstall remain available with slowdown.
 - CRITICAL:
-  - Same severe slowdown profile as degraded bay states.
-  - Minor integrity risk on `deploy`/`recall`.
-  - Passive repair is even slower, more expensive, and may fail with minor drone damage.
+  - Severe slowdown plus degraded passive-repair reliability.
+  - Drone-module bay operations blocked (`drone_bay_not_nominal`).
+  - Ship-module install/uninstall remain available with severe slowdown.
 - OFFLINE:
-  - Normal `drone deploy` is blocked.
-  - `drone install` is blocked.
-  - `drone recall` remains allowed (without maintenance support).
-  - No charging, no decontamination, no passive repair.
+  - Bay support unavailable.
+  - Drone-module bay operations blocked (`drone_bay_install_offline`).
 
-EMERGENCY ADVICE
-- If you must launch while bay support is down, use `drone deploy!`.
-- `deploy!` enables emergency override (including critical state and bay OFFLINE), but it does NOT bypass physical prerequisites:
-  - drone must exist and be `docked` (not `disabled`, not already deployed),
-  - minimum deploy integrity must be met,
-  - target must be valid (`ship_sector` or a `world_node` where ship is docked).
-- `deploy!` also does not bypass global terminal lockouts (`terminal_state`).
-- `deploy!` enqueues a risk job (glitch/failure). It can end with integrity loss or deploy failure.
-- If `energy_distribution` is `OFFLINE`, `deploy!` runs under emergency maintenance bypass and remains high-risk.
+Common symptoms
+- Docked drones stop charging while needing battery.
+- Docked drones stop recovering integrity while needing repair.
+- `drone_bay_maintenance_blocked` alert remains active.
+- Drone-module install/uninstall blocked despite module availability.
 
-Related alerts
-- `drone_bay_charging_unavailable`
-- `drone_bay_maintenance_blocked` (see `alerts explain drone_bay_maintenance_blocked`)
+Recovery pattern
+- Restore `drone_bay` and `energy_distribution` above `OFFLINE` for maintenance support.
+- For drone-module operations, restore `drone_bay` specifically to `NOMINAL`.
+- Validate power net and scrap availability when passive repair is expected.
 
 Related commands
-- `drone deploy`, `drone deploy!`, `drone recall`, `drone reboot`, `drone install`
-- `diag drone_bay`, `alerts`, `alerts explain drone_bay_maintenance_blocked`
+- `diag drone_bay`, `drone status [drone_id]`, `drone install <drone_id> <module_id>`, `drone uninstall <drone_id> <module_id>`, `alerts explain drone_bay_maintenance_blocked`

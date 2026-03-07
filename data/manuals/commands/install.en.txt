@@ -2,13 +2,14 @@ install
 
 Command status
 - Legacy command removed from active workflow.
-- Installation is drone-operated.
+- Module operations are under `drone` command family.
 
-Canonical replacement
-- `drone install <drone_id> <module_id>`
-
-Operational note
-- Module installation now follows drone job flow and bay support gating.
+Operational behavior
+- Use `drone install <drone_id> <module_id>` for installation.
+- Use `drone uninstall <drone_id> <module_id>` for uninstallation.
+- Install behavior resolves by module scope:
+  - `scope=ship`: installs into ship module stack.
+  - `scope=drone`: installs into target drone module stack (bay operation).
 
 Related commands
-- `module inspect <module_id>`, `modules`, `drone status [drone_id]`
+- `drone install <drone_id> <module_id>`, `drone uninstall <drone_id> <module_id>`, `module inspect <module_id>`, `modules`

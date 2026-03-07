@@ -154,6 +154,17 @@ Esto da variedad, pero no lo haría aún como primer sistema.
 
 === OTROS / SIN CATALOGAR ===
 
+- [ ] Hay que reducir el coste de scrap de instalación de módulos de drone.
+
+- [ ] El bonus de tiempo del módulo rapid_maneuver_module debe ser mayor. Los drones con ese módulo deben ser más rápidos.
+
+- [ ] Parece que el módulo rapid_maneuver_module no está afectando al tiempo ETA de "drone recall". Ese módulo tiene que influir en todos los ETA de las operaciones del dron que tenga instalado el módulo.
+
+- [ ] Hay que cambiar el sistema de numerar jobs. Los jobs ya completados deben tener un identificador diferente a los jobs en proceso o queued. De otro modo, cuando el juego se alargue, habrá jobs en proceso cuyo id tenta un número enorme, y eso lo hace poco práctico. Hay que pensar cómo hacer esto. Una fórmula podría ser: 
+  si hay 3 jobs en proceso (o queued) esos tres jobs tendrán siempre los id's J1, J2 y J3. Si son cuatro, J1, J2, J3 y J4. Las numeraciones no se "resetean" hasta que no quede el panel de jobs completamente vacío. O sea, que si se ordena un primer job y, antes de que acabe, se ordena un segundo, estos se numerarán, correspondientemente, J1 y J2, y, cuando el J1 termine, el J2 seguirá teniendo el id J2. Una vez que ambos jobs estén completados, los nuevos jobs que entren se numerarán partiendo de "J1" de nuevo. No sé si me he explicado correctamente.
+En cuanto a la numeración de jobs completados, el formato podría ser "CJ1", "CJ2", etc. (las siglas "CJ" corresponderían a "Completed Job"). Si se te ocurre algo más claro e intuitivo, dímelo. 
+Por otra parte, es necesario que en el output de "jobs" se especifique el id de cada job (actualmente no aparece, si no me equivoco).
+
 - [x] No se debería permitir iniciar un viaje estando dockeado. Debería salir un mensaje de bloqueo advirtiendo que hace falta primero desdockear.
 
 - [x] Las órdenes "drone survey" y "drone salvage *", si se escriben sin parámetro <node_id>, debe entenderse que el <node_id> por defecto es el <node_id> del lugar en que se encuentra el dron en cuestión. Así, si la localización es loc=world_node:WRECK_B0C2BC, y el usuario introduce "drone salvage scrap D1 45", esa orden se deberá entender como equivalente a "drone salvage scrap D1 WRECK_B0C2B 45".
@@ -164,7 +175,7 @@ Esto da variedad, pero no lo haría aún como primer sistema.
 
 - [ ] El mensaje "uplink complete :: node data already exhausted" es quizá un poco confuso (puede dar a entender que tampoco hay data recuperable vía "salvage data"). Debería, mejor, ser "uplink complete :: uplink data already exhausted".
 
-- [!] Cuando se inicia un viaje, la radiación de entorno durante el viaje se calcula (si no me equivoco) como media del la radiación de entorno del origen A y del destino B. Ahora bien: ahora mismo, la radiación de entorno durante el viaje (es decir, la media entre A y B) se aplica desde el momento en que se inicia el viaje. Me gustaría cambiar esto. Me gustaría que el cambio fuera progresivo. Me gustaría que al iniciar el viaje desde el punto A la radiación de entorno fuera la de el punto A, y que a medida que se avanza hacia el punto B se progresa también hacia el valor de radiación de entorno de punto B. Así, la media de la radiación de entorno A - B debería ser la radiación de entorno existente exactamente en el punto intermedio entre el origen A y el destino B (es decir, ahí donde la nave se encuentre a la misma distancia del origen que del destino). En otras palabras, la radiación de entorno debe ir progresando con el viaje, hasta llegar el nivel de radiación del destino. Esto nos permitirá, en un segundo paso, diseñar un sistema de interrupción de la hibernación en el momento del viaje en que se traspasase un cierto umbral de radiación ambiente.
+- [x] Cuando se inicia un viaje, la radiación de entorno durante el viaje se calcula (si no me equivoco) como media del la radiación de entorno del origen A y del destino B. Ahora bien: ahora mismo, la radiación de entorno durante el viaje (es decir, la media entre A y B) se aplica desde el momento en que se inicia el viaje. Me gustaría cambiar esto. Me gustaría que el cambio fuera progresivo. Me gustaría que al iniciar el viaje desde el punto A la radiación de entorno fuera la de el punto A, y que a medida que se avanza hacia el punto B se progresa también hacia el valor de radiación de entorno de punto B. Así, la media de la radiación de entorno A - B debería ser la radiación de entorno existente exactamente en el punto intermedio entre el origen A y el destino B (es decir, ahí donde la nave se encuentre a la misma distancia del origen que del destino). En otras palabras, la radiación de entorno debe ir progresando con el viaje, hasta llegar el nivel de radiación del destino. Esto nos permitirá, en un segundo paso, diseñar un sistema de interrupción de la hibernación en el momento del viaje en que se traspasase un cierto umbral de radiación ambiente.
 
 - [x] Mensaje advirtiendo cuándo no está cargando la batería de los drones en bahía, y recordando las condiciones que se tienen que cumplir.
 

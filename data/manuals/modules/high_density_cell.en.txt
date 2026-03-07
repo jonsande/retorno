@@ -1,0 +1,18 @@
+MODULE DOSSIER — high_density_cell
+
+Role
+- Endurance battery package for extended drone operations.
+
+Operational effect
+- Scope: `drone` (slot cost: 1).
+- Increases effective maximum battery (`battery_max_add`).
+- Extends mission endurance before low-battery gating and autorecall.
+- Tradeoff: slightly increases movement time (`move_time_mult`).
+
+Integration notes
+- Bay charging respects effective maxima and will charge up to the new battery cap.
+- Installed/uninstalled via bay operation (`drone_bay=NOMINAL`, distribution online, target drone docked).
+- Works well with cargo or repair-biased presets where cycle duration is long.
+
+Field note
+- Typical pick when the bottleneck is return frequency, not action speed.

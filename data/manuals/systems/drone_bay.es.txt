@@ -1,60 +1,58 @@
 RESUMEN DE SISTEMA — drone_bay
 Ref: OS-MAN/SYS/DRN-BAY
 
-drone_bay es el subsistema de manipulación, soporte y ciclo de vida de drones en nave.
+drone_bay es el subsistema de nave para manejo de drones, mantenimiento asistido y operaciones de modulos en bahia.
 
 Función
-- Gestiona despliegue/recall/reboot/install desde la bahía.
-- Recarga batería de drones acoplados.
-- Descontamina dosis radiológica de drones acoplados.
-- Aplica reparación pasiva de integridad a drones acoplados (con coste de chatarra).
+- Gestiona flujos asistidos por bahia (`deploy`, `recall`, `reboot`, operaciones de modulos).
+- Recarga drones acoplados.
+- Descontamina drones acoplados.
+- Aplica reparacion pasiva de integridad a drones acoplados cuando se cumplen condiciones de soporte.
 
 Dependencias operativas
-- Para soporte de bahía (recarga, descontaminación y reparación pasiva):
-  - `drone_bay` no debe estar `OFFLINE`.
-  - `energy_distribution` no debe estar `OFFLINE`.
-- Para recarga de batería además importa la disponibilidad eléctrica instantánea:
-  - Potencia neta suficiente (`P_gen - P_load`) para carga normal, o
-  - reserva de batería de nave (`SoC > 0`) para carga reducida.
-- La bahía ya no exige dependencia de estado nominal de distribución para poder encenderse.
+- El soporte de mantenimiento de bahia requiere:
+  - `drone_bay` fuera de `OFFLINE`,
+  - `energy_distribution` fuera de `OFFLINE`.
+- La recarga tambien depende de condiciones electricas instantaneas (neto de generacion / reserva).
+- Las operaciones de modulos de dron en bahia (`drone install` con `scope=drone`, `drone uninstall`) requieren:
+  - dron objetivo acoplado en `drone_bay`,
+  - `drone_bay == NOMINAL`,
+  - `energy_distribution != OFFLINE`.
+- La instalacion/desinstalacion de modulos de nave (flujo legado con dron operador) requiere soporte de bahia online (`drone_bay` no `OFFLINE`) pero no requiere `NOMINAL`.
 
 Impacto en comandos por estado
 - NOMINAL:
-  - ETA base para `drone deploy`, `drone recall`, `drone install`, `drone reboot`.
-  - Recarga/descontaminación/reparación pasiva en régimen normal.
+  - ETA base para jobs asistidos por bahia.
+  - Operaciones de modulos de dron permitidas.
+  - Soporte normal de carga/descontaminacion/reparacion pasiva.
 - LIMITED:
-  - `deploy/recall/install/reboot` más lentos.
-  - Recarga más lenta.
-  - Reparación pasiva más lenta.
+  - ETA asistidos por bahia mas lentos.
+  - Operaciones de modulos de dron bloqueadas (`drone_bay_not_nominal`).
+  - Install/uninstall de modulos de nave sigue disponible con penalizacion de tiempo.
+  - Menor rendimiento de mantenimiento.
 - DAMAGED:
-  - `deploy/recall/install/reboot` mucho más lentos.
-  - Recarga mucho más lenta.
-  - Riesgo leve de pérdida de integridad durante `deploy`/`recall`.
-  - Reparación pasiva lenta y más cara en chatarra.
+  - ETA asistidos por bahia mucho mas lentos.
+  - Riesgo de golpe de integridad en fases asistidas (`deploy`/`recall`).
+  - Operaciones de modulos de dron bloqueadas (`drone_bay_not_nominal`).
+  - Install/uninstall de modulos de nave sigue disponible con penalizacion de tiempo.
 - CRITICAL:
-  - Mismos impactos de lentitud severa de bahía degradada.
-  - Riesgo leve de integridad en `deploy`/`recall`.
-  - Reparación pasiva aún más lenta, más cara y con probabilidad de fallo que puede dañar levemente al dron.
+  - Ralentizacion severa y menor fiabilidad de reparacion pasiva.
+  - Operaciones de modulos de dron bloqueadas (`drone_bay_not_nominal`).
+  - Install/uninstall de modulos de nave sigue disponible con fuerte penalizacion de tiempo.
 - OFFLINE:
-  - `drone deploy` normal bloqueado.
-  - `drone install` bloqueado.
-  - `drone recall` sigue permitido (sin soporte de mantenimiento).
-  - Sin recarga, sin descontaminación y sin reparación pasiva.
+  - Soporte de bahia no disponible.
+  - Operaciones de modulos de dron bloqueadas (`drone_bay_install_offline`).
 
-CONSEJO DE EMERGENCIA
-- Si necesitas sacar un dron con la bahía caída, usa `drone deploy!`.
-- `deploy!` permite override de emergencia (incluido estado crítico y bahía OFFLINE), pero NO salta precondiciones físicas:
-  - el dron debe existir y estar `docked` (no `disabled`, no ya desplegado),
-  - integridad mínima para desplegar,
-  - destino válido (`ship_sector` o `world_node` donde la nave esté acoplada).
-- `deploy!` tampoco evita bloqueos globales del terminal (`terminal_state`).
-- `deploy!` encola un job de riesgo (glitch/fallo). Puede terminar en pérdida de integridad o fallo de despliegue.
-- Si `energy_distribution` está `OFFLINE`, `deploy!` activa bypass de mantenimiento de emergencia y mantiene el riesgo alto.
+Sintomas comunes
+- Drones acoplados dejan de cargar aun necesitando bateria.
+- Drones acoplados dejan de recuperar integridad aun necesitando reparacion.
+- La alerta `drone_bay_maintenance_blocked` permanece activa.
+- Install/uninstall de modulos de dron bloqueado aunque haya modulo disponible.
 
-Alertas relacionadas
-- `drone_bay_charging_unavailable`
-- `drone_bay_maintenance_blocked` (ver `alerts explain drone_bay_maintenance_blocked`)
+Recuperacion tipica
+- Recuperar `drone_bay` y `energy_distribution` por encima de `OFFLINE` para soporte de mantenimiento.
+- Para operaciones de modulos de dron, restaurar `drone_bay` especificamente a `NOMINAL`.
+- Validar potencia neta y chatarra disponible si se espera reparacion pasiva.
 
 Comandos relacionados
-- `drone deploy`, `drone deploy!`, `drone recall`, `drone reboot`, `drone install`
-- `diag drone_bay`, `alerts`, `alerts explain drone_bay_maintenance_blocked`
+- `diag drone_bay`, `drone status [drone_id]`, `drone install <drone_id> <module_id>`, `drone uninstall <drone_id> <module_id>`, `alerts explain drone_bay_maintenance_blocked`

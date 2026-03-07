@@ -1,14 +1,15 @@
 install
 
 Estado del comando
-- Comando heredado retirado del flujo activo.
-- La instalación de módulos ahora es operación con dron.
+- Comando legado retirado del flujo activo.
+- Las operaciones de modulos viven en la familia `drone`.
 
-Reemplazo canónico
-- `drone install <drone_id> <module_id>`
-
-Nota operativa
-- La instalación sigue flujo de jobs de dron y gating de soporte de bahía.
+Comportamiento operativo
+- Usa `drone install <drone_id> <module_id>` para instalar.
+- Usa `drone uninstall <drone_id> <module_id>` para desinstalar.
+- La instalacion se resuelve por scope del modulo:
+  - `scope=ship`: instala en la pila de modulos de nave.
+  - `scope=drone`: instala en la pila de modulos del dron objetivo (operacion de bahia).
 
 Comandos relacionados
-- `module inspect <module_id>`, `modules`, `drone status [drone_id]`
+- `drone install <drone_id> <module_id>`, `drone uninstall <drone_id> <module_id>`, `module inspect <module_id>`, `modules`

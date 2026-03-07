@@ -1,0 +1,18 @@
+MODULE DOSSIER — reinforced_frame
+
+Role
+- Structural reinforcement package for survivability-biased drone builds.
+
+Operational effect
+- Scope: `drone` (slot cost: 1).
+- Increases effective maximum integrity (`integrity_max_add`).
+- Raises damage tolerance and effective repair ceiling.
+- Tradeoff: slightly increases movement time (`move_time_mult`).
+
+Integration notes
+- Passive bay repair and active repair jobs target effective maxima and can recover up to the reinforced cap.
+- Installed/uninstalled via bay operation (`drone_bay=NOMINAL`, distribution online, target drone docked).
+- Commonly paired with repair or mobility modules to offset integrity-side tradeoffs.
+
+Field note
+- Recommended in high-radiation or high-risk salvage loops where attrition is sustained.

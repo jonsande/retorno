@@ -1,15 +1,17 @@
 module inspect <module_id>
 
 Purpose
-- Inspect one installed module and its operational effects.
-
-Command family status
-- `module` and `modules` share the same installed-module context.
-- Installation workflow is external to this command family and is drone-operated.
+- Inspect one module definition from catalog and current runtime placement.
 
 Operational behavior
-- `module inspect <module_id>` shows module effects and description/lore notes.
-- If the module is not installed, inspect will report unavailable context.
+- `module inspect` works for both ship and drone modules.
+- Output includes:
+  - scope (`ship` or `drone`),
+  - effects,
+  - drawbacks,
+  - slot cost (`drone` modules),
+  - runtime presence (inventory / installed on ship / installed on drones).
+- Catalog inspection does not require module to be currently installed.
 
 Related commands
-- `modules`, `drone install <drone_id> <module_id>`, `debug modules`
+- `modules`, `drone install <drone_id> <module_id>`, `drone uninstall <drone_id> <module_id>`, `man <module_id>`

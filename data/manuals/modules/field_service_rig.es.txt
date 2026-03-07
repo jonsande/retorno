@@ -1,0 +1,24 @@
+DOSSIER DE MÓDULO — field_service_rig
+
+Rol
+- Equipo de mantenimiento de campo para builds de dron orientadas a reparacion.
+
+Efecto operativo
+- Scope: `drone` (coste de slots: 1).
+- Reduce ETA de reparacion activa (`repair_time_mult`).
+- Reduce probabilidad efectiva de fallo de reparacion (`repair_fail_p_mult`) usando el modelo de fallo existente.
+- Reduce coste efectivo de chatarra en reparacion (`repair_scrap_cost_mult`) tanto en exito como en fallo.
+- Contrapartida: aumenta el tiempo de movimiento (`move_time_mult`).
+
+Notas de integración
+- Instalacion/desinstalacion por operacion de bahia:
+  - `drone install <drone_id> field_service_rig`
+  - `drone uninstall <drone_id> field_service_rig`
+- Requisitos de operacion de bahia:
+  - dron objetivo acoplado en `drone_bay`,
+  - `drone_bay == NOMINAL`,
+  - `energy_distribution != OFFLINE`.
+- Acumula multiplicativamente con otros modulos de dron bajo clamps del perfil efectivo.
+
+Nota de campo
+- Preferido en ciclos largos de recuperacion donde los fallos de reparacion son costosos.

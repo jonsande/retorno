@@ -1,0 +1,18 @@
+DOSSIER DE MÓDULO — utility_cargo_frame
+
+Rol
+- Extension de bastidor utilitario para builds de dron orientadas a carga.
+
+Efecto operativo
+- Scope: `drone` (coste de slots: 1).
+- Aumenta la capacidad de carga efectiva del dron (`cargo_capacity_add`).
+- Mejora directamente el rendimiento de `drone salvage scrap` al reducir ETA por cantidad solicitada.
+- Contrapartida: aumenta el tiempo de movimiento (`move_time_mult`).
+
+Notas de integración
+- Se instala/desinstala como operacion de bahia (`drone install` / `drone uninstall`).
+- Sujeto a requisitos de operacion de bahia (`drone_bay=NOMINAL`, distribucion online, dron acoplado).
+- Pensado para presets de salvage; combinar con modulos de autonomia o movilidad segun perfil de ruta.
+
+Nota de campo
+- Mayor retorno cuando las ventanas de salvage son cortas y domina la extraccion de chatarra.

@@ -15,6 +15,7 @@ from retorno.core.actions import (
     DroneRecall,
     DroneReboot,
     DroneSurvey,
+    DroneUninstall,
     Hibernate,
     Install,
     JobCancel,
@@ -52,7 +53,9 @@ _PARSE_ERROR_MESSAGES = {
         "wait_number": "wait: <seconds> must be a number",
         "wait_gt0": "wait: <seconds> must be > 0",
         "debug_seed_int": "debug seed: <n> must be an integer",
-        "usage_debug": "Usage: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules | debug galaxy | debug galaxy map <sector|local|regional|global>",
+        "debug_add_amount_int": "debug add: amount must be an integer",
+        "debug_add_amount_gt0": "debug add: amount must be > 0",
+        "usage_debug": "Usage: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules | debug galaxy | debug galaxy map <sector|local|regional|global> | debug add scrap <amount> | debug add module <module_id> [count] | debug add drone[s] [count]",
         "usage_dock": "Usage: dock <node_id>",
         "usage_undock": "Usage: undock",
         "usage_nav": "Usage: nav map sectors|graph [node_id]|path <node_id>|routes|contacts|galaxy [sector|local|regional|global] | nav <node_id> | nav --no-cruise <node_id> | nav abort",
@@ -97,7 +100,7 @@ _PARSE_ERROR_MESSAGES = {
         "usage_power_on": "Usage: power on <system_id>",
         "usage_power_off": "Usage: power off <system_id>",
         "usage_shutdown": "Usage: shutdown <system_id>",
-        "usage_drone": "Usage: drone status [drone_id] | drone deploy <drone_id> <sector_id> | drone move <drone_id> <target_id> | drone survey <drone_id> [node_id] | drone recall <drone_id> | drone autorecall <drone_id> <on|off|amount_percent> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id>",
+        "usage_drone": "Usage: drone status [drone_id] | drone deploy <drone_id> <sector_id> | drone move <drone_id> <target_id> | drone survey <drone_id> [node_id] | drone recall <drone_id> | drone autorecall <drone_id> <on|off|amount_percent> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id> | drone uninstall <drone_id> <module_id>",
         "usage_drone_status": "Usage: drone status [drone_id]",
         "usage_drone_recall": "Usage: drone recall <drone_id>",
         "usage_drone_reboot": "Usage: drone reboot <drone_id>",
@@ -107,6 +110,7 @@ _PARSE_ERROR_MESSAGES = {
         "usage_drone_autorecall": "Usage: drone autorecall <drone_id> <on|off|amount_percent>",
         "drone_autorecall_amount": "drone autorecall: amount must be a number in (0, 100]",
         "usage_drone_install": "Usage: drone install <drone_id> <module_id>",
+        "usage_drone_uninstall": "Usage: drone uninstall <drone_id> <module_id>",
         "usage_drone_salvage": "Usage: drone salvage scrap <drone_id> [node_id] <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage drone(s) <drone_id> [node_id] | drone salvage data <drone_id> [node_id]",
         "usage_drone_salvage_scrap": "Usage: drone salvage scrap <drone_id> <node_id> <amount>",
         "usage_drone_salvage_drone": "Usage: drone salvage drone(s) <drone_id> [node_id]",
@@ -129,7 +133,9 @@ _PARSE_ERROR_MESSAGES = {
         "wait_number": "wait: <segundos> debe ser número",
         "wait_gt0": "wait: <segundos> debe ser > 0",
         "debug_seed_int": "debug seed: <n> debe ser entero",
-        "usage_debug": "Uso: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules | debug galaxy | debug galaxy map <sector|local|regional|global>",
+        "debug_add_amount_int": "debug add: amount debe ser entero",
+        "debug_add_amount_gt0": "debug add: amount debe ser > 0",
+        "usage_debug": "Uso: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules | debug galaxy | debug galaxy map <sector|local|regional|global> | debug add scrap <amount> | debug add module <module_id> [count] | debug add drone[s] [count]",
         "usage_dock": "Uso: dock <node_id>",
         "usage_undock": "Uso: undock",
         "usage_nav": "Uso: nav map sectors|graph [node_id]|path <node_id>|routes|contacts|galaxy [sector|local|regional|global] | nav <node_id> | nav --no-cruise <node_id> | nav abort",
@@ -174,7 +180,7 @@ _PARSE_ERROR_MESSAGES = {
         "usage_power_on": "Uso: power on <system_id>",
         "usage_power_off": "Uso: power off <system_id>",
         "usage_shutdown": "Uso: shutdown <system_id>",
-        "usage_drone": "Uso: drone status [drone_id] | drone deploy <drone_id> <sector_id> | drone move <drone_id> <target_id> | drone survey <drone_id> [node_id] | drone recall <drone_id> | drone autorecall <drone_id> <on|off|porcentaje> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id>",
+        "usage_drone": "Uso: drone status [drone_id] | drone deploy <drone_id> <sector_id> | drone move <drone_id> <target_id> | drone survey <drone_id> [node_id] | drone recall <drone_id> | drone autorecall <drone_id> <on|off|porcentaje> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id> | drone uninstall <drone_id> <module_id>",
         "usage_drone_status": "Uso: drone status [drone_id]",
         "usage_drone_recall": "Uso: drone recall <drone_id>",
         "usage_drone_reboot": "Uso: drone reboot <drone_id>",
@@ -184,6 +190,7 @@ _PARSE_ERROR_MESSAGES = {
         "usage_drone_autorecall": "Uso: drone autorecall <drone_id> <on|off|porcentaje>",
         "drone_autorecall_amount": "drone autorecall: el porcentaje debe ser número en (0, 100]",
         "usage_drone_install": "Uso: drone install <drone_id> <module_id>",
+        "usage_drone_uninstall": "Uso: drone uninstall <drone_id> <module_id>",
         "usage_drone_salvage": "Uso: drone salvage scrap <drone_id> [node_id] <amount> | drone salvage module(s) <drone_id> [node_id] | drone salvage drone(s) <drone_id> [node_id] | drone salvage data <drone_id> [node_id]",
         "usage_drone_salvage_scrap": "Uso: drone salvage scrap <drone_id> <node_id> <amount>",
         "usage_drone_salvage_drone": "Uso: drone salvage drone(s) <drone_id> [node_id]",
@@ -355,6 +362,44 @@ def parse_command(line: str):
             except ValueError as e:
                 raise ParseError("debug_seed_int") from e
             return ("DEBUG_SEED", seed)
+        if len(args) >= 2 and args[0] == "add":
+            kind = args[1]
+            if kind == "scrap":
+                if len(args) != 3:
+                    raise ParseError("usage_debug")
+                try:
+                    amount = int(args[2])
+                except ValueError as e:
+                    raise ParseError("debug_add_amount_int") from e
+                if amount <= 0:
+                    raise ParseError("debug_add_amount_gt0")
+                return ("DEBUG_ADD_SCRAP", amount)
+            if kind == "module":
+                if len(args) not in {3, 4}:
+                    raise ParseError("usage_debug")
+                module_id = args[2]
+                count = 1
+                if len(args) == 4:
+                    try:
+                        count = int(args[3])
+                    except ValueError as e:
+                        raise ParseError("debug_add_amount_int") from e
+                if count <= 0:
+                    raise ParseError("debug_add_amount_gt0")
+                return ("DEBUG_ADD_MODULE", module_id, count)
+            if kind in {"drone", "drones"}:
+                if len(args) not in {2, 3}:
+                    raise ParseError("usage_debug")
+                count = 1
+                if len(args) == 3:
+                    try:
+                        count = int(args[2])
+                    except ValueError as e:
+                        raise ParseError("debug_add_amount_int") from e
+                if count <= 0:
+                    raise ParseError("debug_add_amount_gt0")
+                return ("DEBUG_ADD_DRONE", count)
+            raise ParseError("usage_debug")
         if len(args) == 1 and args[0] == "modules":
             return ("DEBUG_MODULES", None)
         if len(args) == 1 and args[0] in {"arcs", "placement"}:
@@ -641,6 +686,10 @@ def parse_command(line: str):
             if len(args) != 3:
                 raise ParseError("usage_drone_install")
             return Install(drone_id=args[1], module_id=args[2])
+        if sub == "uninstall":
+            if len(args) != 3:
+                raise ParseError("usage_drone_uninstall")
+            return DroneUninstall(drone_id=args[1], module_id=args[2])
         if sub == "salvage":
             if len(args) < 3:
                 raise ParseError("usage_drone_salvage")

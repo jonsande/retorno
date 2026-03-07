@@ -10,6 +10,7 @@ from retorno.core.actions import (
     DroneRecall,
     DroneReboot,
     DroneSurvey,
+    DroneUninstall,
     Install,
     PowerPlan,
     PowerShed,
@@ -93,6 +94,7 @@ def is_action_allowed_in_critical_state(state, action: Action) -> bool:
             DroneSurvey,
             SalvageDrone,
             Install,
+            DroneUninstall,
         ),
     ):
         return True

@@ -7,6 +7,9 @@ debug deadnodes
 debug modules
 debug galaxy
 debug galaxy map <sector|local|regional|global>
+debug add scrap <amount>
+debug add module <module_id> [count]
+debug add drone[s] [count]
 
 Propósito
 - Superficie de control para pruebas deterministas y resets de escenario.
@@ -18,9 +21,13 @@ Comportamiento operativo
 - Los comandos de listado exponen registros internos de depuración.
 - `debug galaxy` emite informe de posición galáctica, vecindad de sectores y distribución de radiación procedural.
 - `debug galaxy map <scale>` dibuja el mapa ASCII galáctico en la escala indicada usando todos los nodos cargados.
+- `debug add scrap <amount>` inyecta scrap directamente al inventario de bodega.
+- `debug add module <module_id> [count]` inyecta uno o varios módulos desde el catálogo completo (scope nave y dron).
+- `debug add drone[s] [count]` crea drones acoplados en bahía para pruebas rápidas.
 
 Notas de uso
 - Pensado para testing/balanceo, no para flujo diegético normal.
+- Las operaciones `debug add ...` requieren tener DEBUG activado (`debug on`).
 
 Comandos relacionados
 - `wait <seconds>`, `status`, `jobs`

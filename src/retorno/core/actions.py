@@ -85,6 +85,12 @@ class Install(Action):
 
 
 @dataclass(slots=True)
+class DroneUninstall(Action):
+    drone_id: str
+    module_id: str
+
+
+@dataclass(slots=True)
 class DroneReboot(Action):
     drone_id: str
 

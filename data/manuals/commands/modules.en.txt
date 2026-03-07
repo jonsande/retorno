@@ -1,16 +1,15 @@
 modules
 
 Purpose
-- List currently installed modules on RETORNO.
+- Show module state split by installation scope and runtime placement.
 
-Command family behavior
-- `modules` focuses on installed inventory only.
-- Alias: `module`.
-
-Operational notes
-- If list is empty, install via drone workflow.
-- For module-level detail, use `module inspect <module_id>`.
-- For full catalog visibility (installed + not installed), use debug module listing.
+Operational behavior
+- `modules` displays three views:
+  - ship installed modules,
+  - drone installed modules grouped by `drone_id`,
+  - inventory modules grouped by scope (`ship`/`drone`).
+- For drones, slot occupancy is shown against slot capacity.
+- Inventory section uses manifest view; if manifest is stale, run `cargo audit`.
 
 Related commands
-- `module inspect <module_id>`, `drone install <drone_id> <module_id>`, `debug modules`
+- `module inspect <module_id>`, `drone install <drone_id> <module_id>`, `drone uninstall <drone_id> <module_id>`, `cargo audit`

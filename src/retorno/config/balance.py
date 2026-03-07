@@ -61,9 +61,16 @@ class Balance:
     UNDOCK_TIME_S = 45.0
     # Module installation time.
     INSTALL_TIME_S = 30.0
+    # Ship module uninstallation time.
+    UNINSTALL_TIME_S = 25.0
+    # Drone module installation/uninstallation (bay operation) times.
+    DRONE_INSTALL_TIME_S = 35.0
+    DRONE_UNINSTALL_TIME_S = 25.0
     # Salvage scrap time model: base + per unit.
     SALVAGE_SCRAP_BASE_S = 5.0
     SALVAGE_SCRAP_PER_UNIT_S = 1.5
+    # Drone salvage scrap time for one full cargo-load cycle.
+    DRONE_SALVAGE_SCRAP_BASE_LOAD_TIME_S = 35.0
     # Salvage module job time.
     SALVAGE_MODULE_TIME_S = 25.0
     # Salvage data job time.
@@ -268,6 +275,7 @@ class Balance:
     # Minimum net power required to allow drone charging.
     DRONE_CHARGE_NET_MIN_KW = -0.2
     DRONE_BATTERY_IDLE_DRAIN_DEPLOYED_PER_S = 0.00002 # Velocidad a la que descarga sin hacer nada
+    DRONE_CARGO_CAPACITY_BASE = 10.0
     DRONE_BASE_DECAY_PER_S = 1.0e-7
     DRONE_DECON_RAD_PER_S = 0.01
     DRONE_RAD_DOSE_WARN = 1.0

@@ -1,0 +1,22 @@
+DOSSIER DE MÓDULO — rapid_maneuver_module
+
+Rol
+- Nucleo de movilidad para builds de dron de alta respuesta.
+
+Efecto operativo
+- Scope: `drone` (coste de slots: 1).
+- Reduce ETA de movimiento (`move_time_mult`).
+- Reduce ETA de despliegue (`deploy_time_mult`), incluido el timing del deploy de emergencia.
+- Reduce ETA de survey (`survey_time_mult`).
+- Contrapartida: reduce la integridad maxima efectiva (`integrity_max_add` negativo).
+
+Notas de integración
+- Instalacion/desinstalacion mediante operacion de bahia con requisitos de bahia nominal.
+- El techo de integridad efectiva impacta:
+  - margenes de seguridad de deploy/recall,
+  - objetivos de reparacion pasiva/activa,
+  - interpretacion de estado en `drone status`.
+- Combinar con `reinforced_frame` cuando se necesita movilidad sin perder tanto margen estructural.
+
+Nota de campo
+- Elegido cuando la cadencia de desplazamiento y de survey vale mas que el margen estructural.

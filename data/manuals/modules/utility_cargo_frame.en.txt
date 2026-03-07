@@ -1,0 +1,18 @@
+MODULE DOSSIER — utility_cargo_frame
+
+Role
+- Utility frame extension for cargo-biased drone builds.
+
+Operational effect
+- Scope: `drone` (slot cost: 1).
+- Increases effective drone cargo capacity (`cargo_capacity_add`).
+- Directly improves `drone salvage scrap` throughput by reducing ETA per requested amount.
+- Tradeoff: increases movement time (`move_time_mult`).
+
+Integration notes
+- Installed/uninstalled as a bay operation (`drone install` / `drone uninstall`).
+- Subject to bay operation requirements (`drone_bay=NOMINAL`, distribution online, drone docked).
+- Designed for salvage-oriented presets; combine with endurance or mobility modules depending on route profile.
+
+Field note
+- Best return when salvage windows are short and scrap extraction dominates mission time.

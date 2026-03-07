@@ -1,0 +1,24 @@
+MODULE DOSSIER — field_service_rig
+
+Role
+- Field maintenance rig for repair-focused drone builds.
+
+Operational effect
+- Scope: `drone` (slot cost: 1).
+- Reduces active repair ETA (`repair_time_mult`).
+- Reduces effective repair fail probability (`repair_fail_p_mult`) using the existing repair failure model.
+- Reduces effective repair scrap cost (`repair_scrap_cost_mult`) for both successful and failed repair attempts.
+- Tradeoff: increases movement time (`move_time_mult`).
+
+Integration notes
+- Installed/uninstalled via bay operation commands:
+  - `drone install <drone_id> field_service_rig`
+  - `drone uninstall <drone_id> field_service_rig`
+- Bay operation requirements:
+  - target drone docked in `drone_bay`,
+  - `drone_bay == NOMINAL`,
+  - `energy_distribution != OFFLINE`.
+- Stacks multiplicatively with other drone modules under profile clamps.
+
+Field note
+- Preferred in long-duration recovery loops where failed repairs are expensive.

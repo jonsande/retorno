@@ -1,0 +1,22 @@
+MODULE DOSSIER — rapid_maneuver_module
+
+Role
+- Mobility core for high-response drone builds.
+
+Operational effect
+- Scope: `drone` (slot cost: 1).
+- Reduces move ETA (`move_time_mult`).
+- Reduces deploy ETA (`deploy_time_mult`), including emergency deploy job timing.
+- Reduces survey ETA (`survey_time_mult`).
+- Tradeoff: lowers effective maximum integrity (`integrity_max_add` negative).
+
+Integration notes
+- Installed/uninstalled through bay operation with nominal bay requirements.
+- Effective integrity cap impacts:
+  - deploy/recall safety margins,
+  - passive/active repair targets,
+  - drone status interpretation.
+- Pair with `reinforced_frame` when mobility is required but survivability floor is too low.
+
+Field note
+- Chosen when travel cadence and sensor/survey tempo are more valuable than structural margin.

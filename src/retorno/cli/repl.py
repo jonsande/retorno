@@ -42,7 +42,7 @@ from retorno.io.save_load import (
     save_single_slot,
 )
 from retorno.model.systems import SystemState
-from retorno.model.drones import DroneStatus
+from retorno.model.drones import DroneLocation, DroneState, DroneStatus, compute_drone_effective_profile
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, list_dir, normalize_path, read_file, required_access_label
 from retorno.model.galaxy import (
     galactic_margins_for_op_pos,
@@ -293,7 +293,8 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ("drone autorecall <drone_id> off", "disable automatic recall", "desactiva autorretorno"),
                 ("drone autorecall <drone_id> <percent>", "set recall battery threshold", "ajusta umbral de batería para retorno"),
                 ("drone repair <drone_id> <target_id>", "repair target with drone", "repara objetivo con dron"),
-                ("drone install <drone_id> <module_id>", "install module using drone", "instala módulo usando dron"),
+                ("drone install <drone_id> <module_id>", "install module (ship/drone by scope)", "instala módulo (nave/dron según scope)"),
+                ("drone uninstall <drone_id> <module_id>", "uninstall module (ship/drone by scope)", "desinstala módulo (nave/dron según scope)"),
                 ("drone salvage scrap <drone_id> [node_id] <amount>", "salvage scrap from node", "recupera chatarra del nodo"),
                 ("drone salvage module <drone_id> [node_id]", "salvage module from node", "recupera módulo del nodo"),
                 ("drone salvage drone <drone_id> [node_id]", "recover all drones from node", "recupera todos los drones del nodo"),
@@ -765,8 +766,32 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "es": "Instalación bloqueada: módulo no disponible ({module_id})",
         },
         "module_unknown": {
-            "en": "Install blocked: unknown module ({module_id})",
-            "es": "Instalación bloqueada: módulo desconocido ({module_id})",
+            "en": "Module operation blocked: unknown module ({module_id})",
+            "es": "Operación de módulo bloqueada: módulo desconocido ({module_id})",
+        },
+        "module_scope_mismatch": {
+            "en": "Module operation blocked: incompatible module scope ({module_id})",
+            "es": "Operación de módulo bloqueada: scope de módulo incompatible ({module_id})",
+        },
+        "module_not_installed": {
+            "en": "Module operation blocked: module not installed ({module_id})",
+            "es": "Operación de módulo bloqueada: módulo no instalado ({module_id})",
+        },
+        "module_slots_full": {
+            "en": "Install blocked: no free drone module slots ({slots_used}/{slots_max})",
+            "es": "Instalación bloqueada: sin slots libres de módulos de dron ({slots_used}/{slots_max})",
+        },
+        "drone_not_in_bay": {
+            "en": "Module operation blocked: target drone is not docked in drone_bay ({drone_id})",
+            "es": "Operación de módulo bloqueada: el dron objetivo no está acoplado en drone_bay ({drone_id})",
+        },
+        "drone_bay_not_nominal": {
+            "en": "Module operation blocked: drone_bay must be NOMINAL",
+            "es": "Operación de módulo bloqueada: drone_bay debe estar en NOMINAL",
+        },
+        "drone_module_not_installed": {
+            "en": "Uninstall blocked: module not installed on target drone ({module_id})",
+            "es": "Desinstalación bloqueada: módulo no instalado en el dron objetivo ({module_id})",
         },
         "scrap_insufficient": {
             "en": "Install blocked: insufficient scrap ({scrap_cost})",
@@ -919,6 +944,26 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "job_completed_install": {
             "en": "Module installed: {module_id}",
             "es": "Módulo instalado: {module_id}",
+        },
+        "job_completed_uninstall": {
+            "en": "Module uninstalled: {module_id}",
+            "es": "Módulo desinstalado: {module_id}",
+        },
+        "job_completed_drone_install": {
+            "en": "Drone module installed: {module_id} -> {drone_id}",
+            "es": "Módulo de dron instalado: {module_id} -> {drone_id}",
+        },
+        "job_completed_drone_uninstall": {
+            "en": "Drone module uninstalled: {module_id} <- {drone_id}",
+            "es": "Módulo de dron desinstalado: {module_id} <- {drone_id}",
+        },
+        "job_failed_drone_install": {
+            "en": "Drone module install failed: {module_id} -> {drone_id}",
+            "es": "Falló la instalación de módulo de dron: {module_id} -> {drone_id}",
+        },
+        "job_failed_drone_uninstall": {
+            "en": "Drone module uninstall failed: {module_id} <- {drone_id}",
+            "es": "Falló la desinstalación de módulo de dron: {module_id} <- {drone_id}",
         },
         "job_completed_cargo_audit": {
             "en": "Cargo manifest updated",
@@ -1902,7 +1947,28 @@ def render_drone_status(state, drone_id: str | None = None) -> None:
         drone_items = [(drone_id, d)]
     else:
         drone_items = list(drones.items())
+    modules = load_modules()
     for did, d in drone_items:
+        profile = compute_drone_effective_profile(d, modules)
+        battery_pct = 100.0 * d.battery / max(0.000001, profile.battery_max_effective)
+        integrity_pct = 100.0 * d.integrity / max(0.000001, profile.integrity_max_effective)
+        installed_modules = list(d.installed_modules or [])
+        slots_used = 0
+        for mid in installed_modules:
+            info = modules.get(mid, {})
+            if _module_scope(info) != "drone":
+                continue
+            slots_used += int(info.get("slot_cost", 1) or 1)
+        modules_suffix = ""
+        if installed_modules:
+            module_counts: dict[str, int] = {}
+            for mid in installed_modules:
+                module_counts[mid] = module_counts.get(mid, 0) + 1
+            listed = ", ".join(
+                f"{mid} x{count}" if count > 1 else mid
+                for mid, count in module_counts.items()
+            )
+            modules_suffix = f" ({listed})"
         dose_level = _radiation_level_id(
             d.dose_rad,
             Balance.RAD_LEVEL_DRONE_DOSE_ELEVATED,
@@ -1913,8 +1979,11 @@ def render_drone_status(state, drone_id: str | None = None) -> None:
         ar_threshold = int(round(d.autorecall_threshold * 100.0))
         print(
             f"- drone_id={did} status={d.status.value} loc={d.location.kind}:{d.location.id} "
-            f"battery={d.battery:.2f} integrity={d.integrity:.2f} "
+            f"battery={d.battery:.2f}/{profile.battery_max_effective:.2f} ({battery_pct:.0f}%) "
+            f"integrity={d.integrity:.2f}/{profile.integrity_max_effective:.2f} ({integrity_pct:.0f}%) "
             f"dose={d.dose_rad:.3f} ({_radiation_level_label(locale, dose_level)}) "
+            f"slots={slots_used}/{int(d.module_slots_max)} "
+            f"mods={len(installed_modules)}{modules_suffix} "
             f"autorecall={ar_mode}@{ar_threshold}%"
         )
 
@@ -1966,31 +2035,134 @@ def render_inventory(state) -> None:
         print("(cargo changes pending; run 'cargo audit' to refresh)")
 
 
+def _module_scope(info: dict) -> str:
+    scope = str(info.get("scope", "ship")).strip().lower() or "ship"
+    return scope if scope in {"ship", "drone"} else "ship"
+
+
+def _module_effects(info: dict) -> dict:
+    scope = _module_scope(info)
+    if scope == "drone":
+        return dict(info.get("drone_effects", {}) or {})
+    return dict(info.get("effects", {}) or {})
+
+
+def _format_module_effect(effect_key: str, value, locale: str) -> str:
+    labels = {
+        "integrity_max_add": {"en": "max integrity", "es": "integridad máxima"},
+        "battery_max_add": {"en": "max battery", "es": "batería máxima"},
+        "cargo_capacity_add": {"en": "cargo capacity", "es": "capacidad de carga"},
+        "move_time_mult": {"en": "move time", "es": "tiempo de movimiento"},
+        "deploy_time_mult": {"en": "deploy time", "es": "tiempo de despliegue"},
+        "survey_time_mult": {"en": "survey time", "es": "tiempo de survey"},
+        "repair_time_mult": {"en": "repair time", "es": "tiempo de reparación"},
+        "repair_fail_p_mult": {"en": "repair fail chance", "es": "prob. de fallo de reparación"},
+        "repair_scrap_cost_mult": {"en": "repair scrap cost", "es": "coste de chatarra en reparación"},
+        "power_quality_offset": {"en": "power quality", "es": "calidad de energía"},
+        "e_batt_bonus_kwh": {"en": "battery capacity", "es": "capacidad de batería"},
+        "p_gen_bonus_kw": {"en": "generation power", "es": "potencia de generación"},
+    }
+    label = labels.get(effect_key, {}).get(locale, effect_key)
+    try:
+        fv = float(value)
+    except Exception:
+        return f"{label}: {value}"
+    if effect_key.endswith("_mult"):
+        return f"{label}: x{fv:.2f}"
+    sign = "+" if fv >= 0 else ""
+    return f"{label}: {sign}{fv:.2f}"
+
+
+def _module_drawbacks(info: dict, locale: str) -> list[str]:
+    key = "drawbacks_es" if locale == "es" else "drawbacks_en"
+    raw = info.get(key, [])
+    if not isinstance(raw, list):
+        return []
+    return [str(item) for item in raw if str(item).strip()]
+
+
 def render_modules_installed(state) -> None:
-    print("\n=== MODULES (installed) ===")
-    installed = list(state.ship.installed_modules or [])
-    if not installed:
-        print("(none)")
-        locale = state.os.locale.value
-        hint = {
-            "en": "Hint: install modules with a drone: drone install <drone_id> <module_id>",
-            "es": "Pista: instala módulos con dron: drone install <drone_id> <module_id>",
-        }
-        print(hint.get(locale, hint["en"]))
-        return
-    counts: dict[str, int] = {}
-    for mid in installed:
-        counts[mid] = counts.get(mid, 0) + 1
-    modules = load_modules()
+    print("\n=== MODULES ===")
     locale = state.os.locale.value
-    for mid, count in sorted(counts.items()):
+    modules = load_modules()
+    disp_scrap, disp_modules, dirty = _inventory_view(state.ship)
+    _ = disp_scrap
+
+    print("ship installed:")
+    ship_installed = list(state.ship.installed_modules or [])
+    if ship_installed:
+        ship_counts: dict[str, int] = {}
+        for mid in ship_installed:
+            ship_counts[mid] = ship_counts.get(mid, 0) + 1
+        for mid, count in sorted(ship_counts.items()):
+            info = modules.get(mid, {})
+            name = info.get("name", mid)
+            scope = _module_scope(info)
+            suffix = f" x{count}" if count > 1 else ""
+            print(f"- {mid}: {name}{suffix} [scope={scope}]")
+    else:
+        print("- (none)")
+
+    print("drone installed:")
+    has_drone_modules = False
+    for drone_id in sorted(state.ship.drones.keys()):
+        drone = state.ship.drones[drone_id]
+        mids = list(drone.installed_modules or [])
+        if not mids:
+            continue
+        has_drone_modules = True
+        used_slots = 0
+        for mid in mids:
+            info = modules.get(mid, {})
+            if _module_scope(info) != "drone":
+                continue
+            used_slots += int(info.get("slot_cost", 1) or 1)
+        print(f"- {drone_id} (slots {used_slots}/{int(drone.module_slots_max)}):")
+        counts: dict[str, int] = {}
+        for mid in mids:
+            counts[mid] = counts.get(mid, 0) + 1
+        for mid, count in sorted(counts.items()):
+            info = modules.get(mid, {})
+            name = info.get("name", mid)
+            scope = _module_scope(info)
+            suffix = f" x{count}" if count > 1 else ""
+            print(f"  - {mid}: {name}{suffix} [scope={scope}]")
+    if not has_drone_modules:
+        print("- (none)")
+
+    print("inventory (manifest view):")
+    inv_ship: dict[str, int] = {}
+    inv_drone: dict[str, int] = {}
+    for mid in list(disp_modules or []):
         info = modules.get(mid, {})
-        name = info.get("name", mid)
-        desc = info.get("desc_es") if locale == "es" else info.get("desc_en")
-        suffix = f" x{count}" if count > 1 else ""
-        print(f"- {mid}: {name}{suffix}")
-        if desc:
-            print(f"  {desc}")
+        if _module_scope(info) == "drone":
+            inv_drone[mid] = inv_drone.get(mid, 0) + 1
+        else:
+            inv_ship[mid] = inv_ship.get(mid, 0) + 1
+    print("- ship scope:")
+    if inv_ship:
+        for mid, count in sorted(inv_ship.items()):
+            info = modules.get(mid, {})
+            name = info.get("name", mid)
+            suffix = f" x{count}" if count > 1 else ""
+            print(f"  - {mid}: {name}{suffix}")
+    else:
+        print("  - (none)")
+    print("- drone scope:")
+    if inv_drone:
+        for mid, count in sorted(inv_drone.items()):
+            info = modules.get(mid, {})
+            name = info.get("name", mid)
+            suffix = f" x{count}" if count > 1 else ""
+            print(f"  - {mid}: {name}{suffix}")
+    else:
+        print("  - (none)")
+    if dirty:
+        note = {
+            "en": "(manifest stale; run 'cargo audit' for synchronized inventory view)",
+            "es": "(manifiesto desactualizado; ejecuta 'cargo audit' para sincronizar inventario)",
+        }
+        print(note.get(locale, note["en"]))
 
 
 def render_module_inspect(state, module_id: str) -> None:
@@ -1999,29 +2171,56 @@ def render_module_inspect(state, module_id: str) -> None:
     if not info:
         print(f"(module) unknown module_id: {module_id}")
         return
-    in_inventory = module_id in state.ship.cargo_modules
-    installed = module_id in state.ship.installed_modules
     locale = state.os.locale.value
     name = info.get("name", module_id)
-    effects = info.get("effects", {})
-    effects_str = ", ".join(f"{k}={v}" for k, v in effects.items()) or "no effects"
+    scope = _module_scope(info)
+    effects = _module_effects(info)
+    drawbacks = _module_drawbacks(info, locale)
+    slot_cost = int(info.get("slot_cost", 1) or 1) if scope == "drone" else 0
     desc = info.get("desc_es") if locale == "es" else info.get("desc_en")
+    in_inventory_count = state.ship.cargo_modules.count(module_id)
+    ship_installed_count = state.ship.installed_modules.count(module_id)
+    drone_holders: dict[str, int] = {}
+    for drone_id, drone in state.ship.drones.items():
+        cnt = list(drone.installed_modules or []).count(module_id)
+        if cnt > 0:
+            drone_holders[drone_id] = cnt
+
     print("\n=== MODULE INSPECT ===")
     print(f"id: {module_id}")
     print(f"name: {name}")
-    print(f"effects: {effects_str}")
+    print(f"scope: {scope}")
+    if scope == "drone":
+        print(f"slots: {slot_cost}")
+    else:
+        print("slots: n/a (ship module)")
+    print("effects:")
+    if effects:
+        for key, value in effects.items():
+            print(f"- {_format_module_effect(str(key), value, locale)}")
+    else:
+        empty = {"en": "(none)", "es": "(ninguno)"}
+        print(f"- {empty.get(locale, empty['en'])}")
+    print("drawbacks:")
+    if drawbacks:
+        for line in drawbacks:
+            print(f"- {line}")
+    else:
+        empty = {"en": "(none declared)", "es": "(sin contrapartidas declaradas)"}
+        print(f"- {empty.get(locale, empty['en'])}")
     if desc:
         print(f"desc: {desc}")
-    if installed:
-        print("status: installed")
-    elif in_inventory:
-        print("status: in inventory")
+    print("presence:")
+    print(f"- inventory: {in_inventory_count}")
+    print(f"- ship installed: {ship_installed_count}")
+    if drone_holders:
+        for drone_id in sorted(drone_holders.keys()):
+            count = drone_holders[drone_id]
+            suffix = f" x{count}" if count > 1 else ""
+            print(f"- drone {drone_id}{suffix}")
     else:
-        msg = {
-            "en": "status: not in inventory (info from catalog)",
-            "es": "estado: no está en inventario (info del catálogo)",
-        }
-        print(msg.get(locale, msg["en"]))
+        none = {"en": "- drones: (none)", "es": "- drones: (ninguno)"}
+        print(none.get(locale, none["en"]))
 
 
 def render_modules_catalog(state) -> None:
@@ -2033,11 +2232,14 @@ def render_modules_catalog(state) -> None:
     locale = state.os.locale.value
     for mid, info in modules.items():
         name = info.get("name", mid)
+        scope = _module_scope(info)
+        slot_cost = int(info.get("slot_cost", 1) or 1) if scope == "drone" else 0
         scrap_cost = info.get("scrap_cost", "?")
-        effects = info.get("effects", {})
+        effects = _module_effects(info)
         effects_str = ", ".join(f"{k}={v}" for k, v in effects.items()) or "no effects"
         desc = info.get("desc_es") if locale == "es" else info.get("desc_en")
-        print(f"- {mid}: {name} (installation scrap cost {scrap_cost}) [{effects_str}]")
+        slot_txt = f" slots={slot_cost}" if scope == "drone" else ""
+        print(f"- {mid}: {name} [scope={scope}{slot_txt}] (installation scrap cost {scrap_cost}) [{effects_str}]")
         if desc:
             print(f"  {desc}")
 
@@ -2461,6 +2663,68 @@ def render_debug_galaxy(state) -> None:
 def render_debug_galaxy_map(state, scale: str | None) -> None:
     print("\n=== DEBUG GALAXY MAP ===")
     render_nav_map_galaxy(state, scale, include_all_loaded=True)
+
+
+def _next_debug_drone_id(state) -> str:
+    max_idx = 0
+    for drone_id in state.ship.drones.keys():
+        if not drone_id.startswith("D"):
+            continue
+        suffix = drone_id[1:]
+        if not suffix.isdigit():
+            continue
+        max_idx = max(max_idx, int(suffix))
+    candidate = max_idx + 1
+    while f"D{candidate}" in state.ship.drones:
+        candidate += 1
+    return f"D{candidate}"
+
+
+def debug_add_scrap(state, amount: int) -> None:
+    amount = int(amount)
+    if amount <= 0:
+        print("debug add scrap: amount must be > 0")
+        return
+    state.ship.cargo_scrap += amount
+    state.ship.manifest_dirty = True
+    print(f"debug add scrap: +{amount} (cargo_scrap={state.ship.cargo_scrap})")
+
+
+def debug_add_module(state, module_id: str, count: int = 1) -> None:
+    count = int(count)
+    if count <= 0:
+        print("debug add module: count must be > 0")
+        return
+    modules = load_modules()
+    if module_id not in modules:
+        print(f"debug add module: unknown module_id '{module_id}'")
+        return
+    for _ in range(count):
+        state.ship.cargo_modules.append(module_id)
+    state.ship.manifest_dirty = True
+    print(f"debug add module: +{count} {module_id} (inventory_count={state.ship.cargo_modules.count(module_id)})")
+
+
+def debug_add_drones(state, count: int = 1) -> None:
+    count = int(count)
+    if count <= 0:
+        print("debug add drone: count must be > 0")
+        return
+    created: list[str] = []
+    for _ in range(count):
+        drone_id = _next_debug_drone_id(state)
+        state.ship.drones[drone_id] = DroneState(
+            drone_id=drone_id,
+            name=f"Drone-{drone_id[1:].zfill(2)}",
+            status=DroneStatus.DOCKED,
+            location=DroneLocation(kind="ship_sector", id="drone_bay"),
+            shield_factor=0.9,
+            battery=1.0,
+            integrity=1.0,
+        )
+        created.append(drone_id)
+    print(f"debug add drone: created {len(created)} -> {', '.join(created)}")
+
 
 def _render_contacts_table(state) -> None:
     current_id = state.world.current_node_id
@@ -5581,7 +5845,7 @@ def render_alert_explain(state, alert_key: str) -> None:
             )
 
         print("Battery charging conditions:")
-        print("- Drone must be docked in drone_bay and battery < 1.0")
+        print("- Drone must be docked in drone_bay and battery below its effective maximum")
         print("- drone_bay must not be OFFLINE")
         print("- energy_distribution must not be OFFLINE")
         print(
@@ -5589,7 +5853,7 @@ def render_alert_explain(state, alert_key: str) -> None:
             f"SoC > 0 with net >= {Balance.DRONE_CHARGE_NET_MIN_KW:.2f}kW (slow charge)"
         )
         print("Integrity passive-repair conditions:")
-        print("- Drone must be docked in drone_bay and integrity < 1.0")
+        print("- Drone must be docked in drone_bay and integrity below its effective maximum")
         print("- drone_bay and energy_distribution must be available (not OFFLINE)")
         print("- Ship must have enough scrap for passive repair cost of the current bay state")
         print("Drone decontamination conditions:")
@@ -5805,6 +6069,7 @@ def main() -> None:
                     drone_local_world_targets = _drone_local_world_node_targets_for_completion(locked_state)
                     drone_move_targets = _drone_move_targets_for_completion(locked_state)
                     drone_deploy_targets = _drone_deploy_targets_for_completion(locked_state)
+                    modules_catalog = sorted(load_modules().keys())
                     modules = list(set(locked_state.ship.cargo_modules or locked_state.ship.manifest_modules))
                     services = []
                     for sys in locked_state.ship.systems.values():
@@ -5908,9 +6173,21 @@ def main() -> None:
                         candidates = [c for c in ["cruise", "normal"] if c.startswith(text)]
                 elif cmd == "debug":
                     if len(tokens) == 2:
-                        candidates = [c for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "modules", "galaxy"] if c.startswith(text)]
+                        candidates = [
+                            c
+                            for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "modules", "galaxy", "add"]
+                            if c.startswith(text)
+                        ]
                     elif len(tokens) == 3 and tokens[1] == "scenario":
                         candidates = [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "add":
+                        candidates = [c for c in ["scrap", "module", "drone", "drones"] if c.startswith(text)]
+                    elif len(tokens) == 4 and tokens[1] == "add" and tokens[2] == "module":
+                        candidates = [m for m in modules_catalog if m.startswith(text)]
+                    elif len(tokens) == 4 and tokens[1] == "add" and tokens[2] in {"scrap", "drone", "drones"}:
+                        candidates = [c for c in ["1", "5", "10", "50", "100"] if c.startswith(text)]
+                    elif len(tokens) == 5 and tokens[1] == "add" and tokens[2] == "module":
+                        candidates = [c for c in ["1", "2", "5", "10"] if c.startswith(text)]
                     elif len(tokens) == 3 and tokens[1] == "galaxy":
                         candidates = [c for c in ["map"] if c.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "galaxy" and tokens[2] == "map":
@@ -5919,7 +6196,7 @@ def main() -> None:
                     if len(tokens) == 2:
                         candidates = [c for c in ["inspect"] if c.startswith(text)]
                     elif len(tokens) == 3 and tokens[1] == "inspect":
-                        candidates = [m for m in modules if m.startswith(text)]
+                        candidates = [m for m in modules_catalog if m.startswith(text)]
                 elif cmd == "inventory":
                     if len(tokens) == 2:
                         candidates = [c for c in ["audit"] if c.startswith(text)]
@@ -6026,10 +6303,10 @@ def main() -> None:
                 elif cmd == "drone":
                     if len(tokens) == 2:
                         candidates = [
-                            c for c in ["status", "deploy", "deploy!", "move", "survey", "reboot", "recall", "autorecall", "repair", "install", "salvage"]
+                            c for c in ["status", "deploy", "deploy!", "move", "survey", "reboot", "recall", "autorecall", "repair", "install", "uninstall", "salvage"]
                             if c.startswith(text)
                         ]
-                    elif len(tokens) == 3 and tokens[1] in {"status", "deploy", "deploy!", "reboot", "recall", "autorecall", "repair", "move", "install", "survey"}:
+                    elif len(tokens) == 3 and tokens[1] in {"status", "deploy", "deploy!", "reboot", "recall", "autorecall", "repair", "move", "install", "uninstall", "survey"}:
                         candidates = [d for d in drones if d.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
                         candidates = [t for t in drone_deploy_targets if t.startswith(text)]
@@ -6041,6 +6318,16 @@ def main() -> None:
                         candidates = [c for c in ["on", "off", "10"] if c.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "install":
                         candidates = [m for m in modules if m.startswith(text)]
+                    elif len(tokens) == 4 and tokens[1] == "uninstall":
+                        target_id = tokens[2]
+                        target_drone = locked_state.ship.drones.get(target_id)
+                        ship_installed = sorted(set(locked_state.ship.installed_modules or []))
+                        if target_drone:
+                            installed = sorted(set(target_drone.installed_modules or []))
+                            all_candidates = list(dict.fromkeys(ship_installed + installed))
+                            candidates = [m for m in all_candidates if m.startswith(text)]
+                        else:
+                            candidates = [m for m in ship_installed if m.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "repair":
                         candidates = [x for x in sorted(set(systems) | set(drones)) if x.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "survey":
@@ -6286,6 +6573,27 @@ def main() -> None:
                 locked_state.meta.rng_counter = 0
                 loop._rng = random.Random(seed)
                 print(f"Seed set to {seed}")
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_ADD_SCRAP":
+            with loop.with_lock() as locked_state:
+                if not locked_state.os.debug_enabled:
+                    print("debug add scrap: available only in DEBUG mode. Use: debug on")
+                    continue
+                debug_add_scrap(locked_state, int(parsed[1]))
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_ADD_MODULE":
+            with loop.with_lock() as locked_state:
+                if not locked_state.os.debug_enabled:
+                    print("debug add module: available only in DEBUG mode. Use: debug on")
+                    continue
+                debug_add_module(locked_state, str(parsed[1]), int(parsed[2]))
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_ADD_DRONE":
+            with loop.with_lock() as locked_state:
+                if not locked_state.os.debug_enabled:
+                    print("debug add drone: available only in DEBUG mode. Use: debug on")
+                    continue
+                debug_add_drones(locked_state, int(parsed[1]))
             continue
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SCENARIO":
             scenario = parsed[1]

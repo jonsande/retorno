@@ -1,5 +1,6 @@
 {
   "bus_stabilizer": {
+    "scope": "ship",
     "name": "Bus Stabilizer",
     "desc_en": "Stabilizes power bus phase alignment.",
     "desc_es": "Estabiliza la alineación de fase del bus de energía.",
@@ -8,6 +9,7 @@
     "effects": { "power_quality_offset": 0.15 }
   },
   "aux_battery_cell": {
+    "scope": "ship",
     "name": "Aux Battery Cell",
     "desc_en": "Adds auxiliary battery capacity.",
     "desc_es": "Añade capacidad auxiliar de baterías.",
@@ -16,6 +18,7 @@
     "effects": { "e_batt_bonus_kwh": 2.0 }
   },
   "micro_reactor_patch": {
+    "scope": "ship",
     "name": "Micro Reactor Patch",
     "desc_en": "Boosts generation output slightly.",
     "desc_es": "Aumenta ligeramente la generación.",
@@ -24,6 +27,7 @@
     "effects": { "p_gen_bonus_kw": 0.5 }
   },
   "selftest_rig": {
+    "scope": "ship",
     "name": "Self-Test Rig",
     "desc_en": "Enables internal self-test repair cycles without a drone.",
     "desc_es": "Habilita ciclos internos de auto-reparación sin dron.",
@@ -32,11 +36,111 @@
     "effects": { "unlock_commands": ["selftest_repair"] }
   },
   "transit_sensor_pack": {
+    "scope": "ship",
     "name": "Transit Sensor Pack",
     "desc_en": "Allows scan and contacts while in transit.",
     "desc_es": "Permite scan y contacts durante el tránsito.",
     "scrap_cost": 18,
     "pool": "rare",
     "effects": { "unlock_commands": ["scan_in_transit"] }
+  },
+  "field_service_rig": {
+    "scope": "drone",
+    "slot_cost": 1,
+    "name": "Field Service Rig",
+    "desc_en": "Repair-biased service rig for sustained maintenance operations.",
+    "desc_es": "Equipo de servicio orientado a reparación para mantenimiento sostenido.",
+    "scrap_cost": 22,
+    "pool": "tech",
+    "drone_effects": {
+      "repair_time_mult": 0.75,
+      "repair_fail_p_mult": 0.65,
+      "repair_scrap_cost_mult": 0.75,
+      "move_time_mult": 1.15
+    },
+    "drawbacks_en": [
+      "Drone movement takes longer."
+    ],
+    "drawbacks_es": [
+      "El desplazamiento del dron tarda más."
+    ]
+  },
+  "utility_cargo_frame": {
+    "scope": "drone",
+    "slot_cost": 1,
+    "name": "Utility Cargo Frame",
+    "desc_en": "Utility frame extension that increases salvage carrying capacity.",
+    "desc_es": "Extensión de bastidor utilitario que aumenta la capacidad de carga de salvage.",
+    "scrap_cost": 20,
+    "pool": "common",
+    "drone_effects": {
+      "cargo_capacity_add": 6.0,
+      "move_time_mult": 1.20
+    },
+    "drawbacks_en": [
+      "Drone movement takes longer."
+    ],
+    "drawbacks_es": [
+      "El desplazamiento del dron tarda más."
+    ]
+  },
+  "rapid_maneuver_module": {
+    "scope": "drone",
+    "slot_cost": 1,
+    "name": "Rapid Maneuver Module",
+    "desc_en": "High-agility control package for fast repositioning and rapid survey passes.",
+    "desc_es": "Paquete de control de alta agilidad para reposicionamiento y survey rápidos.",
+    "scrap_cost": 24,
+    "pool": "rare",
+    "drone_effects": {
+      "move_time_mult": 0.75,
+      "deploy_time_mult": 0.78,
+      "survey_time_mult": 0.82,
+      "integrity_max_add": -0.20
+    },
+    "drawbacks_en": [
+      "Reduced structural integrity ceiling."
+    ],
+    "drawbacks_es": [
+      "Techo de integridad estructural reducido."
+    ]
+  },
+  "high_density_cell": {
+    "scope": "drone",
+    "slot_cost": 1,
+    "name": "High-Density Cell",
+    "desc_en": "Dense battery package that extends operational endurance.",
+    "desc_es": "Paquete de batería densa que amplía la autonomía operativa.",
+    "scrap_cost": 23,
+    "pool": "tech",
+    "drone_effects": {
+      "battery_max_add": 0.35,
+      "move_time_mult": 1.08
+    },
+    "drawbacks_en": [
+      "Slightly slower movement."
+    ],
+    "drawbacks_es": [
+      "Desplazamiento ligeramente más lento."
+    ]
+  },
+  "reinforced_frame": {
+    "scope": "drone",
+    "slot_cost": 1,
+    "name": "Reinforced Frame",
+    "desc_en": "Structural reinforcement package for harsh operational environments.",
+    "desc_es": "Paquete de refuerzo estructural para entornos operativos severos.",
+    "scrap_cost": 21,
+    "pool": "common",
+    "drone_effects": {
+      "integrity_max_add": 0.30,
+      "move_time_mult": 1.10
+    },
+    "drawbacks_en": [
+      "Slightly slower movement."
+    ],
+    "drawbacks_es": [
+      "Desplazamiento ligeramente más lento."
+    ]
   }
 }

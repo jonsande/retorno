@@ -1,0 +1,18 @@
+DOSSIER DE MÓDULO — reinforced_frame
+
+Rol
+- Paquete de refuerzo estructural para builds de dron orientadas a supervivencia.
+
+Efecto operativo
+- Scope: `drone` (coste de slots: 1).
+- Aumenta la integridad maxima efectiva (`integrity_max_add`).
+- Eleva tolerancia a dano y techo efectivo de reparacion.
+- Contrapartida: incrementa ligeramente el tiempo de movimiento (`move_time_mult`).
+
+Notas de integración
+- La reparacion pasiva de bahia y los jobs de reparacion activa apuntan a maximos efectivos y pueden recuperar hasta el nuevo techo reforzado.
+- Instalacion/desinstalacion por operacion de bahia (`drone_bay=NOMINAL`, distribucion online, dron objetivo acoplado).
+- Se combina habitualmente con modulos de reparacion o movilidad para compensar contrapartidas de integridad.
+
+Nota de campo
+- Recomendado en ciclos de salvage de alta radiacion o alto riesgo con desgaste sostenido.

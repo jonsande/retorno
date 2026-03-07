@@ -1,15 +1,17 @@
 module inspect <module_id>
 
 Propósito
-- Inspeccionar un módulo instalado y sus efectos operativos.
-
-Estado de la familia de comandos
-- `module` y `modules` comparten el mismo contexto de módulos instalados.
-- El flujo de instalación queda fuera de esta familia y se realiza con dron.
+- Inspeccionar una definicion de modulo del catalogo y su estado real en runtime.
 
 Comportamiento operativo
-- `module inspect <module_id>` muestra efectos del módulo y notas de descripción/lore.
-- Si el módulo no está instalado, la inspección reporta contexto no disponible.
+- `module inspect` funciona para modulos de nave y modulos de dron.
+- La salida incluye:
+  - scope (`ship` o `drone`),
+  - efectos,
+  - contrapartidas,
+  - coste de slots (modulos `drone`),
+  - presencia real (inventario / instalado en nave / instalado en drones).
+- La inspeccion de catalogo no requiere que el modulo este instalado.
 
 Comandos relacionados
-- `modules`, `drone install <drone_id> <module_id>`, `debug modules`
+- `modules`, `drone install <drone_id> <module_id>`, `drone uninstall <drone_id> <module_id>`, `man <module_id>`

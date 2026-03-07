@@ -128,9 +128,9 @@ Base note: except for emergency/minimal-terminal exceptions, all commands depend
 - debug -> core_os.
 - diag -> core_os (system diagnostics view).
 - dock -> core_os (no specific subsystem dependency; still affected by power/terminal state).
-- drone -> drones + drone_bay for deploy/install/support; normal deploy requires drone_bay online (deploy! allows emergency override).
+- drone -> drones + drone_bay for deploy/support/module operations; drone-module install/uninstall require drone_bay NOMINAL + energy_distribution online, while ship-module install/uninstall keep legacy drone-operated flow.
 - hibernate -> life_support nominal/upgraded + Q >= 0.40 + no brownout.
-- install -> legacy; redirects to drone install (depends on drone_bay support).
+- install -> legacy; redirects to drone install/drone uninstall command family.
 - intel -> core_os (no hard dedicated-system requirement in current implementation).
 - inventory -> core_os (manifest read).
 - inventory_update -> data_core >= limited + datad running (through cargo/inventory audit).

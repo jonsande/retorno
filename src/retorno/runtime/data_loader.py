@@ -19,7 +19,25 @@ def load_loot(node_id: str) -> dict:
 def load_modules() -> dict:
     path = _DATA_ROOT / "modules.json"
     with path.open("r", encoding="utf-8") as fh:
-        return json.load(fh)
+        raw = json.load(fh)
+    if not isinstance(raw, dict):
+        return {}
+    normalized: dict[str, dict] = {}
+    for module_id, info in raw.items():
+        if not isinstance(info, dict):
+            continue
+        item = dict(info)
+        scope = str(item.get("scope", "ship")).strip().lower() or "ship"
+        if scope not in {"ship", "drone"}:
+            scope = "ship"
+        item["scope"] = scope
+        if scope == "drone":
+            slot_cost = int(item.get("slot_cost", 1) or 1)
+            item["slot_cost"] = max(1, slot_cost)
+            if "drone_effects" not in item and isinstance(item.get("effects"), dict):
+                item["drone_effects"] = dict(item.get("effects", {}))
+        normalized[module_id] = item
+    return normalized
 
 
 def load_locations() -> list[dict]:

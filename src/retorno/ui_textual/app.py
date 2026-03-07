@@ -22,6 +22,7 @@ from retorno.config.balance import Balance
 from retorno.model.events import Severity
 from retorno.model.drones import DroneStatus
 from retorno.model.os import Locale, list_dir, normalize_path
+from retorno.runtime.data_loader import load_modules
 from retorno.runtime.loop import GameLoop
 from retorno.runtime.startup import load_startup_sequence_lines
 from retorno.ui_textual import presenter
@@ -593,6 +594,7 @@ class RetornoTextualApp(App):
         drone_local_world_targets = repl._drone_local_world_node_targets_for_completion(state)
         drone_move_targets = repl._drone_move_targets_for_completion(state)
         drone_deploy_targets = repl._drone_deploy_targets_for_completion(state)
+        modules_catalog = sorted(load_modules().keys())
         modules = list(set(state.ship.cargo_modules or state.ship.manifest_modules))
         services = []
         for sys in state.ship.systems.values():
@@ -712,9 +714,33 @@ class RetornoTextualApp(App):
                 return [c for c in ["all", "5", "10", "20", "50"] if c.startswith(text)]
         if cmd == "debug":
             if len(tokens) == 2:
-                return [c for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "modules", "galaxy"] if c.startswith(text)]
+                return [
+                    c
+                    for c in [
+                        "on",
+                        "off",
+                        "status",
+                        "scenario",
+                        "seed",
+                        "deadnodes",
+                        "arcs",
+                        "lore",
+                        "modules",
+                        "galaxy",
+                        "add",
+                    ]
+                    if c.startswith(text)
+                ]
             if len(tokens) == 3 and tokens[1] == "scenario":
                 return [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] == "add":
+                return [c for c in ["scrap", "module", "drone", "drones"] if c.startswith(text)]
+            if len(tokens) == 4 and tokens[1] == "add" and tokens[2] == "module":
+                return [m for m in modules_catalog if m.startswith(text)]
+            if len(tokens) == 4 and tokens[1] == "add" and tokens[2] in {"scrap", "drone", "drones"}:
+                return [c for c in ["1", "5", "10", "50", "100"] if c.startswith(text)]
+            if len(tokens) == 5 and tokens[1] == "add" and tokens[2] == "module":
+                return [c for c in ["1", "2", "5", "10"] if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "galaxy":
                 return [c for c in ["map"] if c.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "galaxy" and tokens[2] == "map":
@@ -723,7 +749,7 @@ class RetornoTextualApp(App):
             if len(tokens) == 2:
                 return [c for c in ["inspect"] if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "inspect":
-                return [m for m in modules if m.startswith(text)]
+                return [m for m in modules_catalog if m.startswith(text)]
         if cmd == "modules":
             return []
         if cmd == "inventory":
@@ -792,8 +818,8 @@ class RetornoTextualApp(App):
             return []
         if cmd == "drone":
             if len(tokens) == 2:
-                return [c for c in ["status", "deploy", "deploy!", "move", "survey", "reboot", "recall", "autorecall", "repair", "install", "salvage"] if c.startswith(text)]
-            if len(tokens) == 3 and tokens[1] in {"status", "deploy", "deploy!", "reboot", "recall", "autorecall", "repair", "move", "install", "survey"}:
+                return [c for c in ["status", "deploy", "deploy!", "move", "survey", "reboot", "recall", "autorecall", "repair", "install", "uninstall", "salvage"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] in {"status", "deploy", "deploy!", "reboot", "recall", "autorecall", "repair", "move", "install", "uninstall", "survey"}:
                 return [d for d in drones if d.startswith(text)]
             if len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
                 return [t for t in drone_deploy_targets if t.startswith(text)]
@@ -805,6 +831,15 @@ class RetornoTextualApp(App):
                 return [c for c in ["on", "off", "10"] if c.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "install":
                 return [m for m in modules if m.startswith(text)]
+            if len(tokens) == 4 and tokens[1] == "uninstall":
+                target_id = tokens[2]
+                target_drone = state.ship.drones.get(target_id)
+                ship_installed = sorted(set(state.ship.installed_modules or []))
+                if not target_drone:
+                    return [m for m in ship_installed if m.startswith(text)]
+                installed = sorted(set(target_drone.installed_modules or []))
+                all_candidates = list(dict.fromkeys(ship_installed + installed))
+                return [m for m in all_candidates if m.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "repair":
                 return [x for x in sorted(set(systems) | set(drones)) if x.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "survey":
@@ -1581,6 +1616,36 @@ class RetornoTextualApp(App):
                 state.meta.rng_counter = 0
                 self.loop._rng = random.Random(seed)
                 self._log_line(f"Seed set to {seed}")
+            return
+
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_ADD_SCRAP":
+            with self.loop.with_lock() as state:
+                if not state.os.debug_enabled:
+                    self._log_line("debug add scrap: available only in DEBUG mode. Use: debug on")
+                    return
+                self._log_lines(
+                    presenter.build_command_output(repl.debug_add_scrap, state, int(parsed[1]))
+                )
+            return
+
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_ADD_MODULE":
+            with self.loop.with_lock() as state:
+                if not state.os.debug_enabled:
+                    self._log_line("debug add module: available only in DEBUG mode. Use: debug on")
+                    return
+                self._log_lines(
+                    presenter.build_command_output(repl.debug_add_module, state, str(parsed[1]), int(parsed[2]))
+                )
+            return
+
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_ADD_DRONE":
+            with self.loop.with_lock() as state:
+                if not state.os.debug_enabled:
+                    self._log_line("debug add drone: available only in DEBUG mode. Use: debug on")
+                    return
+                self._log_lines(
+                    presenter.build_command_output(repl.debug_add_drones, state, int(parsed[1]))
+                )
             return
 
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SCENARIO":
