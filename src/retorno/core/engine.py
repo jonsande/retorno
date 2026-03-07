@@ -4573,7 +4573,15 @@ class Engine:
             from_node = nodes.get(state.ship.transit_from)
             to_node = nodes.get(state.ship.transit_to)
             if from_node and to_node:
-                return max(0.0, (float(from_node.radiation_rad_per_s) + float(to_node.radiation_rad_per_s)) * 0.5)
+                from_rad = max(0.0, float(from_node.radiation_rad_per_s))
+                to_rad = max(0.0, float(to_node.radiation_rad_per_s))
+                start_t = float(state.ship.transit_start_t)
+                end_t = float(state.ship.arrival_t)
+                if end_t > start_t:
+                    progress = self._clamp((state.clock.t - start_t) / (end_t - start_t))
+                else:
+                    progress = 1.0
+                return max(0.0, from_rad + (to_rad - from_rad) * progress)
             if from_node:
                 return max(0.0, float(from_node.radiation_rad_per_s))
             if to_node:

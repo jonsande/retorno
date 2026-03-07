@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from retorno.bootstrap import create_initial_state_prologue
+from retorno.config.balance import Balance
 from retorno.core.engine import Engine
 from retorno.core.actions import Boot, DroneDeploy, Repair
+from retorno.model.jobs import JobStatus
 
 
 def assert_any_event(events, event_type):
@@ -58,8 +60,28 @@ def main() -> None:
         + ", ".join([e.message for e in ev])
     )
 
-    # Avanza tiempo para completar reparación
-    engine.tick(state, 30.0)
+    repair_job_ids = [
+        e.data.get("job_id")
+        for e in ev
+        if (e.data or {}).get("job_type") == "repair_system" and (e.data or {}).get("job_id")
+    ]
+    assert repair_job_ids, "Repair should return a job_id for repair_system"
+    repair_job_id = repair_job_ids[0]
+
+    # Avanza tiempo hasta completar reparación (sin hardcode de 30s).
+    waited_s = 0.0
+    timeout_s = max(120.0, float(Balance.REPAIR_TIME_S) * 3.0)
+    while waited_s < timeout_s:
+        job = state.jobs.jobs.get(repair_job_id)
+        if not job or job.status in {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}:
+            break
+        step = min(5.0, timeout_s - waited_s)
+        engine.tick(state, step)
+        waited_s += step
+
+    job = state.jobs.jobs.get(repair_job_id)
+    assert job is not None, "Repair job must still exist in job registry"
+    assert job.status == JobStatus.COMPLETED, f"Repair job did not complete successfully (status={job.status})"
     assert state.ship.systems["power_core"].health > 0.6, "Power core health should have increased after repair"
 
     # 6) Boot sensord ahora debe permitir encolar job (no bloquear)
