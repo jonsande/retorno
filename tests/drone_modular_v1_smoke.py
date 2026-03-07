@@ -6,7 +6,7 @@ import io
 from retorno.bootstrap import create_initial_state_sandbox
 from retorno.cli import repl
 from retorno.config.balance import Balance
-from retorno.core.actions import DroneDeploy, DroneUninstall, Install, SalvageDrone, SalvageScrap
+from retorno.core.actions import DroneDeploy, DroneRecall, DroneUninstall, Install, SalvageDrone, SalvageScrap
 from retorno.core.engine import Engine
 from retorno.model.drones import DroneLocation, DroneStatus, compute_drone_effective_profile
 from retorno.model.events import EventType
@@ -60,6 +60,20 @@ def _salvage_eta_with_modules(installed_modules: list[str]) -> float:
     node = state.world.space.nodes["ECHO_7"]
     node.salvage_scrap_available = 100
     events = engine.apply_action(state, SalvageScrap(drone_id="D1", node_id="ECHO_7", amount=10))
+    return _queued_eta(events)
+
+
+def _recall_eta_with_modules(installed_modules: list[str]) -> float:
+    engine = Engine()
+    state = create_initial_state_sandbox()
+    _set_bay_ready(state)
+    drone = state.ship.drones["D1"]
+    drone.status = DroneStatus.DEPLOYED
+    drone.location = DroneLocation(kind="ship_sector", id="PWR-A2")
+    drone.battery = 1.0
+    drone.integrity = 1.0
+    drone.installed_modules = list(installed_modules)
+    events = engine.apply_action(state, DroneRecall(drone_id="D1"))
     return _queued_eta(events)
 
 
@@ -184,6 +198,11 @@ def main() -> None:
     eta_base = _salvage_eta_with_modules([])
     eta_cargo = _salvage_eta_with_modules(["utility_cargo_frame"])
     assert eta_cargo < eta_base, (eta_base, eta_cargo)
+
+    # Recall ETA scales with mobility modules too.
+    eta_recall_base = _recall_eta_with_modules([])
+    eta_recall_fast = _recall_eta_with_modules(["rapid_maneuver_module"])
+    assert eta_recall_fast < eta_recall_base, (eta_recall_base, eta_recall_fast)
 
     # Bay charge/passive repair reach effective maxima.
     maint_state = create_initial_state_sandbox()

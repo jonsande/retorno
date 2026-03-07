@@ -2022,7 +2022,8 @@ class Engine:
                 self._record_event(state.events, support_warning)
                 pre_events.append(support_warning)
             bay_state = self._drone_bay_state(state)
-            eta = Balance.RECALL_TIME_S * self._drone_bay_eta_mult(state)
+            profile = self._drone_profile(state, drone)
+            eta = Balance.RECALL_TIME_S * self._drone_bay_eta_mult(state) * profile.move_time_mult_effective
             return pre_events + self._enqueue_job(
                 state,
                 JobType.RECALL_DRONE,
@@ -4451,7 +4452,8 @@ class Engine:
         if support_warning:
             pre_events.append(support_warning)
         bay_state = self._drone_bay_state(state)
-        eta = Balance.RECALL_TIME_S * self._drone_bay_eta_mult(state)
+        profile = self._drone_profile(state, drone)
+        eta = Balance.RECALL_TIME_S * self._drone_bay_eta_mult(state) * profile.move_time_mult_effective
         job_id = f"J{state.jobs.next_job_seq}"
         state.jobs.next_job_seq += 1
         job = Job(

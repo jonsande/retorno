@@ -93,8 +93,8 @@
     "scrap_cost": 24,
     "pool": "rare",
     "drone_effects": {
-      "move_time_mult": 0.75,
-      "deploy_time_mult": 0.78,
+      "move_time_mult": 0.65,
+      "deploy_time_mult": 0.68,
       "survey_time_mult": 0.82,
       "integrity_max_add": -0.20
     },
