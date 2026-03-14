@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "backend": {
+    "preferred_backends": ["pcm-mixer-pulse", "pcm-mixer-alsa", "pygame-mixer", "ffmpeg-pulse", "ffplay", "ffmpeg-alsa"]
+  },
+  "ambient": {
+    "cue": "ship_hum"
+  },
+  "startup": {
+    "cue": "intro_booting"
+  },
+  "cues": {
+    "ship_hum": {
+      "path": "sound/hum_loop_short.wav",
+      "mode": "loop",
+      "channel": "ambient",
+      "volume": 0.75,
+      "fade_in_s": 0.01,
+      "fade_out_s": 0.0
+    },
+    "alert_ping": {
+      "path": "sound/alert.mp3",
+      "mode": "once",
+      "channel": "sfx",
+      "volume": 1.0,
+      "fade_in_s": 0.003,
+      "fade_out_s": 0.003
+    },
+    "alerts_running": {
+      "path": "sound/alerts_running.mp3",
+      "mode": "once",
+      "channel": "sfx",
+      "volume": 1.0,
+      "fade_in_s": 0.003,
+      "fade_out_s": 0.003
+    },
+    "job_done": {
+      "path": "sound/job_done.mp3",
+      "mode": "once",
+      "channel": "sfx",
+      "volume": 1.0,
+      "fade_in_s": 0.003,
+      "fade_out_s": 0.003
+    },
+    "intro_booting": {
+      "path": "sound/intro_booting.ogg",
+      "mode": "once",
+      "channel": "startup",
+      "volume": 0.0,
+      "fade_in_s": 0.005,
+      "fade_out_s": 0.005
+    }
+  },
+  "events": {}
+}

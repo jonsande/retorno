@@ -1,20 +1,10 @@
-> drone deploy D1 ECHO_7
-[CMD] [WARN] boot_blocked :: Action blocked: drone bay offline; use 'drone deploy!' for emergency launch
-> power on power_core
-> drone deploy D1 ECHO_7
-[CMD] [WARN] boot_blocked :: Action blocked: drone bay offline; use 'drone deploy!' for emergency launch
-> power on drone_bay
-[CMD] [WARN] system_state_changed :: drone_bay: offline -> nominal (cause=manual_restore, health=0.90)
-[CMD] [INFO] system_power_restored :: Power restored: drone_bay (offline -> nominal)
-> scan
-=== SCAN ===
-- ECHO-7 Relay Station (station) id=ECHO_7
-> scan
-=== SCAN ===
-- CURL-12 Waystation (station) id=CURL_12
-- ECHO-7 Relay Station (station) id=ECHO_7
-> scan
-=== SCAN ===
-- ECHO-7 Relay Station (station) id=ECHO_7
-- Wreck B0C2BC (ship) id=WRECK_B0C2BC
-> log copy 20
+Tip: use 'config set lang' to change ship_os languaje
+Tip: use 'help' to see available commands.
+Tip: use TAB key for list and autocomplete available commands, id's, paths, etc.
+> config show
+language: en
+audio: on
+ambientsound: on
+audio_backend: pygame-mixer
+auth: GUEST
+> log copy 10

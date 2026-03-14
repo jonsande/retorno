@@ -1,15 +1,20 @@
 config show
 config set lang <en|es>
+config set audio <on|off>
+config set ambientsound <on|off>
 
 Purpose
 - Inspect and modify operator interface configuration.
 
 Operational behavior
-- `config show` prints current runtime configuration.
+- `config show` prints current runtime configuration, including active audio backend when available.
 - `config set lang <en|es>` switches command/UI localization.
+- `config set audio <on|off>` enables or disables all game audio.
+- `config set ambientsound <on|off>` enables or disables the ambient loop without muting the whole audio system.
 
 Usage notes
 - Language switch affects manuals, messages, and localized file preference.
+- Audio preferences are persistent and affect both CLI and Textual sessions.
 
 Related commands
 - `status`, `man <topic>`, `cat <path>`

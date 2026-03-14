@@ -3,11 +3,11 @@ Ref: E7/OPS/CACHE/0007
 Acceso: ENG (solo lectura)
 Integridad: degradada (reconstrucción parcial)
 
-Este archivo es una captura del relay con rutas en caché y notas operativas. Se generó automáticamente a partir de buffers de mantenimiento y posteriormente se reconstruyó desde bloques de almacenamiento incompletos. Las marcas temporales no son fiables; el orden es estimado.
+Este informe es una captura de las notas operativas extraídas de las rutas en caché del relé ECHO-7. Se generó automáticamente a partir de buffers de mantenimiento y posteriormente se reconstruyó desde bloques de almacenamiento incompletos. Las marcas temporales no son fiables. Los registros más recientes datan del 12519dd.
 
-Durante el último periodo registrado, el relay dedicó la mayor parte del ciclo de servicio a handshakes de baja banda y anuncios cortos de enrutado. Las portadoras de largo alcance estuvieron a menudo indisponibles, ya sea por silencio aguas arriba o por fallos locales de amplificación. Por ello, la caché de rutas se inclina hacia waystations cercanas y transbordos repetidos de corredor.
+Durante el último periodo registrado, el relé dedicó la mayor parte del ciclo de servicio a negociación de protocolos de baja banda y anuncios cortos de enrutado. Las operadoras de largo alcance estuvieron indispuestas a menudo, ya sea por silencio aguas arriba o por fallos locales de amplificación. Por ello, la caché de rutas se inclina hacia waystations cercanas y transbordos repetidos de corredor.
 
-El token HARBOR-12 aparece con una frecuencia inusual en las tablas en caché. Esto no significa que Harbor-12 fuera “importante” en abstracto; significa que muchas rutas se estaban haciendo pasar por allí. En la práctica: naves que aún tenían hardware de navegación funcional recibían instrucciones de pasar por Harbor-12 en vez de intentar tramos largos directos o depender de relays que ya fallaban de manera intermitente.
+El token HARBOR-12 aparece con una frecuencia inusual en las tablas en caché. Muchas rutas se estaban haciendo pasar por allí. En la práctica: naves que aún tenían hardware de navegación funcional recibían instrucciones de pasar por Harbor-12 en vez de intentar tramos largos directos o depender de relés que ya fallaban de manera intermitente.
 
 Se encontró una breve anotación de operador incrustada en el payload de un paquete de enrutado. El relay la conservó porque coincidía con un perfil de checksum; esto no implica validación. El texto se reproduce literal:
 

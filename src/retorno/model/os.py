@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import MISSING, dataclass, field, fields
 from enum import Enum
 
 
@@ -33,6 +33,12 @@ class FSNode:
 
 
 @dataclass(slots=True)
+class AudioSettings:
+    enabled: bool = True
+    ambient_enabled: bool = True
+
+
+@dataclass(slots=True)
 class OSState:
     auth_levels: set[str] = field(default_factory=lambda: {"GUEST"})
     locale: Locale = Locale.EN
@@ -41,8 +47,35 @@ class OSState:
     mail_received_t: dict[str, float] = field(default_factory=dict)
     mail_received_seq: int = 0
     mail_received_seq_map: dict[str, int] = field(default_factory=dict)
+    audio: AudioSettings = field(default_factory=AudioSettings)
     terminal_lock: bool = False
     terminal_reason: str | None = None
+
+    def __setstate__(self, state) -> None:
+        """Backward-compatible unpickle for slot additions."""
+        slot_state = state
+        if isinstance(state, tuple):
+            if len(state) == 2 and isinstance(state[1], dict):
+                slot_state = state[1]
+            elif len(state) == 2 and isinstance(state[0], dict):
+                slot_state = state[0]
+        if not isinstance(slot_state, dict):
+            raise TypeError(f"Unsupported OSState pickle payload: {type(state)!r}")
+
+        data = dict(slot_state)
+        if "audio" not in data:
+            data["audio"] = AudioSettings()
+
+        for f in fields(self):
+            if f.name in data:
+                value = data[f.name]
+            elif f.default is not MISSING:
+                value = f.default
+            elif f.default_factory is not MISSING:
+                value = f.default_factory()
+            else:
+                continue
+            object.__setattr__(self, f.name, value)
 
 
 def normalize_path(path: str) -> str:

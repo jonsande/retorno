@@ -33,6 +33,7 @@ from retorno.core.actions import (
     Travel,
     TravelAbort,
 )
+from retorno.runtime.operator_config import config_keys, is_valid_config_value
 
 
 @dataclass(slots=True)
@@ -71,7 +72,9 @@ _PARSE_ERROR_MESSAGES = {
         "usage_salvage_data": "Usage: drone salvage data <drone_id> [node_id]",
         "usage_inventory": "Usage: inventory|cargo | inventory|cargo audit",
         "config_set_lang": "config set lang <en|es>",
-        "usage_config": "Usage: config set lang <en|es> | config show",
+        "config_set_audio": "config set audio <on|off>",
+        "config_set_ambientsound": "config set ambientsound <on|off>",
+        "usage_config": "Usage: config set lang <en|es> | config set audio <on|off> | config set ambientsound <on|off> | config show",
         "usage_mail": "Usage: mail inbox | mail read <id|latest>",
         "usage_mail_read": "Usage: mail read <id|latest>",
         "usage_intel": "Usage: intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>",
@@ -151,7 +154,9 @@ _PARSE_ERROR_MESSAGES = {
         "usage_salvage_data": "Uso: drone salvage data <drone_id> [node_id]",
         "usage_inventory": "Uso: inventory|cargo | inventory|cargo audit",
         "config_set_lang": "config set lang <en|es>",
-        "usage_config": "Uso: config set lang <en|es> | config show",
+        "config_set_audio": "config set audio <on|off>",
+        "config_set_ambientsound": "config set ambientsound <on|off>",
+        "usage_config": "Uso: config set lang <en|es> | config set audio <on|off> | config set ambientsound <on|off> | config show",
         "usage_mail": "Uso: mail inbox | mail read <id|latest>",
         "usage_mail_read": "Uso: mail read <id|latest>",
         "usage_intel": "Uso: intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>",
@@ -485,11 +490,20 @@ def parse_command(line: str):
     if cmd == "config":
         if len(args) == 0 or (len(args) == 1 and args[0] == "show"):
             return "CONFIG_SHOW"
-        if len(args) == 3 and args[0] == "set" and args[1] == "lang":
-            lang = args[2].lower()
-            if lang not in {"en", "es"}:
-                raise ParseError("config_set_lang")
-            return ("CONFIG_SET_LANG", lang)
+        if len(args) == 3 and args[0] == "set":
+            key = args[1].lower()
+            value = args[2].lower()
+            if key not in config_keys():
+                raise ParseError("usage_config")
+            if not is_valid_config_value(key, value):
+                if key == "lang":
+                    raise ParseError("config_set_lang")
+                if key == "audio":
+                    raise ParseError("config_set_audio")
+                if key == "ambientsound":
+                    raise ParseError("config_set_ambientsound")
+                raise ParseError("usage_config")
+            return ("CONFIG_SET", key, value)
         raise ParseError("usage_config")
 
     if cmd == "auth":

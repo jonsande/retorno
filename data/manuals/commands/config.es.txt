@@ -1,15 +1,20 @@
 config show
 config set lang <en|es>
+config set audio <on|off>
+config set ambientsound <on|off>
 
 Propósito
 - Inspeccionar y modificar configuración de la interfaz de operador.
 
 Comportamiento operativo
-- `config show` imprime la configuración activa.
+- `config show` imprime la configuración activa, incluyendo el backend de audio activo cuando esté disponible.
 - `config set lang <en|es>` cambia localización de comandos/interfaz.
+- `config set audio <on|off>` activa o desactiva todo el audio del juego.
+- `config set ambientsound <on|off>` activa o desactiva el loop ambiental sin silenciar el resto del sistema.
 
 Notas de uso
 - El cambio de idioma afecta manuales, mensajes y preferencia de archivos localizados.
+- Las preferencias de audio persisten y afectan tanto a CLI como a la interfaz Textual.
 
 Comandos relacionados
 - `status`, `man <topic>`, `cat <path>`

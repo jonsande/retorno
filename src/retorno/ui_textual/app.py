@@ -13,6 +13,8 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Static, Input, RichLog
 
+from retorno.audio.config import AudioConfigError, load_audio_config
+from retorno.audio.manager import AudioManager
 from retorno.bootstrap import create_initial_state_prologue, create_initial_state_sandbox
 from retorno.cli.parser import ParseError, parse_command, format_parse_error
 from retorno.cli import repl
@@ -24,6 +26,13 @@ from retorno.model.drones import DroneStatus
 from retorno.model.os import Locale, list_dir, normalize_path
 from retorno.runtime.data_loader import load_modules
 from retorno.runtime.loop import GameLoop
+from retorno.runtime.operator_config import (
+    apply_config_value,
+    audio_flags,
+    config_keys,
+    config_show_lines,
+    config_value_choices,
+)
 from retorno.runtime.startup import load_startup_sequence_lines
 from retorno.ui_textual import presenter
 from retorno.io.save_load import (
@@ -234,6 +243,14 @@ class RetornoTextualApp(App):
         self._log_buffer: list[str] = []
         self._startup_sequence_running = False
         self._startup_sequence_skip = False
+        self._audio_notice = ""
+        try:
+            self._audio_manager = AudioManager(load_audio_config())
+        except AudioConfigError as exc:
+            self._audio_manager = None
+            self._audio_notice = f"[WARN] Audio disabled: {exc}"
+        else:
+            self._audio_notice = self._audio_manager.notice or ""
         self._panel_visible = {
             "status": True,
             "alerts": True,
@@ -257,6 +274,15 @@ class RetornoTextualApp(App):
         self.loop.step(1.0)
         if self._startup_notice:
             self._log_line(self._startup_notice)
+        if self._audio_notice:
+            self._log_line(self._audio_notice)
+        if self._audio_manager is not None:
+            audio_enabled, ambient_enabled = audio_flags(self.loop.state.os)
+            self._audio_manager.start(audio_enabled, ambient_enabled)
+            self._audio_manager.play_startup(audio_enabled)
+            notice = self._audio_manager.consume_notice()
+            if notice:
+                self._log_line(notice)
         if not self.loop.state.os.debug_enabled:
             self.loop.set_auto_tick(True)
             self.loop.start()
@@ -383,6 +409,8 @@ class RetornoTextualApp(App):
     def _persist_game_on_exit(self) -> None:
         if self._exit_persist_done:
             return
+        if self._audio_manager is not None:
+            self._audio_manager.shutdown()
         self.loop.stop()
         try:
             with self.loop.with_lock() as state:
@@ -866,9 +894,9 @@ class RetornoTextualApp(App):
             if len(tokens) == 2:
                 return [c for c in ["set", "show"] if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "set":
-                return [c for c in ["lang"] if c.startswith(text)]
-            if len(tokens) == 4 and tokens[1] == "set" and tokens[2] == "lang":
-                return [c for c in ["en", "es"] if c.startswith(text)]
+                return [c for c in config_keys() if c.startswith(text)]
+            if len(tokens) == 4 and tokens[1] == "set":
+                return [c for c in config_value_choices(tokens[2]) if c.startswith(text)]
         if cmd == "auth":
             if len(tokens) == 2:
                 return [c for c in ["status", "recover"] if c.startswith(text)]
@@ -1185,9 +1213,16 @@ class RetornoTextualApp(App):
         auto_events = self.loop.drain_events()
         if not auto_events:
             return
+        audio_enabled = False
         with self.loop.with_lock() as state:
             lines = presenter.format_event_lines(state, auto_events)
+            audio_enabled = state.os.audio.enabled
         self._log_lines(lines)
+        if self._audio_manager is not None:
+            self._audio_manager.handle_event_batch(audio_enabled, auto_events)
+            notice = self._audio_manager.consume_notice()
+            if notice:
+                self._log_line(notice)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         text = event.value.strip()
@@ -1467,14 +1502,32 @@ class RetornoTextualApp(App):
                 self._log_lines(presenter.build_command_output(repl.render_power_status, state))
             return
         if parsed == "CONFIG_SHOW":
+            backend_name = self._audio_manager.backend.name if self._audio_manager is not None else None
+            runtime_status = None
+            if self._audio_manager is None:
+                runtime_status = "disabled"
+            elif self._audio_manager.notice:
+                runtime_status = "degraded"
             with self.loop.with_lock() as state:
-                self._log_line(f"language: {state.os.locale.value}")
+                self._log_lines(
+                    config_show_lines(
+                        state.os,
+                        audio_backend=backend_name,
+                        audio_runtime_status=runtime_status,
+                    )
+                )
             return
-        if isinstance(parsed, tuple) and parsed[0] == "CONFIG_SET_LANG":
-            lang = parsed[1]
+        if isinstance(parsed, tuple) and parsed[0] == "CONFIG_SET":
+            key, value = parsed[1], parsed[2]
             with self.loop.with_lock() as state:
-                state.os.locale = Locale(lang)
-                self._log_line(f"Language set to {state.os.locale.value}")
+                message = apply_config_value(state.os, key, value)
+                audio_enabled, ambient_enabled = audio_flags(state.os)
+                self._log_line(message)
+            if self._audio_manager is not None and key in {"audio", "ambientsound"}:
+                self._audio_manager.apply_preferences(audio_enabled, ambient_enabled)
+                notice = self._audio_manager.consume_notice()
+                if notice:
+                    self._log_line(notice)
             return
         if isinstance(parsed, tuple) and parsed[0] == "MAIL_LIST":
             with self.loop.with_lock() as state:
@@ -1680,9 +1733,16 @@ class RetornoTextualApp(App):
                     return
             step_events = self.loop.step_many(seconds, dt=1.0)
             step_pairs = [("step", e) for e in step_events]
+            audio_enabled = False
             with self.loop.with_lock() as state:
                 lines = presenter.format_event_lines(state, step_pairs)
+                audio_enabled = state.os.audio.enabled
             self._log_lines(lines)
+            if self._audio_manager is not None:
+                self._audio_manager.handle_event_batch(audio_enabled, step_events)
+                notice = self._audio_manager.consume_notice()
+                if notice:
+                    self._log_line(notice)
             return
 
         if isinstance(parsed, Hibernate):
@@ -1709,8 +1769,10 @@ class RetornoTextualApp(App):
         # Engine actions
         ev = self.loop.apply_action(parsed)
         if ev:
+            audio_enabled = False
             with self.loop.with_lock() as state:
                 lines = presenter.format_event_lines(state, [("cmd", e) for e in ev])
+                audio_enabled = state.os.audio.enabled
                 if parsed.__class__.__name__ == "Travel":
                     for e in ev:
                         if e.type == "travel_started" or e.type == repl.EventType.TRAVEL_STARTED:
@@ -1722,6 +1784,11 @@ class RetornoTextualApp(App):
                             lines.append(msg.get(state.os.locale.value, msg["en"]))
                             break
             self._log_lines(lines)
+            if self._audio_manager is not None:
+                self._audio_manager.handle_event_batch(audio_enabled, ev)
+                notice = self._audio_manager.consume_notice()
+                if notice:
+                    self._log_line(notice)
         else:
             # No immediate events; still ok.
             pass

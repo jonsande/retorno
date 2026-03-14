@@ -15,6 +15,8 @@ import termios
 import time
 import tty
 from pathlib import Path
+from retorno.audio.config import AudioConfigError, load_audio_config
+from retorno.audio.manager import AudioManager
 from retorno.core.engine import Engine
 from retorno.core.lore import (
     build_lore_context,
@@ -26,6 +28,13 @@ from retorno.core.lore import (
 from retorno.core.deadnodes import evaluate_dead_nodes
 from retorno.core.actions import Action, AuthRecover, Hibernate, RouteSolve, Status
 from retorno.runtime.loop import GameLoop
+from retorno.runtime.operator_config import (
+    apply_config_value,
+    audio_flags,
+    config_keys,
+    config_show_lines,
+    config_value_choices,
+)
 from retorno.core.power_policy import is_parsed_command_allowed_in_core_os_critical
 from retorno.model.events import Event, EventType, Severity, SourceRef
 from retorno.model.jobs import JobStatus, JobType
@@ -209,6 +218,8 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ("intel import <path>", "import intel from file", "importa intel desde archivo"),
                 ("intel export <path>", "export intel to file", "exporta intel a archivo"),
                 ("config set lang <en|es>", "set interface language", "cambia idioma de interfaz"),
+                ("config set audio <on|off>", "toggle all game audio", "activa o desactiva todo el audio"),
+                ("config set ambientsound <on|off>", "toggle ambient loop", "activa o desactiva el loop ambiental"),
                 ("config show", "show current config", "muestra configuración actual"),
             ],
         ),
@@ -5984,12 +5995,28 @@ def main() -> None:
                 else:
                     startup_message = f"[INFO] Loaded saved game: {loaded.path}"
 
+    audio_warning = ""
+    try:
+        audio_manager = AudioManager(load_audio_config())
+    except AudioConfigError as exc:
+        audio_manager = None
+        audio_warning = f"[WARN] Audio disabled: {exc}"
+    else:
+        audio_warning = audio_manager.notice or ""
+
     loop = GameLoop(engine, state, tick_s=1.0)
     loop.step(1.0)
     if startup_message:
         print(startup_message)
     if play_startup_sequence:
         _maybe_run_startup_sequence(state.os.locale.value)
+    if audio_manager is not None:
+        audio_enabled, ambient_enabled = audio_flags(state.os)
+        audio_manager.start(audio_enabled, ambient_enabled)
+        audio_manager.play_startup(audio_enabled)
+        audio_warning = audio_manager.consume_notice() or audio_warning
+    if audio_warning:
+        print(audio_warning)
     if not state.os.debug_enabled:
         loop.set_auto_tick(True)
         loop.start()
@@ -6354,9 +6381,9 @@ def main() -> None:
                     if len(tokens) == 2:
                         candidates = [c for c in ["set", "show"] if c.startswith(text)]
                     elif len(tokens) == 3 and tokens[1] == "set":
-                        candidates = [c for c in ["lang"] if c.startswith(text)]
-                    elif len(tokens) == 4 and tokens[1] == "set" and tokens[2] == "lang":
-                        candidates = [c for c in ["en", "es"] if c.startswith(text)]
+                        candidates = [c for c in config_keys() if c.startswith(text)]
+                    elif len(tokens) == 4 and tokens[1] == "set":
+                        candidates = [c for c in config_value_choices(tokens[2]) if c.startswith(text)]
                 elif cmd == "mail":
                     if len(tokens) == 2:
                         candidates = [c for c in ["inbox", "read"] if c.startswith(text)]
@@ -6398,9 +6425,16 @@ def main() -> None:
     def _drain_auto_events() -> None:
         auto_ev = loop.drain_events()
         if auto_ev:
+            audio_enabled = False
             with loop.with_lock() as locked_state:
                 _apply_salvage_loot(loop, locked_state, auto_ev)
                 render_events(locked_state, auto_ev)
+                audio_enabled = locked_state.os.audio.enabled
+            if audio_manager is not None:
+                audio_manager.handle_event_batch(audio_enabled, auto_ev)
+                notice = audio_manager.consume_notice()
+                if notice:
+                    print(notice)
 
     # print("RETORNO (prologue)")
     # print("\nTip: cat /mail/inbox/0000.notice.txt")
@@ -6415,6 +6449,8 @@ def main() -> None:
         if did_persist_on_exit:
             return
         loop.stop()
+        if audio_manager is not None:
+            audio_manager.shutdown()
         try:
             with loop.with_lock() as locked_state:
                 saved_path = save_single_slot(locked_state, args.save_path, user=profile_user)
@@ -6474,20 +6510,35 @@ def main() -> None:
             print("\033[2J\033[H", end="")
             continue
         if parsed == "CONFIG_SHOW":
+            backend_name = audio_manager.backend.name if audio_manager is not None else None
+            runtime_status = None
+            if audio_manager is None:
+                runtime_status = "disabled"
+            elif audio_manager.notice:
+                runtime_status = "degraded"
             with loop.with_lock() as locked_state:
-                print(f"language: {locked_state.os.locale.value}")
-                levels = ", ".join(sorted(locked_state.os.auth_levels))
-                print(f"auth: {levels or '(none)'}")
+                for line in config_show_lines(
+                    locked_state.os,
+                    audio_backend=backend_name,
+                    audio_runtime_status=runtime_status,
+                ):
+                    print(line)
             continue
         if parsed == "AUTH_STATUS":
             with loop.with_lock() as locked_state:
                 render_auth_status(locked_state)
             continue
-        if isinstance(parsed, tuple) and parsed[0] == "CONFIG_SET_LANG":
-            lang = parsed[1]
+        if isinstance(parsed, tuple) and parsed[0] == "CONFIG_SET":
+            key, value = parsed[1], parsed[2]
             with loop.with_lock() as locked_state:
-                locked_state.os.locale = Locale(lang)
-                print(f"Language set to {locked_state.os.locale.value}")
+                message = apply_config_value(locked_state.os, key, value)
+                audio_enabled, ambient_enabled = audio_flags(locked_state.os)
+                print(message)
+            if audio_manager is not None and key in {"audio", "ambientsound"}:
+                audio_manager.apply_preferences(audio_enabled, ambient_enabled)
+                notice = audio_manager.consume_notice()
+                if notice:
+                    print(notice)
             continue
         if isinstance(parsed, tuple) and parsed[0] == "MAIL_LIST":
             with loop.with_lock() as locked_state:
@@ -6740,9 +6791,16 @@ def main() -> None:
                 render_events(locked_state, ev)
             auto_ev = loop.drain_events()
             if auto_ev:
+                audio_enabled = False
                 with loop.with_lock() as locked_state:
                     _apply_salvage_loot(loop, locked_state, auto_ev)
                     render_events(locked_state, auto_ev)
+                    audio_enabled = locked_state.os.audio.enabled
+                if audio_manager is not None:
+                    audio_manager.handle_event_batch(audio_enabled, auto_ev)
+                    notice = audio_manager.consume_notice()
+                    if notice:
+                        print(notice)
             continue
         if parsed == "UPLINK":
             _drain_auto_events()
@@ -6807,16 +6865,30 @@ def main() -> None:
                     continue
             step_events = loop.step_many(seconds, dt=1.0)
             cmd_events = [("step", e) for e in step_events]
+            audio_enabled = False
             with loop.with_lock() as locked_state:
                 _apply_salvage_loot(loop, locked_state, cmd_events)
                 render_events(locked_state, cmd_events)
+                audio_enabled = locked_state.os.audio.enabled
                 if any(e.severity == Severity.CRITICAL for _, e in cmd_events):
                     render_alerts(locked_state)
+            if audio_manager is not None:
+                audio_manager.handle_event_batch(audio_enabled, step_events)
+                notice = audio_manager.consume_notice()
+                if notice:
+                    print(notice)
             auto_ev = loop.drain_events()
             if auto_ev:
+                audio_enabled = False
                 with loop.with_lock() as locked_state:
                     _apply_salvage_loot(loop, locked_state, auto_ev)
                     render_events(locked_state, auto_ev)
+                    audio_enabled = locked_state.os.audio.enabled
+                if audio_manager is not None:
+                    audio_manager.handle_event_batch(audio_enabled, auto_ev)
+                    notice = audio_manager.consume_notice()
+                    if notice:
+                        print(notice)
             continue
         if isinstance(parsed, Hibernate):
             _drain_auto_events()
@@ -6874,9 +6946,11 @@ def main() -> None:
                     continue
 
         ev = loop.apply_action(parsed)
+        audio_enabled = False
         with loop.with_lock() as locked_state:
             _apply_salvage_loot(loop, locked_state, ev)
             render_events(locked_state, ev)
+            audio_enabled = locked_state.os.audio.enabled
             if parsed.__class__.__name__ == "Travel":
                 for item in ev:
                     event = item[1] if isinstance(item, tuple) and len(item) == 2 else item
@@ -6889,11 +6963,23 @@ def main() -> None:
                         }
                         print(msg.get(locale, msg["en"]))
                         break
+        if audio_manager is not None:
+            audio_manager.handle_event_batch(audio_enabled, ev)
+            notice = audio_manager.consume_notice()
+            if notice:
+                print(notice)
         auto_ev = loop.drain_events()
         if auto_ev:
+            audio_enabled = False
             with loop.with_lock() as locked_state:
                 _apply_salvage_loot(loop, locked_state, auto_ev)
                 render_events(locked_state, auto_ev)
+                audio_enabled = locked_state.os.audio.enabled
+            if audio_manager is not None:
+                audio_manager.handle_event_batch(audio_enabled, auto_ev)
+                notice = audio_manager.consume_notice()
+                if notice:
+                    print(notice)
 
     _stop_and_persist()
     print("bye")
