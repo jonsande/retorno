@@ -251,6 +251,8 @@ class RetornoTextualApp(App):
             self._audio_notice = f"[WARN] Audio disabled: {exc}"
         else:
             self._audio_notice = self._audio_manager.notice or ""
+            audio_enabled, ambient_enabled = audio_flags(self.loop.state.os)
+            self._audio_manager.prepare_session(audio_enabled, ambient_enabled)
         self._panel_visible = {
             "status": True,
             "alerts": True,
@@ -271,11 +273,6 @@ class RetornoTextualApp(App):
         yield Static(id="power")
 
     def on_mount(self) -> None:
-        self.loop.step(1.0)
-        if self._startup_notice:
-            self._log_line(self._startup_notice)
-        if self._audio_notice:
-            self._log_line(self._audio_notice)
         if self._audio_manager is not None:
             audio_enabled, ambient_enabled = audio_flags(self.loop.state.os)
             self._audio_manager.start(audio_enabled, ambient_enabled)
@@ -283,6 +280,11 @@ class RetornoTextualApp(App):
             notice = self._audio_manager.consume_notice()
             if notice:
                 self._log_line(notice)
+        self.loop.step(1.0)
+        if self._startup_notice:
+            self._log_line(self._startup_notice)
+        if self._audio_notice:
+            self._log_line(self._audio_notice)
         if not self.loop.state.os.debug_enabled:
             self.loop.set_auto_tick(True)
             self.loop.start()

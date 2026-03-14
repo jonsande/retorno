@@ -34,9 +34,13 @@ class _Voice:
     decoded: _DecodedCue
     loop: bool
     position_frames: int = 0
+    played_frames_total: int = 0
 
 
 class _AudioBackend:
+    def prepare(self, cue: AudioCueConfig) -> None:
+        return
+
     def play(self, cue: AudioCueConfig) -> None:
         raise NotImplementedError
 
@@ -125,10 +129,8 @@ class PygameMixerAudioBackend(_AudioBackend):
         self._next_dynamic_channel = 2
 
     def play(self, cue: AudioCueConfig) -> None:
-        sound = self._sounds.get(cue.cue_id)
-        if sound is None:
-            sound = self._load_sound(cue)
-            self._sounds[cue.cue_id] = sound
+        self.prepare(cue)
+        sound = self._sounds[cue.cue_id]
         sound.set_volume(float(cue.volume))
 
         if cue.channel in self._channels:
@@ -169,6 +171,10 @@ class PygameMixerAudioBackend(_AudioBackend):
     def name(self) -> str:
         return "pygame-mixer"
 
+    def prepare(self, cue: AudioCueConfig) -> None:
+        if cue.cue_id not in self._sounds:
+            self._sounds[cue.cue_id] = self._load_sound(cue)
+
     def _load_sound(self, cue: AudioCueConfig):
         command = [
             self._ffmpeg,
@@ -203,6 +209,7 @@ class PcmMixerAudioBackend(_AudioBackend):
     _OUTPUT_SAMPLE_RATE = 44100
     _OUTPUT_CHANNELS = 2
     _CHUNK_FRAMES = 2048
+    _PULSE_BUFFER_DURATION_MS = 40
 
     def __init__(self, binary: str, device: str) -> None:
         self._binary = binary
@@ -217,10 +224,8 @@ class PcmMixerAudioBackend(_AudioBackend):
         self._ensure_process()
 
     def play(self, cue: AudioCueConfig) -> None:
-        decoded = self._decoded_cache.get(cue.cue_id)
-        if decoded is None:
-            decoded = self._decode_cue(cue)
-            self._decoded_cache[cue.cue_id] = decoded
+        self.prepare(cue)
+        decoded = self._decoded_cache[cue.cue_id]
         channel = cue.channel
         if cue.mode == "once":
             channel = f"{cue.channel}#{self._ephemeral_seq}"
@@ -252,6 +257,10 @@ class PcmMixerAudioBackend(_AudioBackend):
     def name(self) -> str:
         return f"pcm-mixer-{self._device}"
 
+    def prepare(self, cue: AudioCueConfig) -> None:
+        if cue.cue_id not in self._decoded_cache:
+            self._decoded_cache[cue.cue_id] = self._decode_cue(cue)
+
     def _ensure_process(self) -> None:
         if self._process is not None and self._process.poll() is None and self._thread is not None and self._thread.is_alive():
             return
@@ -272,8 +281,21 @@ class PcmMixerAudioBackend(_AudioBackend):
             "pipe:0",
             "-f",
             self._device,
-            "default",
         ]
+        if self._device == "pulse":
+            command.extend(
+                [
+                    "-buffer_duration",
+                    str(self._PULSE_BUFFER_DURATION_MS),
+                    "-prebuf",
+                    "0",
+                    "-minreq",
+                    "0",
+                    "-stream_name",
+                    "retorno",
+                ]
+            )
+        command.append("default")
         process = subprocess.Popen(
             command,
             stdin=subprocess.PIPE,
@@ -369,28 +391,61 @@ class PcmMixerAudioBackend(_AudioBackend):
                 fade_in_frames = max(0, int(round(voice.cue.fade_in_s * self._OUTPUT_SAMPLE_RATE)))
                 fade_out_frames = max(0, int(round(voice.cue.fade_out_s * self._OUTPUT_SAMPLE_RATE)))
                 total_frames = voice.decoded.frame_count
+                loop_crossfade_frames = 0
+                if voice.loop:
+                    loop_crossfade_frames = max(
+                        0, int(round(voice.cue.loop_crossfade_s * self._OUTPUT_SAMPLE_RATE))
+                    )
+                    if total_frames > 1:
+                        loop_crossfade_frames = min(loop_crossfade_frames, max(0, total_frames // 2))
+                    else:
+                        loop_crossfade_frames = 0
+                rendered_frames = 0
                 for frame_idx in range(self._CHUNK_FRAMES):
                     if voice.loop:
-                        src_frame = (voice.position_frames + frame_idx) % total_frames
+                        src_frame = voice.position_frames
                     else:
                         src_frame = voice.position_frames + frame_idx
                         if src_frame >= total_frames:
                             finished_channels.append(voice.channel)
                             break
                     gain = 1.0
-                    if fade_in_frames > 0 and src_frame < fade_in_frames:
-                        gain *= src_frame / fade_in_frames
+                    if fade_in_frames > 0:
+                        if voice.loop:
+                            age_frame = voice.played_frames_total + frame_idx
+                            if age_frame < fade_in_frames:
+                                gain *= age_frame / fade_in_frames
+                        elif src_frame < fade_in_frames:
+                            gain *= src_frame / fade_in_frames
                     if not voice.loop and fade_out_frames > 0 and src_frame >= max(0, total_frames - fade_out_frames):
                         remaining = total_frames - src_frame
                         gain *= max(0.0, remaining / fade_out_frames)
                     base = src_frame * self._OUTPUT_CHANNELS
                     out = frame_idx * self._OUTPUT_CHANNELS
-                    mixed[out] += voice.decoded.samples[base] * gain
-                    mixed[out + 1] += voice.decoded.samples[base + 1] * gain
-                voice.position_frames += self._CHUNK_FRAMES
-                if voice.loop:
-                    voice.position_frames %= total_frames
-                elif voice.position_frames >= total_frames:
+                    left = voice.decoded.samples[base]
+                    right = voice.decoded.samples[base + 1]
+                    if voice.loop and loop_crossfade_frames > 0 and src_frame >= (total_frames - loop_crossfade_frames):
+                        crossfade_idx = src_frame - (total_frames - loop_crossfade_frames)
+                        crossfade_progress = (crossfade_idx + 1) / (loop_crossfade_frames + 1)
+                        wrap_frame = min(crossfade_idx, total_frames - 1)
+                        wrap_base = wrap_frame * self._OUTPUT_CHANNELS
+                        left = (left * (1.0 - crossfade_progress)) + (
+                            voice.decoded.samples[wrap_base] * crossfade_progress
+                        )
+                        right = (right * (1.0 - crossfade_progress)) + (
+                            voice.decoded.samples[wrap_base + 1] * crossfade_progress
+                        )
+                    mixed[out] += left * gain
+                    mixed[out + 1] += right * gain
+                    rendered_frames += 1
+                    if voice.loop:
+                        voice.position_frames += 1
+                        if voice.position_frames >= total_frames:
+                            voice.position_frames = loop_crossfade_frames
+                if not voice.loop:
+                    voice.position_frames += rendered_frames
+                voice.played_frames_total += rendered_frames
+                if not voice.loop and voice.position_frames >= total_frames:
                     finished_channels.append(voice.channel)
             if finished_channels:
                 with self._lock:
@@ -640,6 +695,18 @@ class AudioManager:
     def start(self, audio_enabled: bool, ambient_enabled: bool) -> None:
         self.apply_preferences(audio_enabled, ambient_enabled)
 
+    def prepare_session(self, audio_enabled: bool, ambient_enabled: bool) -> None:
+        if not audio_enabled:
+            return
+        if ambient_enabled and self.config.ambient_cue_id:
+            cue = self.config.cues.get(self.config.ambient_cue_id)
+            if cue is not None:
+                self._safe_prepare(cue)
+        if self.config.startup_cue_id:
+            cue = self.config.cues.get(self.config.startup_cue_id)
+            if cue is not None:
+                self._safe_prepare(cue)
+
     def play_startup(self, audio_enabled: bool) -> None:
         if not audio_enabled:
             return
@@ -701,4 +768,11 @@ class AudioManager:
             self.backend.play(cue)
         except AudioPlaybackError as exc:
             self.notice = f"[WARN] Audio playback failed on {self.backend.name}: {exc}"
+            self.backend.stop_all()
+
+    def _safe_prepare(self, cue: AudioCueConfig) -> None:
+        try:
+            self.backend.prepare(cue)
+        except AudioPlaybackError as exc:
+            self.notice = f"[WARN] Audio preload failed on {self.backend.name}: {exc}"
             self.backend.stop_all()

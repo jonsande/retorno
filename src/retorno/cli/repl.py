@@ -6006,15 +6006,16 @@ def main() -> None:
 
     loop = GameLoop(engine, state, tick_s=1.0)
     loop.step(1.0)
+    audio_enabled, ambient_enabled = audio_flags(state.os)
+    if audio_manager is not None:
+        audio_manager.prepare_session(audio_enabled, ambient_enabled)
+        audio_manager.start(audio_enabled, ambient_enabled)
+        audio_manager.play_startup(audio_enabled)
+        audio_warning = audio_manager.consume_notice() or audio_warning
     if startup_message:
         print(startup_message)
     if play_startup_sequence:
         _maybe_run_startup_sequence(state.os.locale.value)
-    if audio_manager is not None:
-        audio_enabled, ambient_enabled = audio_flags(state.os)
-        audio_manager.start(audio_enabled, ambient_enabled)
-        audio_manager.play_startup(audio_enabled)
-        audio_warning = audio_manager.consume_notice() or audio_warning
     if audio_warning:
         print(audio_warning)
     if not state.os.debug_enabled:

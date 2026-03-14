@@ -26,6 +26,7 @@ class AudioCueConfig:
     sample_count: int | None = None
     fade_in_s: float = 0.005
     fade_out_s: float = 0.005
+    loop_crossfade_s: float = 0.0
 
 
 @dataclass(slots=True, frozen=True)
@@ -87,6 +88,7 @@ def load_audio_config(path: str | Path | None = None) -> AudioConfig:
         volume = float(entry.get("volume", 1.0) or 1.0)
         fade_in_s = max(0.0, float(entry.get("fade_in_s", 0.005) or 0.0))
         fade_out_s = max(0.0, float(entry.get("fade_out_s", 0.005) or 0.0))
+        loop_crossfade_s = max(0.0, float(entry.get("loop_crossfade_s", 0.0) or 0.0))
         asset_path = (_DATA_ROOT / rel_path).resolve()
         if not asset_path.exists():
             raise AudioConfigError(f"Audio asset not found for cue '{cue_id}': {asset_path}")
@@ -102,6 +104,7 @@ def load_audio_config(path: str | Path | None = None) -> AudioConfig:
             sample_count=sample_count,
             fade_in_s=fade_in_s,
             fade_out_s=fade_out_s,
+            loop_crossfade_s=loop_crossfade_s if mode == "loop" else 0.0,
         )
 
     ambient_raw = raw.get("ambient", {}) or {}

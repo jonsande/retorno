@@ -15,8 +15,9 @@
       "mode": "loop",
       "channel": "ambient",
       "volume": 0.75,
-      "fade_in_s": 0.01,
-      "fade_out_s": 0.0
+      "fade_in_s": 0.11,
+      "fade_out_s": 0.0,
+      "loop_crossfade_s": 0.015
     },
     "alert_ping": {
       "path": "sound/alert.mp3",

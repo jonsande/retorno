@@ -20,6 +20,7 @@ def main() -> None:
     assert ambient.sample_count is not None and ambient.sample_count > 0
     assert ambient.fade_in_s > 0.0
     assert ambient.fade_out_s == 0.0
+    assert ambient.loop_crossfade_s > 0.0
 
     startup = config.cues["intro_booting"]
     assert startup.mode == "once"
