@@ -93,24 +93,34 @@ ENERGY
   - [ ] 2) Dron recuperado (mediante un futuro comando "drone salvage drone") que al desplegarlo (deploy) por primera vez produce un mensaje pregrabado; 
   - [ ] 3) Información que se obtiene/descubre al desmantelar un dron (mediante un futuro comando "drone dismantle", o algo así, que permite reducir a scrap un dron).
 
-- [ ] Sistema de escalado de privilegios. Actualmente sólo se tiene acceso a archivos con un nivel de acceso de GUEST. No sé cuántos niveles hay actualmente definidos, pero me interesa que haya estos: GUEST, ENG, MED, OPS, SEC. Tenemos entonces que desarrollar formas diegéticas de elevar el acceso por distintos medios:
-  - [ ] 0) Versión 0 muy simple pero funcional (MVP): comandos "auth status" "auth recover eng", "auth recover med". Requisitos: data_core >= LIMITED, datad running, opcional: securityd para MED (o al revés). Efecto: job de x segundos o minutos que, al completarse, añade ENG o MED a auth_levels. Resultado narrativo: empiezas en GUEST; puedes leer el mail del PJ; más tarde recuperas ENG; entonces ves los logs de los otros sarcófagos
+- [x] Sistema de escalado de privilegios. Actualmente sólo se tiene acceso a archivos con un nivel de acceso de GUEST. No sé cuántos niveles hay actualmente definidos, pero me interesa que haya estos: GUEST, ENG, MED, OPS, SEC. Tenemos entonces que desarrollar formas diegéticas de elevar el acceso por distintos medios:
+
+  - [x] 0) Versión 0 muy simple pero funcional (MVP): comandos "auth status" "auth recover eng", "auth recover med". Requisitos: data_core >= LIMITED, datad running, opcional: securityd para MED (o al revés). Efecto: job de x segundos o minutos que, al completarse, añade ENG o MED a auth_levels. Resultado narrativo: empiezas en GUEST; puedes leer el mail del PJ; más tarde recuperas ENG; entonces ves los logs de los otros sarcófagos
+
+  - [ ] 0.1) Hay que añadir objetivo:
+      auth status <node_id>
+      auth recover eng <node_id>
+  La idea es que esto te da acceso a la documentación con credenciales de nivel ENG, pero sólo en la nave objetivo. De esta forma ya tenemos una primera versión de hackeo.
+
   - [ ] 1) Boot de servicios + self-tests: La más natural para tu juego ahora mismo. Ejemplo: cuando data_core está operativo y datad corriendo, puedes ejecutar:
     auth probe
     auth recover eng
     auth recover med
   Y eso hace un job. Requerirá tiempo y energía, y, si sale bien, añade ENG o MED (pero quizá hay que limitar esto a la nave/station en la que se está docked, o a la propia nave; de forma que a esos comandos habría que añadires un id, como por ejemplo ECHO_7 o RETORNO_SHIP).
   Justificación diegética: estás restaurando tablas de permisos/certificados desde caché local.
+
+  - [ ] 1.1.) Sólo para salvage avanzado: las operaciones de auth recover sólo se pueden hacer si un drone con el módulo de hack apropiado encuentra una terminal en la nave y se logra conectar a ella.
+
   - [ ] 2) Salvage de credenciales desde nodos remoto (muy buena para la experiencia de exploración del Jugador): ejemplo: en un hospital ship o una estación técnica encuentras:
     med_override.token
     eng_cert.fragment
   Al extraerlos: auth import /remote/.../med_override.token
-  obtienes acceso MED en ese hospital ship. [Esto convierte los permisos en parte del loop de exploración.]
-  - [ ] 3) Módulos instalables: secure_coprocessor, legacy_auth_bridge, med_console_patch. Al instalar uno, desbloqueas cierno nivel o reduces dificultad de recuperación. [Esto da progresión material.]
-  - [ ] 4) Acceso contextual/temporal (muy interesante, pero para más adelante): 
-    a dockear en cierta station, recibes acceso temporal (ENG session token valid while docked), o sólo durante un timpo (contador atrás); o tras un uplink en un relay.
+  obtienes acceso MED en ese hospital ship. [Esto convierte los permisos en parte del loop de exploración.] [P.D. Mejor: encontrar esos documentos hace que el hackeo sea más rápido, o incluso automático.]
 
-Esto da variedad, pero no lo haría aún como primer sistema. 
+  - [ ] 3) Módulos instalables: secure_coprocessor, legacy_auth_bridge, med_console_patch. Al instalar uno, desbloqueas cierno nivel o reduces dificultad de recuperación. [Esto da progresión material.]
+
+  - [ ] 4) Acceso contextual/temporal (muy interesante, pero para más adelante): 
+    a dockear en cierta station, recibes acceso temporal (ENG session token valid while docked), o sólo durante un timpo (contador atrás); o tras un uplink en un relay. 
 
 
 === MODULES ===
