@@ -1,0 +1,11 @@
+From: nav.ops@harbor12
+To: relay.supervisor@echo7
+Subject: corredor degradado
+
+La ruta principal ya no es fiable.
+Mantengan registro del último sector confirmado y del punto de entrada.
+
+[INTEL]
+SECTOR: S+001_-002_+000
+COORD: 12.5, -3.0, 1.25
+[/INTEL]

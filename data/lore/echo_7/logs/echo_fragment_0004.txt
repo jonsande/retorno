@@ -1,0 +1,7 @@
+Registro de tránsito reconstruido.
+
+[INTEL]
+SECTOR: S+001_-002_+000
+NODE: STATION_A1B2C3
+LINK: ECHO_7 -> STATION_A1B2C3
+[/INTEL]

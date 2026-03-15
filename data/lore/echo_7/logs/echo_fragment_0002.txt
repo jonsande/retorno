@@ -1,0 +1,6 @@
+Fragmento de navegación recuperado.
+La ruta completa está dañada, pero el sector de destino sigue siendo legible.
+
+[INTEL]
+SECTOR: S+001_-002_+000
+[/INTEL]
