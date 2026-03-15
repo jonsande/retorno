@@ -5968,13 +5968,16 @@ def main() -> None:
 
     play_startup_sequence = False
     startup_message = ""
+    startup_audio_context = "load_game"
     if scenario in {"sandbox", "dev"}:
         state = create_initial_state_sandbox()
         play_startup_sequence = True
+        startup_audio_context = "new_game"
         startup_message = f"[INFO] Scenario '{scenario}' started as new game (save slot bypassed)."
     elif force_new_game:
         state = create_initial_state_prologue()
         play_startup_sequence = True
+        startup_audio_context = "new_game"
         startup_message = "[INFO] Started new game (save slot ignored by --new-game/RETORNO_NEW_GAME)."
     else:
         try:
@@ -5982,14 +5985,17 @@ def main() -> None:
         except SaveLoadError as exc:
             state = create_initial_state_prologue()
             play_startup_sequence = True
+            startup_audio_context = "new_game"
             startup_message = f"[WARN] Could not load saved game ({exc}). Starting new game."
         else:
             if loaded is None:
                 state = create_initial_state_prologue()
                 play_startup_sequence = True
+                startup_audio_context = "new_game"
                 startup_message = "[INFO] No saved game found. Starting new game."
             else:
                 state = loaded.state
+                startup_audio_context = "load_game"
                 if loaded.source == "backup":
                     startup_message = f"[WARN] Main save unreadable. Loaded backup: {loaded.path}"
                 else:
@@ -6008,9 +6014,9 @@ def main() -> None:
     loop.step(1.0)
     audio_enabled, ambient_enabled = audio_flags(state.os)
     if audio_manager is not None:
-        audio_manager.prepare_session(audio_enabled, ambient_enabled)
+        audio_manager.prepare_session(audio_enabled, ambient_enabled, startup_audio_context)
         audio_manager.start(audio_enabled, ambient_enabled)
-        audio_manager.play_startup(audio_enabled)
+        audio_manager.play_startup(audio_enabled, startup_audio_context)
         audio_warning = audio_manager.consume_notice() or audio_warning
     if startup_message:
         print(startup_message)
@@ -6482,15 +6488,29 @@ def main() -> None:
 
         with loop.with_lock() as locked_state:
             block_msg = _command_blocked_message(locked_state, parsed)
+            audio_enabled = locked_state.os.audio.enabled
         if block_msg:
             print(block_msg)
+            if audio_manager is not None:
+                severity = Severity.WARN if "Action blocked" in block_msg or "Acción bloqueada" in block_msg else Severity.INFO
+                audio_manager.play_event(audio_enabled, EventType.BOOT_BLOCKED, severity)
+                notice = audio_manager.consume_notice()
+                if notice:
+                    print(notice)
             continue
 
         ev = loop.drain_events()
         if ev:
+            audio_enabled = False
             with loop.with_lock() as locked_state:
                 _apply_salvage_loot(loop, locked_state, ev)
                 render_events(locked_state, ev)
+                audio_enabled = locked_state.os.audio.enabled
+            if audio_manager is not None:
+                audio_manager.handle_event_batch(audio_enabled, ev)
+                notice = audio_manager.consume_notice()
+                if notice:
+                    print(notice)
 
         if parsed == "EXIT":
             _stop_and_persist()
@@ -6763,12 +6783,26 @@ def main() -> None:
         if isinstance(parsed, RouteSolve):
             _drain_auto_events()
             ev = loop.apply_action(parsed)
+            audio_enabled = False
             with loop.with_lock() as locked_state:
                 render_events(locked_state, ev)
+                audio_enabled = locked_state.os.audio.enabled
+            if audio_manager is not None:
+                audio_manager.handle_event_batch(audio_enabled, ev)
+                notice = audio_manager.consume_notice()
+                if notice:
+                    print(notice)
             auto_ev = loop.drain_events()
             if auto_ev:
+                audio_enabled = False
                 with loop.with_lock() as locked_state:
                     render_events(locked_state, auto_ev)
+                    audio_enabled = locked_state.os.audio.enabled
+                if audio_manager is not None:
+                    audio_manager.handle_event_batch(audio_enabled, auto_ev)
+                    notice = audio_manager.consume_notice()
+                    if notice:
+                        print(notice)
             continue
         if parsed == "INTEL_LIST":
             _drain_auto_events()

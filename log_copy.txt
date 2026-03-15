@@ -1,10 +1,25 @@
-Tip: use 'config set lang' to change ship_os languaje
-Tip: use 'help' to see available commands.
-Tip: use TAB key for list and autocomplete available commands, id's, paths, etc.
-> config show
-language: en
-audio: on
-ambientsound: on
-audio_backend: pygame-mixer
-auth: GUEST
-> log copy 10
+scrap detected: 36
+no modules detected
+no recoverable drones detected
+no recoverable data signatures detected
+uplink-capable infrastructure detected
+depletion: scrap=no, data=no, extras=yes
+node not cleaned
+completions: data drone drones module modules scrap
+> drone salvage data D1 CURL_12
+[CMD] [INFO] job_queued :: J15 salvage_data target=world_node:CURL_12 ETA=40s
+> drone salvage scrap D1 CURL_12 42
+[CMD] [INFO] job_queued :: J16 salvage_scrap requested=42 ETA=2m 6s
+> drone salvage module D1 CURL_12
+[CMD] [INFO] job_queued :: J17 salvage_module target=world_node:CURL_12 ETA=25s
+[AUTO] [INFO] data_salvaged :: Data salvaged at /remote/CURL_12/: new=3, already_mounted=0, total=3
+Recovered documents:
+- /remote/CURL_12/data/nav/fragments/frag_cd3b.txt
+- /remote/CURL_12/logs/nav.log
+- /remote/CURL_12/mail/inbox/0001.en.txt
+Tip: use 'cat <path>' to read recovered files and auto-import their intel.
+completions: /remote/CURL_12/data /remote/CURL_12/logs /remote/CURL_12/mail
+> cat /remote/CURL_12/data/nav/fragments/frag_cd3b.txt
+=== CAT /remote/CURL_12/data/nav/fragments/frag_cd3b.txt ===
+NODE: CURL_12
+> log copy 25

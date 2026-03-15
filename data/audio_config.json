@@ -7,7 +7,13 @@
     "cue": "ship_hum"
   },
   "startup": {
-    "cue": "intro_booting"
+    "new_game_cue": "intro_booting",
+    "load_game_cue": "intro_loading"
+  },
+  "defaults": {
+    "event": {
+    "cue": "alert_ping"
+    }
   },
   "cues": {
     "ship_hum": {
@@ -20,7 +26,15 @@
       "loop_crossfade_s": 0.015
     },
     "alert_ping": {
-      "path": "sound/alert.mp3",
+      "path": "sound/alert_ping.ogg",
+      "mode": "once",
+      "channel": "sfx",
+      "volume": 1.0,
+      "fade_in_s": 0.003,
+      "fade_out_s": 0.003
+    },
+    "alert_critical": {
+      "path": "sound/alert_ping_triple.ogg",
       "mode": "once",
       "channel": "sfx",
       "volume": 1.0,
@@ -39,18 +53,124 @@
       "path": "sound/job_done.mp3",
       "mode": "once",
       "channel": "sfx",
+      "volume": 1.4,
+      "fade_in_s": 0.003,
+      "fade_out_s": 0.003
+    },
+    "signal_detected": {
+      "path": "sound/beep_01.mp3",
+      "mode": "once",
+      "channel": "sfx",
       "volume": 1.0,
       "fade_in_s": 0.003,
       "fade_out_s": 0.003
+    },
+    "intro_loading": {
+      "path": "sound/info.mp3",
+      "mode": "once",
+      "channel": "startup",
+      "volume": 0.7,
+      "fade_in_s": 0.005,
+      "fade_out_s": 0.005
     },
     "intro_booting": {
       "path": "sound/intro_booting.ogg",
       "mode": "once",
       "channel": "startup",
-      "volume": 0.0,
+      "volume": 0.75,
+      "fade_in_s": 0.005,
+      "fade_out_s": 0.005
+    },
+    "error": {
+      "path": "sound/action_blocked.ogg",
+      "mode": "once",
+      "channel": "sfx",
+      "volume": 0.7,
+      "fade_in_s": 0.005,
+      "fade_out_s": 0.005
+    },
+    "info": {
+      "path": "sound/info.mp3",
+      "mode": "once",
+      "channel": "sfx",
+      "volume": 0.7,
+      "fade_in_s": 0.005,
+      "fade_out_s": 0.005
+    },
+    "dock_start": {
+      "path": "sound/info.mp3",
+      "mode": "once",
+      "channel": "sfx",
+      "volume": 0.7,
+      "fade_in_s": 0.005,
+      "fade_out_s": 0.005
+    },
+    "dock_complete": {
+      "path": "sound/beep_01.mp3",
+      "mode": "once",
+      "channel": "sfx",
+      "volume": 0.8,
       "fade_in_s": 0.005,
       "fade_out_s": 0.005
     }
   },
-  "events": {}
+  "events": {
+    "power_net_deficit": {
+      "cue": "alert_ping"
+    },
+    "power_core_degraded": {
+      "cue": "alert_ping"
+    },
+    "power_bus_instability": {
+      "cue": "alert_ping"
+    },
+    "power_bus_instability:critical": {
+      "cue": "alert_critical"
+    },
+    "low_power_quality": {
+      "cue": "alert_ping"
+    },
+    "low_power_quality:critical": {
+      "cue": "alert_critical"
+    },
+    "battery_reserve_exhausted": {
+      "cue": "alert_ping"
+    },
+    "low_soc_warning": {
+      "cue": "alert_ping"
+    },
+    "low_soc_notice": {
+      "cue": "alert_ping"
+    },
+    "drone_bay_charging_unavailable": {
+      "cue": "alert_ping"
+    },
+    "drone_bay_maintenance_blocked": {
+      "cue": "alert_ping"
+    },
+    "job_completed": {
+      "cue": "job_done"
+    },
+    "signal_detected": {
+      "cue": "signal_detected"
+    },
+    "boot_blocked" : {
+      "cue": "error"
+    },
+    "job_failed" : {
+      "cue": "error"
+    },
+    "job_queued" : {
+      "cue": "info"
+    },
+    "job_queued:dock" : {
+      "cue": "dock_start"
+    },
+    "docked" : {
+      "cue": "dock_complete"
+    },
+    "system_state_changed" : {
+      "cue": "info"
+    }
+  }
 }

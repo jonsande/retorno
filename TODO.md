@@ -18,6 +18,10 @@
 
 - [ ] Opción de desmantelar drones para obtener scrap.
 
+DRONE MODULES
+
+- [ ] Módulo de sonido! Podría ser muy útil para interpretar cosas: interpretar el estado de los sistemas (sistemas degradados emiten sonidos de error o sonidos raros, y systemas nominales zumbidos característicos; interpretar si hay algo vivo en la sala, o algún tipo de evento ambiental)
+
 
 === NAVIGATION / ROUTES / WORLD GEN ===
 
@@ -147,9 +151,9 @@ ENERGY
 
 === SOUND AND MUSIC ===
 
-- [ ] Sonido ambiente (https://www.youtube.com/watch?v=wVMrSszssyo)
+- [x] Sonido ambiente (https://www.youtube.com/watch?v=wVMrSszssyo)
 
-- [ ] Posibilidad de apagar/encender el sonido ambiente.
+- [x] Posibilidad de apagar/encender el sonido ambiente.
 
 - [ ] Reproductor de música clásica (Sibelius, Mahler, Buckner, etc.).
   - [ ] Sibelius sinfonía No.2 D mayor, op. 43
@@ -158,7 +162,9 @@ ENERGY
 
 - [ ] Ruido de estática.
 
-- [ ] Bips con las advertencias. Quizá sonido de discos duros al procesar ciertas órdenes. Sonidos específicos únicos para ciertas tareas como solve route o hibernate. Sonido lejano pesado al hacer dock y undock. Chirridos de casco cuando el hull baja.
+- [-] Bips con las advertencias. Quizá sonido de discos duros al procesar ciertas órdenes. Sonidos específicos únicos para ciertas tareas como solve route o hibernate. Sonido lejano pesado al hacer dock y undock. Chirridos de casco cuando el hull baja.
+- [ ] Quiero un sonido específico para cuando sale el mensaje de "Action blocked".
+- [ ] Sonido de advertencia cuando aumenta la radiación.
 
 
 
@@ -170,8 +176,8 @@ ENERGY
 
 - [ ] Parece que el módulo rapid_maneuver_module no está afectando al tiempo ETA de "drone recall". Ese módulo tiene que influir en todos los ETA de las operaciones del dron que tenga instalado el módulo.
 
-- [ ] Hay que cambiar el sistema de numerar jobs. Los jobs ya completados deben tener un identificador diferente a los jobs en proceso o queued. De otro modo, cuando el juego se alargue, habrá jobs en proceso cuyo id tenta un número enorme, y eso lo hace poco práctico. Hay que pensar cómo hacer esto. Una fórmula podría ser: 
-  si hay 3 jobs en proceso (o queued) esos tres jobs tendrán siempre los id's J1, J2 y J3. Si son cuatro, J1, J2, J3 y J4. Las numeraciones no se "resetean" hasta que no quede el panel de jobs completamente vacío. O sea, que si se ordena un primer job y, antes de que acabe, se ordena un segundo, estos se numerarán, correspondientemente, J1 y J2, y, cuando el J1 termine, el J2 seguirá teniendo el id J2. Una vez que ambos jobs estén completados, los nuevos jobs que entren se numerarán partiendo de "J1" de nuevo. No sé si me he explicado correctamente.
+- [ ] Hay que cambiar el sistema de numerar jobs. Los jobs ya completados deben tener un identificador diferente a los jobs en proceso o queued. De otro modo, en partidas muy largas, habrá jobs en proceso cuyo id tendría un número enorme, y eso lo hace poco práctico. Hay que pensar cómo hacer esto. Una fórmula podría ser: 
+  si hay 3 jobs en proceso (o queued) esos tres jobs tendrán siempre los id's J1, J2 y J3. Si son cuatro, J1, J2, J3 y J4. Las numeraciones no se "resetean" hasta que no quede el panel de jobs completamente vacío. O sea, que si se ordena un primer job y, antes de que acabe, se ordena un segundo, estos se numerarán, correspondientemente, J1 y J2, y, cuando el J1 termine, el J2 seguirá teniendo el id J2 (y si entra en cola un tercer job, este tendrá el id J3). Una vez que los jobs estén completados, los nuevos jobs que entren se numerarán partiendo de "J1" de nuevo. No sé si me he explicado correctamente.
 En cuanto a la numeración de jobs completados, el formato podría ser "CJ1", "CJ2", etc. (las siglas "CJ" corresponderían a "Completed Job"). Si se te ocurre algo más claro e intuitivo, dímelo. 
 Por otra parte, es necesario que en el output de "jobs" se especifique el id de cada job (actualmente no aparece, si no me equivoco).
 

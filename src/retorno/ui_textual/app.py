@@ -21,7 +21,7 @@ from retorno.cli import repl
 from retorno.core.engine import Engine
 from retorno.core.actions import Hibernate
 from retorno.config.balance import Balance
-from retorno.model.events import Severity
+from retorno.model.events import EventType, Severity
 from retorno.model.drones import DroneStatus
 from retorno.model.os import Locale, list_dir, normalize_path
 from retorno.runtime.data_loader import load_modules
@@ -198,14 +198,17 @@ class RetornoTextualApp(App):
         self._exit_persist_done = False
         self._play_startup_sequence = False
         self._startup_notice = ""
+        self._startup_audio_context = "load_game"
         scenario = os.getenv("RETORNO_SCENARIO", "prologue").lower()
         if scenario in {"sandbox", "dev"}:
             state = create_initial_state_sandbox()
             self._play_startup_sequence = True
+            self._startup_audio_context = "new_game"
             self._startup_notice = f"[INFO] Scenario '{scenario}' started as new game (save slot bypassed)."
         elif force_new_game:
             state = create_initial_state_prologue()
             self._play_startup_sequence = True
+            self._startup_audio_context = "new_game"
             self._startup_notice = "[INFO] Started new game (save slot ignored by --new-game/RETORNO_NEW_GAME)."
         else:
             try:
@@ -213,14 +216,17 @@ class RetornoTextualApp(App):
             except SaveLoadError as exc:
                 state = create_initial_state_prologue()
                 self._play_startup_sequence = True
+                self._startup_audio_context = "new_game"
                 self._startup_notice = f"[WARN] Could not load saved game ({exc}). Starting new game."
             else:
                 if loaded is None:
                     state = create_initial_state_prologue()
                     self._play_startup_sequence = True
+                    self._startup_audio_context = "new_game"
                     self._startup_notice = "[INFO] No saved game found. Starting new game."
                 else:
                     state = loaded.state
+                    self._startup_audio_context = "load_game"
                     if loaded.source == "backup":
                         self._startup_notice = f"[WARN] Main save unreadable. Loaded backup: {loaded.path}"
                     else:
@@ -252,7 +258,11 @@ class RetornoTextualApp(App):
         else:
             self._audio_notice = self._audio_manager.notice or ""
             audio_enabled, ambient_enabled = audio_flags(self.loop.state.os)
-            self._audio_manager.prepare_session(audio_enabled, ambient_enabled)
+            self._audio_manager.prepare_session(
+                audio_enabled,
+                ambient_enabled,
+                self._startup_audio_context,
+            )
         self._panel_visible = {
             "status": True,
             "alerts": True,
@@ -276,7 +286,7 @@ class RetornoTextualApp(App):
         if self._audio_manager is not None:
             audio_enabled, ambient_enabled = audio_flags(self.loop.state.os)
             self._audio_manager.start(audio_enabled, ambient_enabled)
-            self._audio_manager.play_startup(audio_enabled)
+            self._audio_manager.play_startup(audio_enabled, self._startup_audio_context)
             notice = self._audio_manager.consume_notice()
             if notice:
                 self._log_line(notice)
@@ -1184,9 +1194,16 @@ class RetornoTextualApp(App):
             return
         auto_events = self.loop.drain_events()
         if auto_events:
+            audio_enabled = False
             with self.loop.with_lock() as state:
                 lines = presenter.format_event_lines(state, auto_events)
+                audio_enabled = state.os.audio.enabled
             self._log_lines(lines)
+            if self._audio_manager is not None:
+                self._audio_manager.handle_event_batch(audio_enabled, auto_events)
+                notice = self._audio_manager.consume_notice()
+                if notice:
+                    self._log_line(notice)
 
     def _startup_tips(self, locale: str) -> list[str]:
         tips = {
@@ -1267,7 +1284,18 @@ class RetornoTextualApp(App):
                 if action == "TRAVEL_ABORT":
                     from retorno.core.actions import TravelAbort
                     self._log_line("> nav abort")
-                    self._log_lines(presenter.build_command_output(self.loop.apply_action, TravelAbort()))
+                    ev = self.loop.apply_action(TravelAbort())
+                    if ev:
+                        audio_enabled = False
+                        with self.loop.with_lock() as state:
+                            lines = presenter.format_event_lines(state, [("cmd", e) for e in ev])
+                            audio_enabled = state.os.audio.enabled
+                        self._log_lines(lines)
+                        if self._audio_manager is not None:
+                            self._audio_manager.handle_event_batch(audio_enabled, ev)
+                            notice = self._audio_manager.consume_notice()
+                            if notice:
+                                self._log_line(notice)
                 elif action == "HIBERNATE_DRONES":
                     with self.loop.with_lock() as state:
                         self._confirm_hibernate_wake_needed(state)
@@ -1292,8 +1320,10 @@ class RetornoTextualApp(App):
                         self._log_line(f"> {action.__class__.__name__.lower()}")
                     ev = self.loop.apply_action(action)
                     if ev:
+                        audio_enabled = False
                         with self.loop.with_lock() as state:
                             lines = presenter.format_event_lines(state, [("cmd", e) for e in ev])
+                            audio_enabled = state.os.audio.enabled
                             if action.__class__.__name__ == "Travel":
                                 for e in ev:
                                     if e.type == "travel_started" or e.type == repl.EventType.TRAVEL_STARTED:
@@ -1305,6 +1335,11 @@ class RetornoTextualApp(App):
                                         lines.append(msg.get(state.os.locale.value, msg["en"]))
                                         break
                         self._log_lines(lines)
+                        if self._audio_manager is not None:
+                            self._audio_manager.handle_event_batch(audio_enabled, ev)
+                            notice = self._audio_manager.consume_notice()
+                            if notice:
+                                self._log_line(notice)
             else:
                 if isinstance(action, str) and action in {"HIBERNATE_DRONES", "HIBERNATE_WAKE", "HIBERNATE_NON_CRUISE"}:
                     self._pending_hibernate_parsed = None
@@ -1342,8 +1377,15 @@ class RetornoTextualApp(App):
 
         with self.loop.with_lock() as state:
             block_msg = repl._command_blocked_message(state, parsed)
+            audio_enabled = state.os.audio.enabled
         if block_msg:
             self._log_line(block_msg)
+            if self._audio_manager is not None:
+                severity = Severity.WARN if "Action blocked" in block_msg or "Acción bloqueada" in block_msg else Severity.INFO
+                self._audio_manager.play_event(audio_enabled, EventType.BOOT_BLOCKED, severity)
+                notice = self._audio_manager.consume_notice()
+                if notice:
+                    self._log_line(notice)
             return
 
         # Informational commands (drain AUTO first to avoid mixing)
@@ -1420,14 +1462,28 @@ class RetornoTextualApp(App):
         if isinstance(parsed, repl.RouteSolve):
             ev = self.loop.apply_action(parsed)
             if ev:
+                audio_enabled = False
                 with self.loop.with_lock() as state:
                     lines = presenter.format_event_lines(state, [("cmd", e) for e in ev])
+                    audio_enabled = state.os.audio.enabled
                 self._log_lines(lines)
+                if self._audio_manager is not None:
+                    self._audio_manager.handle_event_batch(audio_enabled, ev)
+                    notice = self._audio_manager.consume_notice()
+                    if notice:
+                        self._log_line(notice)
             auto_ev = self.loop.drain_events()
             if auto_ev:
+                audio_enabled = False
                 with self.loop.with_lock() as state:
                     lines = presenter.format_event_lines(state, auto_ev)
+                    audio_enabled = state.os.audio.enabled
                 self._log_lines(lines)
+                if self._audio_manager is not None:
+                    self._audio_manager.handle_event_batch(audio_enabled, auto_ev)
+                    notice = self._audio_manager.consume_notice()
+                    if notice:
+                        self._log_line(notice)
             return
         if parsed == "UPLINK":
             with self.loop.with_lock() as state:

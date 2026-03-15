@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from retorno.audio.config import AudioConfig, AudioCueConfig
-from retorno.model.events import Event
+from retorno.model.events import Event, EventType, Severity
 
 
 @dataclass(slots=True)
@@ -410,6 +410,7 @@ class PcmMixerAudioBackend(_AudioBackend):
                             finished_channels.append(voice.channel)
                             break
                     gain = 1.0
+                    gain *= float(voice.cue.volume)
                     if fade_in_frames > 0:
                         if voice.loop:
                             age_frame = voice.played_frames_total + frame_idx
@@ -687,30 +688,39 @@ class AudioManager:
         self.config = config
         self.backend = backend if backend is not None else create_audio_backend(config)
         self.notice: str | None = None
+        if self.config.warnings:
+            self.notice = "; ".join(f"[WARN] {warning}" for warning in self.config.warnings[:4])
         if not self.backend.is_available():
             reason = getattr(self.backend, "reason", "") or "backend unavailable"
-            self.notice = f"[WARN] Audio backend unavailable: {reason}"
+            backend_notice = f"[WARN] Audio backend unavailable: {reason}"
+            self.notice = f"{self.notice}; {backend_notice}" if self.notice else backend_notice
         self._event_last_played: dict[str, float] = {}
 
     def start(self, audio_enabled: bool, ambient_enabled: bool) -> None:
         self.apply_preferences(audio_enabled, ambient_enabled)
 
-    def prepare_session(self, audio_enabled: bool, ambient_enabled: bool) -> None:
+    def prepare_session(
+        self,
+        audio_enabled: bool,
+        ambient_enabled: bool,
+        startup_context: str | None = None,
+    ) -> None:
         if not audio_enabled:
             return
         if ambient_enabled and self.config.ambient_cue_id:
             cue = self.config.cues.get(self.config.ambient_cue_id)
             if cue is not None:
                 self._safe_prepare(cue)
-        if self.config.startup_cue_id:
-            cue = self.config.cues.get(self.config.startup_cue_id)
+        startup_cue_id = self._resolve_startup_cue_id(startup_context)
+        if startup_cue_id:
+            cue = self.config.cues.get(startup_cue_id)
             if cue is not None:
                 self._safe_prepare(cue)
 
-    def play_startup(self, audio_enabled: bool) -> None:
+    def play_startup(self, audio_enabled: bool, startup_context: str | None = None) -> None:
         if not audio_enabled:
             return
-        cue_id = self.config.startup_cue_id
+        cue_id = self._resolve_startup_cue_id(startup_context)
         if not cue_id:
             return
         cue = self.config.cues.get(cue_id)
@@ -746,17 +756,22 @@ class AudioManager:
         now = time.monotonic()
         for item in events:
             event = item[1] if isinstance(item, tuple) else item
-            route = self.config.event_routes.get(event.type.value)
-            if route is None:
-                continue
-            last_played = self._event_last_played.get(event.type.value, 0.0)
-            if route.cooldown_s > 0.0 and (now - last_played) < route.cooldown_s:
-                continue
-            cue = self.config.cues.get(route.cue_id)
-            if cue is None:
-                continue
-            self._safe_play(cue)
-            self._event_last_played[event.type.value] = now
+            qualifiers = self._event_route_qualifiers(event)
+            self._play_event_route(str(event.type.value), qualifiers, now)
+
+    def play_event(
+        self,
+        audio_enabled: bool,
+        event_type: EventType | str,
+        severity: Severity | str | None = None,
+    ) -> None:
+        if not audio_enabled:
+            return
+        event_key = event_type.value if isinstance(event_type, EventType) else str(event_type)
+        qualifiers: list[str] = []
+        if severity is not None:
+            qualifiers.append(severity.value if isinstance(severity, Severity) else str(severity))
+        self._play_event_route(event_key, qualifiers, time.monotonic())
 
     def consume_notice(self) -> str | None:
         notice = self.notice
@@ -776,3 +791,59 @@ class AudioManager:
         except AudioPlaybackError as exc:
             self.notice = f"[WARN] Audio preload failed on {self.backend.name}: {exc}"
             self.backend.stop_all()
+
+    def _play_event_route(self, event_key: str, qualifiers: list[str], now: float) -> None:
+        route_key, route = self._resolve_event_route(event_key, qualifiers)
+        if route_key is None or route is None:
+            return
+        last_played = self._event_last_played.get(route_key, 0.0)
+        if route.cooldown_s > 0.0 and (now - last_played) < route.cooldown_s:
+            return
+        cue = self.config.cues.get(route.cue_id)
+        if cue is None:
+            return
+        self._safe_play(cue)
+        self._event_last_played[route_key] = now
+
+    def _resolve_event_route(self, event_key: str, qualifiers: list[str]) -> tuple[str | None, object | None]:
+        candidates = self._event_route_candidates(event_key, qualifiers)
+        for route_key in candidates:
+            route = self.config.event_routes.get(route_key)
+            if route is not None:
+                return route_key, route
+        if self.config.default_event_route is not None:
+            return "__default_event__", self.config.default_event_route
+        return None, None
+
+    def _event_route_candidates(self, event_key: str, qualifiers: list[str]) -> list[str]:
+        candidates: list[str] = []
+        seen: set[str] = set()
+        for qualifier in qualifiers:
+            route_key = f"{event_key}:{qualifier}"
+            if route_key not in seen:
+                candidates.append(route_key)
+                seen.add(route_key)
+        if event_key not in seen:
+            candidates.append(event_key)
+        return candidates
+
+    def _event_route_qualifiers(self, event: Event) -> list[str]:
+        qualifiers: list[str] = [str(event.severity.value)]
+        data = event.data if isinstance(event.data, dict) else {}
+        job_type = data.get("job_type")
+        if job_type:
+            qualifiers.append(str(job_type))
+        message_key = data.get("message_key")
+        if message_key:
+            qualifiers.append(f"message_key:{message_key}")
+        reason = data.get("reason")
+        if reason:
+            qualifiers.append(f"reason:{reason}")
+        return qualifiers
+
+    def _resolve_startup_cue_id(self, startup_context: str | None) -> str | None:
+        if startup_context == "new_game":
+            return self.config.startup_new_game_cue_id or self.config.startup_cue_id
+        if startup_context == "load_game":
+            return self.config.startup_load_game_cue_id or self.config.startup_cue_id
+        return self.config.startup_cue_id

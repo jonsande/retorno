@@ -3,15 +3,15 @@ Ref: E7/OPS/CACHE/0007
 Acceso: ENG (solo lectura)
 Integridad: degradada (reconstrucción parcial)
 
-Este informe es una captura de las notas operativas extraídas de las rutas en caché del relé ECHO-7. Se generó automáticamente a partir de buffers de mantenimiento y posteriormente se reconstruyó desde bloques de almacenamiento incompletos. Las marcas temporales no son fiables. Los registros más recientes datan del 12519dd.
+Este informe es una captura de las notas operativas extraídas de las rutas en caché del relé ECHO-7 en el 12519dd. Se generó automáticamente a partir de buffers de mantenimiento y posteriormente se reconstruyó desde bloques de almacenamiento incompletos. Las marcas temporales no son fiables. Los registros más recientes datan del 12520dd.
 
 Durante el último periodo registrado, el relé dedicó la mayor parte del ciclo de servicio a negociación de protocolos de baja banda y anuncios cortos de enrutado. Las operadoras de largo alcance estuvieron indispuestas a menudo, ya sea por silencio aguas arriba o por fallos locales de amplificación. Por ello, la caché de rutas se inclina hacia waystations cercanas y transbordos repetidos de corredor.
 
-El token HARBOR-12 aparece con una frecuencia inusual en las tablas en caché. Muchas rutas se estaban haciendo pasar por allí. En la práctica: naves que aún tenían hardware de navegación funcional recibían instrucciones de pasar por Harbor-12 en vez de intentar tramos largos directos o depender de relés que ya fallaban de manera intermitente.
+El token HARBOR-12 aparece con una frecuencia inusual en las tablas en caché. Entre 12003 y 12519dd muchas rutas se estaban haciendo pasar por allí. En la práctica: naves que aún tenían hardware de navegación funcional recibían instrucciones de pasar por Harbor-12 en vez de intentar tramos largos directos o depender de relés que ya fallaban de manera intermitente.
 
-Se encontró una breve anotación de operador incrustada en el payload de un paquete de enrutado. El relay la conservó porque coincidía con un perfil de checksum; esto no implica validación. El texto se reproduce literal:
+Se encontró una breve anotación de operador incrustada en el payload de un paquete de enrutado. El relé la conservó porque coincidía con un perfil de checksum. El texto se reproduce literal:
 
-“Los mapas de ruta están desactualizados. No perdáis tiempo persiguiendo lo ruidoso. Si una estación responde, usadla. Harbor-12 todavía responde (por ahora). Si llegas tarde, sigue las tablas del corredor. Si llegas pronto, no esperes.”
+“Los mapas de ruta están desactualizados. No perdáis tiempo persiguiendo ruido. Si una estación responde, usadla. Harbor-12 todavía responde (por ahora). Si llegas tarde, sigue las tablas del corredor. Si llegas pronto, no esperes.”
 
 [INTEL]
 HARBOR_12
