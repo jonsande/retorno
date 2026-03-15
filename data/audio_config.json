@@ -29,7 +29,7 @@
       "path": "sound/alert_ping.ogg",
       "mode": "once",
       "channel": "sfx",
-      "volume": 1.0,
+      "volume": 0.30,
       "fade_in_s": 0.003,
       "fade_out_s": 0.003
     },
@@ -37,7 +37,7 @@
       "path": "sound/alert_ping_triple.ogg",
       "mode": "once",
       "channel": "sfx",
-      "volume": 1.0,
+      "volume": 0.50,
       "fade_in_s": 0.003,
       "fade_out_s": 0.003
     },
@@ -53,7 +53,7 @@
       "path": "sound/job_done.mp3",
       "mode": "once",
       "channel": "sfx",
-      "volume": 1.4,
+      "volume": 1.7,
       "fade_in_s": 0.003,
       "fade_out_s": 0.003
     },
@@ -66,7 +66,7 @@
       "fade_out_s": 0.003
     },
     "intro_loading": {
-      "path": "sound/info.mp3",
+      "path": "sound/beep_01.mp3",
       "mode": "once",
       "channel": "startup",
       "volume": 0.7,
@@ -90,15 +90,15 @@
       "fade_out_s": 0.005
     },
     "info": {
-      "path": "sound/info.mp3",
+      "path": "sound/beep_01.mp3",
       "mode": "once",
       "channel": "sfx",
-      "volume": 0.7,
+      "volume": 1.3,
       "fade_in_s": 0.005,
       "fade_out_s": 0.005
     },
     "dock_start": {
-      "path": "sound/info.mp3",
+      "path": "sound/beep_01.mp3",
       "mode": "once",
       "channel": "sfx",
       "volume": 0.7,

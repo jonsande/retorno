@@ -44,7 +44,7 @@ class ParseError(Exception):
 
 _PARSE_ERROR_MESSAGES = {
     "en": {
-        "usage_help": "Usage: help [--verbose]",
+        "usage_help": "Usage: help [--verbose|-v|--no-verbose]",
         "usage_job_cancel": "Usage: job cancel <job_id>",
         "usage_alerts": "Usage: alerts | alerts explain <alert_key>",
         "usage_log_copy": "Usage: log copy [n]",
@@ -72,9 +72,10 @@ _PARSE_ERROR_MESSAGES = {
         "usage_salvage_data": "Usage: drone salvage data <drone_id> [node_id]",
         "usage_inventory": "Usage: inventory|cargo | inventory|cargo audit",
         "config_set_lang": "config set lang <en|es>",
+        "config_set_verbose": "config set verbose <on|off>",
         "config_set_audio": "config set audio <on|off>",
         "config_set_ambientsound": "config set ambientsound <on|off>",
-        "usage_config": "Usage: config set lang <en|es> | config set audio <on|off> | config set ambientsound <on|off> | config show",
+        "usage_config": "Usage: config set lang <en|es> | config set verbose <on|off> | config set audio <on|off> | config set ambientsound <on|off> | config show",
         "usage_mail": "Usage: mail inbox | mail read <id|latest>",
         "usage_mail_read": "Usage: mail read <id|latest>",
         "usage_intel": "Usage: intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>",
@@ -126,7 +127,7 @@ _PARSE_ERROR_MESSAGES = {
         "unknown_command": "Unknown command: {cmd}",
     },
     "es": {
-        "usage_help": "Uso: help [--verbose]",
+        "usage_help": "Uso: help [--verbose|-v|--no-verbose]",
         "usage_job_cancel": "Uso: job cancel <job_id>",
         "usage_alerts": "Uso: alerts | alerts explain <alert_key>",
         "usage_log_copy": "Uso: log copy [n]",
@@ -154,9 +155,10 @@ _PARSE_ERROR_MESSAGES = {
         "usage_salvage_data": "Uso: drone salvage data <drone_id> [node_id]",
         "usage_inventory": "Uso: inventory|cargo | inventory|cargo audit",
         "config_set_lang": "config set lang <en|es>",
+        "config_set_verbose": "config set verbose <on|off>",
         "config_set_audio": "config set audio <on|off>",
         "config_set_ambientsound": "config set ambientsound <on|off>",
-        "usage_config": "Uso: config set lang <en|es> | config set audio <on|off> | config set ambientsound <on|off> | config show",
+        "usage_config": "Uso: config set lang <en|es> | config set verbose <on|off> | config set audio <on|off> | config set ambientsound <on|off> | config show",
         "usage_mail": "Uso: mail inbox | mail read <id|latest>",
         "usage_mail_read": "Uso: mail read <id|latest>",
         "usage_intel": "Uso: intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>",
@@ -236,6 +238,8 @@ def parse_command(line: str):
             return "HELP"
         if len(args) == 1 and args[0] in {"--verbose", "-v"}:
             return "HELP_VERBOSE"
+        if len(args) == 1 and args[0] == "--no-verbose":
+            return "HELP_NO_VERBOSE"
         raise ParseError("usage_help")
     if cmd == "clear":
         return "CLEAR"
@@ -498,6 +502,8 @@ def parse_command(line: str):
             if not is_valid_config_value(key, value):
                 if key == "lang":
                     raise ParseError("config_set_lang")
+                if key == "verbose":
+                    raise ParseError("config_set_verbose")
                 if key == "audio":
                     raise ParseError("config_set_audio")
                 if key == "ambientsound":

@@ -69,6 +69,8 @@ ENERGY
 
 === LORE ===
 
+- [ ] Sistematizar y darle un sentido de minijuego a build_procedural_salvage_mail_content. La idea de los mails generados proceduralmente debe ser esta: que te ofrezcan indirectamente información útil para planear tus viajes. En esos mails tiene que haber un número determinado de categorías de información que pueden o no cubrirse, como, por ejemplo: nivel de radiación de un nodo, si tenía o no información relevante ese nodo, estado de su casco, si había drones, etc. De este modo el jugador irá obteniendo información que le servirá para seguir avanzando. Es decir que estos mails procedurales le sirven para obtener información de destinos que le puede ser útil de cara a organizarse y planificar su próximo viaje, o saber qué lugares evitar de momento, o a qué lugares le interesa acudir. Estos mails tambien tiene que servir para otra cosa: distribuir una serie de consejos generales (seleccionados de una batería) acerca del universo, de cómo obrar, de peligros de las zonas o consejos, etc.
+
 - [!] Ideas para “formas de aparecer”. Además de las ya planteadas (salvage data, uplink, recibir mensaje automático o no automático, captar mensaje perdido en el espacio):
   
   - Recovered attachment: al cargo audit aparece “found unindexed attachment; run cargo audit again to decode” (bonito para tu “manifest stale”).
@@ -163,23 +165,32 @@ ENERGY
 - [ ] Ruido de estática.
 
 - [-] Bips con las advertencias. Quizá sonido de discos duros al procesar ciertas órdenes. Sonidos específicos únicos para ciertas tareas como solve route o hibernate. Sonido lejano pesado al hacer dock y undock. Chirridos de casco cuando el hull baja.
-- [ ] Quiero un sonido específico para cuando sale el mensaje de "Action blocked".
+- [x] Quiero un sonido específico para cuando sale el mensaje de "Action blocked".
 - [ ] Sonido de advertencia cuando aumenta la radiación.
 
 
 
 === OTROS / SIN CATALOGAR ===
 
-- [ ] Hay que reducir el coste de scrap de instalación de módulos de drone.
+- [ ] La operación de scan debe llevar algún tiempo. Y disparar algún sonido.
+
+- [ ] La orden nav contacts debería listar también la radiación del nodo, si es conocida.
+
+- [ ] Llueven contactos y rutas. Sólo con haber pasado por 3 o 4 nodos, tengo repleto el mapa de contactos. y rutas. Hay que balancear esto, pues de otro modo esta información pierde valor.
+
+- [ ] Tiene que haber un aliciente claro para explorar los nodos del sector antes de dar el salto al siguiente. Un salto de muchos años de hibernación tiene que tener riesgos. No debe tampoco haber muchas rutas que conecten un sector con otro. Lo normal ha de ser que haya una.
+
+- [ ] Cada vez que se consigue un contacto o link tiene que especificarse si es nuevo (no conocido) o no.
+
+- [x] Hay que reducir el coste de scrap de instalación de módulos de drone.
 
 - [ ] El bonus de tiempo del módulo rapid_maneuver_module debe ser mayor. Los drones con ese módulo deben ser más rápidos.
 
-- [ ] Parece que el módulo rapid_maneuver_module no está afectando al tiempo ETA de "drone recall". Ese módulo tiene que influir en todos los ETA de las operaciones del dron que tenga instalado el módulo.
+- [x] Parece que el módulo rapid_maneuver_module no está afectando al tiempo ETA de "drone recall". Ese módulo tiene que influir en todos los ETA de las operaciones del dron que tenga instalado el módulo. [P.D. Sí aplica porque aplica un multiplicador que afecta a todos los movimientos con tiempo]
 
-- [ ] Hay que cambiar el sistema de numerar jobs. Los jobs ya completados deben tener un identificador diferente a los jobs en proceso o queued. De otro modo, en partidas muy largas, habrá jobs en proceso cuyo id tendría un número enorme, y eso lo hace poco práctico. Hay que pensar cómo hacer esto. Una fórmula podría ser: 
+- [x] Hay que cambiar el sistema de numerar jobs. Los jobs ya completados/fallados deben tener un identificador diferente a los jobs en proceso o queued. De otro modo, en partidas muy largas, los jobs en proceso tendrán un id cada vez mayor, hasta hacerse enorme, lo cuál es poco práctico. Hay que pensar cómo hacer esto. Una fórmula podría ser: 
   si hay 3 jobs en proceso (o queued) esos tres jobs tendrán siempre los id's J1, J2 y J3. Si son cuatro, J1, J2, J3 y J4. Las numeraciones no se "resetean" hasta que no quede el panel de jobs completamente vacío. O sea, que si se ordena un primer job y, antes de que acabe, se ordena un segundo, estos se numerarán, correspondientemente, J1 y J2, y, cuando el J1 termine, el J2 seguirá teniendo el id J2 (y si entra en cola un tercer job, este tendrá el id J3). Una vez que los jobs estén completados, los nuevos jobs que entren se numerarán partiendo de "J1" de nuevo. No sé si me he explicado correctamente.
-En cuanto a la numeración de jobs completados, el formato podría ser "CJ1", "CJ2", etc. (las siglas "CJ" corresponderían a "Completed Job"). Si se te ocurre algo más claro e intuitivo, dímelo. 
-Por otra parte, es necesario que en el output de "jobs" se especifique el id de cada job (actualmente no aparece, si no me equivoco).
+En cuanto al id de jobs completados (es decir, el que sale en la lista "complete/failed" del output del comando "jobs"), se compondrá de un prefijo más un número. El prefijo podría ser "CJ" cuando se trate de un job completado (las siglas "CJ" corresponderían a "Completed Job"), y "FJ" cuando se trate de un job failed; tras el sufijo, se aplicará el número, que se irá generando en orden conforme se van completando/fallando trabajos. Por ejemplo, podríamos tener un listado CJ1, CJ2, CJ3, FJ5, CJ6, FJ7, etc. Es decir que si se han completado/fallado 10 jobs, el siguiente job completado/fallado recibirá el prefijo CJ o FJ, según corresponda, más el número 11 (y esto indistintamente del id que tuviera cuando estaba aún inacabado, en proceso o queued).
 
 - [x] No se debería permitir iniciar un viaje estando dockeado. Debería salir un mensaje de bloqueo advirtiendo que hace falta primero desdockear.
 
@@ -187,7 +198,7 @@ Por otra parte, es necesario que en el output de "jobs" se especifique el id de 
 
 - [x] Me encuentro en un nodo con id WRECK_B0C2BC. La radiación ambiente es 0.0000rad/s, es decir, no hay radiación. ¿Es habitual que haya localizaciones sin radiación? Esto no debería pasar. En todos los nodos debe haber radiación. El espacio exterior está lleno de radiación, siendo uno de los mayores desafíos para la exploración espacial. Cómo se configura y decide, acutalmente, qué nivel de radiación hay en cada localización?
 
-- [!] Si la integridad de un sistema está al máximo, se debería bloquear el intento de repararlo.
+- [x] Si la integridad de un sistema está al máximo, se debería bloquear el intento de repararlo.
 
 - [ ] El mensaje "uplink complete :: node data already exhausted" es quizá un poco confuso (puede dar a entender que tampoco hay data recuperable vía "salvage data"). Debería, mejor, ser "uplink complete :: uplink data already exhausted".
 

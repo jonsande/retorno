@@ -11,8 +11,10 @@ from retorno.core.actions import (
     DroneRecall,
     DroneReboot,
     Install,
+    PowerPlan,
     PowerShed,
     Repair,
+    SelfTestRepair,
     SystemOn,
     Undock,
 )
@@ -116,6 +118,61 @@ def main() -> None:
     engine.tick(state, Balance.REPAIR_TIME_S + 1.0)
     assert state.ship.drones["D2"].integrity > 0.5, "Expected D2 integrity increase from drone-to-drone repair"
 
+    # Ship-system repair uses the shared active repair amount for every system, including distribution.
+    state = _fresh_state()
+    _prepare_deployed_drone(state, "D1")
+    state.ship.systems["energy_distribution"].health = 0.4
+    state.ship.cargo_scrap = 100
+    queued = engine.apply_action(state, Repair(drone_id="D1", system_id="energy_distribution"))
+    assert any(e.type == EventType.JOB_QUEUED for e in queued), queued
+    queued_job = state.jobs.jobs[state.jobs.active_job_ids[-1]]
+    assert queued_job.params.get("repair_amount") == Balance.ACTIVE_REPAIR_SYSTEM_AMOUNT
+    expected_scrap = max(1, int(round(Balance.ACTIVE_REPAIR_SYSTEM_AMOUNT * Balance.REPAIR_SCRAP_PER_HEALTH)))
+    assert queued_job.params.get("repair_scrap") == expected_scrap
+    engine.tick(state, Balance.REPAIR_TIME_S + 1.0)
+    assert abs(state.ship.systems["energy_distribution"].health - (0.4 + Balance.ACTIVE_REPAIR_SYSTEM_AMOUNT)) < 1e-6
+
+    # Repair jobs charge only for the repair that can still be applied to the target.
+    state = _fresh_state()
+    _prepare_deployed_drone(state, "D1")
+    state.ship.systems["sensors"].health = 0.95
+    state.ship.cargo_scrap = 100
+    queued = engine.apply_action(state, Repair(drone_id="D1", system_id="sensors"))
+    assert any(e.type == EventType.JOB_QUEUED for e in queued), queued
+    queued_job = state.jobs.jobs[state.jobs.active_job_ids[-1]]
+    assert abs(float(queued_job.params.get("repair_amount", 0.0)) - 0.05) < 1e-6
+    assert queued_job.params.get("repair_scrap") == 1
+    engine.tick(state, Balance.REPAIR_TIME_S + 1.0)
+    assert abs(state.ship.systems["sensors"].health - 1.0) < 1e-6
+
+    state = _fresh_state()
+    _add_d2(state)
+    _prepare_deployed_drone(state, "D1")
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="drone_bay")
+    state.ship.drones["D2"].status = DroneStatus.DOCKED
+    state.ship.drones["D2"].location = DroneLocation(kind="ship_sector", id="drone_bay")
+    state.ship.drones["D2"].integrity = 0.95
+    state.ship.cargo_scrap = 100
+    queued = engine.apply_action(state, Repair(drone_id="D1", system_id="D2"))
+    assert any(e.type == EventType.JOB_QUEUED for e in queued), queued
+    queued_job = state.jobs.jobs[state.jobs.active_job_ids[-1]]
+    assert abs(float(queued_job.params.get("repair_amount", 0.0)) - 0.05) < 1e-6
+    assert queued_job.params.get("repair_scrap") == 1
+    engine.tick(state, Balance.REPAIR_TIME_S + 1.0)
+    assert abs(state.ship.drones["D2"].integrity - 1.0) < 1e-6
+
+    state = _fresh_state()
+    state.ship.installed_modules = ["selftest_rig"]
+    state.ship.systems["sensors"].health = 0.98
+    state.ship.cargo_scrap = 100
+    queued = engine.apply_action(state, SelfTestRepair(system_id="sensors"))
+    assert any(e.type == EventType.JOB_QUEUED for e in queued), queued
+    queued_job = state.jobs.jobs[state.jobs.active_job_ids[-1]]
+    assert abs(float(queued_job.params.get("repair_amount", 0.0)) - 0.02) < 1e-6
+    assert queued_job.params.get("repair_scrap") == 1
+    engine.tick(state, Balance.SELFTEST_REPAIR_TIME_S + 1.0)
+    assert abs(state.ship.systems["sensors"].health - 1.0) < 1e-6
+
     # Repair jobs can fail and consume only a configured fraction of the queued scrap.
     old_repair_fail_cfg = (
         Balance.REPAIR_JOB_FAIL_P_BASE,
@@ -150,6 +207,28 @@ def main() -> None:
             Balance.REPAIR_JOB_FAIL_SCRAP_CONSUME_FRACTION,
         ) = old_repair_fail_cfg
 
+    # Ship-system repair blocked if target system is already at max integrity.
+    state = _fresh_state()
+    _prepare_deployed_drone(state, "D1")
+    state.ship.systems["sensors"].health = 1.0
+    state.ship.cargo_scrap = 100
+    blocked = engine.apply_action(state, Repair(drone_id="D1", system_id="sensors"))
+    _assert_blocked_reason(blocked, "already_nominal")
+    assert not any(e.type == EventType.JOB_QUEUED for e in blocked), blocked
+    assert state.ship.cargo_scrap == 100
+    assert not state.jobs.active_job_ids
+
+    # Self-test repair blocked if target system is already at max integrity.
+    state = _fresh_state()
+    state.ship.cargo_scrap = 100
+    state.ship.cargo_modules = ["selftest_rig"]
+    state.ship.systems["sensors"].health = 1.0
+    blocked = engine.apply_action(state, SelfTestRepair(system_id="sensors"))
+    _assert_blocked_reason(blocked, "already_nominal")
+    assert not any(e.type == EventType.JOB_QUEUED for e in blocked), blocked
+    assert state.ship.cargo_scrap == 100
+    assert not state.jobs.active_job_ids
+
     # Drone-to-drone repair blocked if target not co-located.
     state = _fresh_state()
     _add_d2(state)
@@ -166,6 +245,29 @@ def main() -> None:
     state.ship.systems["drone_bay"].forced_offline = True
     events = engine.apply_action(state, SystemOn(system_id="drone_bay"))
     assert not any(e.type == EventType.BOOT_BLOCKED and e.data.get("reason") == "deps_unmet" for e in events), events
+
+    # Manual restore during CRUISE must raise load again for systems auto-shed by the plan.
+    state = _fresh_state()
+    state.ship.systems["sensors"].state = SystemState.NOMINAL
+    state.ship.systems["sensors"].forced_offline = False
+    state.ship.systems["sensors"].service.is_running = True
+    cruise_events = engine.apply_action(state, PowerPlan(mode="cruise"))
+    assert state.ship.op_mode == "CRUISE"
+    assert any(e.type == EventType.SYSTEM_STATE_CHANGED for e in cruise_events), cruise_events
+    cruise_load = engine._compute_load_kw(state)  # noqa: SLF001
+    engine.apply_action(state, SystemOn(system_id="sensors"))
+    sensors_load = engine._compute_load_kw(state)  # noqa: SLF001
+    assert sensors_load > cruise_load, (
+        f"Manual restore in CRUISE should increase load for sensors: {sensors_load} <= {cruise_load}"
+    )
+    engine.apply_action(state, SystemOn(system_id="drone_bay"))
+    bay_load = engine._compute_load_kw(state)  # noqa: SLF001
+    assert bay_load > sensors_load, (
+        f"Manual restore in CRUISE should increase load for drone_bay: {bay_load} <= {sensors_load}"
+    )
+    engine.apply_action(state, PowerShed(system_id="sensors"))
+    shed_load = engine._compute_load_kw(state)  # noqa: SLF001
+    assert shed_load < bay_load, f"Power shed in CRUISE should reduce load again: {shed_load} >= {bay_load}"
 
     # LIMITED eta multipliers for bay-assisted actions.
     state = _fresh_state()

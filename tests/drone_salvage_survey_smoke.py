@@ -8,6 +8,7 @@ from retorno.cli.parser import parse_command
 from retorno.config.balance import Balance
 from retorno.core.actions import DroneDeploy, DroneSurvey, SalvageDrone, SalvageScrap
 from retorno.core.engine import Engine
+from retorno.core.lore import collect_node_salvage_data_files
 from retorno.io.save_load import load_single_slot, save_single_slot
 from retorno.model.drones import DroneLocation, DroneStatus
 from retorno.model.events import EventType
@@ -192,6 +193,47 @@ def main() -> None:
             Balance.SALVAGE_DATA_FRAG_P_OTHER,
             Balance.LORE_SINGLES_BASE_P,
             Balance.DRONE_SURVEY_DATA_FALSE_NEGATIVE_P,
+        ) = old_cfg
+
+    # Procedural salvage intel should not emit self-referential NODE entries.
+    self_ref_state = create_initial_state_sandbox()
+    self_ref_state.world.space.nodes["SELF_NODE"] = SpaceNode(
+        node_id="SELF_NODE",
+        name="Self Node",
+        kind="station",
+        region="disk",
+    )
+    self_ref_state.ship.current_node_id = "SELF_NODE"
+    self_ref_state.world.current_node_id = "SELF_NODE"
+    self_ref_state.ship.docked_node_id = "SELF_NODE"
+    old_cfg = (
+        Balance.SALVAGE_DATA_LOG_P_STATION_SHIP,
+        Balance.SALVAGE_DATA_LOG_P_OTHER,
+        Balance.SALVAGE_DATA_MAIL_P_STATION_SHIP,
+        Balance.SALVAGE_DATA_MAIL_P_OTHER,
+        Balance.SALVAGE_DATA_FRAG_P_STATION_DERELICT,
+        Balance.SALVAGE_DATA_FRAG_P_OTHER,
+        Balance.LORE_SINGLES_BASE_P,
+    )
+    try:
+        Balance.SALVAGE_DATA_LOG_P_STATION_SHIP = 1.0
+        Balance.SALVAGE_DATA_LOG_P_OTHER = 1.0
+        Balance.SALVAGE_DATA_MAIL_P_STATION_SHIP = 0.0
+        Balance.SALVAGE_DATA_MAIL_P_OTHER = 0.0
+        Balance.SALVAGE_DATA_FRAG_P_STATION_DERELICT = 1.0
+        Balance.SALVAGE_DATA_FRAG_P_OTHER = 1.0
+        Balance.LORE_SINGLES_BASE_P = 0.0
+        files = collect_node_salvage_data_files(self_ref_state, "SELF_NODE")
+        assert files == [], f"Expected no procedural self-node intel files; got {files}"
+    finally:
+        (
+            Balance.SALVAGE_DATA_LOG_P_STATION_SHIP,
+            Balance.SALVAGE_DATA_LOG_P_OTHER,
+            Balance.SALVAGE_DATA_MAIL_P_STATION_SHIP,
+            Balance.SALVAGE_DATA_MAIL_P_OTHER,
+            Balance.SALVAGE_DATA_FRAG_P_STATION_DERELICT,
+            Balance.SALVAGE_DATA_FRAG_P_OTHER,
+            Balance.LORE_SINGLES_BASE_P,
         ) = old_cfg
 
     state.ship.drones["D1"].battery = 1.0

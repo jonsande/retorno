@@ -34,10 +34,11 @@ from retorno.runtime.operator_config import (
     config_keys,
     config_show_lines,
     config_value_choices,
+    resolve_help_verbose,
 )
 from retorno.core.power_policy import is_parsed_command_allowed_in_core_os_critical
 from retorno.model.events import Event, EventType, Severity, SourceRef
-from retorno.model.jobs import JobStatus, JobType
+from retorno.model.jobs import JobStatus, JobType, active_job_display_ids
 from retorno.runtime.data_loader import load_modules, load_arcs, load_locations, load_worldgen_templates
 from retorno.runtime.startup import load_startup_sequence_lines
 from retorno.config.balance import Balance
@@ -194,6 +195,7 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
             [
                 ("help", "show command list", "muestra lista de comandos"),
                 ("help --verbose", "show command list with short descriptions", "muestra comandos con descripciones breves"),
+                ("help --no-verbose", "show command list without descriptions", "muestra comandos sin descripciones"),
                 ("clear", "clear terminal output", "limpia salida de terminal"),
                 ("exit", "save and close session", "guarda y cierra sesión"),
                 ("quit", "save and close session", "guarda y cierra sesión"),
@@ -218,6 +220,7 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ("intel import <path>", "import intel from file", "importa intel desde archivo"),
                 ("intel export <path>", "export intel to file", "exporta intel a archivo"),
                 ("config set lang <en|es>", "set interface language", "cambia idioma de interfaz"),
+                ("config set verbose <on|off>", "toggle default help verbosity", "activa o desactiva la verbosidad por defecto de help"),
                 ("config set audio <on|off>", "toggle all game audio", "activa o desactiva todo el audio"),
                 ("config set ambientsound <on|off>", "toggle ambient loop", "activa o desactiva el loop ambiental"),
                 ("config show", "show current config", "muestra configuración actual"),
@@ -1926,16 +1929,12 @@ def render_jobs(state, limit: int | None = 5) -> None:
     history = [
         job
         for job in jobs_state.jobs.values()
-        if job.job_id not in jobs_state.active_job_ids and job.status in {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}
+        if (job.internal_id or job.job_id) not in jobs_state.active_job_ids
+        and job.status in {JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED}
     ]
     if history:
-        print("Recent complete/failed:")
-        def _job_sort_key(job):
-            try:
-                return int(job.job_id[1:]) if job.job_id.startswith("J") else int(job.job_id)
-            except Exception:
-                return 0
-        history_sorted = sorted(history, key=_job_sort_key, reverse=True)
+        print("Recent complete/failed/cancelled:")
+        history_sorted = sorted(history, key=lambda job: int(job.terminal_seq or 0), reverse=True)
         if limit is not None:
             history_sorted = history_sorted[:limit]
         for job in history_sorted:
@@ -1964,6 +1963,7 @@ def render_drone_status(state, drone_id: str | None = None) -> None:
         battery_pct = 100.0 * d.battery / max(0.000001, profile.battery_max_effective)
         integrity_pct = 100.0 * d.integrity / max(0.000001, profile.integrity_max_effective)
         installed_modules = list(d.installed_modules or [])
+        module_counts = _module_counts(installed_modules)
         slots_used = 0
         for mid in installed_modules:
             info = modules.get(mid, {})
@@ -1972,9 +1972,6 @@ def render_drone_status(state, drone_id: str | None = None) -> None:
             slots_used += int(info.get("slot_cost", 1) or 1)
         modules_suffix = ""
         if installed_modules:
-            module_counts: dict[str, int] = {}
-            for mid in installed_modules:
-                module_counts[mid] = module_counts.get(mid, 0) + 1
             listed = ", ".join(
                 f"{mid} x{count}" if count > 1 else mid
                 for mid, count in module_counts.items()
@@ -1997,6 +1994,14 @@ def render_drone_status(state, drone_id: str | None = None) -> None:
             f"mods={len(installed_modules)}{modules_suffix} "
             f"autorecall={ar_mode}@{ar_threshold}%"
         )
+        if drone_id is not None and installed_modules:
+            label = "módulos instalados" if locale == "es" else "installed modules"
+            print(f"  {label}:")
+            for mid, count in sorted(module_counts.items()):
+                info = modules.get(mid, {})
+                name = str(info.get("name", mid))
+                suffix = f" x{count}" if count > 1 else ""
+                print(f"  - {name}{suffix} [{mid}]")
 
 
 def _set_drone_autorecall(state, drone_id: str, enabled: bool | None = None, threshold: float | None = None) -> None:
@@ -2092,6 +2097,13 @@ def _module_drawbacks(info: dict, locale: str) -> list[str]:
     return [str(item) for item in raw if str(item).strip()]
 
 
+def _module_counts(module_ids: list[str]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for mid in module_ids:
+        counts[mid] = counts.get(mid, 0) + 1
+    return counts
+
+
 def render_modules_installed(state) -> None:
     print("\n=== MODULES ===")
     locale = state.os.locale.value
@@ -2102,9 +2114,7 @@ def render_modules_installed(state) -> None:
     print("ship installed:")
     ship_installed = list(state.ship.installed_modules or [])
     if ship_installed:
-        ship_counts: dict[str, int] = {}
-        for mid in ship_installed:
-            ship_counts[mid] = ship_counts.get(mid, 0) + 1
+        ship_counts = _module_counts(ship_installed)
         for mid, count in sorted(ship_counts.items()):
             info = modules.get(mid, {})
             name = info.get("name", mid)
@@ -2129,9 +2139,7 @@ def render_modules_installed(state) -> None:
                 continue
             used_slots += int(info.get("slot_cost", 1) or 1)
         print(f"- {drone_id} (slots {used_slots}/{int(drone.module_slots_max)}):")
-        counts: dict[str, int] = {}
-        for mid in mids:
-            counts[mid] = counts.get(mid, 0) + 1
+        counts = _module_counts(mids)
         for mid, count in sorted(counts.items()):
             info = modules.get(mid, {})
             name = info.get("name", mid)
@@ -3237,7 +3245,7 @@ def _core_os_damaged_blocks(parsed) -> bool:
 
 
 def _terminal_state_allows(parsed) -> bool:
-    if parsed in {"HELP", "HELP_VERBOSE", "EXIT", "CLEAR"}:
+    if parsed in {"HELP", "HELP_VERBOSE", "HELP_NO_VERBOSE", "EXIT", "CLEAR"}:
         return True
     if isinstance(parsed, Status):
         return True
@@ -6115,7 +6123,7 @@ def main() -> None:
                     candidates = [c for c in base_commands if c.startswith(text)]
                 elif cmd == "help":
                     if len(tokens) == 2:
-                        candidates = [c for c in ["--verbose", "-v"] if c.startswith(text)]
+                        candidates = [c for c in ["--verbose", "-v", "--no-verbose"] if c.startswith(text)]
                 elif cmd == "diag" or cmd == "about" or cmd == "locate":
                     candidates = [s for s in systems if s.startswith(text)]
                 elif cmd == "boot":
@@ -6241,7 +6249,7 @@ def main() -> None:
                     if len(tokens) == 2:
                         candidates = [c for c in ["cancel"] if c.startswith(text)]
                     elif len(tokens) == 3 and tokens[1] == "cancel":
-                        candidates = [jid for jid in locked_state.jobs.active_job_ids if jid.startswith(text)]
+                        candidates = [jid for jid in active_job_display_ids(locked_state.jobs) if jid.startswith(text)]
                 elif cmd == "log":
                     if len(tokens) == 2:
                         candidates = [c for c in ["copy"] if c.startswith(text)]
@@ -6519,13 +6527,20 @@ def main() -> None:
             _drain_auto_events()
             with loop.with_lock() as locked_state:
                 locale = locked_state.os.locale.value
-            print_help(locale)
+                verbose = resolve_help_verbose(locked_state.os)
+            print_help(locale, verbose=verbose)
             continue
         if parsed == "HELP_VERBOSE":
             _drain_auto_events()
             with loop.with_lock() as locked_state:
                 locale = locked_state.os.locale.value
             print_help(locale, verbose=True)
+            continue
+        if parsed == "HELP_NO_VERBOSE":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                locale = locked_state.os.locale.value
+            print_help(locale, verbose=False)
             continue
         if parsed == "CLEAR":
             print("\033[2J\033[H", end="")

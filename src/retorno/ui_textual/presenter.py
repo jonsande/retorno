@@ -6,6 +6,7 @@ from contextlib import redirect_stdout
 from retorno.cli import repl
 from retorno.util.timefmt import format_elapsed_short
 from retorno.config.balance import Balance
+from retorno.runtime.operator_config import resolve_help_verbose
 
 
 def _capture_output(func, *args, **kwargs) -> list[str]:
@@ -110,9 +111,9 @@ def build_jobs_lines(state) -> list[str]:
     return filtered
 
 
-def build_help_lines(state, verbose: bool = False) -> list[str]:
+def build_help_lines(state, verbose: bool | None = None) -> list[str]:
     locale = state.os.locale.value
-    return _capture_output(repl.print_help, locale, verbose=verbose)
+    return _capture_output(repl.print_help, locale, verbose=resolve_help_verbose(state.os, verbose))
 
 
 def build_command_output(func, *args, **kwargs) -> list[str]:

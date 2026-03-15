@@ -42,6 +42,7 @@ class AudioSettings:
 class OSState:
     auth_levels: set[str] = field(default_factory=lambda: {"GUEST"})
     locale: Locale = Locale.EN
+    help_verbose: bool = True
     debug_enabled: bool = False
     fs: dict[str, FSNode] = field(default_factory=dict)
     mail_received_t: dict[str, float] = field(default_factory=dict)

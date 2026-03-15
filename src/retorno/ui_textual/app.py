@@ -23,6 +23,7 @@ from retorno.core.actions import Hibernate
 from retorno.config.balance import Balance
 from retorno.model.events import EventType, Severity
 from retorno.model.drones import DroneStatus
+from retorno.model.jobs import active_job_display_ids
 from retorno.model.os import Locale, list_dir, normalize_path
 from retorno.runtime.data_loader import load_modules
 from retorno.runtime.loop import GameLoop
@@ -32,6 +33,7 @@ from retorno.runtime.operator_config import (
     config_keys,
     config_show_lines,
     config_value_choices,
+    resolve_help_verbose,
 )
 from retorno.runtime.startup import load_startup_sequence_lines
 from retorno.ui_textual import presenter
@@ -437,7 +439,7 @@ class RetornoTextualApp(App):
 
     def action_help(self) -> None:
         with self.loop.with_lock() as state:
-            self._log_lines(presenter.build_help_lines(state))
+            self._log_lines(presenter.build_help_lines(state, verbose=resolve_help_verbose(state.os)))
 
     def action_help_verbose(self) -> None:
         with self.loop.with_lock() as state:
@@ -648,7 +650,7 @@ class RetornoTextualApp(App):
             return [c for c in base_commands if c.startswith(text)]
         if cmd == "help":
             if len(tokens) == 2:
-                return [c for c in ["--verbose", "-v"] if c.startswith(text)]
+                return [c for c in ["--verbose", "-v", "--no-verbose"] if c.startswith(text)]
         if cmd in {"diag", "about", "locate"}:
             return [s for s in systems if s.startswith(text)]
         if cmd == "boot":
@@ -745,7 +747,7 @@ class RetornoTextualApp(App):
             if len(tokens) == 2:
                 return [c for c in ["cancel"] if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "cancel":
-                return [jid for jid in state.jobs.active_job_ids if jid.startswith(text)]
+                return [jid for jid in active_job_display_ids(state.jobs) if jid.startswith(text)]
         if cmd == "log":
             if len(tokens) == 2:
                 return [c for c in ["copy"] if c.startswith(text)]
@@ -1369,6 +1371,10 @@ class RetornoTextualApp(App):
             return
         if parsed == "HELP_VERBOSE":
             self.action_help_verbose()
+            return
+        if parsed == "HELP_NO_VERBOSE":
+            with self.loop.with_lock() as state:
+                self._log_lines(presenter.build_help_lines(state, verbose=False))
             return
         if parsed == "CLEAR":
             self.query_one("#log", RichLog).clear()

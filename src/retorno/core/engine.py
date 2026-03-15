@@ -41,7 +41,6 @@ from retorno.core.actions import (
 from retorno.core.gamestate import GameState
 from retorno.core.lore import (
     LoreContext,
-    build_procedural_salvage_mail_content,
     build_lore_context,
     close_window_on_orbit_entry,
     collect_node_salvage_data_files,
@@ -61,7 +60,18 @@ from retorno.core.power_policy import (
 )
 from retorno.model.drones import DroneEffectiveProfile, DroneLocation, DroneState, DroneStatus, compute_drone_effective_profile
 from retorno.model.events import AlertState, Event, EventManagerState, EventType, Severity, SourceRef
-from retorno.model.jobs import Job, JobManagerState, JobStatus, JobType, RiskProfile, TargetRef
+from retorno.model.jobs import (
+    Job,
+    JobManagerState,
+    JobStatus,
+    JobType,
+    RiskProfile,
+    TargetRef,
+    allocate_job_ids,
+    find_job_key,
+    finalize_job,
+    job_id_numeric_suffix,
+)
 from retorno.model.world import add_known_link, is_hop_within_cap, SpaceNode, sector_id_for_pos
 from retorno.runtime.data_loader import load_locations, load_modules
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path, mount_files
@@ -916,6 +926,23 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
+            scrap_cost = int(mod.get("scrap_cost", 0))
+            if state.ship.cargo_scrap < scrap_cost:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    f"Install blocked: insufficient scrap ({state.ship.cargo_scrap}/{scrap_cost})",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "scrap_insufficient",
+                        "module_id": action.module_id,
+                        "scrap_cost": scrap_cost,
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
             slot_cost = int(mod.get("slot_cost", 1) or 1)
             used_slots = self._drone_slots_used(target_drone, modules)
             if used_slots + slot_cost > max(0, int(target_drone.module_slots_max)):
@@ -949,6 +976,7 @@ class Engine:
                 params={
                     "module_id": action.module_id,
                     "target_drone_id": target_drone.drone_id,
+                    "scrap_cost": scrap_cost,
                     "slot_cost": slot_cost,
                 },
             )
@@ -1328,7 +1356,8 @@ class Engine:
             )
 
         if isinstance(action, JobCancel):
-            job = state.jobs.jobs.get(action.job_id)
+            job_key = self._resolve_job_key(state.jobs, action.job_id)
+            job = state.jobs.jobs.get(job_key) if job_key else None
             if not job:
                 event = self._make_event(
                     state,
@@ -1351,17 +1380,15 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            job.status = JobStatus.CANCELLED
-            if action.job_id in state.jobs.active_job_ids:
-                state.jobs.active_job_ids.remove(action.job_id)
-            event = self._make_event(
+            job = self._finalize_job(state.jobs, job, JobStatus.CANCELLED)
+            event = self._make_job_outcome_event(
                 state,
+                job,
                 EventType.JOB_FAILED,
                 Severity.INFO,
                 SourceRef(kind="ship", id=state.ship.ship_id),
-                f"Job cancelled: {action.job_id}",
+                f"Job cancelled: {job.job_id}",
                 data={
-                    "job_id": action.job_id,
                     "job_type": job.job_type.value,
                     "message_key": "job_cancelled",
                 },
@@ -2117,10 +2144,17 @@ class Engine:
                     )
                     self._record_event(state.events, event)
                     return [event]
-                repair_amount = 0.15
+                repair_amount = self._effective_repair_amount(
+                    target_drone.integrity,
+                    target_profile.integrity_max_effective,
+                    Balance.ACTIVE_REPAIR_DRONE_AMOUNT,
+                )
                 profile = self._drone_profile(state, drone)
-                repair_scrap_base = max(1, int(round(repair_amount * Balance.REPAIR_SCRAP_PER_HEALTH)))
-                repair_scrap = max(1, int(round(repair_scrap_base * profile.repair_scrap_cost_mult_effective)))
+                repair_scrap = self._repair_scrap_cost(
+                    repair_amount,
+                    Balance.REPAIR_SCRAP_PER_HEALTH,
+                    profile.repair_scrap_cost_mult_effective,
+                )
                 if state.ship.cargo_scrap < repair_scrap:
                     event = self._make_event(
                         state,
@@ -2167,6 +2201,21 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
+            if target_system.health >= 1.0:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.INFO,
+                    SourceRef(kind="ship_system", id=target_system.system_id),
+                    f"Repair skipped: {target_system.system_id} already at full integrity",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "already_nominal",
+                        "system_id": target_system.system_id,
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
 
             pre_events: list[Event] = []
             if is_critical_power_state(state):
@@ -2201,11 +2250,17 @@ class Engine:
                     self._record_event(state.events, warn)
                     pre_events.append(warn)
 
-            default_repair = 0.25 if action.system_id == "energy_distribution" else 0.15
-            repair_amount = float(default_repair)
+            repair_amount = self._effective_repair_amount(
+                target_system.health,
+                1.0,
+                Balance.ACTIVE_REPAIR_SYSTEM_AMOUNT,
+            )
             profile = self._drone_profile(state, drone)
-            repair_scrap_base = max(1, int(round(repair_amount * Balance.REPAIR_SCRAP_PER_HEALTH)))
-            repair_scrap = max(1, int(round(repair_scrap_base * profile.repair_scrap_cost_mult_effective)))
+            repair_scrap = self._repair_scrap_cost(
+                repair_amount,
+                Balance.REPAIR_SCRAP_PER_HEALTH,
+                profile.repair_scrap_cost_mult_effective,
+            )
             if state.ship.cargo_scrap < repair_scrap:
                 event = self._make_event(
                     state,
@@ -2230,8 +2285,6 @@ class Engine:
                 "repair_fail_p_mult": profile.repair_fail_p_mult_effective,
                 "repair_scrap_cost_mult": profile.repair_scrap_cost_mult_effective,
             }
-            if action.system_id == "energy_distribution":
-                params["repair_amount"] = 0.25
             profile = self._drone_profile(state, drone)
             return pre_events + self._enqueue_job(
                 state,
@@ -2255,6 +2308,21 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
+            if system.health >= 1.0:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.INFO,
+                    SourceRef(kind="ship_system", id=system.system_id),
+                    f"Repair skipped: {system.system_id} already at full integrity",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "already_nominal",
+                        "system_id": system.system_id,
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
             if not self._has_unlock(state, "selftest_repair"):
                 event = self._make_event(
                     state,
@@ -2266,7 +2334,11 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            repair_scrap = max(1, int(round(Balance.SELFTEST_REPAIR_AMOUNT * Balance.SELFTEST_REPAIR_SCRAP_PER_HEALTH)))
+            repair_amount = self._effective_repair_amount(system.health, 1.0, Balance.SELFTEST_REPAIR_AMOUNT)
+            repair_scrap = self._repair_scrap_cost(
+                repair_amount,
+                Balance.SELFTEST_REPAIR_SCRAP_PER_HEALTH,
+            )
             if state.ship.cargo_scrap < repair_scrap:
                 event = self._make_event(
                     state,
@@ -2290,7 +2362,11 @@ class Engine:
                 TargetRef(kind="ship_system", id=action.system_id),
                 owner_id=None,
                 eta_s=Balance.SELFTEST_REPAIR_TIME_S,
-                params={"system_id": action.system_id, "repair_scrap": repair_scrap},
+                params={
+                    "system_id": action.system_id,
+                    "repair_amount": repair_amount,
+                    "repair_scrap": repair_scrap,
+                },
             )
 
         if isinstance(action, DroneSurvey):
@@ -3003,13 +3079,14 @@ class Engine:
             if job.eta_s <= 0:
                 failed_event = self._maybe_fail_repair_job(state, job)
                 if failed_event is not None:
-                    job.status = JobStatus.FAILED
                     events.append(failed_event)
                     completed.append(job_id)
                     continue
                 job.status = JobStatus.COMPLETED
                 completed.append(job_id)
                 events.extend(self._apply_job_effect(state, job))
+                if job.status == JobStatus.COMPLETED and job.terminal_seq is None:
+                    self._finalize_job(state.jobs, job, JobStatus.COMPLETED)
 
         for job_id in completed:
             if job_id in jobs_state.active_job_ids:
@@ -3022,14 +3099,14 @@ class Engine:
             node_id = job.params.get("node_id", job.target.id if job.target else "")
             system = state.ship.systems.get("sensors")
             if not system or self._state_rank(system.state) < self._state_rank(SystemState.LIMITED):
-                event = self._make_event(
+                event = self._make_job_outcome_event(
                     state,
+                    job,
                     EventType.JOB_FAILED,
                     Severity.WARN,
                     SourceRef(kind="ship_system", id="sensors"),
                     f"Route solve interrupted: sensors unavailable for {node_id}",
                     data={
-                        "job_id": job.job_id,
                         "job_type": job.job_type.value,
                         "node_id": node_id,
                         "message_key": "job_failed_route_sensors_unavailable",
@@ -3039,14 +3116,14 @@ class Engine:
                 self._record_event(state.events, event)
                 return event
             if not system.service or system.service.service_name != "sensord" or not system.service.is_running:
-                event = self._make_event(
+                event = self._make_job_outcome_event(
                     state,
+                    job,
                     EventType.JOB_FAILED,
                     Severity.WARN,
                     SourceRef(kind="ship_system", id="sensors"),
                     f"Route solve interrupted: sensord stopped during solve for {node_id}",
                     data={
-                        "job_id": job.job_id,
                         "job_type": job.job_type.value,
                         "node_id": node_id,
                         "message_key": "job_failed_route_sensord_stopped",
@@ -3060,14 +3137,14 @@ class Engine:
         if job.job_type == JobType.DOCK:
             node_id = job.params.get("node_id", job.target.id if job.target else "")
             if state.ship.in_transit:
-                event = self._make_event(
+                event = self._make_job_outcome_event(
                     state,
+                    job,
                     EventType.JOB_FAILED,
                     Severity.WARN,
                     SourceRef(kind="ship", id=state.ship.ship_id),
                     f"Dock interrupted: ship entered transit before docking at {node_id}",
                     data={
-                        "job_id": job.job_id,
                         "job_type": job.job_type.value,
                         "node_id": node_id,
                         "message_key": "job_failed_dock_interrupted",
@@ -3076,14 +3153,14 @@ class Engine:
                 self._record_event(state.events, event)
                 return event
             if node_id and state.world.current_node_id != node_id:
-                event = self._make_event(
+                event = self._make_job_outcome_event(
                     state,
+                    job,
                     EventType.JOB_FAILED,
                     Severity.WARN,
                     SourceRef(kind="ship", id=state.ship.ship_id),
                     f"Dock interrupted: ship left {node_id} before docking completed",
                     data={
-                        "job_id": job.job_id,
                         "job_type": job.job_type.value,
                         "node_id": node_id,
                         "message_key": "job_failed_dock_interrupted",
@@ -3096,14 +3173,14 @@ class Engine:
         if job.job_type == JobType.UNDOCK:
             node_id = job.params.get("node_id", job.target.id if job.target else "")
             if state.ship.in_transit:
-                event = self._make_event(
+                event = self._make_job_outcome_event(
                     state,
+                    job,
                     EventType.JOB_FAILED,
                     Severity.WARN,
                     SourceRef(kind="ship", id=state.ship.ship_id),
                     f"Undock interrupted: ship entered transit before undocking from {node_id}",
                     data={
-                        "job_id": job.job_id,
                         "job_type": job.job_type.value,
                         "node_id": node_id,
                         "message_key": "job_failed_undock_interrupted",
@@ -3112,14 +3189,14 @@ class Engine:
                 self._record_event(state.events, event)
                 return event
             if node_id and state.world.current_node_id != node_id:
-                event = self._make_event(
+                event = self._make_job_outcome_event(
                     state,
+                    job,
                     EventType.JOB_FAILED,
                     Severity.WARN,
                     SourceRef(kind="ship", id=state.ship.ship_id),
                     f"Undock interrupted: ship left {node_id} before undocking completed",
                     data={
-                        "job_id": job.job_id,
                         "job_type": job.job_type.value,
                         "node_id": node_id,
                         "message_key": "job_failed_undock_interrupted",
@@ -3128,14 +3205,14 @@ class Engine:
                 self._record_event(state.events, event)
                 return event
             if node_id and state.ship.docked_node_id != node_id:
-                event = self._make_event(
+                event = self._make_job_outcome_event(
                     state,
+                    job,
                     EventType.JOB_FAILED,
                     Severity.WARN,
                     SourceRef(kind="ship", id=state.ship.ship_id),
                     f"Undock interrupted: ship no longer docked at {node_id}",
                     data={
-                        "job_id": job.job_id,
                         "job_type": job.job_type.value,
                         "node_id": node_id,
                         "message_key": "job_failed_undock_interrupted",
@@ -3154,6 +3231,16 @@ class Engine:
         drone = state.ship.drones.get(drone_id)
         if drone:
             drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_REPAIR)
+
+    def _effective_repair_amount(self, current: float, maximum: float, nominal_amount: float) -> float:
+        missing = max(0.0, float(maximum) - float(current))
+        return max(0.0, min(float(nominal_amount), missing))
+
+    def _repair_scrap_cost(self, repair_amount: float, scrap_per_full: float, cost_mult: float = 1.0) -> int:
+        if repair_amount <= 0.0:
+            return 0
+        base_cost = max(1, int(round(float(repair_amount) * float(scrap_per_full))))
+        return max(1, int(round(base_cost * float(cost_mult))))
 
     def _maybe_fail_repair_job(self, state: GameState, job: Job) -> Event | None:
         if job.job_type not in {JobType.REPAIR_SYSTEM, JobType.REPAIR_DRONE, JobType.SELFTEST_REPAIR}:
@@ -3188,8 +3275,9 @@ class Engine:
             target_kind = "ship_system"
             target_id = job.target.id
 
-        event = self._make_event(
+        event = self._make_job_outcome_event(
             state,
+            job,
             EventType.JOB_FAILED,
             Severity.WARN,
             SourceRef(kind=target_kind, id=target_id),
@@ -3198,7 +3286,6 @@ class Engine:
                 f"Consumed {scrap_consumed}/{repair_scrap} scrap and refunded {scrap_refunded}."
             ),
             data={
-                "job_id": job.job_id,
                 "job_type": job.job_type.value,
                 "message_key": "job_failed_repair_attempt",
                 "target_id": target_id,
@@ -3250,62 +3337,6 @@ class Engine:
         state.world.fine_ranges_km[to_id] = fine_km
         return fine_km
 
-    def _procedural_fs_files(self, state: GameState, node) -> list[dict]:
-        h = hashlib.blake2b(digest_size=8)
-        h.update(str(state.meta.rng_seed).encode("utf-8"))
-        h.update(node.node_id.encode("utf-8"))
-        seed = int.from_bytes(h.digest(), "big", signed=False)
-        rng = random.Random(seed)
-        files: list[dict] = []
-
-        def _add(path: str, content: str) -> None:
-            files.append({"path": path, "access": AccessLevel.GUEST.value, "content": content})
-
-        link_line = ""
-        if node.links:
-            link = sorted(node.links)[0]
-            link_line = f"LINK: {node.node_id} -> {link}\n"
-        has_link_intel = False
-
-        # Nav log (common)
-        p_log = Balance.SALVAGE_DATA_LOG_P_STATION_SHIP if node.kind in {"station", "ship"} else Balance.SALVAGE_DATA_LOG_P_OTHER
-        if rng.random() < p_log:
-            content = link_line or f"NODE: {node.node_id}\n"
-            _add("/logs/nav.log", content)
-            if "LINK:" in content:
-                has_link_intel = True
-
-        # Mail (occasional)
-        p_mail = Balance.SALVAGE_DATA_MAIL_P_STATION_SHIP if node.kind in {"station", "ship"} else Balance.SALVAGE_DATA_MAIL_P_OTHER
-        if rng.random() < p_mail:
-            lang = state.os.locale.value
-            content = build_procedural_salvage_mail_content(state, node)
-            _add(f"/mail/inbox/0001.{lang}.txt", content)
-
-        # Nav fragment (rare)
-        p_frag = (
-            Balance.SALVAGE_DATA_FRAG_P_STATION_DERELICT
-            if node.kind in {"station", "derelict"}
-            else Balance.SALVAGE_DATA_FRAG_P_OTHER
-        )
-        if rng.random() < p_frag:
-            frag_id = f"{rng.getrandbits(16):04x}"
-            if link_line and has_link_intel:
-                # Avoid semantic duplication when nav.log already carries this route intel.
-                content = f"NODE: {node.node_id}\n"
-            else:
-                content = link_line or f"NODE: {node.node_id}\n"
-            _add(f"/data/nav/fragments/frag_{frag_id}.txt", content)
-            if "LINK:" in content:
-                has_link_intel = True
-
-        # Guarantee at least one LINK if links exist.
-        if link_line and not has_link_intel:
-            frag_id = f"{rng.getrandbits(16):04x}"
-            _add(f"/data/nav/fragments/frag_{frag_id}.txt", link_line)
-
-        return files
-
     def _build_lore_context(self, state: GameState, node_id: str) -> LoreContext:
         return build_lore_context(state, node_id)
 
@@ -3353,17 +3384,18 @@ class Engine:
         if job.job_type == JobType.SELFTEST_REPAIR and job.target:
             system = state.ship.systems.get(job.target.id)
             if system:
-                system.health = min(1.0, system.health + Balance.SELFTEST_REPAIR_AMOUNT)
+                repair_amount = float(job.params.get("repair_amount", Balance.SELFTEST_REPAIR_AMOUNT))
+                system.health = min(1.0, system.health + repair_amount)
                 self._apply_health_state(system, state, events, cause="selftest")
                 events.append(
-                    self._make_event(
+                    self._make_job_outcome_event(
                         state,
+                        job,
                         EventType.JOB_COMPLETED,
                         Severity.INFO,
                         SourceRef(kind="ship_system", id=system.system_id),
                         f"Self-test repair completed: {system.system_id}",
                         data={
-                            "job_id": job.job_id,
                             "job_type": job.job_type.value,
                             "message_key": "job_completed_selftest",
                         },
@@ -3374,21 +3406,20 @@ class Engine:
             system = state.ship.systems.get(job.target.id)
             if system:
                 self._drain_repair_operator_battery(state, job)
-                default_repair = 0.25 if system.system_id == "energy_distribution" else 0.15
-                repair_amount = float(job.params.get("repair_amount", default_repair))
+                repair_amount = float(job.params.get("repair_amount", Balance.ACTIVE_REPAIR_SYSTEM_AMOUNT))
                 system.health = min(1.0, system.health + repair_amount)
                 if system.system_id == "energy_distribution":
                     system.state_locked = False
                 self._apply_health_state(system, state, events, cause="repair")
                 events.append(
-                    self._make_event(
+                    self._make_job_outcome_event(
                         state,
+                        job,
                         EventType.JOB_COMPLETED,
                         Severity.INFO,
                         SourceRef(kind="ship_system", id=system.system_id),
                         f"Repair completed for {system.system_id}",
                         data={
-                            "job_id": job.job_id,
                             "job_type": job.job_type.value,
                             "system_id": system.system_id,
                             "message_key": "job_completed_repair",
@@ -3404,14 +3435,14 @@ class Engine:
                 target_profile = self._drone_profile(state, target_drone)
                 target_drone.integrity = min(target_profile.integrity_max_effective, target_drone.integrity + repair_amount)
                 events.append(
-                    self._make_event(
+                    self._make_job_outcome_event(
                         state,
+                        job,
                         EventType.JOB_COMPLETED,
                         Severity.INFO,
                         SourceRef(kind="drone", id=target_drone.drone_id),
                         f"Drone repair completed for {target_drone.drone_id}",
                         data={
-                            "job_id": job.job_id,
                             "job_type": job.job_type.value,
                             "drone_id": target_drone.drone_id,
                             "message_key": "job_completed_drone_repair",
@@ -3429,14 +3460,14 @@ class Engine:
                 state.os.auth_levels.add(level)
             message = f"Credential cache restored: {level}" if not already else f"{level} already available"
             events.append(
-                self._make_event(
+                self._make_job_outcome_event(
                     state,
+                    job,
                     EventType.JOB_COMPLETED,
                     Severity.INFO,
                     SourceRef(kind="ship", id=state.ship.ship_id),
                     message,
                     data={
-                        "job_id": job.job_id,
                         "job_type": job.job_type.value,
                         "level": level,
                     },
@@ -3455,14 +3486,14 @@ class Engine:
                 if not system.forced_offline:
                     self._apply_health_state(system, state, events, cause="boot")
                 events.append(
-                    self._make_event(
+                    self._make_job_outcome_event(
                         state,
+                        job,
                         EventType.JOB_COMPLETED,
                         Severity.INFO,
                         SourceRef(kind="ship_system", id=system.system_id),
                         f"Service booted: {system.service.service_name}",
                         data={
-                            "job_id": job.job_id,
                             "job_type": job.job_type.value,
                             "service": system.service.service_name,
                             "message_key": "job_completed_boot",
@@ -3499,14 +3530,14 @@ class Engine:
                 else:
                     drone.location = DroneLocation(kind="ship_sector", id=job.target.id)
                 events.append(
-                    self._make_event(
+                    self._make_job_outcome_event(
                         state,
+                        job,
                         EventType.JOB_COMPLETED,
                         Severity.INFO,
                         SourceRef(kind="drone", id=drone.drone_id),
                         f"Drone deployed to {job.target.id}",
                         data={
-                            "job_id": job.job_id,
                             "job_type": job.job_type.value,
                             "drone_id": drone.drone_id,
                             "sector_id": job.target.id,
@@ -3527,14 +3558,14 @@ class Engine:
                     drone.location = DroneLocation(kind="ship_sector", id=job.target.id)
                 drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_MOVE)
                 events.append(
-                    self._make_event(
+                    self._make_job_outcome_event(
                         state,
+                        job,
                         EventType.JOB_COMPLETED,
                         Severity.INFO,
                         SourceRef(kind="drone", id=drone.drone_id),
                         f"Drone moved to {job.target.id}",
                         data={
-                            "job_id": job.job_id,
                             "job_type": job.job_type.value,
                             "drone_id": drone.drone_id,
                             "sector_id": job.target.id,
@@ -3557,14 +3588,14 @@ class Engine:
                     drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_RECALL)
                     drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_REBOOT)
                     events.append(
-                        self._make_event(
+                        self._make_job_outcome_event(
                             state,
+                            job,
                             EventType.JOB_COMPLETED,
                             Severity.INFO,
                             SourceRef(kind="drone", id=drone.drone_id),
                             f"Drone rebooted: {drone.drone_id}",
                             data={
-                                "job_id": job.job_id,
                                 "job_type": job.job_type.value,
                                 "drone_id": drone.drone_id,
                                 "message_key": "job_completed_reboot",
@@ -3574,14 +3605,14 @@ class Engine:
                 else:
                     job.status = JobStatus.FAILED
                     events.append(
-                        self._make_event(
+                        self._make_job_outcome_event(
                             state,
+                            job,
                             EventType.JOB_FAILED,
                             Severity.WARN,
                             SourceRef(kind="drone", id=drone.drone_id),
                             f"Drone reboot failed: {drone.drone_id}",
                             data={
-                                "job_id": job.job_id,
                                 "job_type": job.job_type.value,
                                 "drone_id": drone.drone_id,
                                 "message_key": "job_failed_reboot",
@@ -3600,14 +3631,14 @@ class Engine:
                     drone.status = DroneStatus.DOCKED
                     drone.location = DroneLocation(kind="ship_sector", id="drone_bay")
                     events.append(
-                        self._make_event(
+                        self._make_job_outcome_event(
                             state,
+                            job,
                             EventType.JOB_COMPLETED,
                             Severity.INFO,
                             SourceRef(kind="drone", id=drone.drone_id),
                             f"Drone recalled: {drone.drone_id}",
                             data={
-                                "job_id": job.job_id,
                                 "job_type": job.job_type.value,
                                 "drone_id": drone.drone_id,
                                 "message_key": "job_completed_recall",
@@ -3618,14 +3649,14 @@ class Engine:
                 else:
                     job.status = JobStatus.FAILED
                     events.append(
-                        self._make_event(
+                        self._make_job_outcome_event(
                             state,
+                            job,
                             EventType.JOB_FAILED,
                             Severity.WARN,
                             SourceRef(kind="drone", id=drone.drone_id),
                             f"Drone recall failed: {drone.drone_id}",
                             data={
-                                "job_id": job.job_id,
                                 "job_type": job.job_type.value,
                                 "drone_id": drone.drone_id,
                                 "message_key": "job_failed_recall",
@@ -3721,8 +3752,9 @@ class Engine:
             )
             if requested > recovered:
                 events.append(
-                    self._make_event(
+                    self._make_job_outcome_event(
                         state,
+                        job,
                         EventType.JOB_COMPLETED,
                         Severity.INFO,
                         SourceRef(kind="world", id=node_id),
@@ -3794,8 +3826,9 @@ class Engine:
                     found = True
             if not found:
                 events.append(
-                    self._make_event(
+                    self._make_job_outcome_event(
                         state,
+                        job,
                         EventType.JOB_COMPLETED,
                         Severity.INFO,
                         SourceRef(kind="world", id=node_id),
@@ -3872,7 +3905,7 @@ class Engine:
             data_signatures_detected = self._survey_reports_data_signatures(
                 state,
                 node_id,
-                job.job_id,
+                str(job.internal_id or job.job_id),
                 recoverable_data_files > 0,
             )
             uplink_detected = bool(node and node.kind in {"relay", "station", "waystation"})
@@ -3883,14 +3916,14 @@ class Engine:
             if drone:
                 drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_SALVAGE)
             events.append(
-                self._make_event(
+                self._make_job_outcome_event(
                     state,
+                    job,
                     EventType.JOB_COMPLETED,
                     Severity.INFO,
                     SourceRef(kind="world", id=node_id),
                     f"Survey complete: {node_id}",
                     data={
-                        "job_id": job.job_id,
                         "job_type": job.job_type.value,
                         "node_id": node_id,
                         "scrap_available": scrap_available,
@@ -3940,14 +3973,14 @@ class Engine:
             if drone:
                 drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_SALVAGE)
             events.append(
-                self._make_event(
+                self._make_job_outcome_event(
                     state,
+                    job,
                     EventType.JOB_COMPLETED,
                     Severity.INFO,
                     SourceRef(kind="world", id=node_id),
                     f"Drone salvage complete: recovered {recovered_count} drone(s)",
                     data={
-                        "job_id": job.job_id,
                         "job_type": job.job_type.value,
                         "node_id": node_id,
                         "recovered_count": recovered_count,
@@ -3990,14 +4023,14 @@ class Engine:
                 state.world.known_contacts.add(node_id)
             self._maybe_set_fine_range(state, from_id, node_id)
             events.append(
-                self._make_event(
+                self._make_job_outcome_event(
                     state,
+                    job,
                     EventType.JOB_COMPLETED,
                     Severity.INFO,
                     SourceRef(kind="world", id=node_id),
                     f"Route solved: {from_id} -> {node_id}",
                     data={
-                        "job_id": job.job_id,
                         "job_type": job.job_type.value,
                         "from_id": from_id,
                         "node_id": node_id,
@@ -4027,14 +4060,14 @@ class Engine:
                 state.ship.installed_modules.append(module_id)
                 self._recompute_ship_module_effects(state, previous_installed_modules=prev_installed)
             events.append(
-                self._make_event(
+                self._make_job_outcome_event(
                     state,
+                    job,
                     EventType.JOB_COMPLETED,
                     Severity.INFO,
                     SourceRef(kind="ship", id=state.ship.ship_id),
                     f"Module installed: {module_id}",
                     data={
-                        "job_id": job.job_id,
                         "job_type": job.job_type.value,
                         "module_id": module_id,
                         "message_key": "job_completed_install",
@@ -4066,14 +4099,14 @@ class Engine:
                 state.ship.manifest_dirty = True
                 self._recompute_ship_module_effects(state, previous_installed_modules=prev_installed)
             events.append(
-                self._make_event(
+                self._make_job_outcome_event(
                     state,
+                    job,
                     EventType.JOB_COMPLETED,
                     Severity.INFO,
                     SourceRef(kind="ship", id=state.ship.ship_id),
                     f"Module uninstalled: {module_id}",
                     data={
-                        "job_id": job.job_id,
                         "job_type": job.job_type.value,
                         "module_id": module_id,
                         "message_key": "job_completed_uninstall",
@@ -4095,6 +4128,8 @@ class Engine:
                     slot_cost = int(mod.get("slot_cost", 1) or 1)
                     used_slots = self._drone_slots_used(target_drone, modules)
                     if used_slots + slot_cost <= max(0, int(target_drone.module_slots_max)):
+                        scrap_cost = int(job.params.get("scrap_cost", mod.get("scrap_cost", 0)))
+                        state.ship.cargo_scrap = max(0, state.ship.cargo_scrap - scrap_cost)
                         target_drone.installed_modules.append(module_id)
                         state.ship.cargo_modules.remove(module_id)
                         state.ship.manifest_dirty = True
@@ -4102,14 +4137,14 @@ class Engine:
                         installed_ok = True
             if not installed_ok:
                 events.append(
-                    self._make_event(
+                    self._make_job_outcome_event(
                         state,
+                        job,
                         EventType.JOB_FAILED,
                         Severity.WARN,
                         SourceRef(kind="drone", id=target_drone_id or job.target.id),
                         f"Drone module install failed: {module_id} -> {target_drone_id}",
                         data={
-                            "job_id": job.job_id,
                             "job_type": job.job_type.value,
                             "module_id": module_id,
                             "drone_id": target_drone_id,
@@ -4120,14 +4155,14 @@ class Engine:
                 return events
 
             events.append(
-                self._make_event(
+                self._make_job_outcome_event(
                     state,
+                    job,
                     EventType.JOB_COMPLETED,
                     Severity.INFO,
                     SourceRef(kind="drone", id=target_drone_id or job.target.id),
                     f"Drone module installed: {module_id} -> {target_drone_id}",
                     data={
-                        "job_id": job.job_id,
                         "job_type": job.job_type.value,
                         "module_id": module_id,
                         "drone_id": target_drone_id,
@@ -4162,14 +4197,14 @@ class Engine:
                 uninstall_ok = True
             if not uninstall_ok:
                 events.append(
-                    self._make_event(
+                    self._make_job_outcome_event(
                         state,
+                        job,
                         EventType.JOB_FAILED,
                         Severity.WARN,
                         SourceRef(kind="drone", id=target_drone_id or job.target.id),
                         f"Drone module uninstall failed: {module_id} <- {target_drone_id}",
                         data={
-                            "job_id": job.job_id,
                             "job_type": job.job_type.value,
                             "module_id": module_id,
                             "drone_id": target_drone_id,
@@ -4180,14 +4215,14 @@ class Engine:
                 return events
 
             events.append(
-                self._make_event(
+                self._make_job_outcome_event(
                     state,
+                    job,
                     EventType.JOB_COMPLETED,
                     Severity.INFO,
                     SourceRef(kind="drone", id=target_drone_id or job.target.id),
                     f"Drone module uninstalled: {module_id} <- {target_drone_id}",
                     data={
-                        "job_id": job.job_id,
                         "job_type": job.job_type.value,
                         "module_id": module_id,
                         "drone_id": target_drone_id,
@@ -4204,14 +4239,14 @@ class Engine:
             ship.manifest_dirty = False
             ship.manifest_last_sync_t = state.clock.t
             events.append(
-                self._make_event(
+                self._make_job_outcome_event(
                     state,
+                    job,
                     EventType.JOB_COMPLETED,
                     Severity.INFO,
                     SourceRef(kind="ship", id=ship.ship_id),
                     "Inventory synchronized",
                     data={
-                        "job_id": job.job_id,
                         "job_type": job.job_type.value,
                         "message_key": "job_completed_cargo_audit",
                     },
@@ -4228,14 +4263,16 @@ class Engine:
             if job.status == JobStatus.RUNNING and job.power_draw_kw > 0.0:
                 job_load_kw += job.power_draw_kw
         if state.ship.op_mode == "CRUISE":
-            cruise_zero = {"sensors", "security", "data_core", "drone_bay"}
+            cruise_shed_targets = {"sensors", "security", "data_core", "drone_bay"}
             def _factor(sys: ShipSystem) -> float:
                 if sys.state == SystemState.OFFLINE:
                     return 0.0
+                if sys.system_id in cruise_shed_targets and sys.forced_offline:
+                    return 0.0
                 if "critical" in sys.tags or sys.system_id in {"energy_distribution"}:
                     return 1.0
-                if sys.system_id in cruise_zero:
-                    return 0.0
+                if sys.system_id in cruise_shed_targets:
+                    return 1.0
                 return 0.1
             return sum(sys.p_effective_kw() * _factor(sys) for sys in systems) + job_load_kw
         return sum(system.p_effective_kw() for system in systems if system.state != SystemState.OFFLINE) + job_load_kw
@@ -4454,8 +4491,7 @@ class Engine:
         bay_state = self._drone_bay_state(state)
         profile = self._drone_profile(state, drone)
         eta = Balance.RECALL_TIME_S * self._drone_bay_eta_mult(state) * profile.move_time_mult_effective
-        job_id = f"J{state.jobs.next_job_seq}"
-        state.jobs.next_job_seq += 1
+        job_key, job_id = allocate_job_ids(state.jobs)
         job = Job(
             job_id=job_id,
             job_type=JobType.RECALL_DRONE,
@@ -4464,9 +4500,10 @@ class Engine:
             owner_id=drone.drone_id,
             target=TargetRef(kind="drone", id=drone.drone_id),
             params={"drone_id": drone.drone_id, "bay_state_at_start": bay_state.value if bay_state else ""},
+            internal_id=job_key,
         )
-        state.jobs.jobs[job_id] = job
-        state.jobs.active_job_ids.append(job_id)
+        state.jobs.jobs[job_key] = job
+        state.jobs.active_job_ids.append(job_key)
         queued_event = self._make_event(
             state,
             EventType.JOB_QUEUED,
@@ -4475,6 +4512,7 @@ class Engine:
             f"Job queued: recall_drone -> drone:{drone.drone_id} (ETA {int(eta)}s)",
             data={
                 "job_id": job_id,
+                "job_key": job_key,
                 "job_type": JobType.RECALL_DRONE.value,
                 "eta_s": eta,
                 "target": {"kind": "drone", "id": drone.drone_id},
@@ -4690,6 +4728,38 @@ class Engine:
             data=data or {},
         )
 
+    def _resolve_job_key(self, jobs_state: JobManagerState, job_ref: str) -> str | None:
+        return find_job_key(jobs_state, job_ref)
+
+    def _finalize_job(self, jobs_state: JobManagerState, job: Job, status: JobStatus) -> Job:
+        job_key = str(job.internal_id or job.job_id)
+        finalized = finalize_job(jobs_state, job_key, status)
+        return finalized or job
+
+    def _make_job_outcome_event(
+        self,
+        state: GameState,
+        job: Job,
+        event_type: EventType,
+        severity: Severity,
+        source: SourceRef,
+        message: str,
+        data: dict | None = None,
+    ) -> Event:
+        if event_type == EventType.JOB_COMPLETED:
+            status = JobStatus.COMPLETED
+        elif job.status == JobStatus.CANCELLED:
+            status = JobStatus.CANCELLED
+        else:
+            status = JobStatus.FAILED
+        job_key = str(job.internal_id or job.job_id)
+        if job.status != status or job.terminal_seq is None or job_key in state.jobs.active_job_ids:
+            job = self._finalize_job(state.jobs, job, status)
+        payload = {"job_id": job.job_id, "job_key": job.internal_id or job.job_id}
+        if data:
+            payload.update(data)
+        return self._make_event(state, event_type, severity, source, message, data=payload)
+
     def _enqueue_job(
         self,
         state: GameState,
@@ -4701,8 +4771,7 @@ class Engine:
         risk: RiskProfile | None = None,
         power_draw_kw: float = 0.0,
     ) -> list[Event]:
-        job_id = f"J{state.jobs.next_job_seq}"
-        state.jobs.next_job_seq += 1
+        job_key, job_id = allocate_job_ids(state.jobs)
         job = Job(
             job_id=job_id,
             job_type=job_type,
@@ -4712,14 +4781,16 @@ class Engine:
             target=target,
             params=params,
             power_draw_kw=power_draw_kw,
+            internal_id=job_key,
         )
         if risk is not None:
             job.risk = risk
-        state.jobs.jobs[job_id] = job
-        state.jobs.active_job_ids.append(job_id)
+        state.jobs.jobs[job_key] = job
+        state.jobs.active_job_ids.append(job_key)
         source = self._job_source(state, target, owner_id, params)
         data = {
             "job_id": job_id,
+            "job_key": job_key,
             "job_type": job_type.value,
             "eta_s": eta_s,
             "target": {"kind": target.kind, "id": target.id},
@@ -5827,14 +5898,14 @@ class Engine:
                     data={"drone_id": drone.drone_id, "message_key": "drone_disabled"},
                 )
                 self._record_event(state.events, disabled_event)
-        return self._make_event(
+        return self._make_job_outcome_event(
             state,
+            job,
             EventType.JOB_FAILED,
             Severity.WARN,
             source,
             f"Emergency job failed: {job.job_type.value}",
             data={
-                "job_id": job.job_id,
                 "emergency": True,
                 "job_type": job.job_type.value,
                 "message_key": "job_failed",
@@ -5842,7 +5913,7 @@ class Engine:
         )
 
     def _job_rng(self, state: GameState, job: Job) -> random.Random:
-        job_num = int(job.job_id[1:]) if job.job_id.startswith("J") else 0
+        job_num = job_id_numeric_suffix(str(job.internal_id or job.job_id))
         seed = state.meta.rng_seed + int(state.clock.t * 1000.0) + job_num
         return random.Random(seed)
 

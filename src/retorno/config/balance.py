@@ -80,12 +80,20 @@ class Balance:
     # Recoverable drone salvage time model: base + per unit.
     DRONE_SALVAGE_DRONE_BASE_TIME_S = 35.0
     DRONE_SALVAGE_DRONE_PER_UNIT_S = 4.0
+    # Repair amounts use the normalized 0.0..1.0 health/integrity scale.
+    ACTIVE_REPAIR_SYSTEM_AMOUNT = 0.15
+    ACTIVE_REPAIR_DRONE_AMOUNT = 0.15
     # Self-test repair job time and amount.
     SELFTEST_REPAIR_TIME_S = 18.0
     SELFTEST_REPAIR_AMOUNT = 0.05
-    # Scrap cost per unit of health repaired.
-    REPAIR_SCRAP_PER_HEALTH = 20 # ???
-    SELFTEST_REPAIR_SCRAP_PER_HEALTH = 12 # ???
+    # Scrap formulas:
+    # - repair_amount is the real repair that can still be applied, after truncating the
+    #   nominal job amount to the missing health/integrity up to the target maximum.
+    # - Active drone repair base cost = max(1, round(repair_amount * REPAIR_SCRAP_PER_HEALTH)).
+    # - Active drone repair final cost = max(1, round(base_cost * repair_scrap_cost_mult_effective)).
+    # - Self-test repair cost = max(1, round(repair_amount * SELFTEST_REPAIR_SCRAP_PER_HEALTH)).
+    REPAIR_SCRAP_PER_HEALTH = 20  # Repairing 1.0 (100%) costs this much base scrap.
+    SELFTEST_REPAIR_SCRAP_PER_HEALTH = 12  # Repairing 1.0 (100%) costs this much base scrap.
     # Active repair jobs can fail with a low base chance.
     REPAIR_JOB_FAIL_P_BASE = 0.10
     # On repair failure, keep only this fraction of the originally paid scrap.
@@ -316,7 +324,7 @@ class Balance:
     HIBERNATE_WAKE_ON_ENV_RAD_THRESHOLD = True
     HIBERNATE_WAKE_ENV_RAD_THRESHOLD_RAD_PER_S = RAD_LEVEL_ENV_HIGH
     # Repair efficiency per scrap spent.
-    DRONE_REPAIR_INTEGRITY_PER_SCRAP = 5.0
+    DRONE_REPAIR_INTEGRITY_PER_SCRAP = 0.05
     # Thresholds for alerts and action gating.
     DRONE_LOW_BATTERY_THRESHOLD = 0.15
     DRONE_MIN_BATTERY_FOR_TASK = 0.10

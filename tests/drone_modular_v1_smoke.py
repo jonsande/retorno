@@ -120,6 +120,7 @@ def _salvage_recovered_signature() -> dict[str, tuple[str, ...]]:
 
 def main() -> None:
     modules = load_modules()
+    utility_cargo_scrap_cost = int(modules["utility_cargo_frame"]["scrap_cost"])
 
     # Install / uninstall drone module in bay.
     engine = Engine()
@@ -129,12 +130,14 @@ def main() -> None:
     drone.status = DroneStatus.DOCKED
     drone.location = DroneLocation(kind="ship_sector", id="drone_bay")
     state.ship.cargo_modules = ["utility_cargo_frame"]
+    state.ship.cargo_scrap = utility_cargo_scrap_cost
 
     queued = engine.apply_action(state, Install(drone_id="D1", module_id="utility_cargo_frame"))
     assert _queued_job_type(queued) == "drone_install_module", queued
     engine.tick(state, Balance.DRONE_INSTALL_TIME_S + 2.0)
     assert "utility_cargo_frame" in drone.installed_modules, drone.installed_modules
     assert "utility_cargo_frame" not in state.ship.cargo_modules, state.ship.cargo_modules
+    assert state.ship.cargo_scrap == 0, state.ship.cargo_scrap
 
     queued_un = engine.apply_action(state, DroneUninstall(drone_id="D1", module_id="utility_cargo_frame"))
     assert _queued_job_type(queued_un) == "drone_uninstall_module", queued_un
@@ -142,9 +145,21 @@ def main() -> None:
     assert "utility_cargo_frame" not in drone.installed_modules, drone.installed_modules
     assert "utility_cargo_frame" in state.ship.cargo_modules, state.ship.cargo_modules
 
+    # Drone install requires enough scrap, matching the module catalog cost.
+    scrap_blocked_state = create_initial_state_sandbox()
+    _set_bay_ready(scrap_blocked_state)
+    scrap_drone = scrap_blocked_state.ship.drones["D1"]
+    scrap_drone.status = DroneStatus.DOCKED
+    scrap_drone.location = DroneLocation(kind="ship_sector", id="drone_bay")
+    scrap_blocked_state.ship.cargo_modules = ["utility_cargo_frame"]
+    scrap_blocked_state.ship.cargo_scrap = utility_cargo_scrap_cost - 1
+    blocked_scrap = engine.apply_action(scrap_blocked_state, Install(drone_id="D1", module_id="utility_cargo_frame"))
+    _assert_blocked_reason(blocked_scrap, "scrap_insufficient")
+
     # Slots limit (2 max).
     drone.installed_modules = ["field_service_rig", "high_density_cell"]
     state.ship.cargo_modules = ["utility_cargo_frame"]
+    state.ship.cargo_scrap = utility_cargo_scrap_cost
     blocked_slots = engine.apply_action(state, Install(drone_id="D1", module_id="utility_cargo_frame"))
     _assert_blocked_reason(blocked_slots, "module_slots_full")
 
@@ -244,6 +259,8 @@ def main() -> None:
     assert "scope: drone" in rendered, rendered
     assert "slots:" in rendered, rendered
     assert "mods=1 (field_service_rig)" in rendered, rendered
+    assert "installed modules:" in rendered or "módulos instalados:" in rendered, rendered
+    assert "Field Service Rig [field_service_rig]" in rendered, rendered
 
     print("DRONE MODULAR V1 SMOKE PASSED")
 

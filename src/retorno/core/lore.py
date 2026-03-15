@@ -420,11 +420,9 @@ def _procedural_fs_files(state, node: SpaceNode) -> list[dict]:
         if node.kind in {"station", "ship"}
         else Balance.SALVAGE_DATA_LOG_P_OTHER
     )
-    if rng.random() < p_log:
-        content = link_line or f"NODE: {node.node_id}\n"
-        _add("/logs/nav.log", content)
-        if "LINK:" in content:
-            has_link_intel = True
+    if link_line and rng.random() < p_log:
+        _add("/logs/nav.log", link_line)
+        has_link_intel = True
 
     p_mail = (
         Balance.SALVAGE_DATA_MAIL_P_STATION_SHIP
@@ -441,15 +439,10 @@ def _procedural_fs_files(state, node: SpaceNode) -> list[dict]:
         if node.kind in {"station", "derelict"}
         else Balance.SALVAGE_DATA_FRAG_P_OTHER
     )
-    if rng.random() < p_frag:
+    if link_line and rng.random() < p_frag:
         frag_id = f"{rng.getrandbits(16):04x}"
-        if link_line and has_link_intel:
-            # Avoid semantic duplication when nav.log already carries this route intel.
-            content = f"NODE: {node.node_id}\n"
-        else:
-            content = link_line or f"NODE: {node.node_id}\n"
-        _add(f"/data/nav/fragments/frag_{frag_id}.txt", content)
-        if "LINK:" in content:
+        if not has_link_intel:
+            _add(f"/data/nav/fragments/frag_{frag_id}.txt", link_line)
             has_link_intel = True
 
     if link_line and not has_link_intel:

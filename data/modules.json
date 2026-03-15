@@ -50,7 +50,7 @@
     "name": "Field Service Rig",
     "desc_en": "Repair-biased service rig for sustained maintenance operations.",
     "desc_es": "Equipo de servicio orientado a reparación para mantenimiento sostenido.",
-    "scrap_cost": 22,
+    "scrap_cost": 3,
     "pool": "tech",
     "drone_effects": {
       "repair_time_mult": 0.75,
@@ -71,7 +71,7 @@
     "name": "Utility Cargo Frame",
     "desc_en": "Utility frame extension that increases salvage carrying capacity.",
     "desc_es": "Extensión de bastidor utilitario que aumenta la capacidad de carga de salvage.",
-    "scrap_cost": 20,
+    "scrap_cost": 3,
     "pool": "common",
     "drone_effects": {
       "cargo_capacity_add": 6.0,
@@ -90,7 +90,7 @@
     "name": "Rapid Maneuver Module",
     "desc_en": "High-agility control package for fast repositioning and rapid survey passes.",
     "desc_es": "Paquete de control de alta agilidad para reposicionamiento y survey rápidos.",
-    "scrap_cost": 24,
+    "scrap_cost": 3,
     "pool": "rare",
     "drone_effects": {
       "move_time_mult": 0.65,
@@ -111,7 +111,7 @@
     "name": "High-Density Cell",
     "desc_en": "Dense battery package that extends operational endurance.",
     "desc_es": "Paquete de batería densa que amplía la autonomía operativa.",
-    "scrap_cost": 23,
+    "scrap_cost": 3,
     "pool": "tech",
     "drone_effects": {
       "battery_max_add": 0.35,
@@ -130,7 +130,7 @@
     "name": "Reinforced Frame",
     "desc_en": "Structural reinforcement package for harsh operational environments.",
     "desc_es": "Paquete de refuerzo estructural para entornos operativos severos.",
-    "scrap_cost": 21,
+    "scrap_cost": 2,
     "pool": "common",
     "drone_effects": {
       "integrity_max_add": 0.30,

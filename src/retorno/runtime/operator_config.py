@@ -5,6 +5,7 @@ from retorno.model.os import Locale, OSState
 
 CONFIG_SET_VALUES: dict[str, tuple[str, ...]] = {
     "lang": ("en", "es"),
+    "verbose": ("on", "off"),
     "audio": ("on", "off"),
     "ambientsound": ("on", "off"),
 }
@@ -31,6 +32,7 @@ def config_show_lines(
     levels = ", ".join(sorted(os_state.auth_levels))
     lines = [
         f"language: {os_state.locale.value}",
+        f"verbose: {_format_toggle(os_state.help_verbose)}",
         f"audio: {_format_toggle(os_state.audio.enabled)}",
     ]
     ambient_line = f"ambientsound: {_format_toggle(os_state.audio.ambient_enabled)}"
@@ -57,6 +59,13 @@ def apply_config_value(os_state: OSState, key: str, value: str) -> str:
             "es": f"Idioma cambiado a {os_state.locale.value}",
         }
         return messages.get(locale, messages["en"])
+    if key == "verbose":
+        os_state.help_verbose = value == "on"
+        messages = {
+            "en": f"Help verbosity set to {_format_toggle(os_state.help_verbose)}",
+            "es": f"Verbosidad de help configurada a {_format_toggle(os_state.help_verbose)}",
+        }
+        return messages.get(locale_before, messages["en"])
     if key == "audio":
         os_state.audio.enabled = value == "on"
         messages = {
@@ -76,6 +85,12 @@ def apply_config_value(os_state: OSState, key: str, value: str) -> str:
 
 def audio_flags(os_state: OSState) -> tuple[bool, bool]:
     return os_state.audio.enabled, os_state.audio.ambient_enabled
+
+
+def resolve_help_verbose(os_state: OSState, verbose: bool | None = None) -> bool:
+    if verbose is not None:
+        return verbose
+    return os_state.help_verbose
 
 
 def _format_toggle(enabled: bool) -> str:

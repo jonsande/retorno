@@ -92,7 +92,7 @@ Some common in-game commands:
 - **cat <path>**
 - **intel import <path>**
 
-Dentro del juego, usa **help --verbose** para ver el listado actualizado de comandos.
+Dentro del juego, usa **help** para ver el listado actualizado de comandos.
 
 ## Idioma
 

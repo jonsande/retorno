@@ -82,7 +82,7 @@ Some common in-game commands:
 - **cat <path>**
 - **intel import <path>**
 
-Use **help --verbose** in-game for the current and complete command list.
+Use **help** in-game for the current and complete command list.
 
 ## Language
 

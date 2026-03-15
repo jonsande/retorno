@@ -61,7 +61,7 @@ def main() -> None:
     )
 
     repair_job_ids = [
-        e.data.get("job_id")
+        (e.data or {}).get("job_key") or (e.data or {}).get("job_id")
         for e in ev
         if (e.data or {}).get("job_type") == "repair_system" and (e.data or {}).get("job_id")
     ]
