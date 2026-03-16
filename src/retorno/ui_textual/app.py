@@ -35,7 +35,7 @@ from retorno.runtime.operator_config import (
     config_value_choices,
     resolve_help_verbose,
 )
-from retorno.runtime.startup import load_startup_sequence_lines
+from retorno.runtime.startup import load_hibernate_start_sequence_lines, load_startup_sequence_lines
 from retorno.ui_theme import get_theme_palette, normalize_theme_preset, render_rich_block, render_rich_line
 from retorno.ui_textual import presenter
 from retorno.io.save_load import (
@@ -253,6 +253,7 @@ class RetornoTextualApp(App):
         self._log_buffer: list[str] = []
         self._startup_sequence_running = False
         self._startup_sequence_skip = False
+        self._hibernate_sequence_running = False
         self._audio_notice = ""
         try:
             self._audio_manager = AudioManager(load_audio_config())
@@ -404,6 +405,74 @@ class RetornoTextualApp(App):
         self.refresh_panels()
         self.call_later(lambda: self.query_one("#input", Input).focus())
 
+    def _clear_log_widget(self, *, clear_buffer: bool = False) -> None:
+        self.query_one("#log", RichLog).clear()
+        if clear_buffer:
+            self._log_buffer.clear()
+
+    async def _run_hibernate_start_sequence(self, years: float, wake_on_low_battery: bool) -> None:
+        if self._hibernate_sequence_running:
+            return
+        self._hibernate_sequence_running = True
+        input_widget = self.query_one("#input", Input)
+        input_widget.disabled = True
+        try:
+            with self.loop.with_lock() as state:
+                locale = state.os.locale.value
+            lines = load_hibernate_start_sequence_lines(locale)
+            typewriter = Balance.HIBERNATE_SEQUENCE_TYPEWRITER
+            cps = max(1, int(Balance.HIBERNATE_SEQUENCE_TYPEWRITER_CPS))
+            line_delay_s = max(0.0, float(Balance.HIBERNATE_SEQUENCE_LINE_DELAY_S))
+            countdown_s = max(0, int(Balance.HIBERNATE_SEQUENCE_COUNTDOWN_S))
+            base_lines = list(self._log_buffer)
+            rendered_lines: list[str] = []
+            log = self.query_one("#log", RichLog)
+
+            def _render_snapshot(current_line: str | None) -> None:
+                log.clear()
+                for line in base_lines:
+                    self._write_rich_line(log, line)
+                for line in rendered_lines:
+                    self._write_rich_line(log, line)
+                if current_line is not None:
+                    self._write_rich_line(log, current_line)
+
+            for line in lines:
+                if typewriter:
+                    current = ""
+                    for ch in line:
+                        current += ch
+                        _render_snapshot(current)
+                        await asyncio.sleep(1.0 / cps)
+                    rendered_lines.append(line)
+                    _render_snapshot(None)
+                else:
+                    rendered_lines.append(line)
+                    _render_snapshot(None)
+                if line_delay_s > 0.0:
+                    await asyncio.sleep(line_delay_s)
+
+            for remaining in range(countdown_s, -1, -1):
+                _render_snapshot(repl._hibernate_countdown_line(locale, remaining))
+                if remaining > 0:
+                    await asyncio.sleep(1.0)
+
+            self._clear_log_widget(clear_buffer=True)
+            lines = presenter.build_command_output(
+                repl._run_hibernate,
+                self.loop,
+                years,
+                wake_on_low_battery=wake_on_low_battery,
+            )
+            self._log_lines(lines)
+        except Exception as e:
+            self._log_line(f"[ERROR] hibernate failed: {e}")
+        finally:
+            input_widget.disabled = False
+            self._hibernate_sequence_running = False
+            self.refresh_panels()
+            self.call_later(input_widget.focus)
+
     def action_startup_skip(self) -> None:
         if not self._startup_sequence_running:
             return
@@ -438,7 +507,7 @@ class RetornoTextualApp(App):
         self._exit_persist_done = True
 
     def action_clear_log(self) -> None:
-        self.query_one("#log", RichLog).clear()
+        self._clear_log_widget()
 
     def action_help(self) -> None:
         with self.loop.with_lock() as state:
@@ -1144,13 +1213,7 @@ class RetornoTextualApp(App):
                         return
                 else:
                     years = parsed.years
-            lines = presenter.build_command_output(
-                repl._run_hibernate,
-                self.loop,
-                years,
-                wake_on_low_battery=wake_on_low_battery,
-            )
-            self._log_lines(lines)
+            asyncio.create_task(self._run_hibernate_start_sequence(years, wake_on_low_battery))
         except Exception as e:
             self._log_line(f"[ERROR] hibernate failed: {e}")
         self._pending_hibernate_parsed = None
@@ -1246,7 +1309,7 @@ class RetornoTextualApp(App):
                 follow_end=(self.focused is not jobs_widget),
             )
         self.query_one("#power", Static).update(render_rich_block(power_lines, self._theme_preset))
-        if self._startup_sequence_running:
+        if self._startup_sequence_running or self._hibernate_sequence_running:
             return
         auto_events = self.loop.drain_events()
         if auto_events:
@@ -1304,6 +1367,8 @@ class RetornoTextualApp(App):
         event.input.value = ""
         if not text:
             return
+        if self._hibernate_sequence_running:
+            return
         if self._pending_confirm_action is not None:
             reply = text.lower()
             locale = self._pending_confirm_locale
@@ -1358,12 +1423,10 @@ class RetornoTextualApp(App):
                     return
                 elif action == "HIBERNATE_NON_CRUISE":
                     self._log_line("> hibernate until_arrival", separate=True)
-                    self._log_lines(
-                        presenter.build_command_output(
-                            repl._run_hibernate,
-                            self.loop,
+                    asyncio.create_task(
+                        self._run_hibernate_start_sequence(
                             self._pending_years,
-                            wake_on_low_battery=self._pending_wake_on_low_battery,
+                            self._pending_wake_on_low_battery,
                         )
                     )
                     self._pending_hibernate_parsed = None
@@ -1431,8 +1494,7 @@ class RetornoTextualApp(App):
                 self._log_lines(presenter.build_help_lines(state, verbose=False))
             return
         if parsed == "CLEAR":
-            self.query_one("#log", RichLog).clear()
-            self._log_buffer.clear()
+            self._clear_log_widget(clear_buffer=True)
             return
 
         with self.loop.with_lock() as state:

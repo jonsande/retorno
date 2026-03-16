@@ -1,0 +1,10 @@
+Iniciando secuencia de criogenización
+[med_bay] Bóveda criogénica: reserva de cámara confirmada
+OBJETIVO seleccionado: Sarcophagus-05
+Secuencia de criogenización: INICIO (perfil de tránsito)
+Gradiente térmico descendente: estable
+Perfusión crioprotectora: EN CURSO
+Constantes vitales del huésped: dentro de ventana de preservación
+Conscious Interface Recovery Protocol (CIRP): SUSPENDIDO
+Enlace de terminal neural: STANDBY
+Telemetría pasiva y alertas críticas: ARMADAS

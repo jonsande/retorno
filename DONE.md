@@ -63,6 +63,7 @@ Hay que buscar una solución más diegética a esto. La información de lore que
 
 === NAVIGATION / ROUTES / WORLD GEN ===
 
+- [x] Llueven contactos y rutas. Sólo con haber pasado por 3 o 4 nodos, tengo repleto el mapa de contactos. y rutas. Hay que balancear esto, pues de otro modo esta información pierde valor.
 - [x] Ahora mismo, al comienzo de juego, cuando el jugador consigue encender el sistema sensors se detecta una señal automáticamente (por cierto, ¿dónde se configura esto?):
   [AUTO] [INFO] signal_detected :: Signal detected: ECHO_7
 Al introducir después el comando 'nav' se obtine esto:
@@ -171,7 +172,8 @@ obtener scrap.
 - [x] Se debería poder mover un dron desplegado a otro plot sin necesidad de llevarlo a dock antes y desplegar de nuevo. Quiero comando 'drone move'.
 - [x] Las tareas de un mismo dron deberían ir en cola. Ahora mismo las hace simultáneamente. Si le mandas más de una antes de que acabe la anterior.
 - [x] Los drones deben perder batería al trabajar. Deben recargarse al atracar (dock).
-- [x] repair debería consumir algo. Como mínimo scrap. (La nave inicial debe por tanto empezar con una cantidad de scrap). 
+- [x] repair debería consumir algo. Como mínimo scrap. (La nave inicial debe por tanto empezar con una cantidad de scrap).
+- [x] Implementar un drone recall all, y que "drone recall" a secas, es decir sin especificar el id del drone, equivalga a un drone recall all.
 
 JOBS
 - [x] Un comando que liste los trabajos (jobs) en proceso o en cola.
@@ -186,6 +188,11 @@ OTHER
 - [x] Locate debe admitir node_id's, tal como lo indica el Hint del drone deploy (cuando no se le da un tarjet válido).
 - [x] jobs debe admitir número de entradas que se quieren imprimir en pantalla, o filtros.
 - [x] El comando contacts debe imprimir también la distancia a la que se encuentra cada contacto y si hay o no ruta conocida.
+- [DESCARTADO] Necesitamos que el log se guarde y cargue al cargar partida! Al menos un número determinado del log. De otro modo es fácil perderse, no acordarse de dónde se estaba o qué se había hecho. Otra solución sería guardar un archivo con todo (o parte) del log, y crear un comando que te permitiera imprimir las últimas x líneas. [P.D. YA EXISTE EL COMANDO LOGS]
+- [x] Necesitamos un comando que, para cada nodo sin ruta conocida, nos diga desde qué nodos conocidos es posible calcular una ruta (con route solve) a ese nodo. Es decir, desde qué nodos conocidos el comando "route solve" tiene alcance para calcular una ruta hasta el nodo deseado. Para no multiplicar comandos, se me ocurre que esto podría ser una función extendida del propio comando "route solve <node_id>": si <node_id> está dentro del rango, se procede como de costumbre; si no lo está, se emite el mensaje habitual de "target out of sensor range" y a continuación un listado de los nodos conocidos desde los cuales el <node_id> introducido está dentro del rango de route solve. De este modo el jugador siempre podrá saber a qué nodos tiene que lograr llegar para poder constuir una ruta a su nodo objetivo último.
+- [x] Al escribir el comando "dock" el autocompletado tiene que ser más contextual. No tiene sentido que el autocompletado te liste todos los contactos conocidos cuando estás en órbita de un nodo. Cuando estás en órbita de un nodo tu única posibilidad de dock es con el nodo que estás orbitando, así que ese es el nodo que debería autocompletarse automáticamente.
+- [x] La orden ship survey debería listar también la radiación del nodo, si es conocida, o decir que es desconocida si es desconocida.
+- [x] La operación de scan debe llevar algún tiempo (configurable desde el balance.py). Y disparar algún sonido si detecta un contacto nuevo (por ejemplo el cue "info").
 
 
 
@@ -234,3 +241,9 @@ LIFE_SUPPORT
 - [x] Los ParseError no parecen estar localizados. Con en lang configurado en inglés salen mensajes como este:
 ParseError: Uso: travel <node_id|name> | travel --no-cruise <dest> | travel abort
 La palabra "uso" es español. Hay que localizar estos mensajes de error. Aprovechar para revisar que estén bien localizados otros mensajes de error, advertencias y hints.
+
+
+=== OTROS / SIN CLASIFICAR ===
+
+- [x] Necesitamos mensajes de advertencia (si es que no los hay) cada vez que haya un cambio muy brusco de radiación, y cada vez que se entre o salga de alguno de los umbrales de radiación. Definir umbrales "muy baja", "baja", "normal", "alta", "muy alta", "extrema".
+- [x] Al hacer 'route <node_id>' a un node_id para el que ya conoces ruta,  no se debería iniciar el job. Debería salir un mensaje informando de que ya se conoce ruta a ese objetivo. Por otra parte, debería de haber un comando para cancelar jobs en curso.

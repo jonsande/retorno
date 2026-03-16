@@ -12,6 +12,8 @@ Requisitos (gating)
 Comportamiento operativo
 - `until_arrival`: duerme hasta completar el tránsito actual.
 - `<años>`: duerme la duración objetivo en bloques grandes.
+- Antes de hacerse efectiva, la hibernación reproduce una secuencia diegética de criogenización y una cuenta atrás visible de 10 segundos.
+- Al llegar la cuenta atrás a 0, la ventana de log se limpia y la criostasis entra en vigor.
 - Despierta ante eventos críticos que requieren intervención.
 - Durante el tránsito, la hibernación también despierta cuando la radiación ambiental cruza el umbral configurado (`HIBERNATE_WAKE_ENV_RAD_THRESHOLD_RAD_PER_S`).
 

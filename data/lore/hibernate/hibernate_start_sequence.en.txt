@@ -1,0 +1,10 @@
+Cryogenization sequence: INIT
+[med_bay] Cryo vault: chamber reservation confirmed
+TARGET selected: Sarcophagus-05
+Cryogenization sequence: INIT (transit profile)
+Descending thermal gradient: stable
+Cryoprotectant perfusion: IN PROGRESS
+Host vitals: within preservation window
+Conscious Interface Recovery Protocol (CIRP): SUSPENDED
+Neural terminal link: STANDBY
+Passive telemetry and critical alerts: ARMED

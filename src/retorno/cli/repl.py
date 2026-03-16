@@ -41,7 +41,7 @@ from retorno.core.power_policy import is_parsed_command_allowed_in_core_os_criti
 from retorno.model.events import Event, EventType, Severity, SourceRef
 from retorno.model.jobs import JobStatus, JobType, active_job_display_ids
 from retorno.runtime.data_loader import load_modules, load_arcs, load_locations, load_worldgen_archetypes, load_worldgen_templates
-from retorno.runtime.startup import load_startup_sequence_lines
+from retorno.runtime.startup import load_hibernate_start_sequence_lines, load_startup_sequence_lines
 from retorno.config.balance import Balance
 from retorno.io.save_load import (
     LoadGameResult,
@@ -113,11 +113,14 @@ def _print_startup_tips(locale: str) -> None:
         print(line)
 
 
-def _play_startup_sequence(lines: list[str]) -> None:
-    typewriter = Balance.STARTUP_SEQUENCE_TYPEWRITER
-    cps = max(1, int(Balance.STARTUP_SEQUENCE_TYPEWRITER_CPS))
-    line_delay_s = max(0.0, float(Balance.STARTUP_SEQUENCE_LINE_DELAY_S))
-    skippable = Balance.STARTUP_SEQUENCE_SKIPPABLE and sys.stdin.isatty()
+def _play_terminal_sequence(
+    lines: list[str],
+    *,
+    typewriter: bool,
+    cps: int,
+    line_delay_s: float,
+    skippable: bool,
+) -> None:
     skip = False
 
     def _check_skip_escape() -> bool:
@@ -187,6 +190,48 @@ def _play_startup_sequence(lines: list[str]) -> None:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old)
             except Exception:
                 pass
+
+
+def _play_startup_sequence(lines: list[str]) -> None:
+    _play_terminal_sequence(
+        lines,
+        typewriter=Balance.STARTUP_SEQUENCE_TYPEWRITER,
+        cps=max(1, int(Balance.STARTUP_SEQUENCE_TYPEWRITER_CPS)),
+        line_delay_s=max(0.0, float(Balance.STARTUP_SEQUENCE_LINE_DELAY_S)),
+        skippable=bool(Balance.STARTUP_SEQUENCE_SKIPPABLE and sys.stdin.isatty()),
+    )
+
+
+def _hibernate_countdown_line(locale: str, remaining: int) -> str:
+    templates = {
+        "en": "Cryostasis lock in {remaining:02d}s",
+        "es": "Bloqueo criostático en {remaining:02d}s",
+    }
+    template = templates.get(locale, templates["en"])
+    return template.format(remaining=max(0, remaining))
+
+
+def _play_hibernate_start_sequence(locale: str) -> None:
+    lines = load_hibernate_start_sequence_lines(locale)
+    if lines:
+        _play_terminal_sequence(
+            lines,
+            typewriter=Balance.HIBERNATE_SEQUENCE_TYPEWRITER,
+            cps=max(1, int(Balance.HIBERNATE_SEQUENCE_TYPEWRITER_CPS)),
+            line_delay_s=max(0.0, float(Balance.HIBERNATE_SEQUENCE_LINE_DELAY_S)),
+            skippable=False,
+        )
+
+    countdown_s = max(0, int(Balance.HIBERNATE_SEQUENCE_COUNTDOWN_S))
+    if countdown_s > 0:
+        for remaining in range(countdown_s, -1, -1):
+            sys.stdout.write(f"\r{_hibernate_countdown_line(locale, remaining)}")
+            sys.stdout.flush()
+            if remaining > 0:
+                time.sleep(1.0)
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+    print("\033[2J\033[H", end="")
 
 def print_help(locale: str = "en", verbose: bool = False) -> None:
     lang = "es" if locale == "es" else "en"
@@ -5394,7 +5439,8 @@ def render_intel_list(state, limit: int | None = 20) -> None:
     if limit is not None:
         items = items[:limit]
     id_w = max(2, max((len(item.intel_id) for item in items), default=2))
-    print(f"{'ID':<{id_w}}  kind   what                        conf  source                 age")
+    what_w = 38
+    print(f"{'ID':<{id_w}}  kind   {'what':<{what_w}} conf  source                 age")
     now = state.clock.t
     for item in items:
         if item.kind == "link":
@@ -5407,15 +5453,15 @@ def render_intel_list(state, limit: int | None = 20) -> None:
             what = f"{item.coord[0]:.2f},{item.coord[1]:.2f},{item.coord[2]:.2f}"
         else:
             what = "?"
-        if len(what) > 28:
-            what = what[:25] + "..."
+        if len(what) > what_w:
+            what = what[: what_w - 3] + "..."
         source = item.source_kind
         if item.source_ref:
             source = f"{item.source_kind}@{item.source_ref}"
             if len(source) > 20:
                 source = source[:17] + "..."
         age = _format_age_short(now - item.t)
-        print(f"{item.intel_id:<{id_w}}  {item.kind:<6} {what:<28} {item.confidence:>4.2f}  {source:<20} {age:>4}")
+        print(f"{item.intel_id:<{id_w}}  {item.kind:<6} {what:<{what_w}} {item.confidence:>4.2f}  {source:<20} {age:>4}")
     locale = state.os.locale.value
     hint = {
         "en": "Try: intel import <path> | intel show <intel_id> | man intel",
@@ -7463,6 +7509,9 @@ def main() -> None:
                     years = remaining_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
             else:
                 years = parsed.years
+            with loop.with_lock() as locked_state:
+                locale = locked_state.os.locale.value
+            _play_hibernate_start_sequence(locale)
             _run_hibernate(loop, years, wake_on_low_battery=wake_on_low)
             continue
 

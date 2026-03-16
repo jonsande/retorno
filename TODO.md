@@ -176,31 +176,13 @@ ship survey ahora muestra node_radiation en la salida; si el nodo ya fue visitad
 
 === OTROS / SIN CATALOGAR ===
 
-
-
-- [DESCARTADO] Necesitamos que el log se guarde y cargue al cargar partida! Al menos un número determinado del log. De otro modo es fácil perderse, no acordarse de dónde se estaba o qué se había hecho. Otra solución sería guardar un archivo con todo (o parte) del log, y crear un comando que te permitiera imprimir las últimas x líneas. [P.D. YA EXISTE EL COMANDO LOGS]
-
 - [ ] Actualmente el comando ship survey es un pelín confuso?
 
 - [!] Necesitamos un comando que te liste el camino que has seguido. El orden de los nodos que has visitado. Incluso estaría bien que junto a los nodos por los que has pasado apareciera entre paréntesis o algo un listado de los nodos que eran accesibles desde él.
 
-- [x] Necesitamos un comando que, para cada nodo sin ruta conocida, nos diga desde qué nodos conocidos es posible calcular una ruta (con route solve) a ese nodo. Es decir, desde qué nodos conocidos el comando "route solve" tiene alcance para calcular una ruta hasta el nodo deseado. Para no multiplicar comandos, se me ocurre que esto podría ser una función extendida del propio comando "route solve <node_id>": si <node_id> está dentro del rango, se procede como de costumbre; si no lo está, se emite el mensaje habitual de "target out of sensor range" y a continuación un listado de los nodos conocidos desde los cuales el <node_id> introducido está dentro del rango de route solve. De este modo el jugador siempre podrá saber a qué nodos tiene que lograr llegar para poder constuir una ruta a su nodo objetivo último.
-
-- [x] Al escribir el comando "dock" el autocompletado tiene que ser más contextual. No tiene sentido que el autocompletado te liste todos los contactos conocidos cuando estás en órbita de un nodo. Cuando estás en órbita de un nodo tu única posibilidad de dock es con el nodo que estás orbitando, así que ese es el nodo que debería autocompletarse automáticamente.
-
-- [x] Implementar un drone recall all, y que "drone recall" a secas, es decir sin especificar el id del drone, equivalga a un drone recall all.
-
-- [x] La operación de scan debe llevar algún tiempo (configurable desde el balance.py). Y disparar algún sonido si detecta un contacto nuevo (por ejemplo el cue "info").
-
-- [x] La orden ship survey debería listar también la radiación del nodo, si es conocida, o decir que es desconocida si es desconocida.
-
-- [x] Llueven contactos y rutas. Sólo con haber pasado por 3 o 4 nodos, tengo repleto el mapa de contactos. y rutas. Hay que balancear esto, pues de otro modo esta información pierde valor.
-
 - [ ] Tiene que haber un aliciente claro para explorar los nodos del sector antes de dar el salto al siguiente. Un salto de muchos años de hibernación tiene que tener riesgos. No debe tampoco haber muchas rutas que conecten un sector con otro. Lo normal ha de ser que haya una.
 
 - [ ] Cada vez que se consigue un contacto o link tiene que especificarse si es nuevo (no conocido) o no.
-
-- [x] Hay que reducir el coste de scrap de instalación de módulos de drone.
 
 - [ ] El bonus de tiempo del módulo rapid_maneuver_module debe ser mayor. Los drones con ese módulo deben ser más rápidos.
 
@@ -232,13 +214,15 @@ En cuanto al id de jobs completados (es decir, el que sale en la lista "complete
 
 - [ ] Nuevo loot: uranio (como combustible). La idea es que para poder generar energía, el reactor nuclear necesita uranio. Es duradero, pero teniendo en cuenta que se viaja durante años... El uranio (o lo que sea) se tiene que poder obtener con los drones de otras derelics.
 
-- [ ] Eventos aleatorios durante viajes/hibernación, que despiertan de hibernación automática.
+- [ ] Chequeos periódicos. Permite configurar “wake every N years/days” (cuando desbloquees software).
+
+hibernate until_arrival --wake-every 2y
+
+- [ ] Diseñar 3 eventos básicos que te despierten de hibernación.. Eventos aleatorios durante viajes/hibernación, que despiertan de hibernación automática.
   Tipos de eventos:
     - [ ] Señal/mensaje capturado.
     - [ ] Impacto con...
-    - [ ] 
-
-- [x] Necesitamos mensajes de advertencia (si es que no los hay) cada vez que haya un cambio muy brusco de radiación, y cada vez que se entre o salga de alguno de los umbrales de radiación. Definir umbrales "muy baja", "baja", "normal", "alta", "muy alta", "extrema".
+    - [ ] ...
 
 - [ ] Posible contamination_ship (rad que se acumula y se disipa lento y ha que limpiar). La fórmula sería  internal_rad = env_rad * ingress_factor + contamination_rad. Por otra parte, necesitamos diseñar una forma de limpiar la nave (e. e. el hull y los sistemas o lo que sea) de radiación. Podría haber algunas estaciones especializadas en ello. Y algún módulo que redujeran lentamente la radiación. Y operaciones con drones.
 
@@ -266,9 +250,36 @@ El paso de un sector a otro estará bloqueado por puertas. A veces esas puertas 
   - un ejemplo del archivo entregado por captured_signal o ship_os_mail
   Para calibrar probabilidades (para que no “llueva lore” y siga siendo calmado).
 
-- [x] Al hacer 'route <node_id>' a un node_id para el que ya conoces ruta,  no se debería iniciar el job. Debería salir un mensaje informando de que ya se conoce ruta a ese objetivo. Por otra parte, debería de haber un comando para cancelar jobs en curso.
+- [ ] Quiero diseñar e implementar la cinemática de inicio de hibernación. Al iniciar la hibernación, debería de salir un mensaje (localizado) diciendo que se está iniciando la secuencia de criogenización, y una serie de mensajes (meramente narrativos) diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la criogenización/hibernación. Es decir, hay que diseñar una serie de mensajes diegéticos para el proceso de hibernación/criogenización (esos mensajes tienen que ser coherentes con los mensajes relacionados que se generan en la intro cinemática al iniciar nueva partida). 
+Una vez impresos esos mensajes, deberá iniciarse una cuenta atrás de 10 segundos (visible para el jugador). Al llegar a 0, debe limpiarse la ventana de logs, y se considerará que la hibernación se ha hecho efectiva. En un segundo paso, necesitamos diseñar una cinemática del despertar de la hibernación, pero diseñemos primero la cinemática del inicio de hibernación.
 
-- [ ] Al iniciar la hibernación, debería de salir un mensaje (localizado) diciendo algo así como "Iniciando secuencia de hibernación", y una serie de mensajes (meramente narrativos) diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la criogenización, y una cuenta atrás de 10 segundos. Después, debe limpiarse la pantalla de logs, esperar 2 segundos e imprimirse una serie de mensajes diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la descriogenización, junto con un mensaje (que se repetirá siempre), advirtiendo de que hay un problema crítico y no es posible descriogenizar completamente al sujeto del sarcófago (es decir, al Personaje Jugador). El sarcófago del PJ debe tener un id, por cierto. 
+Actualmente esos mensajes son los siguientes:
+
+«
+[core_os] wake schedule integrity: FAIL (chronometry desync)
+[core_os] Multiple wake timers unreadable or outside valid bounds.
+[core_os] No authorized medical staff response detected.
+[core_os] Entering autonomous emergency recovery protocol.
+AUTONOMOUS RECOVERY PROTOCOL engaged
+CRYO VAULT status scan... ok
+TARGET selected: Sarcophagus-05
+Decryo sequence: INIT (emergency profile)
+Thermal gradient stabilized
+Neurochemical thaw: PARTIAL
+Motor pathway recovery: FAIL (indeterminate system fault)
+Host vitals: nominal
+Conscious Interface Recovery Protocol (CIRP): ARMED
+Neural terminal link: ONLINE
+Manual operations required
+Timebase fault detected: internal clock invalid
+Chronology reset: Year 1 / Day 1 / 00:00:00
+Awaiting operator input
+»
+
+
+algunos de esos mensajes no tienen que volver a salir, pero otros sí. Dependerá de cuál sea la causa para despertar de la hibernación. Si la causa para despertar/salir de la hibernación es por una interrupción automatizada (por ejemplo porque un sistema crítico pasa a CRITICAL u OFFLINE, o alguna otra de las razones que me acabas de describir), entonces te
+Al salir/despertar de la hibernación (por la causa que sea) debe limpiarse la pantalla de logs, esperar 2 segundos e imprimirse una serie de mensajes diegéticos técnicos (localizados) sobre las operaciones que se están llevando a cabo para la descriogenización.
+junto con un mensaje (que se repetirá siempre), advirtiendo de que hay un problema crítico y no es posible descriogenizar completamente al sujeto del sarcófago (es decir, al Personaje Jugador). El sarcófago del PJ debe tener un id, por cierto. 
 
 - [ ] Necesitamos una merjor organización del help.
 
@@ -277,8 +288,6 @@ El paso de un sector a otro estará bloqueado por puertas. A veces esas puertas 
 - [ ] se puede usar el comando "scan" estando el servicio "datad" offline?
 
 - [ ] Ahora mismo los manuals se han generado con un tono "diegético". Me gustaría ver cómo sería la versión más "técnica", pues chatgpt y codex me la han propuesto varias veces pero siempre la he rechazado sin llegar a ver cómo sería.
-
-- [x] El comando "travel" hay que cambiarlo quizá por "navigate" (o algo primero como "trazar ruta" y después "navigate"). 
 
 - [ ] También creo que tendría que aparecer en primer lugar el nombre de la hubicación (si la tiene), por ejemplo Relay-97 (relay) dist=1.30ly coord=S+000_-001_-001:02""
 
@@ -358,16 +367,6 @@ Sugerencias de diseño para la hibernación “con consecuencias” (Paso 2)
 
 Para que viajes de décadas sean jugables y tensos sin ser arbitrarios:
 
-Despertar por eventos
-Durante hibernación, si ocurre un CRITICAL (p.ej. POWER_BUS_INSTABILITY, LIFE_SUPPORT_FAILURE), el sistema despierta al jugador automáticamente:
-
-“WAKE_EVENT: life_support anomaly”
-Esto evita “morir offscreen” y crea puzzles emergentes.
-
-Chequeos periódicos
-Permite configurar “wake every N years/days” (cuando desbloquees software).
-
-hibernate until_arrival --wake-every 2y
 
 Riesgo como función de preparación
 Riesgo aumenta con:
