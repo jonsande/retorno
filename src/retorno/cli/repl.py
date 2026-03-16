@@ -43,9 +43,11 @@ from retorno.model.events import Event, EventType, Severity, SourceRef
 from retorno.model.jobs import JobStatus, JobType, active_job_display_ids
 from retorno.runtime.data_loader import load_modules, load_arcs, load_locations, load_worldgen_archetypes, load_worldgen_templates
 from retorno.runtime.startup import (
+    clear_terminal_screen,
     load_hibernate_start_sequence_lines,
     load_hibernate_wake_sequence_lines,
     load_startup_sequence_lines,
+    run_console_entry_gate,
 )
 from retorno.config.balance import Balance
 from retorno.io.save_load import (
@@ -100,7 +102,7 @@ def _maybe_run_startup_sequence(locale: str) -> None:
     lines = load_startup_sequence_lines(locale)
     if not lines:
         return
-    print("\033[2J\033[H", end="")
+    clear_terminal_screen()
     _play_startup_sequence(lines)
     _print_startup_tips(locale)
 
@@ -249,7 +251,7 @@ def _play_hibernate_start_sequence(locale: str) -> None:
                 time.sleep(1.0)
         sys.stdout.write("\n")
         sys.stdout.flush()
-    print("\033[2J\033[H", end="")
+    clear_terminal_screen()
 
 
 def _hibernate_wake_panel_blackout_s() -> float:
@@ -6622,15 +6624,16 @@ def main() -> None:
     audio_enabled, ambient_enabled = audio_flags(state.os)
     if audio_manager is not None:
         audio_manager.prepare_session(audio_enabled, ambient_enabled, startup_audio_context)
+    run_console_entry_gate(
+        [startup_message, audio_warning],
+        state.os.locale.value,
+        clear_after=True,
+    )
+    if audio_manager is not None:
         audio_manager.start(audio_enabled, ambient_enabled)
         audio_manager.play_startup(audio_enabled, startup_audio_context)
-        audio_warning = audio_manager.consume_notice() or audio_warning
-    if startup_message:
-        print(startup_message)
     if play_startup_sequence:
         _maybe_run_startup_sequence(state.os.locale.value)
-    if audio_warning:
-        print(audio_warning)
     if not state.os.debug_enabled:
         loop.set_auto_tick(True)
         loop.start()

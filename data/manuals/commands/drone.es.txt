@@ -49,7 +49,7 @@ Bloqueos frecuentes
 Notas operativas
 - Slots base por dron en v1: 2.
 - Todos los modulos de dron de v1 consumen 1 slot.
-- Drones recuperados pueden traer modulos de dron preinstalados de forma determinista.
+- Drones recuperados pueden traer modulos de dron preinstalados.
 
 Comandos relacionados
 - `modules`, `module inspect <module_id>`, `cargo`, `cargo audit`, `diag drone_bay`, `alerts explain drone_bay_maintenance_blocked`

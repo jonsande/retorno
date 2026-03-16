@@ -39,6 +39,7 @@ from retorno.runtime.startup import (
     load_hibernate_start_sequence_lines,
     load_hibernate_wake_sequence_lines,
     load_startup_sequence_lines,
+    run_console_entry_gate,
 )
 from retorno.ui_theme import get_theme_palette, normalize_theme_preset, render_rich_block, render_rich_line
 from retorno.ui_textual import presenter
@@ -203,20 +204,21 @@ class RetornoTextualApp(App):
         self._save_path = save_path
         self._user = user
         self._exit_persist_done = False
+        self._console_messages: list[str] = []
+        self._console_exit_message = ""
         self._play_startup_sequence = False
-        self._startup_notice = ""
         self._startup_audio_context = "load_game"
         scenario = os.getenv("RETORNO_SCENARIO", "prologue").lower()
         if scenario in {"sandbox", "dev"}:
             state = create_initial_state_sandbox()
             self._play_startup_sequence = True
             self._startup_audio_context = "new_game"
-            self._startup_notice = f"[INFO] Scenario '{scenario}' started as new game (save slot bypassed)."
+            self._console_messages.append(f"[INFO] Scenario '{scenario}' started as new game (save slot bypassed).")
         elif force_new_game:
             state = create_initial_state_prologue()
             self._play_startup_sequence = True
             self._startup_audio_context = "new_game"
-            self._startup_notice = "[INFO] Started new game (save slot ignored by --new-game/RETORNO_NEW_GAME)."
+            self._console_messages.append("[INFO] Started new game (save slot ignored by --new-game/RETORNO_NEW_GAME).")
         else:
             try:
                 loaded: LoadGameResult | None = load_single_slot(save_path, user=self._user)
@@ -224,20 +226,20 @@ class RetornoTextualApp(App):
                 state = create_initial_state_prologue()
                 self._play_startup_sequence = True
                 self._startup_audio_context = "new_game"
-                self._startup_notice = f"[WARN] Could not load saved game ({exc}). Starting new game."
+                self._console_messages.append(f"[WARN] Could not load saved game ({exc}). Starting new game.")
             else:
                 if loaded is None:
                     state = create_initial_state_prologue()
                     self._play_startup_sequence = True
                     self._startup_audio_context = "new_game"
-                    self._startup_notice = "[INFO] No saved game found. Starting new game."
+                    self._console_messages.append("[INFO] No saved game found. Starting new game.")
                 else:
                     state = loaded.state
                     self._startup_audio_context = "load_game"
                     if loaded.source == "backup":
-                        self._startup_notice = f"[WARN] Main save unreadable. Loaded backup: {loaded.path}"
+                        self._console_messages.append(f"[WARN] Main save unreadable. Loaded backup: {loaded.path}")
                     else:
-                        self._startup_notice = f"[INFO] Loaded saved game: {loaded.path}"
+                        self._console_messages.append(f"[INFO] Loaded saved game: {loaded.path}")
         engine = Engine()
         self.loop = GameLoop(engine, state, tick_s=1.0)
         self._theme_preset = normalize_theme_preset(getattr(state.os, "theme_preset", "linux"))
@@ -257,16 +259,17 @@ class RetornoTextualApp(App):
         self._log_buffer: list[str] = []
         self._startup_sequence_running = False
         self._startup_sequence_skip = False
+        self._startup_panel_blackout = bool(self._play_startup_sequence and Balance.STARTUP_SEQUENCE_ENABLED)
         self._hibernate_sequence_running = False
         self._hibernate_panel_blackout = False
-        self._audio_notice = ""
         try:
             self._audio_manager = AudioManager(load_audio_config())
         except AudioConfigError as exc:
             self._audio_manager = None
-            self._audio_notice = f"[WARN] Audio disabled: {exc}"
+            self._console_messages.append(f"[WARN] Audio disabled: {exc}")
         else:
-            self._audio_notice = self._audio_manager.notice or ""
+            if self._audio_manager.notice:
+                self._console_messages.append(self._audio_manager.notice)
             audio_enabled, ambient_enabled = audio_flags(self.loop.state.os)
             self._audio_manager.prepare_session(
                 audio_enabled,
@@ -298,14 +301,8 @@ class RetornoTextualApp(App):
             audio_enabled, ambient_enabled = audio_flags(self.loop.state.os)
             self._audio_manager.start(audio_enabled, ambient_enabled)
             self._audio_manager.play_startup(audio_enabled, self._startup_audio_context)
-            notice = self._audio_manager.consume_notice()
-            if notice:
-                self._log_line(notice)
+            self._audio_manager.consume_notice()
         self.loop.step(1.0)
-        if self._startup_notice:
-            self._log_line(self._startup_notice)
-        if self._audio_notice:
-            self._log_line(self._audio_notice)
         if not self.loop.state.os.debug_enabled:
             self.loop.set_auto_tick(True)
             self.loop.start()
@@ -335,10 +332,15 @@ class RetornoTextualApp(App):
     async def _run_startup_sequence(self) -> None:
         self._startup_sequence_running = True
         self._startup_sequence_skip = False
+        input_widget = self.query_one("#input", Input)
+        input_widget.disabled = True
         locale = self.loop.state.os.locale.value
         lines = load_startup_sequence_lines(locale)
         if not lines:
             self._startup_sequence_running = False
+            self._startup_panel_blackout = False
+            input_widget.disabled = False
+            self.refresh_panels()
             return
         typewriter = Balance.STARTUP_SEQUENCE_TYPEWRITER
         cps = max(1, int(Balance.STARTUP_SEQUENCE_TYPEWRITER_CPS))
@@ -405,20 +407,23 @@ class RetornoTextualApp(App):
                 _render_snapshot(None)
 
         self._startup_sequence_running = False
+        self._startup_panel_blackout = False
+        input_widget.disabled = False
         self._log_lines(self._startup_tips(locale))
         self._drain_auto_to_log()
         self.refresh_panels()
-        self.call_later(lambda: self.query_one("#input", Input).focus())
+        self.call_later(input_widget.focus)
 
     def _clear_log_widget(self, *, clear_buffer: bool = False) -> None:
         self.query_one("#log", RichLog).clear()
         if clear_buffer:
             self._log_buffer.clear()
 
-    def _render_panel_blackout(self) -> None:
+    def _render_panel_blackout(self, *, clear_log: bool = True) -> None:
         self.query_one("#header", Static).update("")
         self.query_one("#power", Static).update("")
-        for widget_id in ("status", "alerts", "jobs", "log"):
+        widget_ids = ("status", "alerts", "jobs", "log") if clear_log else ("status", "alerts", "jobs")
+        for widget_id in widget_ids:
             self.query_one(f"#{widget_id}", RichLog).clear()
 
     async def _run_hibernate_start_sequence(self, years: float, wake_on_low_battery: bool) -> None:
@@ -562,6 +567,12 @@ class RetornoTextualApp(App):
     def on_shutdown(self) -> None:
         self._persist_game_on_exit()
 
+    def startup_console_messages(self) -> list[str]:
+        return list(self._console_messages)
+
+    def exit_console_message(self) -> str:
+        return self._console_exit_message
+
     def _persist_game_on_exit(self) -> None:
         if self._exit_persist_done:
             return
@@ -571,9 +582,9 @@ class RetornoTextualApp(App):
         try:
             with self.loop.with_lock() as state:
                 saved_path = save_single_slot(state, self._save_path, user=self._user)
-            print(f"[INFO] Game saved: {saved_path}")
+            self._console_exit_message = f"[INFO] Game saved: {saved_path}"
         except SaveLoadError as exc:
-            print(f"[WARN] Failed to save game: {exc}", file=sys.stderr)
+            self._console_exit_message = f"[WARN] Failed to save game: {exc}"
         self._exit_persist_done = True
 
     def action_clear_log(self) -> None:
@@ -1344,6 +1355,9 @@ class RetornoTextualApp(App):
         input_widget.styles.color = palette.foreground
 
     def refresh_panels(self) -> None:
+        if self._startup_panel_blackout:
+            self._render_panel_blackout(clear_log=False)
+            return
         if self._hibernate_panel_blackout:
             self._render_panel_blackout()
             return
@@ -1439,6 +1453,8 @@ class RetornoTextualApp(App):
         text = event.value.strip()
         event.input.value = ""
         if not text:
+            return
+        if self._startup_panel_blackout or self._startup_sequence_running:
             return
         if self._hibernate_sequence_running:
             return
@@ -2093,7 +2109,16 @@ def main() -> None:
         if reply not in {"y", "yes", "s", "si", "sí"}:
             print("Cancelled.")
             return
-    RetornoTextualApp(force_new_game=force_new_game, save_path=args.save_path, user=profile_user).run()
+    app = RetornoTextualApp(force_new_game=force_new_game, save_path=args.save_path, user=profile_user)
+    run_console_entry_gate(
+        app.startup_console_messages(),
+        app.loop.state.os.locale.value,
+        clear_after=False,
+    )
+    app.run()
+    exit_message = app.exit_console_message()
+    if exit_message:
+        print(exit_message)
 
 
 if __name__ == "__main__":

@@ -49,7 +49,7 @@ Common block reasons
 Operational notes
 - Base drone slots in v1: 2.
 - All v1 drone modules consume 1 slot.
-- Recovered drones may include deterministic preinstalled drone modules.
+- Recovered drones may include preinstalled drone modules.
 
 Related commands
 - `modules`, `module inspect <module_id>`, `cargo`, `cargo audit`, `diag drone_bay`, `alerts explain drone_bay_maintenance_blocked`
