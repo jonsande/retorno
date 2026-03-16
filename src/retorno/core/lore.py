@@ -1097,8 +1097,8 @@ def _piece_index() -> dict[str, dict]:
 
 
 def _start_node_for_hops(state) -> str:
-    if "UNKNOWN_00" in state.world.space.nodes:
-        return "UNKNOWN_00"
+    if "UNKNOWN" in state.world.space.nodes:
+        return "UNKNOWN"
     return state.world.current_node_id
 
 

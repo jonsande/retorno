@@ -53,7 +53,7 @@ def main() -> None:
 
     # 2) Hull decays very slowly in normal/low-radiation operation.
     state = _fresh_state()
-    _set_node(state, "UNKNOWN_00")
+    _set_node(state, "UNKNOWN")
     h0 = state.ship.hull_integrity
     engine.tick(state, 30 * Balance.DAY_S)
     h1 = state.ship.hull_integrity
@@ -166,7 +166,7 @@ def main() -> None:
 
     # 10) Radiation level warnings are emitted on threshold change only.
     state = _fresh_state()
-    _set_node(state, "UNKNOWN_00")
+    _set_node(state, "UNKNOWN")
     baseline_events = engine.tick(state, 1.0)
     assert not any(
         e.type == EventType.ACTION_WARNING and e.data.get("message_key") == "radiation_level_changed"

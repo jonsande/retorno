@@ -130,7 +130,7 @@ def _run_hard_force_case() -> None:
 
 def _run_hard_force_constraints_and_no_relax_case() -> None:
     state = create_initial_state_sandbox()
-    start_node = state.world.space.nodes.get("UNKNOWN_00")
+    start_node = state.world.space.nodes.get("UNKNOWN")
     assert start_node is not None
     # Move start reference away from origin to verify dist constraints are evaluated from start-node.
     start_node.x_ly = 100.0

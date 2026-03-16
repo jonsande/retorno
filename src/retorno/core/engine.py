@@ -3455,7 +3455,7 @@ class Engine:
         state.world.active_tmp_progress = None
 
     def _drop_initial_unknown_node(self, state: GameState) -> None:
-        unknown_id = "UNKNOWN_00"
+        unknown_id = "UNKNOWN"
         if state.world.current_node_id == unknown_id:
             return
         state.world.space.nodes.pop(unknown_id, None)

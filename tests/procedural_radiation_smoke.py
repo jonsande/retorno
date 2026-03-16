@@ -51,7 +51,7 @@ def main() -> None:
 
     # 4) Authored nodes keep explicit configured values (including zero when authored that way).
     state = create_initial_state_prologue()
-    assert state.world.space.nodes["UNKNOWN_00"].radiation_rad_per_s == 0.0005
+    assert state.world.space.nodes["UNKNOWN"].radiation_rad_per_s == 0.0005
     authored_cfg = next(
         loc for loc in load_locations() if (loc.get("node", {}) or {}).get("node_id") == "RETORNO_SHIP"
     )

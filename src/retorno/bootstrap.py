@@ -175,7 +175,7 @@ def create_initial_state_prologue() -> GameState:
         "CRG-01": ShipSector(sector_id="CRG-01", name="Cargo Hold", tags={"cargo"}),
     }
 
-    state.world.current_node_id = "UNKNOWN_00"
+    state.world.current_node_id = "UNKNOWN"
     state.ship.current_node_id = state.world.current_node_id
     state.world.visited_nodes.add(state.world.current_node_id)
     rng = random.Random(state.meta.rng_seed)
@@ -188,7 +188,7 @@ def create_initial_state_prologue() -> GameState:
     current_node = state.world.space.nodes.get(state.world.current_node_id)
     if current_node:
         state.world.current_pos_ly = (current_node.x_ly, current_node.y_ly, current_node.z_ly)
-        if current_node.node_id != "UNKNOWN_00":
+        if current_node.node_id != "UNKNOWN":
             # Generate links for the current sector and seed known routes
             sector_id = sector_id_for_pos(current_node.x_ly, current_node.y_ly, current_node.z_ly)
             ensure_sector_generated(state, sector_id)

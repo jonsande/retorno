@@ -2699,13 +2699,13 @@ def render_debug_galaxy(state) -> None:
         )
     else:
         print(f"- current_sector_gen: generated={'yes' if psector in state.world.generated_sectors else 'no'} region={phys_region} archetype=(not_generated)")
-    if state.world.current_node_id == "UNKNOWN_00":
+    if state.world.current_node_id == "UNKNOWN":
         if phys_region != "disk":
-            print("! warning: prologue start node UNKNOWN_00 is not in physical disk")
+            print("! warning: prologue start node UNKNOWN is not in physical disk")
         margin_bulge = float(margins.get("distance_to_bulge_ly", 0.0))
         margin_halo = float(margins.get("distance_to_halo_ly", 0.0))
         if margin_bulge < 100000.0 or margin_halo < 100000.0:
-            print("! warning: prologue start node UNKNOWN_00 is too close to physical bulge/halo edge (<100k ly)")
+            print("! warning: prologue start node UNKNOWN is too close to physical bulge/halo edge (<100k ly)")
 
     authored_ids = _authored_node_ids()
     proc_values: list[float] = []
@@ -3227,9 +3227,13 @@ def debug_add_drones(state, count: int = 1) -> None:
     print(f"debug add drone: created {len(created)} -> {', '.join(created)}")
 
 
+def _is_hidden_origin_contact_id(node_id: str) -> bool:
+    return node_id == "UNKNOWN" or node_id.startswith("UNKNOWN_")
+
+
 def _known_contact_cache_ids(state) -> set[str]:
     known = state.world.known_nodes if hasattr(state.world, "known_nodes") and state.world.known_nodes else state.world.known_contacts
-    return set(known)
+    return {node_id for node_id in known if not _is_hidden_origin_contact_id(node_id)}
 
 
 def _contact_distance_text(state, node: SpaceNode, current_pos: tuple[float, float, float]) -> tuple[float, str]:
@@ -3326,7 +3330,7 @@ def _render_contacts_table(state) -> None:
     print("\n=== CONTACTS ===")
     entries = _collect_known_contact_entries(state)
     if not entries:
-        print("(no signals detected)")
+        print("(no entries)")
         return
     for entry in entries:
         if not bool(entry["node_present"]):
@@ -6313,12 +6317,12 @@ def _known_contact_ids_for_completion(state) -> list[str]:
         if hasattr(state.world, "known_nodes") and state.world.known_nodes
         else state.world.known_contacts
     )
-    return sorted(c for c in known_ids if c != "UNKNOWN_00")
+    return sorted(c for c in known_ids if not _is_hidden_origin_contact_id(c))
 
 
 def _dock_targets_for_completion(state) -> list[str]:
     current_node_id = getattr(state.world, "current_node_id", "")
-    if not current_node_id or current_node_id == "UNKNOWN_00":
+    if not current_node_id or current_node_id == "UNKNOWN":
         return []
     node = state.world.space.nodes.get(current_node_id)
     if not node or node.kind in {"origin", "transit"}:
@@ -6328,7 +6332,7 @@ def _dock_targets_for_completion(state) -> list[str]:
 
 def _route_solve_targets_for_completion(state) -> list[str]:
     current_node_id = getattr(state.world, "current_node_id", "")
-    if not current_node_id or current_node_id == "UNKNOWN_00":
+    if not current_node_id or current_node_id == "UNKNOWN":
         return []
     known_routes = set(state.world.known_links.get(current_node_id, set()))
     return [
@@ -6340,12 +6344,12 @@ def _route_solve_targets_for_completion(state) -> list[str]:
 
 def _travel_targets_for_completion(state) -> list[str]:
     current_node_id = getattr(state.world, "current_node_id", "")
-    if not current_node_id or current_node_id == "UNKNOWN_00":
+    if not current_node_id or current_node_id == "UNKNOWN":
         return []
     candidates = [
         node_id
         for node_id in sorted(state.world.known_links.get(current_node_id, set()))
-        if node_id != current_node_id and node_id != "UNKNOWN_00"
+        if node_id != current_node_id and node_id != "UNKNOWN"
     ]
     if (
         getattr(state.world, "active_tmp_node_id", None)
@@ -6360,14 +6364,14 @@ def _drone_local_world_node_targets_for_completion(state) -> list[str]:
     # Drone world interactions are local to the ship position (orbit/docked node).
     candidates: list[str] = []
     current_node_id = getattr(state.world, "current_node_id", "")
-    if current_node_id and current_node_id != "UNKNOWN_00":
+    if current_node_id and current_node_id != "UNKNOWN":
         node = state.world.space.nodes.get(current_node_id)
         if node and node.kind != "transit":
             candidates.append(current_node_id)
     docked_node_id = getattr(state.ship, "docked_node_id", None)
     if (
         docked_node_id
-        and docked_node_id != "UNKNOWN_00"
+        and docked_node_id != "UNKNOWN"
         and docked_node_id in state.world.space.nodes
     ):
         candidates.append(docked_node_id)
@@ -6375,7 +6379,7 @@ def _drone_local_world_node_targets_for_completion(state) -> list[str]:
 
 
 def _drone_ship_sector_targets_for_completion(state) -> list[str]:
-    return sorted(s for s in state.ship.sectors.keys() if s != "UNKNOWN_00")
+    return sorted(s for s in state.ship.sectors.keys() if s != "UNKNOWN")
 
 
 def _drone_move_targets_for_completion(state) -> list[str]:

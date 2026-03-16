@@ -76,3 +76,29 @@ def test_contacts_render_includes_sector_region_and_sector_summary() -> None:
     assert f"contacts=({next_sector_id})" in sector_text, sector_text
     assert f"- {far_sector} " in sector_text, sector_text
     assert f"contacts=({far_sector_id})" in sector_text, sector_text
+
+
+def test_contacts_outputs_hide_start_unknown_placeholder() -> None:
+    state = create_initial_state_prologue()
+    hidden_id = state.world.current_node_id
+
+    visible_id = "TEST_VISIBLE"
+    state.world.space.nodes[visible_id] = _make_node(visible_id, "Visible", 12.0)
+    state.world.known_nodes.add(visible_id)
+    state.world.known_contacts.add(visible_id)
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        repl.render_nav_contacts(state)
+    text = buf.getvalue()
+
+    assert f"id={visible_id}" in text, text
+    assert hidden_id not in text, text
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        repl.render_nav_contacts(state, map_arg="sector")
+    sector_text = buf.getvalue()
+
+    assert f"contacts=({visible_id})" in sector_text, sector_text
+    assert hidden_id not in sector_text, sector_text

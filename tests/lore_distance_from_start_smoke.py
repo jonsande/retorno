@@ -7,8 +7,8 @@ from retorno.model.world import SpaceNode, region_for_pos
 
 def main() -> None:
     state = create_initial_state_sandbox()
-    start = state.world.space.nodes.get("UNKNOWN_00")
-    assert start is not None, "UNKNOWN_00 must exist"
+    start = state.world.space.nodes.get("UNKNOWN")
+    assert start is not None, "UNKNOWN must exist"
     start.x_ly = 100.0
     start.y_ly = -25.0
     start.z_ly = 3.0

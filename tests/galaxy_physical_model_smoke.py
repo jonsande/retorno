@@ -24,8 +24,8 @@ def main() -> None:
     assert math.isclose(gz0, float(Balance.GALAXY_OP_ORIGIN_PHYSICAL_Z_LY))
 
     state = create_initial_state_prologue()
-    start = state.world.space.nodes.get("UNKNOWN_00")
-    assert start is not None, "UNKNOWN_00 must exist"
+    start = state.world.space.nodes.get("UNKNOWN")
+    assert start is not None, "UNKNOWN must exist"
     sx, sy, sz = start.x_ly, start.y_ly, start.z_ly
 
     region = galactic_region_for_op_pos(sx, sy, sz)

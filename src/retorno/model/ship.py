@@ -141,7 +141,7 @@ class ShipState:
             return "docked"
         node = getattr(world, "space", world).nodes.get(current_node_id) if hasattr(world, "space") else world.nodes.get(current_node_id)
         active_tmp = getattr(world, "active_tmp_node_id", None)
-        if not node or node.kind == "transit" or current_node_id == "UNKNOWN_00" or active_tmp == current_node_id:
+        if not node or node.kind == "transit" or current_node_id == "UNKNOWN" or active_tmp == current_node_id:
             return "adrift"
         return "orbit"
 
