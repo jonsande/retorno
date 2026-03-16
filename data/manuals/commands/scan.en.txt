@@ -8,7 +8,10 @@ Requirements (gating)
 - Power state must allow active scanning operations.
 
 Operational behavior
-- Updates local contact awareness and may reveal scan events.
+- Queues a scan job with ETA based on `Balance.SCAN_TIME_S`.
+- On completion, updates local contact awareness and may reveal detection events.
+- If new contacts are discovered, it emits `signal_detected` and its mapped cue.
+- If operating context changes before completion, the job may be interrupted.
 
 Related commands
-- `boot sensord`, `diag sensors`, `nav map contacts`, `route solve <node_id>`
+- `boot sensord`, `diag sensors`, `jobs`, `nav map contacts`, `route solve <node_id>`

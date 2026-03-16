@@ -184,13 +184,13 @@ ship survey ahora muestra node_radiation en la salida; si el nodo ya fue visitad
 
 - [!] Necesitamos un comando que te liste el camino que has seguido. El orden de los nodos que has visitado. Incluso estaría bien que junto a los nodos por los que has pasado apareciera entre paréntesis o algo un listado de los nodos que eran accesibles desde él.
 
-- [!] Necesitamos un comando que, para cada nodo sin ruta conocida, nos diga desde qué nodos conocidos es posible calcular una ruta (con route solve) a ese nodo. Es decir, desde qué nodos conocidos "route solve" tiene alcance para calcular una ruta hasta el nodo deseado. Para no multiplicar comandos, se me ocurre que esto podría ser una función extendida del propio comando "route solve <node_id>": si <node_id> está dentro del rango, se procede como de costumbre; si no lo está, se emite el mensaje habitual de "target out of sensor range" y a continuación un listado de los nodos conocidos desde los cuales el <node_id> introducido está dentro del rango de route solve. De este modo el jugador siempre podrá saber a qué nodos tiene que lograr llegar para poder constuir una ruta a su nodo objetivo último.
+- [x] Necesitamos un comando que, para cada nodo sin ruta conocida, nos diga desde qué nodos conocidos es posible calcular una ruta (con route solve) a ese nodo. Es decir, desde qué nodos conocidos el comando "route solve" tiene alcance para calcular una ruta hasta el nodo deseado. Para no multiplicar comandos, se me ocurre que esto podría ser una función extendida del propio comando "route solve <node_id>": si <node_id> está dentro del rango, se procede como de costumbre; si no lo está, se emite el mensaje habitual de "target out of sensor range" y a continuación un listado de los nodos conocidos desde los cuales el <node_id> introducido está dentro del rango de route solve. De este modo el jugador siempre podrá saber a qué nodos tiene que lograr llegar para poder constuir una ruta a su nodo objetivo último.
 
-- [ ] Al hacer dock el autocompletado tiene que ser contextual. No tiene sentido que el autocompletado te liste todos los contactos conocidos cuando estás en órbita de un nodo. Cuando estás en órbita de un nodo tu única posibilidad de dock es con el nodo que estás orbitando. De hecho, debería valer como alias el comando "dock" a secas, sin introducir el <node_id>.
+- [x] Al escribir el comando "dock" el autocompletado tiene que ser más contextual. No tiene sentido que el autocompletado te liste todos los contactos conocidos cuando estás en órbita de un nodo. Cuando estás en órbita de un nodo tu única posibilidad de dock es con el nodo que estás orbitando, así que ese es el nodo que debería autocompletarse automáticamente.
 
 - [x] Implementar un drone recall all, y que "drone recall" a secas, es decir sin especificar el id del drone, equivalga a un drone recall all.
 
-- [!] La operación de scan debe llevar algún tiempo (configurable desde el balance.py). Y disparar algún sonido si detecta un contacto nuevo (por ejemplo el cue "info").
+- [x] La operación de scan debe llevar algún tiempo (configurable desde el balance.py). Y disparar algún sonido si detecta un contacto nuevo (por ejemplo el cue "info").
 
 - [x] La orden ship survey debería listar también la radiación del nodo, si es conocida, o decir que es desconocida si es desconocida.
 

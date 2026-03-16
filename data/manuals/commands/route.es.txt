@@ -9,6 +9,7 @@ Comportamiento
   - Si no hay nada que afinar (porque el destino se encuentra fuera del sector actual o a una distancia demasiado grande), informa que la ruta ya era conocida.
 - Si la ruta no es conocida, encola un job `ROUTE_SOLVE`.
 - La duración del job escala con la distancia al objetivo (más cerca = más rápido).
+- Si el objetivo queda fuera de rango, informa del bloqueo y lista los nodos conocidos desde los que ese objetivo sí entra en rango de `route solve`.
 
 Requisitos (gating)
 - `sensors` en estado `>= limited`.

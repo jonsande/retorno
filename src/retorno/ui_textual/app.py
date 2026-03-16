@@ -633,6 +633,9 @@ class RetornoTextualApp(App):
         systems = list(state.ship.systems.keys())
         drones = list(state.ship.drones.keys())
         contacts = repl._known_contact_ids_for_completion(state)
+        dock_targets = repl._dock_targets_for_completion(state)
+        route_solve_targets = repl._route_solve_targets_for_completion(state)
+        travel_targets = repl._travel_targets_for_completion(state)
         drone_local_world_targets = repl._drone_local_world_node_targets_for_completion(state)
         drone_move_targets = repl._drone_move_targets_for_completion(state)
         drone_deploy_targets = repl._drone_deploy_targets_for_completion(state)
@@ -688,12 +691,12 @@ class RetornoTextualApp(App):
                     return [c for c in ["--selftest"] if c.startswith(text)]
                 return [s for s in systems if s.startswith(text)]
         if cmd in {"dock"}:
-            return [c for c in contacts if c.startswith(text)]
+            return [c for c in dock_targets if c.startswith(text)]
         if cmd == "undock":
             return []
         if cmd in {"nav", "navigation", "travel"}:
             def _travel_targets(prefix: str) -> list[str]:
-                return [c for c in contacts if c.startswith(prefix)]
+                return [c for c in travel_targets if c.startswith(prefix)]
 
             if len(tokens) == 2:
                 base_opts = ["map", "abort", "--no-cruise"]
@@ -907,7 +910,7 @@ class RetornoTextualApp(App):
             if len(tokens) == 2:
                 return [c for c in ["solve"] if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "solve":
-                return [c for c in contacts if c.startswith(text)]
+                return [c for c in route_solve_targets if c.startswith(text)]
         if cmd == "config":
             if len(tokens) == 2:
                 return [c for c in ["set", "show"] if c.startswith(text)]
@@ -1403,7 +1406,6 @@ class RetornoTextualApp(App):
 
         # Informational commands (drain AUTO first to avoid mixing)
         info_tokens = {
-            "SCAN",
             "JOBS",
             "UPLINK",
             "ALERTS",
@@ -1442,25 +1444,6 @@ class RetornoTextualApp(App):
         ):
             self._drain_auto_to_log()
 
-        if parsed == "SCAN":
-            with self.loop.with_lock() as state:
-                seen, discovered, handshakes, route_msgs, warn = repl._scan_and_discover(state)
-                if warn:
-                    self._log_line(f"[WARN] {warn}")
-                self._log_lines(presenter.build_command_output(repl.render_scan_results, state, seen))
-                for line in route_msgs:
-                    self._log_line(line)
-                if discovered:
-                    self._log_line(f"(scan) new: {', '.join(sorted(discovered))}")
-                dead_events = repl.evaluate_dead_nodes(state, "scan", debug=state.os.debug_enabled)
-                if dead_events:
-                    repl._store_recent_events(state, dead_events)
-                    self._log_lines(presenter.format_event_lines(state, [("cmd", e) for e in dead_events]))
-                recovery_events = repl.ensure_exploration_recovery(state, "scan")
-                if recovery_events:
-                    repl._store_recent_events(state, recovery_events)
-                    self._log_lines(presenter.format_event_lines(state, [("cmd", e) for e in recovery_events]))
-            return
         if parsed == "JOBS":
             with self.loop.with_lock() as state:
                 self._log_lines(presenter.build_command_output(repl.render_jobs, state))

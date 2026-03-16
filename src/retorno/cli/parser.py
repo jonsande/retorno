@@ -22,6 +22,7 @@ from retorno.core.actions import (
     PowerPlan,
     PowerShed,
     Repair,
+    Scan,
     SelfTestRepair,
     SystemOn,
     SalvageModule,
@@ -59,7 +60,7 @@ _PARSE_ERROR_MESSAGES = {
         "usage_debug": "Usage: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules | debug galaxy | debug galaxy map <sector|local|regional|global> | debug worldgen sector <sector_id> | debug graph all | debug add scrap <amount> | debug add module <module_id> [count] | debug add drone[s] [count]",
         "usage_dock": "Usage: dock <node_id>",
         "usage_undock": "Usage: undock",
-        "usage_nav": "Usage: nav map sectors|graph [node_id]|path <node_id>|routes|contacts|galaxy [sector|local|regional|global] | nav <node_id> | nav --no-cruise <node_id> | nav abort",
+        "usage_nav": "Usage: nav map sectors|graph [node_id]|path <node_id>|routes|contacts [sector]|galaxy [sector|local|regional|global] | nav <node_id> | nav --no-cruise <node_id> | nav abort",
         "usage_hibernate": "Usage: hibernate until_arrival | hibernate <years>",
         "hibernate_number": "hibernate: <years> must be a number",
         "hibernate_gt0": "hibernate: <years> must be > 0",
@@ -142,7 +143,7 @@ _PARSE_ERROR_MESSAGES = {
         "usage_debug": "Uso: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules | debug galaxy | debug galaxy map <sector|local|regional|global> | debug worldgen sector <sector_id> | debug graph all | debug add scrap <amount> | debug add module <module_id> [count] | debug add drone[s] [count]",
         "usage_dock": "Uso: dock <node_id>",
         "usage_undock": "Uso: undock",
-        "usage_nav": "Uso: nav map sectors|graph [node_id]|path <node_id>|routes|contacts|galaxy [sector|local|regional|global] | nav <node_id> | nav --no-cruise <node_id> | nav abort",
+        "usage_nav": "Uso: nav map sectors|graph [node_id]|path <node_id>|routes|contacts [sector]|galaxy [sector|local|regional|global] | nav <node_id> | nav --no-cruise <node_id> | nav abort",
         "usage_hibernate": "Uso: hibernate until_arrival | hibernate <años>",
         "hibernate_number": "hibernate: <años> debe ser número",
         "hibernate_gt0": "hibernate: <años> debe ser > 0",
@@ -245,12 +246,14 @@ def parse_command(line: str):
         return "CLEAR"
 
     if cmd == "contacts":
-        if len(args) != 0:
-            raise ParseError("usage_nav")
-        return ("NAV_MAP", "contacts", None)
+        if len(args) == 0:
+            return ("NAV_MAP", "contacts", None)
+        if len(args) == 1 and args[0] == "sector":
+            return ("NAV_MAP", "contacts", "sector")
+        raise ParseError("usage_nav")
 
     if cmd == "scan":
-        return "SCAN"
+        return Scan()
 
     if cmd == "status":
         return Status()
@@ -282,6 +285,8 @@ def parse_command(line: str):
         if args[0] == "map":
             if len(args) == 2 and args[1] in {"sectors", "routes", "contacts", "graph", "galaxy"}:
                 return ("NAV_MAP", args[1], None)
+            if len(args) == 3 and args[1] == "contacts" and args[2] == "sector":
+                return ("NAV_MAP", "contacts", "sector")
             if len(args) == 3 and args[1] == "galaxy" and args[2] in galaxy_scales:
                 return ("NAV_MAP", "galaxy", args[2])
             if len(args) == 3 and args[1] == "graph":
@@ -291,6 +296,8 @@ def parse_command(line: str):
             raise ParseError("usage_nav")
         if len(args) == 1 and args[0] in {"sectors", "routes", "contacts", "galaxy"}:
             return ("NAV_MAP", args[0], None)
+        if len(args) == 2 and args[0] == "contacts" and args[1] == "sector":
+            return ("NAV_MAP", "contacts", "sector")
         if len(args) == 2 and args[0] == "galaxy" and args[1] in galaxy_scales:
             return ("NAV_MAP", "galaxy", args[1])
         if len(args) == 1 and args[0] == "graph":

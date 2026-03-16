@@ -9,6 +9,7 @@ Behavior
   - If nothing can be refined, it reports the route is already known.
 - If the route is not known, it queues a `ROUTE_SOLVE` job.
 - Job ETA scales with target distance (closer targets finish faster).
+- If the target is out of range, it reports the block and lists known nodes from which that target falls within `route solve` range.
 
 Requirements (gating)
 - `sensors` state `>= limited`.

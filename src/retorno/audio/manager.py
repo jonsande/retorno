@@ -53,6 +53,9 @@ class _AudioBackend:
     def is_available(self) -> bool:
         raise NotImplementedError
 
+    def consume_notice(self) -> str | None:
+        return None
+
     @property
     def name(self) -> str:
         raise NotImplementedError
@@ -221,6 +224,7 @@ class PcmMixerAudioBackend(_AudioBackend):
         self._voices: dict[str, _Voice] = {}
         self._decoded_cache: dict[str, _DecodedCue] = {}
         self._ephemeral_seq = 0
+        self._notice: str | None = None
         self._ensure_process()
 
     def play(self, cue: AudioCueConfig) -> None:
@@ -253,6 +257,12 @@ class PcmMixerAudioBackend(_AudioBackend):
     def is_available(self) -> bool:
         return True
 
+    def consume_notice(self) -> str | None:
+        with self._lock:
+            notice = self._notice
+            self._notice = None
+        return notice
+
     @property
     def name(self) -> str:
         return f"pcm-mixer-{self._device}"
@@ -266,6 +276,12 @@ class PcmMixerAudioBackend(_AudioBackend):
             return
         self._shutdown_process()
         self._stop.clear()
+        process = self._spawn_process()
+        self._process = process
+        self._thread = threading.Thread(target=self._mix_loop, daemon=True)
+        self._thread.start()
+
+    def _spawn_process(self) -> subprocess.Popen[bytes]:
         command = [
             self._binary,
             "-v",
@@ -314,20 +330,21 @@ class PcmMixerAudioBackend(_AudioBackend):
                     stderr = b""
             detail = stderr.decode("utf-8", errors="replace").strip() or f"exit code {process.returncode}"
             raise AudioPlaybackError(f"pcm-mixer-{self._device} failed: {detail}")
-        self._process = process
-        self._thread = threading.Thread(target=self._mix_loop, daemon=True)
-        self._thread.start()
+        return process
 
     def _shutdown_process(self) -> None:
         self._stop.set()
         thread = self._thread
         self._thread = None
-        if thread is not None and thread.is_alive():
+        if thread is not None and thread.is_alive() and thread is not threading.current_thread():
             thread.join(timeout=1.0)
         process = self._process
         self._process = None
         if process is None:
             return
+        self._terminate_process(process)
+
+    def _terminate_process(self, process: subprocess.Popen[bytes]) -> None:
         try:
             if process.stdin is not None and not process.stdin.closed:
                 process.stdin.close()
@@ -342,6 +359,35 @@ class PcmMixerAudioBackend(_AudioBackend):
                     process.kill()
                 except Exception:
                     pass
+
+    def _process_error_detail(self, process: subprocess.Popen[bytes]) -> str:
+        stderr = b""
+        if process.stderr is not None:
+            try:
+                stderr = process.stderr.read() or b""
+            except Exception:
+                stderr = b""
+        return stderr.decode("utf-8", errors="replace").strip() or f"exit code {process.returncode}"
+
+    def _set_notice(self, message: str) -> None:
+        with self._lock:
+            self._notice = message
+
+    def _restart_process_from_runtime_failure(self, detail: str) -> bool:
+        failed_process = self._process
+        self._process = None
+        if failed_process is not None:
+            self._terminate_process(failed_process)
+        try:
+            new_process = self._spawn_process()
+        except AudioPlaybackError as exc:
+            self._set_notice(
+                f"[WARN] Audio runtime failed on {self.name}: {detail}. Restart failed: {exc}"
+            )
+            return False
+        self._process = new_process
+        self._set_notice(f"[WARN] Audio runtime recovered on {self.name}: {detail}")
+        return True
 
     def _decode_cue(self, cue: AudioCueConfig) -> _DecodedCue:
         command = [
@@ -381,8 +427,15 @@ class PcmMixerAudioBackend(_AudioBackend):
         chunk_len = self._CHUNK_FRAMES * self._OUTPUT_CHANNELS
         while not self._stop.is_set():
             process = self._process
-            if process is None or process.stdin is None or process.poll() is not None:
+            if process is None or process.stdin is None:
                 return
+            if process.poll() is not None:
+                detail = self._process_error_detail(process)
+                if self._stop.is_set() or not self._restart_process_from_runtime_failure(
+                    f"output stream lost ({detail})"
+                ):
+                    return
+                continue
             with self._lock:
                 voices = list(self._voices.values())
             mixed = [0.0] * chunk_len
@@ -461,7 +514,11 @@ class PcmMixerAudioBackend(_AudioBackend):
             try:
                 process.stdin.write(payload)
             except Exception as exc:
-                raise AudioPlaybackError(f"pcm mixer stream write failed: {exc}") from exc
+                if self._stop.is_set() or not self._restart_process_from_runtime_failure(
+                    f"stream write failed ({exc})"
+                ):
+                    return
+                continue
 
 
 class FfplayAudioBackend(_AudioBackend):
@@ -774,6 +831,9 @@ class AudioManager:
         self._play_event_route(event_key, qualifiers, time.monotonic())
 
     def consume_notice(self) -> str | None:
+        backend_notice = self.backend.consume_notice()
+        if backend_notice:
+            self.notice = f"{self.notice}; {backend_notice}" if self.notice else backend_notice
         notice = self.notice
         self.notice = None
         return notice

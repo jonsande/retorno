@@ -4,6 +4,7 @@ nav map graph [node_id]
 nav map path <node_id>
 nav map routes
 nav map contacts
+nav map contacts sector
 nav galaxy [sector|local|regional|global]
 nav <node_id>
 nav --no-cruise <node_id>
@@ -16,7 +17,8 @@ Description
 - `nav map graph <node_id>`: focus graph output around one known node.
 - `nav map path <node_id>`: compute the best known path from current node.
 - `nav map routes`: list known direct routes from current node.
-- `nav map contacts`: list known contacts and route status relative to current node.
+- `nav map contacts`: list known contacts with sector, region, and route status relative to current node.
+- `nav map contacts sector`: group known contacts by sector and order sectors by proximity.
 - `nav <node_id>`: start transit to destination.
 - `nav --no-cruise <node_id>`: start transit without forcing CRUISE profile.
 - `nav abort`: abort active transit and revert to origin.
@@ -30,6 +32,7 @@ Accepted aliases (hidden from `help`)
 - `map path <node_id>` and `path <node_id>` -> `nav map path <node_id>`
 - `nav routes` and `routes` -> `nav map routes`
 - `nav contacts` and `contacts` -> `nav map contacts`
+- `nav contacts sector` and `contacts sector` -> `nav map contacts sector`
 - `travel <node_id>` -> `nav <node_id>`
 
 Dependencies and gating

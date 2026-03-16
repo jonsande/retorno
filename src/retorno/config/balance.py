@@ -77,6 +77,8 @@ class Balance:
     SALVAGE_DATA_TIME_S = 40.0
     # Drone survey job time.
     DRONE_SURVEY_TIME_S = 20.0
+    # Local scan job time.
+    SCAN_TIME_S = 8.0
     # Recoverable drone salvage time model: base + per unit.
     DRONE_SALVAGE_DRONE_BASE_TIME_S = 35.0
     DRONE_SALVAGE_DRONE_PER_UNIT_S = 4.0

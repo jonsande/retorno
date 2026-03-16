@@ -29,7 +29,7 @@
       "path": "sound/alert_ping.ogg",
       "mode": "once",
       "channel": "sfx",
-      "volume": 0.20,
+      "volume": 0.10,
       "fade_in_s": 0.003,
       "fade_out_s": 0.003
     },
@@ -37,7 +37,7 @@
       "path": "sound/alert_ping_triple.ogg",
       "mode": "once",
       "channel": "sfx",
-      "volume": 0.50,
+      "volume": 0.30,
       "fade_in_s": 0.003,
       "fade_out_s": 0.003
     },

@@ -7,9 +7,13 @@ Estado del comando
 Formas alias aceptadas
 - `contacts` -> `nav map contacts`
 - `nav contacts` -> `nav map contacts`
+- `contacts sector` -> `nav map contacts sector`
+- `nav contacts sector` -> `nav map contacts sector`
 
 Comportamiento operativo
 - Lista contactos conocidos relativos al contexto de navegación actual.
+- Muestra `sector` y `region` para cada contacto y ordena la salida por cercanía de sector.
+- `nav map contacts sector` agrupa por sector y muestra entre paréntesis los contactos conocidos de cada uno.
 - Incluye indicadores de disponibilidad de ruta y estado de visita.
 - En tránsito, la salida usa caché de contactos conocidos.
 

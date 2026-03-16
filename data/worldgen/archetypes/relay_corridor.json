@@ -1,19 +1,19 @@
 {
   "archetype": "relay_corridor",
-  "node_count_min": 1,
-  "node_count_max": 2,
+  "node_count_min": 2,
+  "node_count_max": 3,
   "kind_weights": {
     "relay": 1.0,
-    "waystation": 0.8,
-    "ship": 0.4,
-    "derelict": 0.3
+    "waystation": 0.7,
+    "ship": 0.3,
+    "derelict": 0.5
   },
   "kind_caps": {
     "station": 0,
     "relay": 1,
     "waystation": 1,
     "ship": 1,
-    "derelict": 1
+    "derelict": 2
   },
   "forbidden_kinds": ["station"],
   "intersector_link_max": 2,

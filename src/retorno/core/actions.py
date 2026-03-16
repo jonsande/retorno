@@ -72,6 +72,11 @@ class Undock(Action):
 
 
 @dataclass(slots=True)
+class Scan(Action):
+    pass
+
+
+@dataclass(slots=True)
 class Salvage(Action):
     node_id: str
     kind: str

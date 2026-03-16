@@ -24,6 +24,7 @@ from retorno.core.actions import (
     Install,
     PowerPlan,
     PowerShed,
+    Scan,
     SystemOn,
     Repair,
     SelfTestRepair,
@@ -73,11 +74,12 @@ from retorno.model.jobs import (
     finalize_job,
     job_id_numeric_suffix,
 )
-from retorno.model.world import add_known_link, is_hop_within_cap, SpaceNode, sector_id_for_pos
+from retorno.model.world import SECTOR_SIZE_LY, add_known_link, is_hop_within_cap, record_intel, SpaceNode, sector_id_for_pos
 from retorno.runtime.data_loader import load_locations, load_modules
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path, mount_files
 from retorno.model.systems import Dependency, ShipSystem, SystemState
 from retorno.config.balance import Balance
+from retorno.worldgen.generator import ensure_sector_generated
 
 
 class Engine:
@@ -1400,6 +1402,21 @@ class Engine:
             )
             self._record_event(state.events, event)
             return [event]
+
+        if isinstance(action, Scan):
+            blocked = self._scan_blocked_event(state)
+            if blocked is not None:
+                self._record_event(state.events, blocked)
+                return [blocked]
+            origin_node_id = state.world.current_node_id
+            return self._enqueue_job(
+                state,
+                JobType.SCAN,
+                TargetRef(kind="world_node", id=origin_node_id),
+                owner_id=None,
+                eta_s=float(Balance.SCAN_TIME_S),
+                params={"origin_node_id": origin_node_id},
+            )
 
         if isinstance(action, RouteSolve):
             current_id = state.world.current_node_id
@@ -3003,6 +3020,52 @@ class Engine:
         return events
 
     def _check_job_interruption(self, state: GameState, job: Job) -> Event | None:
+        if job.job_type == JobType.SCAN:
+            blocked = self._scan_block_details(state)
+            if blocked is not None:
+                _, message, data = blocked
+                reason = str(data.get("reason", ""))
+                message_key = {
+                    "scan_sensors_offline": "job_failed_scan_sensors_unavailable",
+                    "scan_sensord_not_running": "job_failed_scan_sensord_stopped",
+                    "scan_locked_in_transit": "job_failed_scan_locked_in_transit",
+                }.get(reason, "job_failed_scan_sensors_unavailable")
+                event = self._make_job_outcome_event(
+                    state,
+                    job,
+                    EventType.JOB_FAILED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id="sensors"),
+                    message,
+                    data={
+                        "job_type": job.job_type.value,
+                        "node_id": job.params.get("origin_node_id", job.target.id if job.target else ""),
+                        "message_key": message_key,
+                        "reason": reason,
+                    },
+                )
+                self._record_event(state.events, event)
+                return event
+            origin_node_id = str(job.params.get("origin_node_id", job.target.id if job.target else "") or "")
+            if origin_node_id and state.world.current_node_id != origin_node_id:
+                event = self._make_job_outcome_event(
+                    state,
+                    job,
+                    EventType.JOB_FAILED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=origin_node_id),
+                    f"Scan interrupted: location changed during scan from {origin_node_id}",
+                    data={
+                        "job_type": job.job_type.value,
+                        "node_id": origin_node_id,
+                        "message_key": "job_failed_scan_context_changed",
+                        "reason": "scan_context_changed",
+                    },
+                )
+                self._record_event(state.events, event)
+                return event
+            return None
+
         if job.job_type == JobType.ROUTE_SOLVE:
             node_id = job.params.get("node_id", job.target.id if job.target else "")
             system = state.ship.systems.get("sensors")
@@ -3244,6 +3307,126 @@ class Engine:
         fine_km = self._compute_fine_range_km(state, from_id, to_id)
         state.world.fine_ranges_km[to_id] = fine_km
         return fine_km
+
+    def _scan_block_details(self, state: GameState) -> tuple[SourceRef, str, dict[str, object]] | None:
+        system = state.ship.systems.get("sensors")
+        if not system or self._state_rank(system.state) < self._state_rank(SystemState.LIMITED):
+            return (
+                SourceRef(kind="ship_system", id="sensors"),
+                "Scan blocked: sensors offline (requires >= limited)",
+                {"message_key": "boot_blocked", "reason": "scan_sensors_offline"},
+            )
+        if not system.service or system.service.service_name != "sensord" or not system.service.is_running:
+            return (
+                SourceRef(kind="ship_system", id="sensors"),
+                "Scan blocked: sensord not running. Try: boot sensord",
+                {"message_key": "boot_blocked", "reason": "scan_sensord_not_running"},
+            )
+        node = state.world.space.nodes.get(state.world.current_node_id)
+        if node and node.kind == "transit" and not self._has_unlock(state, "scan_in_transit"):
+            return (
+                SourceRef(kind="world", id=state.world.current_node_id),
+                "Scan blocked: sensors lock unavailable while adrift",
+                {"message_key": "boot_blocked", "reason": "scan_locked_in_transit"},
+            )
+        return None
+
+    def _scan_blocked_event(self, state: GameState) -> Event | None:
+        details = self._scan_block_details(state)
+        if details is None:
+            return None
+        source, message, data = details
+        severity = Severity.WARN if source.kind == "ship_system" else Severity.INFO
+        return self._make_event(state, EventType.BOOT_BLOCKED, severity, source, message, data=data)
+
+    def _perform_scan(self, state: GameState) -> tuple[list[str], list[str], list[dict[str, object]]]:
+        current_id = state.world.current_node_id
+        node = state.world.space.nodes.get(current_id)
+        if node:
+            x, y, z = node.x_ly, node.y_ly, node.z_ly
+        else:
+            x, y, z = state.world.current_pos_ly
+
+        radius_ly = float(state.ship.sensors_range_ly)
+        min_sx = math.floor((x - radius_ly) / SECTOR_SIZE_LY)
+        max_sx = math.floor((x + radius_ly) / SECTOR_SIZE_LY)
+        min_sy = math.floor((y - radius_ly) / SECTOR_SIZE_LY)
+        max_sy = math.floor((y + radius_ly) / SECTOR_SIZE_LY)
+        min_sz = math.floor((z - radius_ly) / SECTOR_SIZE_LY)
+        max_sz = math.floor((z + radius_ly) / SECTOR_SIZE_LY)
+        for sx in range(min_sx, max_sx + 1):
+            for sy in range(min_sy, max_sy + 1):
+                for sz in range(min_sz, max_sz + 1):
+                    ensure_sector_generated(state, f"S{sx:+04d}_{sy:+04d}_{sz:+04d}")
+
+        system = state.ship.systems.get("sensors")
+        state_p = {
+            SystemState.NOMINAL: Balance.SENSORS_DETECT_P_NOMINAL,
+            SystemState.LIMITED: Balance.SENSORS_DETECT_P_LIMITED,
+            SystemState.DAMAGED: Balance.SENSORS_DETECT_P_DAMAGED,
+            SystemState.CRITICAL: Balance.SENSORS_DETECT_P_CRITICAL,
+        }.get(system.state if system else SystemState.CRITICAL, Balance.SENSORS_DETECT_P_CRITICAL)
+
+        def _chance_for(dist_ly: float) -> float:
+            if radius_ly <= 0:
+                return 0.0
+            t = min(1.0, max(0.0, dist_ly / radius_ly))
+            return Balance.SENSORS_DETECT_P_NEAR + (Balance.SENSORS_DETECT_P_FAR - Balance.SENSORS_DETECT_P_NEAR) * t
+
+        seen: list[str] = []
+        discovered: list[str] = []
+        fine_range_updates: list[dict[str, object]] = []
+        recovery_entry_id = getattr(state.world.exploration_recovery, "entry_node_id", None)
+        state.meta.rng_counter += 1
+
+        for node_id, target in state.world.space.nodes.items():
+            dx = target.x_ly - x
+            dy = target.y_ly - y
+            dz = target.z_ly - z
+            dist2 = dx * dx + dy * dy + dz * dz
+            if dist2 > radius_ly * radius_ly:
+                continue
+
+            dist_ly = dist2 ** 0.5
+            guaranteed_recovery_detect = node_id == recovery_entry_id and node_id not in state.world.known_nodes
+            if not guaranteed_recovery_detect:
+                detect_p = max(0.0, min(1.0, _chance_for(dist_ly) * state_p))
+                seed = self._hash64(state.meta.rng_seed + state.meta.rng_counter, f"scan:{node_id}:{int(state.clock.t)}")
+                rng = random.Random(seed)
+                if rng.random() > detect_p:
+                    continue
+
+            seen.append(node_id)
+            is_new = node_id not in state.world.known_nodes
+            if is_new:
+                discovered.append(node_id)
+            state.world.known_nodes.add(node_id)
+            state.world.known_contacts.add(node_id)
+
+            if is_new:
+                record_intel(
+                    state.world,
+                    t=state.clock.t,
+                    kind="node",
+                    to_id=node_id,
+                    confidence=0.6,
+                    source_kind="scan",
+                    source_ref=current_id,
+                )
+
+            if (
+                dist2 <= Balance.LOCAL_TRAVEL_RADIUS_LY ** 2
+                and target.kind in {"relay", "station", "waystation", "ship", "derelict"}
+                and current_id != node_id
+            ):
+                fine_km = self._maybe_set_fine_range(state, current_id, node_id)
+                if fine_km is not None:
+                    fine_range_updates.append({"node_id": node_id, "distance_km": fine_km})
+
+        seen.sort()
+        discovered.sort()
+        fine_range_updates.sort(key=lambda item: str(item.get("node_id", "")))
+        return seen, discovered, fine_range_updates
 
     def _build_lore_context(self, state: GameState, node_id: str) -> LoreContext:
         return build_lore_context(state, node_id)
@@ -3899,6 +4082,42 @@ class Engine:
                     },
                 )
             )
+            return events
+
+        if job.job_type == JobType.SCAN:
+            origin_node_id = str(job.params.get("origin_node_id", job.target.id if job.target else state.world.current_node_id) or "")
+            seen, discovered, fine_range_updates = self._perform_scan(state)
+            for node_id in discovered:
+                events.append(
+                    self._make_event(
+                        state,
+                        EventType.SIGNAL_DETECTED,
+                        Severity.INFO,
+                        SourceRef(kind="world", id=node_id),
+                        f"Signal detected: {node_id}",
+                        data={"contact_id": node_id, "message_key": "signal_detected"},
+                    )
+                )
+            events.append(
+                self._make_job_outcome_event(
+                    state,
+                    job,
+                    EventType.JOB_COMPLETED,
+                    Severity.INFO,
+                    SourceRef(kind="world", id=origin_node_id or state.world.current_node_id),
+                    f"Scan completed at {origin_node_id or state.world.current_node_id}",
+                    data={
+                        "job_type": job.job_type.value,
+                        "node_id": origin_node_id or state.world.current_node_id,
+                        "seen_ids": seen,
+                        "new_ids": discovered,
+                        "fine_range_updates": fine_range_updates,
+                        "message_key": "job_completed_scan",
+                    },
+                )
+            )
+            events.extend(evaluate_dead_nodes(state, "scan", debug=state.os.debug_enabled))
+            events.extend(ensure_exploration_recovery(state, "scan"))
             return events
 
         if job.job_type == JobType.ROUTE_SOLVE and job.target:
@@ -5764,7 +5983,7 @@ class Engine:
                     )
 
         if power_quality < Balance.POWER_QUALITY_BLOCK_THRESHOLD:
-            if isinstance(action, RouteSolve):
+            if isinstance(action, (RouteSolve, Scan)):
                 return self._power_blocked_event(
                     state,
                     "Action blocked: power quality too low",

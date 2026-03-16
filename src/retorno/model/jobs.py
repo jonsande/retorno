@@ -27,6 +27,7 @@ class JobType(str, Enum):
     SURVEY_DRONE = "survey_drone"
     SALVAGE_DRONE = "salvage_drone"
     ROUTE_SOLVE = "route_solve"
+    SCAN = "scan"
     RECALL_DRONE = "recall_drone"
     CARGO_AUDIT = "cargo_audit"
     RECOVER_AUTH = "recover_auth"

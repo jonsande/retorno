@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 
 from retorno.ui_textual.app import RetornoTextualApp
+from retorno.model.world import add_known_link
 
 
 def main() -> None:
@@ -17,6 +18,17 @@ def main() -> None:
         state.ship.docked_node_id = None
         state.world.known_nodes.update({"ECHO_7", "CURL_12", "WRECK_B0C2BC"})
         state.world.known_contacts.update({"ECHO_7", "CURL_12", "WRECK_B0C2BC"})
+        add_known_link(state.world, "ECHO_7", "CURL_12", bidirectional=True)
+
+        dock_candidates = set(app._get_completion_candidates(state, "dock ", ""))
+        assert dock_candidates == {"ECHO_7"}, dock_candidates
+
+        route_candidates = set(app._get_completion_candidates(state, "route solve ", ""))
+        assert route_candidates == {"WRECK_B0C2BC"}, route_candidates
+
+        nav_candidates = set(app._get_completion_candidates(state, "nav ", ""))
+        assert "CURL_12" in nav_candidates, nav_candidates
+        assert "WRECK_B0C2BC" not in nav_candidates, nav_candidates
 
         deploy_candidates = set(app._get_completion_candidates(state, "drone deploy D1 ", ""))
         assert "BRG-01" in deploy_candidates, deploy_candidates

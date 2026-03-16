@@ -763,6 +763,18 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Action blocked: sensord not running. Try: boot sensord",
             "es": "Acción bloqueada: sensord no está en ejecución. Prueba: boot sensord",
         },
+        "scan_sensors_offline": {
+            "en": "Action blocked: sensors offline (requires >= limited)",
+            "es": "Acción bloqueada: sensores fuera de línea (requiere >= limitado)",
+        },
+        "scan_sensord_not_running": {
+            "en": "Action blocked: sensord not running. Try: boot sensord",
+            "es": "Acción bloqueada: sensord no está en ejecución. Prueba: boot sensord",
+        },
+        "scan_locked_in_transit": {
+            "en": "Action blocked: scan unavailable while adrift",
+            "es": "Acción bloqueada: scan no disponible en tránsito",
+        },
         "out_of_range": {
             "en": "Action blocked: target out of sensor range ({node_id})",
             "es": "Acción bloqueada: objetivo fuera de rango de sensores ({node_id})",
@@ -953,6 +965,22 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Route solve interrupted: sensord stopped for {node_id}",
             "es": "Route solve interrumpido: sensord detenido para {node_id}",
         },
+        "job_failed_scan_sensors_unavailable": {
+            "en": "Scan interrupted: sensors unavailable for {node_id}",
+            "es": "Scan interrumpido: sensores no disponibles para {node_id}",
+        },
+        "job_failed_scan_sensord_stopped": {
+            "en": "Scan interrupted: sensord stopped for {node_id}",
+            "es": "Scan interrumpido: sensord detenido para {node_id}",
+        },
+        "job_failed_scan_locked_in_transit": {
+            "en": "Scan interrupted: scan unavailable while adrift",
+            "es": "Scan interrumpido: scan no disponible en tránsito",
+        },
+        "job_failed_scan_context_changed": {
+            "en": "Scan interrupted: location changed during scan ({node_id})",
+            "es": "Scan interrumpido: la ubicación cambió durante el scan ({node_id})",
+        },
         "job_failed_repair_attempt": {
             "en": (
                 "Repair failed for {target_id}. "
@@ -998,6 +1026,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "job_completed_route": {
             "en": "Route solved: {from_id} -> {node_id}",
             "es": "Ruta calculada: {from_id} -> {node_id}",
+        },
+        "job_completed_scan": {
+            "en": "Scan completed at {node_id}",
+            "es": "Scan completado en {node_id}",
         },
         "job_completed_drone_survey": {
             "en": "Survey completed at {node_id}",
@@ -1189,6 +1221,24 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                 print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
             except Exception:
                 print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
+            if key == "job_completed_scan":
+                seen_ids = [str(item) for item in (e.data.get("seen_ids") or [])]
+                new_ids = [str(item) for item in (e.data.get("new_ids") or [])]
+                fine_updates = e.data.get("fine_range_updates") or []
+                render_scan_results(state, seen_ids)
+                for update in fine_updates:
+                    if not isinstance(update, dict):
+                        continue
+                    node_id = str(update.get("node_id", "?"))
+                    fine_km = float(update.get("distance_km", 0.0) or 0.0)
+                    if locale == "en":
+                        dist_txt = f"{_format_large_distance(fine_km * 0.621371)}mi"
+                        print(f"[INFO] (scan) fine range fixed: {node_id} ({dist_txt})")
+                    else:
+                        dist_txt = f"{_format_large_distance(fine_km)}km"
+                        print(f"[INFO] (scan) distancia fina fijada: {node_id} ({dist_txt})")
+                if new_ids:
+                    print(f"(scan) new: {', '.join(sorted(new_ids))}")
             if key == "job_completed_drone_survey":
                 scrap = int(e.data.get("scrap_available", 0) or 0)
                 modules_detected = bool(e.data.get("modules_detected", False))
@@ -1270,6 +1320,11 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                 print(f"[{origin_tag}] " + _safe_format(tmpl, payload))
             except Exception:
                 print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
+            if reason == "out_of_range":
+                target_id = str(e.data.get("node_id", "") or "").strip()
+                if target_id:
+                    for line in _route_solve_origin_hint_lines(state, target_id):
+                        print(line)
             hint_key = e.data.get("hint_key", "")
             if hint_key and hint_key in boot_blocked_reasons:
                 hint = boot_blocked_reasons[hint_key].get(locale, boot_blocked_reasons[hint_key]["en"])
@@ -3172,8 +3227,95 @@ def debug_add_drones(state, count: int = 1) -> None:
     print(f"debug add drone: created {len(created)} -> {', '.join(created)}")
 
 
-def _render_contacts_table(state) -> None:
+def _known_contact_cache_ids(state) -> set[str]:
+    known = state.world.known_nodes if hasattr(state.world, "known_nodes") and state.world.known_nodes else state.world.known_contacts
+    return set(known)
+
+
+def _contact_distance_text(state, node: SpaceNode, current_pos: tuple[float, float, float]) -> tuple[float, str]:
+    x, y, z = current_pos
+    dx = node.x_ly - x
+    dy = node.y_ly - y
+    dz = node.z_ly - z
+    dist = (dx * dx + dy * dy + dz * dz) ** 0.5
+    if node.node_id in state.world.fine_ranges_km and dist <= Balance.LOCAL_TRAVEL_RADIUS_LY:
+        km = state.world.fine_ranges_km.get(node.node_id, 0.0)
+        locale = state.os.locale.value
+        if locale == "en":
+            return dist, f"{_format_large_distance(km * 0.621371)}mi"
+        return dist, f"{_format_large_distance(km)}km"
+    if dist < 0.1:
+        return dist, f"{dist:.4f}ly"
+    if dist < 1.0:
+        return dist, f"{dist:.3f}ly"
+    return dist, f"{dist:.2f}ly"
+
+
+def _collect_known_contact_entries(state) -> list[dict[str, object]]:
     current_id = state.world.current_node_id
+    known = _known_contact_cache_ids(state)
+    current = state.world.space.nodes.get(current_id)
+    if current:
+        x, y, z = current.x_ly, current.y_ly, current.z_ly
+    else:
+        x, y, z = state.world.current_pos_ly
+    routes = state.world.known_links.get(current_id, set())
+    current_pos = (x, y, z)
+    entries: list[dict[str, object]] = []
+    for cid in sorted(known):
+        node = state.world.space.nodes.get(cid)
+        if node:
+            sector_id = sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly)
+            region = node.region or region_for_pos(node.x_ly, node.y_ly, node.z_ly)
+            sector_center = _sector_center_ly(sector_id)
+            sector_dist = float("inf")
+            if sector_center is not None:
+                sx, sy, sz = sector_center
+                dx = sx - x
+                dy = sy - y
+                dz = sz - z
+                sector_dist = (dx * dx + dy * dy + dz * dz) ** 0.5
+            dist, dist_txt = _contact_distance_text(state, node, current_pos)
+            visited = "visited" if cid in state.world.visited_nodes else "unvisited"
+            # Current location is always directly reachable (no self-link is stored).
+            route_flag = "route" if cid == current_id or cid in routes else "no_route"
+            entries.append({
+                "cid": cid,
+                "name": node.name,
+                "kind": node.kind,
+                "sector_id": sector_id,
+                "region": region,
+                "sector_dist": sector_dist,
+                "dist": dist,
+                "dist_txt": dist_txt,
+                "route_flag": route_flag,
+                "visited": visited,
+                "node_present": True,
+            })
+        else:
+            entries.append({
+                "cid": cid,
+                "name": cid,
+                "kind": "?",
+                "sector_id": "?",
+                "region": "unknown",
+                "sector_dist": float("inf"),
+                "dist": float("inf"),
+                "dist_txt": "?",
+                "route_flag": "no_route",
+                "visited": "unvisited",
+                "node_present": False,
+            })
+    entries.sort(key=lambda item: (
+        float(item["sector_dist"]),
+        str(item["sector_id"]),
+        float(item["dist"]),
+        str(item["cid"]),
+    ))
+    return entries
+
+
+def _render_contacts_table(state) -> None:
     if state.ship.in_transit:
         locale = state.os.locale.value
         msg = {
@@ -3182,49 +3324,65 @@ def _render_contacts_table(state) -> None:
         }
         print(msg.get(locale, msg["en"]))
     print("\n=== CONTACTS ===")
-    known = state.world.known_nodes if hasattr(state.world, "known_nodes") and state.world.known_nodes else state.world.known_contacts
-    if not known:
+    entries = _collect_known_contact_entries(state)
+    if not entries:
         print("(no signals detected)")
         return
-    current = state.world.space.nodes.get(current_id)
-    if current:
-        x, y, z = current.x_ly, current.y_ly, current.z_ly
-    else:
-        x, y, z = state.world.current_pos_ly
-    routes = state.world.known_links.get(current_id, set())
-    for cid in sorted(known):
-        node = state.world.space.nodes.get(cid)
-        if node:
-            sector = ""
-            if node.node_id.startswith("S"):
-                sector = f" sector={node.node_id.split(':', 1)[0]}"
-            dx = node.x_ly - x
-            dy = node.y_ly - y
-            dz = node.z_ly - z
-            dist = (dx * dx + dy * dy + dz * dz) ** 0.5
-            if node.node_id in state.world.fine_ranges_km and dist <= Balance.LOCAL_TRAVEL_RADIUS_LY:
-                km = state.world.fine_ranges_km.get(node.node_id, 0.0)
-                locale = state.os.locale.value
-                if locale == "en":
-                    dist_txt = f"{_format_large_distance(km * 0.621371)}mi"
-                else:
-                    dist_txt = f"{_format_large_distance(km)}km"
-            else:
-                if dist < 0.1:
-                    dist_txt = f"{dist:.4f}ly"
-                elif dist < 1.0:
-                    dist_txt = f"{dist:.3f}ly"
-                else:
-                    dist_txt = f"{dist:.2f}ly"
-            visited = "visited" if cid in state.world.visited_nodes else "unvisited"
-            # Current location is always directly reachable (no self-link is stored).
-            route_flag = "route" if cid == current_id or cid in routes else "no_route"
-            print(f"- {node.name} ({node.kind}){sector} id={cid} dist={dist_txt} {route_flag} {visited}")
-        else:
-            print(f"- {cid}")
+    for entry in entries:
+        if not bool(entry["node_present"]):
+            print(f"- {entry['cid']}")
+            continue
+        print(
+            f"- {entry['name']} ({entry['kind']}) "
+            f"sector={entry['sector_id']} region={entry['region']} "
+            f"id={entry['cid']} dist={entry['dist_txt']} {entry['route_flag']} {entry['visited']}"
+        )
 
 
-def render_nav_contacts(state) -> None:
+def _render_contact_sectors_table(state) -> None:
+    if state.ship.in_transit:
+        locale = state.os.locale.value
+        msg = {
+            "en": "contacts sector: in transit; showing cached known contacts only",
+            "es": "contacts sector: en tránsito; mostrando solo contactos conocidos en caché",
+        }
+        print(msg.get(locale, msg["en"]))
+    print("\n=== CONTACT SECTORS ===")
+    entries = _collect_known_contact_entries(state)
+    if not entries:
+        print("(none)")
+        return
+
+    grouped: dict[str, dict[str, object]] = {}
+    for entry in entries:
+        sector_id = str(entry["sector_id"])
+        if sector_id not in grouped:
+            grouped[sector_id] = {
+                "sector_id": sector_id,
+                "region": entry["region"],
+                "sector_dist": entry["sector_dist"],
+                "contacts": [],
+            }
+        grouped[sector_id]["contacts"].append(str(entry["cid"]))
+
+    ordered = sorted(
+        grouped.values(),
+        key=lambda item: (float(item["sector_dist"]), str(item["sector_id"])),
+    )
+    for item in ordered:
+        contacts_txt = ", ".join(sorted(set(item["contacts"])))
+        sector_dist = item["sector_dist"]
+        sector_dist_txt = "?" if sector_dist == float("inf") else f"{float(sector_dist):.2f}ly"
+        print(
+            f"- {item['sector_id']} region={item['region']} sector_dist={sector_dist_txt} "
+            f"contacts=({contacts_txt})"
+        )
+
+
+def render_nav_contacts(state, map_arg: str | None = None) -> None:
+    if map_arg == "sector":
+        _render_contact_sectors_table(state)
+        return
     _render_contacts_table(state)
 
 
@@ -3250,116 +3408,23 @@ def render_scan_results(state, node_ids: list[str]) -> None:
 
 
 def _scan_and_discover(state) -> tuple[list[str], list[str], list[str], list[str], str | None]:
-    system = state.ship.systems.get("sensors")
-    if not system or _state_rank(system.state) < _state_rank(SystemState.LIMITED):
-        locale = state.os.locale.value
-        msg = {
-            "en": "scan: sensors offline (requires >= limited)",
-            "es": "scan: sensores fuera de línea (requiere >= limitado)",
-        }
-        return [], [], [], [], msg.get(locale, msg["en"])
-    if not system.service or system.service.service_name != "sensord" or not system.service.is_running:
-        locale = state.os.locale.value
-        msg = {
-            "en": "scan: sensord not running (try: boot sensord)",
-            "es": "scan: sensord no está en ejecución (prueba: boot sensord)",
-        }
-        return [], [], [], [], msg.get(locale, msg["en"])
-    current_id = state.world.current_node_id
-    node = state.world.space.nodes.get(current_id)
-    if node and node.kind == "transit" and not _has_unlock(state, "scan_in_transit"):
-        locale = state.os.locale.value
-        msg = {
-            "en": "scan: sensors lock unavailable while adrift",
-            "es": "scan: bloqueo de sensores no disponible en tránsito",
-        }
-        return [], [], [], [], msg.get(locale, msg["en"])
-    if node:
-        x, y, z = node.x_ly, node.y_ly, node.z_ly
-    else:
-        x, y, z = state.world.current_pos_ly
-    r = state.ship.sensors_range_ly
-    min_sx = math.floor((x - r) / SECTOR_SIZE_LY)
-    max_sx = math.floor((x + r) / SECTOR_SIZE_LY)
-    min_sy = math.floor((y - r) / SECTOR_SIZE_LY)
-    max_sy = math.floor((y + r) / SECTOR_SIZE_LY)
-    min_sz = math.floor((z - r) / SECTOR_SIZE_LY)
-    max_sz = math.floor((z + r) / SECTOR_SIZE_LY)
-    for sx in range(min_sx, max_sx + 1):
-        for sy in range(min_sy, max_sy + 1):
-            for sz in range(min_sz, max_sz + 1):
-                sector_id = f"S{sx:+04d}_{sy:+04d}_{sz:+04d}"
-                ensure_sector_generated(state, sector_id)
-
-    discovered: list[str] = []
-    handshakes: list[str] = []
-    seen: list[str] = []
+    engine = Engine()
+    blocked = engine._scan_blocked_event(state)
+    if blocked is not None:
+        return [], [], [], [], blocked.message
+    seen, discovered, fine_range_updates = engine._perform_scan(state)
     route_msgs: list[str] = []
-    state_p = {
-        SystemState.NOMINAL: Balance.SENSORS_DETECT_P_NOMINAL,
-        SystemState.LIMITED: Balance.SENSORS_DETECT_P_LIMITED,
-        SystemState.DAMAGED: Balance.SENSORS_DETECT_P_DAMAGED,
-        SystemState.CRITICAL: Balance.SENSORS_DETECT_P_CRITICAL,
-    }.get(system.state, Balance.SENSORS_DETECT_P_CRITICAL)
-
-    def _chance_for(dist: float) -> float:
-        if r <= 0:
-            return 0.0
-        t = min(1.0, max(0.0, dist / r))
-        return Balance.SENSORS_DETECT_P_NEAR + (Balance.SENSORS_DETECT_P_FAR - Balance.SENSORS_DETECT_P_NEAR) * t
-
-    state.meta.rng_counter += 1
-    recovery_entry_id = getattr(state.world.exploration_recovery, "entry_node_id", None)
-    for nid, n in state.world.space.nodes.items():
-        dx = n.x_ly - x
-        dy = n.y_ly - y
-        dz = n.z_ly - z
-        dist2 = dx * dx + dy * dy + dz * dz
-        if dist2 <= r * r:
-            dist = dist2 ** 0.5
-            guaranteed_recovery_detect = nid == recovery_entry_id and nid not in state.world.known_nodes
-            if not guaranteed_recovery_detect:
-                p = max(0.0, min(1.0, _chance_for(dist) * state_p))
-                seed = _hash64(state.meta.rng_seed + state.meta.rng_counter, f"scan:{nid}:{int(state.clock.t)}")
-                rng = random.Random(seed)
-                if rng.random() > p:
-                    continue
-            seen.append(nid)
-            is_new = nid not in state.world.known_nodes
-            if is_new:
-                discovered.append(nid)
-            state.world.known_nodes.add(nid)
-            state.world.known_contacts.add(nid)
-            if is_new:
-                record_intel(
-                    state.world,
-                    t=state.clock.t,
-                    kind="node",
-                    to_id=nid,
-                    confidence=0.6,
-                    source_kind="scan",
-                    source_ref=state.world.current_node_id,
-                )
-            if (
-                dist2 <= Balance.LOCAL_TRAVEL_RADIUS_LY ** 2
-                and n.kind in {"relay", "station", "waystation", "ship", "derelict"}
-                and state.world.current_node_id != nid
-            ):
-                fine_km = _maybe_set_fine_range(state, state.world.current_node_id, nid)
-                if fine_km is not None:
-                    locale = state.os.locale.value
-                    if locale == "en":
-                        dist_txt = f"{_format_large_distance(fine_km * 0.621371)}mi"
-                    else:
-                        dist_txt = f"{_format_large_distance(fine_km)}km"
-                    msg = {
-                        "en": f"[INFO] (scan) fine range fixed: {nid} ({dist_txt})",
-                        "es": f"[INFO] (scan) distancia fina fijada: {nid} ({dist_txt})",
-                    }
-                    route_msgs.append(msg.get(locale, msg["en"]))
-            if n.kind in {"relay", "station", "waystation"}:
-                handshakes.append(nid)
-    return seen, discovered, handshakes, route_msgs, None
+    locale = state.os.locale.value
+    for update in fine_range_updates:
+        node_id = str(update.get("node_id", "?"))
+        fine_km = float(update.get("distance_km", 0.0) or 0.0)
+        if locale == "en":
+            dist_txt = f"{_format_large_distance(fine_km * 0.621371)}mi"
+            route_msgs.append(f"[INFO] (scan) fine range fixed: {node_id} ({dist_txt})")
+        else:
+            dist_txt = f"{_format_large_distance(fine_km)}km"
+            route_msgs.append(f"[INFO] (scan) distancia fina fijada: {node_id} ({dist_txt})")
+    return seen, discovered, [], route_msgs, None
 
 
 def _hash64(seed: int, text: str) -> int:
@@ -4467,6 +4532,23 @@ def _map_preview(items: list[str], max_items: int = 6) -> str:
     return f"{shown}, +{len(items) - max_items} more"
 
 
+def _map_reachable_nodes(adj: dict[str, set[str]], start_id: str) -> set[str]:
+    if start_id not in adj:
+        return {start_id}
+    queue = [start_id]
+    seen = {start_id}
+    i = 0
+    while i < len(queue):
+        cur = queue[i]
+        i += 1
+        for nxt in sorted(adj.get(cur, set())):
+            if nxt in seen:
+                continue
+            seen.add(nxt)
+            queue.append(nxt)
+    return seen
+
+
 def _distance_ly_between_nodes(state, left_id: str, right_id: str) -> float | None:
     left = state.world.space.nodes.get(left_id)
     right = state.world.space.nodes.get(right_id)
@@ -4502,6 +4584,81 @@ def _map_bfs_path(adj: dict[str, set[str]], start_id: str, target_id: str) -> tu
         cur = prev.get(cur)
     path.reverse()
     return path, reachable
+
+
+def _route_solve_sources_for_target(state, target_id: str, source_ids: set[str]) -> list[tuple[float, str]]:
+    sensors_range_ly = max(0.0, float(getattr(state.ship, "sensors_range_ly", Balance.SENSORS_RANGE_LY)))
+    candidates: list[tuple[float, str]] = []
+    for src_id in sorted(source_ids):
+        if src_id == target_id:
+            continue
+        dist = _distance_ly_between_nodes(state, src_id, target_id)
+        if dist is None or dist > sensors_range_ly:
+            continue
+        candidates.append((dist, src_id))
+    candidates.sort(key=lambda item: (item[0], item[1]))
+    return candidates
+
+
+def _route_solve_origin_hints(state, target_id: str) -> list[tuple[float, str, bool, bool]]:
+    known_nodes = _map_known_nodes(state)
+    current_id = state.world.current_node_id
+    adj = _map_known_adjacency(state, known_nodes)
+    adj.setdefault(current_id, set())
+    reachable = _map_reachable_nodes(adj, current_id)
+
+    hints: list[tuple[float, str, bool, bool]] = []
+    for dist, src_id in _route_solve_sources_for_target(state, target_id, known_nodes):
+        route_known = target_id in state.world.known_links.get(src_id, set())
+        hints.append((dist, src_id, src_id in reachable, route_known))
+
+    hints.sort(key=lambda item: (0 if item[2] else 1, 0 if item[3] else 1, item[0], item[1]))
+    return hints
+
+
+def _route_solve_origin_hint_lines(state, target_id: str) -> list[str]:
+    locale = state.os.locale.value
+    hints = _route_solve_origin_hints(state, target_id)
+    if not hints:
+        msg = {
+            "en": f"No known nodes place {target_id} within route-solve range.",
+            "es": f"Ningun nodo conocido situa {target_id} dentro del rango de route solve.",
+        }
+        return [msg.get(locale, msg["en"])]
+
+    title = {
+        "en": f"Known nodes from which {target_id} is within route-solve range:",
+        "es": f"Nodos conocidos desde los que {target_id} entra en rango de route solve:",
+    }
+    reachable_labels = {
+        "en": "reachable",
+        "es": "alcanzable",
+    }
+    unreachable_labels = {
+        "en": "no known path from current",
+        "es": "sin camino conocido desde aqui",
+    }
+    route_known_labels = {
+        "en": "route already known",
+        "es": "ruta ya conocida",
+    }
+    route_solve_labels = {
+        "en": "route solve possible",
+        "es": "route solve posible",
+    }
+
+    lines = [title.get(locale, title["en"])]
+    for dist, src_id, is_reachable, route_known in hints:
+        tags = [
+            reachable_labels.get(locale, reachable_labels["en"])
+            if is_reachable
+            else unreachable_labels.get(locale, unreachable_labels["en"]),
+            route_known_labels.get(locale, route_known_labels["en"])
+            if route_known
+            else route_solve_labels.get(locale, route_solve_labels["en"]),
+        ]
+        lines.append(f"- {src_id} ({', '.join(tags)}, {dist:.2f}ly)")
+    return lines
 
 
 def render_map_graph(state, node_id: str | None = None) -> None:
@@ -4579,11 +4736,9 @@ def render_map_path(state, target_id: str) -> None:
     print(f"reachable_component={len(reachable)} unreachable_known={len(unreachable)}")
 
     bridges: list[tuple[float, str, str]] = []
-    for src in sorted(reachable):
-        for dst in unreachable:
-            dist = _distance_ly_between_nodes(state, src, dst)
-            if dist is None or dist > Balance.SENSORS_RANGE_LY:
-                continue
+    reachable_sources = set(reachable)
+    for dst in unreachable:
+        for dist, src in _route_solve_sources_for_target(state, dst, reachable_sources):
             bridges.append((dist, src, dst))
     bridges.sort(key=lambda x: x[0])
     if bridges:
@@ -4832,7 +4987,7 @@ def render_nav_map(state, mode: str, map_arg: str | None = None) -> None:
         render_nav_routes(state)
         return
     if mode == "contacts":
-        render_nav_contacts(state)
+        render_nav_contacts(state, map_arg=map_arg)
         return
     if mode == "sectors":
         render_nav_map_sectors(state)
@@ -6161,6 +6316,46 @@ def _known_contact_ids_for_completion(state) -> list[str]:
     return sorted(c for c in known_ids if c != "UNKNOWN_00")
 
 
+def _dock_targets_for_completion(state) -> list[str]:
+    current_node_id = getattr(state.world, "current_node_id", "")
+    if not current_node_id or current_node_id == "UNKNOWN_00":
+        return []
+    node = state.world.space.nodes.get(current_node_id)
+    if not node or node.kind in {"origin", "transit"}:
+        return []
+    return [current_node_id]
+
+
+def _route_solve_targets_for_completion(state) -> list[str]:
+    current_node_id = getattr(state.world, "current_node_id", "")
+    if not current_node_id or current_node_id == "UNKNOWN_00":
+        return []
+    known_routes = set(state.world.known_links.get(current_node_id, set()))
+    return [
+        node_id
+        for node_id in _known_contact_ids_for_completion(state)
+        if node_id != current_node_id and node_id not in known_routes
+    ]
+
+
+def _travel_targets_for_completion(state) -> list[str]:
+    current_node_id = getattr(state.world, "current_node_id", "")
+    if not current_node_id or current_node_id == "UNKNOWN_00":
+        return []
+    candidates = [
+        node_id
+        for node_id in sorted(state.world.known_links.get(current_node_id, set()))
+        if node_id != current_node_id and node_id != "UNKNOWN_00"
+    ]
+    if (
+        getattr(state.world, "active_tmp_node_id", None)
+        and current_node_id == state.world.active_tmp_node_id
+    ):
+        allowed = {state.world.active_tmp_from, state.world.active_tmp_to}
+        candidates = [node_id for node_id in candidates if node_id in allowed]
+    return candidates
+
+
 def _drone_local_world_node_targets_for_completion(state) -> list[str]:
     # Drone world interactions are local to the ship position (orbit/docked node).
     candidates: list[str] = []
@@ -6378,6 +6573,9 @@ def main() -> None:
                     systems = list(locked_state.ship.systems.keys())
                     drones = list(locked_state.ship.drones.keys())
                     contacts = _known_contact_ids_for_completion(locked_state)
+                    dock_targets = _dock_targets_for_completion(locked_state)
+                    route_solve_targets = _route_solve_targets_for_completion(locked_state)
+                    travel_targets = _travel_targets_for_completion(locked_state)
                     drone_local_world_targets = _drone_local_world_node_targets_for_completion(locked_state)
                     drone_move_targets = _drone_move_targets_for_completion(locked_state)
                     drone_deploy_targets = _drone_deploy_targets_for_completion(locked_state)
@@ -6431,12 +6629,12 @@ def main() -> None:
                         else:
                             candidates = [s for s in systems if s.startswith(text)]
                 elif cmd == "dock":
-                    candidates = [c for c in contacts if c.startswith(text)]
+                    candidates = [c for c in dock_targets if c.startswith(text)]
                 elif cmd == "undock":
                     candidates = []
                 elif cmd in {"nav", "navigation", "travel"}:
                     def _travel_targets(prefix: str) -> list[str]:
-                        return [c for c in contacts if c.startswith(prefix)]
+                        return [c for c in travel_targets if c.startswith(prefix)]
 
                     if len(tokens) == 2:
                         base_opts = ["map", "abort", "--no-cruise"]
@@ -6448,10 +6646,14 @@ def main() -> None:
                         candidates = [c for c in ["sectors", "graph", "path", "routes", "contacts", "galaxy"] if c.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "map" and tokens[2] == "galaxy":
                         candidates = [c for c in ["sector", "local", "regional", "global"] if c.startswith(text)]
+                    elif len(tokens) == 4 and tokens[1] == "map" and tokens[2] == "contacts":
+                        candidates = [c for c in ["sector"] if c.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "map" and tokens[2] in {"graph", "path"}:
                         candidates = _travel_targets(text)
                     elif len(tokens) == 3 and tokens[1] == "--no-cruise":
                         candidates = _travel_targets(text)
+                    elif len(tokens) == 3 and tokens[1] == "contacts":
+                        candidates = [c for c in ["sector"] if c.startswith(text)]
                     elif len(tokens) == 3 and tokens[1] == "graph":
                         candidates = _travel_targets(text)
                     elif len(tokens) == 3 and tokens[1] == "galaxy":
@@ -6672,7 +6874,10 @@ def main() -> None:
                     if len(tokens) == 2:
                         candidates = [c for c in ["solve"] if c.startswith(text)]
                     elif len(tokens) == 3 and tokens[1] == "solve":
-                        candidates = [c for c in contacts if c.startswith(text)]
+                        candidates = [c for c in route_solve_targets if c.startswith(text)]
+                elif cmd == "contacts":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["sector"] if c.startswith(text)]
                 elif cmd == "config":
                     if len(tokens) == 2:
                         candidates = [c for c in ["set", "show"] if c.startswith(text)]
@@ -7009,22 +7214,6 @@ def main() -> None:
             _drain_auto_events()
             with loop.with_lock() as locked_state:
                 render_cat(locked_state, parsed[1])
-            continue
-        if parsed == "SCAN":
-            _drain_auto_events()
-            with loop.with_lock() as locked_state:
-                seen, discovered, handshakes, route_msgs, warn = _scan_and_discover(locked_state)
-                if warn:
-                    print(f"[WARN] {warn}")
-                render_scan_results(locked_state, seen)
-                for line in route_msgs:
-                    print(line)
-                if discovered:
-                    print(f"(scan) new: {', '.join(sorted(discovered))}")
-                dead_events = evaluate_dead_nodes(locked_state, "scan", debug=locked_state.os.debug_enabled)
-                _render_and_store_events(locked_state, dead_events)
-                recovery_events = ensure_exploration_recovery(locked_state, "scan")
-                _render_and_store_events(locked_state, recovery_events)
             continue
         if parsed == "INVENTORY":
             _drain_auto_events()

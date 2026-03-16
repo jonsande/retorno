@@ -7,9 +7,13 @@ Command status
 Accepted alias forms
 - `contacts` -> `nav map contacts`
 - `nav contacts` -> `nav map contacts`
+- `contacts sector` -> `nav map contacts sector`
+- `nav contacts sector` -> `nav map contacts sector`
 
 Operational behavior
 - Lists known contacts relative to current navigation context.
+- Shows `sector` and `region` for each contact and orders output by sector proximity.
+- `nav map contacts sector` groups by sector and shows each sector's known contacts in parentheses.
 - Includes route availability and visit-state indicators.
 - During transit, output uses known-contact cache.
 
