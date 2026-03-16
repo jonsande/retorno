@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from retorno.model.os import Locale, OSState
+from retorno.ui_theme import normalize_theme_preset, theme_presets
 
 
 CONFIG_SET_VALUES: dict[str, tuple[str, ...]] = {
@@ -8,6 +9,7 @@ CONFIG_SET_VALUES: dict[str, tuple[str, ...]] = {
     "verbose": ("on", "off"),
     "audio": ("on", "off"),
     "ambientsound": ("on", "off"),
+    "theme": theme_presets(),
 }
 
 
@@ -34,6 +36,7 @@ def config_show_lines(
         f"language: {os_state.locale.value}",
         f"verbose: {_format_toggle(os_state.help_verbose)}",
         f"audio: {_format_toggle(os_state.audio.enabled)}",
+        f"theme: {normalize_theme_preset(os_state.theme_preset)}",
     ]
     ambient_line = f"ambientsound: {_format_toggle(os_state.audio.ambient_enabled)}"
     if not os_state.audio.enabled and os_state.audio.ambient_enabled:
@@ -78,6 +81,13 @@ def apply_config_value(os_state: OSState, key: str, value: str) -> str:
         messages = {
             "en": f"Ambient sound set to {_format_toggle(os_state.audio.ambient_enabled)}",
             "es": f"Sonido ambiente configurado a {_format_toggle(os_state.audio.ambient_enabled)}",
+        }
+        return messages.get(locale_before, messages["en"])
+    if key == "theme":
+        os_state.theme_preset = normalize_theme_preset(value)
+        messages = {
+            "en": f"Theme set to {os_state.theme_preset}",
+            "es": f"Tema configurado a {os_state.theme_preset}",
         }
         return messages.get(locale_before, messages["en"])
     raise KeyError(key)

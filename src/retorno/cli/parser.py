@@ -76,7 +76,8 @@ _PARSE_ERROR_MESSAGES = {
         "config_set_verbose": "config set verbose <on|off>",
         "config_set_audio": "config set audio <on|off>",
         "config_set_ambientsound": "config set ambientsound <on|off>",
-        "usage_config": "Usage: config set lang <en|es> | config set verbose <on|off> | config set audio <on|off> | config set ambientsound <on|off> | config show",
+        "config_set_theme": "config set theme <linux|amber|green|ice>",
+        "usage_config": "Usage: config set lang <en|es> | config set verbose <on|off> | config set audio <on|off> | config set ambientsound <on|off> | config set theme <linux|amber|green|ice> | config show",
         "usage_mail": "Usage: mail inbox | mail read <id|latest>",
         "usage_mail_read": "Usage: mail read <id|latest>",
         "usage_intel": "Usage: intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>",
@@ -159,7 +160,8 @@ _PARSE_ERROR_MESSAGES = {
         "config_set_verbose": "config set verbose <on|off>",
         "config_set_audio": "config set audio <on|off>",
         "config_set_ambientsound": "config set ambientsound <on|off>",
-        "usage_config": "Uso: config set lang <en|es> | config set verbose <on|off> | config set audio <on|off> | config set ambientsound <on|off> | config show",
+        "config_set_theme": "config set theme <linux|amber|green|ice>",
+        "usage_config": "Uso: config set lang <en|es> | config set verbose <on|off> | config set audio <on|off> | config set ambientsound <on|off> | config set theme <linux|amber|green|ice> | config show",
         "usage_mail": "Uso: mail inbox | mail read <id|latest>",
         "usage_mail_read": "Uso: mail read <id|latest>",
         "usage_intel": "Uso: intel | intel <amount> | intel all | intel show <intel_id> | intel import <path> | intel export <path>",
@@ -519,6 +521,8 @@ def parse_command(line: str):
                     raise ParseError("config_set_audio")
                 if key == "ambientsound":
                     raise ParseError("config_set_ambientsound")
+                if key == "theme":
+                    raise ParseError("config_set_theme")
                 raise ParseError("usage_config")
             return ("CONFIG_SET", key, value)
         raise ParseError("usage_config")

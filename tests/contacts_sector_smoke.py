@@ -102,3 +102,32 @@ def test_contacts_outputs_hide_start_unknown_placeholder() -> None:
 
     assert f"contacts=({visible_id})" in sector_text, sector_text
     assert hidden_id not in sector_text, sector_text
+
+
+def test_nav_routes_hides_start_unknown_placeholder() -> None:
+    state = create_initial_state_prologue()
+    hidden_id = state.world.current_node_id
+
+    current_id = "TEST_CUR"
+    visible_route_id = "TEST_ROUTE"
+    visible_contact_id = "TEST_CONTACT"
+
+    state.world.space.nodes[current_id] = _make_node(current_id, "Current", 0.5)
+    state.world.space.nodes[visible_route_id] = _make_node(visible_route_id, "Route", 12.0)
+    state.world.space.nodes[visible_contact_id] = _make_node(visible_contact_id, "Contact", 20.0)
+
+    state.world.current_node_id = current_id
+    state.ship.current_node_id = current_id
+    state.world.current_pos_ly = (0.5, 0.0, 0.0)
+    state.world.known_nodes = {hidden_id, current_id, visible_route_id, visible_contact_id}
+    state.world.known_contacts = set(state.world.known_nodes)
+    state.world.known_links = {current_id: {hidden_id, visible_route_id}}
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        repl.render_nav_routes(state)
+    text = buf.getvalue()
+
+    assert f"id={visible_route_id}" in text, text
+    assert f"id={visible_contact_id}" in text, text
+    assert hidden_id not in text, text

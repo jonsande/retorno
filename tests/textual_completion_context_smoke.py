@@ -3,7 +3,21 @@ from __future__ import annotations
 import os
 
 from retorno.ui_textual.app import RetornoTextualApp
-from retorno.model.world import add_known_link
+from retorno.model.systems import SystemState
+from retorno.model.world import SpaceNode, add_known_link, region_for_pos
+
+
+def _make_node(node_id: str, x_ly: float) -> SpaceNode:
+    return SpaceNode(
+        node_id=node_id,
+        name=node_id,
+        kind="station",
+        radiation_rad_per_s=0.001,
+        region=region_for_pos(x_ly, 0.0, 0.0),
+        x_ly=x_ly,
+        y_ly=0.0,
+        z_ly=0.0,
+    )
 
 
 def main() -> None:
@@ -16,19 +30,30 @@ def main() -> None:
         state.world.current_node_id = "ECHO_7"
         state.ship.current_node_id = "ECHO_7"
         state.ship.docked_node_id = None
-        state.world.known_nodes.update({"ECHO_7", "CURL_12", "WRECK_B0C2BC"})
-        state.world.known_contacts.update({"ECHO_7", "CURL_12", "WRECK_B0C2BC"})
+        sensor_range = float(state.ship.sensors_range_ly)
+        current = state.world.space.nodes["ECHO_7"]
+        in_range_id = "WRECK_B0C2BC"
+        out_of_range_id = "WRECK_FAR_TEST"
+        state.world.space.nodes[in_range_id] = _make_node(in_range_id, current.x_ly + max(0.1, sensor_range * 0.5))
+        state.world.space.nodes[out_of_range_id] = _make_node(out_of_range_id, current.x_ly + sensor_range + 5.0)
+
+        sensors = state.ship.systems["sensors"]
+        sensors.state = SystemState.OFFLINE
+
+        state.world.known_nodes.update({"ECHO_7", "CURL_12"})
+        state.world.known_contacts.update({"ECHO_7", "CURL_12", in_range_id, out_of_range_id})
         add_known_link(state.world, "ECHO_7", "CURL_12", bidirectional=True)
 
         dock_candidates = set(app._get_completion_candidates(state, "dock ", ""))
         assert dock_candidates == {"ECHO_7"}, dock_candidates
 
         route_candidates = set(app._get_completion_candidates(state, "route solve ", ""))
-        assert route_candidates == {"WRECK_B0C2BC"}, route_candidates
+        assert route_candidates == {"ECHO_7", in_range_id}, route_candidates
 
         nav_candidates = set(app._get_completion_candidates(state, "nav ", ""))
         assert "CURL_12" in nav_candidates, nav_candidates
-        assert "WRECK_B0C2BC" not in nav_candidates, nav_candidates
+        assert in_range_id not in nav_candidates, nav_candidates
+        assert out_of_range_id not in nav_candidates, nav_candidates
 
         deploy_candidates = set(app._get_completion_candidates(state, "drone deploy D1 ", ""))
         assert "BRG-01" in deploy_candidates, deploy_candidates
@@ -37,7 +62,8 @@ def main() -> None:
         assert "PWR-A2" in deploy_candidates, deploy_candidates
         assert "ECHO_7" in deploy_candidates, deploy_candidates
         assert "CURL_12" not in deploy_candidates, deploy_candidates
-        assert "WRECK_B0C2BC" not in deploy_candidates, deploy_candidates
+        assert in_range_id not in deploy_candidates, deploy_candidates
+        assert out_of_range_id not in deploy_candidates, deploy_candidates
 
         salvage_candidates = set(app._get_completion_candidates(state, "drone salvage data D1 ", ""))
         assert salvage_candidates == {"ECHO_7"}, salvage_candidates
@@ -66,6 +92,18 @@ def main() -> None:
         state.ship.installed_modules = ["bus_stabilizer"]
         uninstall_candidates = set(app._get_completion_candidates(state, "drone uninstall D1 ", ""))
         assert uninstall_candidates == {"field_service_rig", "bus_stabilizer"}, uninstall_candidates
+
+        state.world.current_node_id = "UNKNOWN"
+        state.ship.current_node_id = "UNKNOWN"
+        state.world.known_nodes = {"ECHO_7", "UNKNOWN"}
+        state.world.known_contacts = {"ECHO_7", "UNKNOWN"}
+        state.world.known_links = {"UNKNOWN": {"ECHO_7"}}
+
+        route_unknown_origin_candidates = set(app._get_completion_candidates(state, "route solve ", ""))
+        assert route_unknown_origin_candidates == set(), route_unknown_origin_candidates
+
+        nav_unknown_origin_candidates = set(app._get_completion_candidates(state, "nav ", ""))
+        assert "ECHO_7" in nav_unknown_origin_candidates, nav_unknown_origin_candidates
     finally:
         if old_scenario is None:
             os.environ.pop("RETORNO_SCENARIO", None)

@@ -259,7 +259,17 @@ def _known_node_ids(state) -> list[str]:
 def _pool_seed_node_ids(state) -> list[str]:
     known = set(_known_node_ids(state))
     hidden = set(getattr(state.world, "forced_hidden_nodes", set()) or set())
-    return sorted(known | hidden)
+    anchors = {
+        str(getattr(state.world, "current_node_id", "") or "").strip(),
+        str(getattr(state.ship, "current_node_id", "") or "").strip(),
+        str(getattr(state.ship, "docked_node_id", "") or "").strip(),
+    }
+    anchors.discard("")
+    return sorted(known | hidden | anchors)
+
+
+def _is_hidden_origin_placeholder(node_id: str) -> bool:
+    return node_id == "UNKNOWN" or node_id.startswith("UNKNOWN_")
 
 
 def _location_node_ids() -> set[str]:
@@ -385,6 +395,8 @@ def _precompute_uplink_route_pool_for_node(state, node_id: str, max_new: int = 3
         max_authored = 0
 
     def _add_candidate(nid: str, weight: int) -> None:
+        if _is_hidden_origin_placeholder(nid):
+            return
         if nid == node_id or nid in routes or nid in locked_primary_targets:
             return
         prev = candidates.get(nid, 0)
@@ -431,7 +443,13 @@ def _precompute_uplink_route_pool_for_node(state, node_id: str, max_new: int = 3
         if not isinstance(entry, dict):
             continue
         dest = str(entry.get("node_id", "")).strip()
-        if not dest or dest == node_id or dest in routes or dest in locked_primary_targets:
+        if (
+            not dest
+            or _is_hidden_origin_placeholder(dest)
+            or dest == node_id
+            or dest in routes
+            or dest in locked_primary_targets
+        ):
             continue
         if dest not in authored_ids or dest not in state.world.space.nodes:
             continue

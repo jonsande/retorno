@@ -36,6 +36,7 @@ from retorno.runtime.operator_config import (
     resolve_help_verbose,
 )
 from retorno.runtime.startup import load_startup_sequence_lines
+from retorno.ui_theme import get_theme_palette, normalize_theme_preset, render_rich_block, render_rich_line
 from retorno.ui_textual import presenter
 from retorno.io.save_load import (
     LoadGameResult,
@@ -235,6 +236,7 @@ class RetornoTextualApp(App):
                         self._startup_notice = f"[INFO] Loaded saved game: {loaded.path}"
         engine = Engine()
         self.loop = GameLoop(engine, state, tick_s=1.0)
+        self._theme_preset = normalize_theme_preset(getattr(state.os, "theme_preset", "linux"))
         self._history: list[str] = []
         self._history_index: int = 0
         self._history_current: str = ""
@@ -285,6 +287,7 @@ class RetornoTextualApp(App):
         yield Static(id="power")
 
     def on_mount(self) -> None:
+        self._apply_theme(self._theme_preset)
         if self._audio_manager is not None:
             audio_enabled, ambient_enabled = audio_flags(self.loop.state.os)
             self._audio_manager.start(audio_enabled, ambient_enabled)
@@ -350,11 +353,11 @@ class RetornoTextualApp(App):
         def _render_snapshot(current_line: str | None) -> None:
             log.clear()
             for line in base_lines:
-                log.write(line)
+                self._write_rich_line(log, line)
             for line in rendered_lines:
-                log.write(line)
+                self._write_rich_line(log, line)
             if current_line is not None:
-                log.write(current_line)
+                self._write_rich_line(log, current_line)
 
         for idx, line in enumerate(lines):
             if self._startup_sequence_skip and Balance.STARTUP_SEQUENCE_SKIPPABLE:
@@ -967,7 +970,7 @@ class RetornoTextualApp(App):
         if separate and self._log_buffer and self._log_buffer[-1] != "":
             self.query_one("#log", RichLog).write("")
             self._log_buffer.append("")
-        self.query_one("#log", RichLog).write(line)
+        self._write_rich_line(self.query_one("#log", RichLog), line)
         self._log_buffer.append(line)
         if len(self._log_buffer) > 2000:
             self._log_buffer = self._log_buffer[-2000:]
@@ -1161,7 +1164,7 @@ class RetornoTextualApp(App):
             widget.auto_scroll = False
         widget.clear()
         for line in lines:
-            widget.write(line)
+            self._write_rich_line(widget, line)
         if follow_end:
             widget.scroll_end(animate=False)
         elif preserve_scroll and scroll_y is not None:
@@ -1169,14 +1172,55 @@ class RetornoTextualApp(App):
         if preserve_scroll:
             widget.auto_scroll = prev_auto
 
+    def _write_rich_line(self, widget: RichLog, line: str) -> None:
+        if line == "":
+            widget.write("")
+            return
+        widget.write(render_rich_line(line, self._theme_preset))
+
+    def _apply_theme(self, preset: str | None) -> None:
+        palette = get_theme_palette(preset)
+        self._theme_preset = palette.name
+
+        self.screen.styles.background = palette.background
+        self.screen.styles.color = palette.foreground
+
+        panel_ids = ("status", "alerts", "jobs", "log", "input", "sep_header_right")
+        for widget_id in panel_ids:
+            widget = self.query_one(f"#{widget_id}")
+            widget.styles.background = palette.panel_background
+            widget.styles.color = palette.foreground
+
+        for widget_id in ("status", "alerts", "jobs", "log"):
+            widget = self.query_one(f"#{widget_id}", RichLog)
+            widget.styles.scrollbar_color = palette.scrollbar
+            widget.styles.scrollbar_color_hover = palette.accent
+            widget.styles.scrollbar_color_active = palette.info
+            widget.styles.scrollbar_background = palette.panel_background
+
+        header = self.query_one("#header", Static)
+        header.styles.background = palette.header_background
+        header.styles.color = palette.header_foreground
+
+        power = self.query_one("#power", Static)
+        power.styles.background = palette.power_background
+        power.styles.color = palette.power_foreground
+
+        input_widget = self.query_one("#input", Input)
+        input_widget.styles.background = palette.panel_background
+        input_widget.styles.color = palette.foreground
+
     def refresh_panels(self) -> None:
         with self.loop.with_lock() as state:
+            theme_preset = normalize_theme_preset(getattr(state.os, "theme_preset", "linux"))
             header = presenter.build_header(state)
             status_lines = presenter.build_status_lines(state)
             alerts_lines = presenter.build_alerts_lines(state)
             jobs_lines = presenter.build_jobs_lines(state)
             power_lines = presenter.build_power_lines(state)
-        self.query_one("#header", Static).update(header)
+        if theme_preset != self._theme_preset:
+            self._apply_theme(theme_preset)
+        self.query_one("#header", Static).update(render_rich_line(header, self._theme_preset))
         status_widget = self.query_one("#status", RichLog)
         if status_widget.display:
             self._set_log_content(
@@ -1201,7 +1245,7 @@ class RetornoTextualApp(App):
                 preserve_scroll=(self.focused is jobs_widget),
                 follow_end=(self.focused is not jobs_widget),
             )
-        self.query_one("#power", Static).update("\n".join(power_lines))
+        self.query_one("#power", Static).update(render_rich_block(power_lines, self._theme_preset))
         if self._startup_sequence_running:
             return
         auto_events = self.loop.drain_events()
@@ -1585,8 +1629,12 @@ class RetornoTextualApp(App):
             key, value = parsed[1], parsed[2]
             with self.loop.with_lock() as state:
                 message = apply_config_value(state.os, key, value)
+                next_theme = normalize_theme_preset(getattr(state.os, "theme_preset", "linux"))
                 audio_enabled, ambient_enabled = audio_flags(state.os)
                 self._log_line(message)
+            if key == "theme":
+                self._apply_theme(next_theme)
+                self.refresh_panels()
             if self._audio_manager is not None and key in {"audio", "ambientsound"}:
                 self._audio_manager.apply_preferences(audio_enabled, ambient_enabled)
                 notice = self._audio_manager.consume_notice()

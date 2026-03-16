@@ -11,6 +11,25 @@ from retorno.core.lore import sync_node_pools_for_known_nodes
 from retorno.model.world import ExplorationRecoveryState, SpaceNode
 
 
+def _assert_current_anchor_node_seeds_pool() -> None:
+    state = create_initial_state_sandbox()
+    assert "ECHO_7" not in state.world.known_nodes
+    assert "ECHO_7" not in state.world.known_contacts
+
+    sync_node_pools_for_known_nodes(state)
+
+    pool = state.world.node_pools.get("ECHO_7")
+    assert pool is not None, "Expected current anchor node to seed a node pool"
+    assert {entry.get("path") for entry in pool.base_files} >= {
+        "/logs/echo_cache.en.txt",
+        "/logs/echo_cache.es.txt",
+    }, f"Expected authored ECHO_7 files in pool, got: {pool.base_files!r}"
+    assert pool.uplink_route_pool, "Expected ECHO_7 uplink pool to be precomputed for current anchor node"
+    assert "UNKNOWN" not in pool.uplink_route_pool, (
+        f"Expected hidden origin placeholder excluded from uplink pool, got: {pool.uplink_route_pool!r}"
+    )
+
+
 def _assert_authored_uplink_table_is_applied() -> None:
     state = create_initial_state_sandbox()
     node_id = "AUTH_HUB_TEST"
@@ -169,6 +188,7 @@ def _assert_uplink_activates_diegetic_recovery() -> None:
 
 
 def main() -> None:
+    _assert_current_anchor_node_seeds_pool()
     _assert_authored_uplink_table_is_applied()
     _assert_uplink_activates_diegetic_recovery()
     print("UPLINK AUTHORED+FAILSAFE SMOKE PASSED")

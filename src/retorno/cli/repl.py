@@ -52,6 +52,7 @@ from retorno.io.save_load import (
     save_exists,
     save_single_slot,
 )
+from retorno.ui_theme import ThemedStdout, normalize_theme_preset
 from retorno.model.systems import SystemState
 from retorno.model.drones import DroneLocation, DroneState, DroneStatus, compute_drone_effective_profile
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, list_dir, normalize_path, read_file, required_access_label
@@ -224,6 +225,7 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ("config set verbose <on|off>", "toggle default help verbosity", "activa o desactiva la verbosidad por defecto de help"),
                 ("config set audio <on|off>", "toggle all game audio", "activa o desactiva todo el audio"),
                 ("config set ambientsound <on|off>", "toggle ambient loop", "activa o desactiva el loop ambiental"),
+                ("config set theme <linux|amber|green|ice>", "set color preset", "configura preset de color"),
                 ("config show", "show current config", "muestra configuración actual"),
             ],
         ),
@@ -5035,7 +5037,7 @@ def render_nav_routes(state) -> None:
     routes = {
         rid
         for rid in state.world.known_links.get(current_id, set())
-        if rid != current_id and rid != player_ship_id
+        if rid != current_id and rid != player_ship_id and not _is_hidden_origin_contact_id(rid)
     }
     current = state.world.space.nodes.get(current_id)
     cx, cy, cz = (current.x_ly, current.y_ly, current.z_ly) if current else state.world.current_pos_ly
@@ -5082,7 +5084,7 @@ def render_nav_routes(state) -> None:
     nearby = [
         nid
         for nid in state.world.known_nodes
-        if nid not in routes and nid != current_id and nid != player_ship_id
+        if nid not in routes and nid != current_id and nid != player_ship_id and not _is_hidden_origin_contact_id(nid)
     ]
     if nearby:
         print("Nearby contacts without known route:")
@@ -6312,11 +6314,8 @@ def render_alert_explain(state, alert_key: str) -> None:
 
 
 def _known_contact_ids_for_completion(state) -> list[str]:
-    known_ids = (
-        state.world.known_nodes
-        if hasattr(state.world, "known_nodes") and state.world.known_nodes
-        else state.world.known_contacts
-    )
+    known_ids = set(getattr(state.world, "known_nodes", set()) or set())
+    known_ids.update(getattr(state.world, "known_contacts", set()) or set())
     return sorted(c for c in known_ids if not _is_hidden_origin_contact_id(c))
 
 
@@ -6332,19 +6331,24 @@ def _dock_targets_for_completion(state) -> list[str]:
 
 def _route_solve_targets_for_completion(state) -> list[str]:
     current_node_id = getattr(state.world, "current_node_id", "")
-    if not current_node_id or current_node_id == "UNKNOWN":
+    if not current_node_id:
         return []
     known_routes = set(state.world.known_links.get(current_node_id, set()))
+    sensors_range_ly = max(0.0, float(getattr(state.ship, "sensors_range_ly", Balance.SENSORS_RANGE_LY)))
     return [
         node_id
         for node_id in _known_contact_ids_for_completion(state)
-        if node_id != current_node_id and node_id not in known_routes
+        if node_id not in known_routes
+        and (
+            (dist := _distance_ly_between_nodes(state, current_node_id, node_id)) is not None
+            and dist <= sensors_range_ly
+        )
     ]
 
 
 def _travel_targets_for_completion(state) -> list[str]:
     current_node_id = getattr(state.world, "current_node_id", "")
-    if not current_node_id or current_node_id == "UNKNOWN":
+    if not current_node_id:
         return []
     candidates = [
         node_id
@@ -6415,8 +6419,10 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    active_theme: dict[str, str] = {"preset": "linux"}
     if not isinstance(sys.stdout, _TeeStdout):
-        sys.stdout = _TeeStdout(sys.stdout, _LOG_BUFFER)
+        themed_stdout = ThemedStdout(sys.stdout, lambda: normalize_theme_preset(active_theme["preset"]))
+        sys.stdout = _TeeStdout(themed_stdout, _LOG_BUFFER)
     if os.environ.get("RETORNO_DEBUG_COMPLETER", "").strip().lower() in {"1", "true", "yes"}:
         try:
             if hasattr(sys.stdout, "isatty") and not sys.stdout.isatty():
@@ -6477,6 +6483,7 @@ def main() -> None:
                     startup_message = f"[WARN] Main save unreadable. Loaded backup: {loaded.path}"
                 else:
                     startup_message = f"[INFO] Loaded saved game: {loaded.path}"
+    active_theme["preset"] = normalize_theme_preset(getattr(state.os, "theme_preset", "linux"))
 
     audio_warning = ""
     try:
@@ -7058,6 +7065,7 @@ def main() -> None:
             key, value = parsed[1], parsed[2]
             with loop.with_lock() as locked_state:
                 message = apply_config_value(locked_state.os, key, value)
+                active_theme["preset"] = normalize_theme_preset(getattr(locked_state.os, "theme_preset", "linux"))
                 audio_enabled, ambient_enabled = audio_flags(locked_state.os)
                 print(message)
             if audio_manager is not None and key in {"audio", "ambientsound"}:
@@ -7197,6 +7205,7 @@ def main() -> None:
             else:
                 new_state = create_initial_state_prologue()
             new_state.os.debug_enabled = keep_debug
+            new_state.os.theme_preset = active_theme["preset"]
             with loop.with_lock() as locked_state:
                 loop.state = new_state
                 loop._events_auto.clear()
