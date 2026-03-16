@@ -34,8 +34,8 @@ class ThemePalette:
 _PALETTES: dict[str, ThemePalette] = {
     "linux": ThemePalette(
         name="linux",
-        background="#0c1110",
-        panel_background="#0f1513",
+        background="#10110c",
+        panel_background="#15110f",
         foreground="#d7e3d8",
         muted="#7f9184",
         accent="#7bd389",
@@ -45,8 +45,10 @@ _PALETTES: dict[str, ThemePalette] = {
         critical="#ff4d4d",
         ok="#7bd389",
         prompt="#6ee7d2",
+        #header_background="#13201b",
         header_background="#13201b",
         header_foreground="#eef6ee",
+        #power_background="#13201b",
         power_background="#13201b",
         power_foreground="#eef6ee",
         scrollbar="#4e6355",

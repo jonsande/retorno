@@ -296,7 +296,7 @@ class RetornoTextualApp(App):
         yield Static(id="power")
 
     def on_mount(self) -> None:
-        self._apply_theme(self._theme_preset)
+        self._apply_theme(normalize_theme_preset(getattr(self.loop.state.os, "theme_preset", self._theme_preset)))
         if self._audio_manager is not None:
             audio_enabled, ambient_enabled = audio_flags(self.loop.state.os)
             self._audio_manager.start(audio_enabled, ambient_enabled)
@@ -1326,10 +1326,12 @@ class RetornoTextualApp(App):
         palette = get_theme_palette(preset)
         self._theme_preset = palette.name
 
-        self.screen.styles.background = palette.background
+        # Keep the Screen background aligned with panel surfaces so the
+        # vertical margins around #log blend into the log panel.
+        self.screen.styles.background = palette.panel_background
         self.screen.styles.color = palette.foreground
 
-        panel_ids = ("status", "alerts", "jobs", "log", "input", "sep_header_right")
+        panel_ids = ("main", "right", "status", "alerts", "jobs", "log", "input", "sep_header_right")
         for widget_id in panel_ids:
             widget = self.query_one(f"#{widget_id}")
             widget.styles.background = palette.panel_background
@@ -1355,6 +1357,10 @@ class RetornoTextualApp(App):
         input_widget.styles.color = palette.foreground
 
     def refresh_panels(self) -> None:
+        with self.loop.with_lock() as state:
+            theme_preset = normalize_theme_preset(getattr(state.os, "theme_preset", "linux"))
+        if theme_preset != self._theme_preset:
+            self._apply_theme(theme_preset)
         if self._startup_panel_blackout:
             self._render_panel_blackout(clear_log=False)
             return
@@ -1362,14 +1368,11 @@ class RetornoTextualApp(App):
             self._render_panel_blackout()
             return
         with self.loop.with_lock() as state:
-            theme_preset = normalize_theme_preset(getattr(state.os, "theme_preset", "linux"))
             header = presenter.build_header(state)
             status_lines = presenter.build_status_lines(state)
             alerts_lines = presenter.build_alerts_lines(state)
             jobs_lines = presenter.build_jobs_lines(state)
             power_lines = presenter.build_power_lines(state)
-        if theme_preset != self._theme_preset:
-            self._apply_theme(theme_preset)
         self.query_one("#header", Static).update(render_rich_line(header, self._theme_preset))
         status_widget = self.query_one("#status", RichLog)
         if status_widget.display:

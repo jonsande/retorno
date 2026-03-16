@@ -16,6 +16,8 @@ async def _run() -> None:
         app.loop.state.os.debug_enabled = True
         app.loop.state.os.audio.enabled = False
         app.loop.state.os.audio.ambient_enabled = False
+        app._play_startup_sequence = False
+        app._startup_panel_blackout = False
 
         async with app.run_test() as pilot:
             app.query_one("#log", RichLog).clear()
