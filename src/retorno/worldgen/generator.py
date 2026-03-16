@@ -586,6 +586,7 @@ def _ensure_sector_generated_core(
         force_playable_hub=sector_id in force_playable_hub,
     )
     x0, y0, z0 = _sector_bounds(sector_id)
+    z_center = z0 + SECTOR_SIZE_LY / 2.0
     z_sigma = float(region_template.get("z_sigma", 0.3) or 0.3)
     salvage_cfg = dict(region_template.get("salvage", {}) or {})
 
@@ -593,7 +594,7 @@ def _ensure_sector_generated_core(
         rng = random.Random(_hash64(state.meta.rng_seed, f"sector_node:{sector_id}:{archetype}:{index}:{kind}"))
         x = x0 + rng.random() * SECTOR_SIZE_LY
         y = y0 + rng.random() * SECTOR_SIZE_LY
-        z = z0 + rng.gauss(0.0, z_sigma)
+        z = rng.gauss(z_center, z_sigma)
         node_region = region_for_pos(x, y, z)
         node_id = _generate_node_id(state, kind, rng)
         node = SpaceNode(

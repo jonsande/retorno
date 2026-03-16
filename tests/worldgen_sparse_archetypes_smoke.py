@@ -226,6 +226,31 @@ def _assert_sparse_topology_and_caps() -> None:
             assert int(sector_state.intersector_link_count) <= 1
 
 
+def _assert_vertical_distribution_centered() -> None:
+    state = create_initial_state_prologue()
+    center_sector = _find_sector_in_region("disk", min_radius=20)
+    csx, csy, csz = _parse_sector_id(center_sector)
+    for dx in range(-8, 9):
+        for dy in range(-8, 9):
+            ensure_sector_generated(state, f"S{csx+dx:+04d}_{csy+dy:+04d}_{csz:+04d}")
+
+    normalized_offsets: list[float] = []
+    for sector_id, sector_state in state.world.sector_states.items():
+        sx, sy, sz = _parse_sector_id(sector_id)
+        if abs(sx - csx) > 8 or abs(sy - csy) > 8 or sz != csz:
+            continue
+        sector_origin_z = sz * SECTOR_SIZE_LY
+        for node_id in sector_state.node_ids:
+            node = state.world.space.nodes[node_id]
+            normalized_offsets.append((node.z_ly - sector_origin_z) / SECTOR_SIZE_LY)
+
+    assert normalized_offsets, "Expected sampled nodes for vertical distribution check"
+    mean_offset = sum(normalized_offsets) / len(normalized_offsets)
+    assert 0.30 <= mean_offset <= 0.70, (
+        f"Expected node z positions centered within their sectors, got mean normalized offset {mean_offset:.3f}"
+    )
+
+
 def main() -> None:
     _assert_region_templates()
     _assert_archetype_catalog()
@@ -233,6 +258,7 @@ def main() -> None:
     _assert_origin_guardrail()
     _assert_neighbor_materialization_without_reveal()
     _assert_sparse_topology_and_caps()
+    _assert_vertical_distribution_centered()
     print("WORLDGEN SPARSE ARCHETYPES SMOKE PASSED")
 
 
