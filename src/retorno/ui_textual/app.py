@@ -139,7 +139,7 @@ class RetornoTextualApp(App):
         scrollbar-corner-color: $background;
     }
     #log {
-        height: 12;
+        height: 16;
         border: none;
         margin: 1 0;
         padding: 0 2;
@@ -485,7 +485,7 @@ class RetornoTextualApp(App):
             log_widget.styles.height = "1fr"
             log_widget.styles.margin = (0, 0)
         else:
-            log_widget.styles.height = 12
+            log_widget.styles.height = 16
             log_widget.styles.margin = (1, 0)
 
     def action_history_prev(self) -> None:
