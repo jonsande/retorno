@@ -861,8 +861,12 @@ class RetornoTextualApp(App):
         if cmd == "drone":
             if len(tokens) == 2:
                 return [c for c in ["status", "deploy", "deploy!", "move", "survey", "reboot", "recall", "autorecall", "repair", "install", "uninstall", "salvage"] if c.startswith(text)]
-            if len(tokens) == 3 and tokens[1] in {"status", "deploy", "deploy!", "reboot", "recall", "autorecall", "repair", "move", "install", "uninstall", "survey"}:
+            if len(tokens) == 3 and tokens[1] in {"status", "deploy", "deploy!", "reboot", "autorecall", "repair", "move", "install", "uninstall", "survey"}:
                 return [d for d in drones if d.startswith(text)]
+            if len(tokens) == 3 and tokens[1] == "recall":
+                recall_targets = [c for c in ["all"] if c.startswith(text)]
+                recall_targets += [d for d in drones if d.startswith(text)]
+                return recall_targets
             if len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
                 return [t for t in drone_deploy_targets if t.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "move":
@@ -954,9 +958,12 @@ class RetornoTextualApp(App):
                 return candidates
         return candidates
 
-    def _log_line(self, line: str) -> None:
+    def _log_line(self, line: str, *, separate: bool = False) -> None:
         if line is None:
             return
+        if separate and self._log_buffer and self._log_buffer[-1] != "":
+            self.query_one("#log", RichLog).write("")
+            self._log_buffer.append("")
         self.query_one("#log", RichLog).write(line)
         self._log_buffer.append(line)
         if len(self._log_buffer) > 2000:
@@ -1285,7 +1292,7 @@ class RetornoTextualApp(App):
             if reply in yes:
                 if action == "TRAVEL_ABORT":
                     from retorno.core.actions import TravelAbort
-                    self._log_line("> nav abort")
+                    self._log_line("> nav abort", separate=True)
                     ev = self.loop.apply_action(TravelAbort())
                     if ev:
                         audio_enabled = False
@@ -1303,7 +1310,7 @@ class RetornoTextualApp(App):
                         self._confirm_hibernate_wake_needed(state)
                     return
                 elif action == "HIBERNATE_NON_CRUISE":
-                    self._log_line("> hibernate until_arrival")
+                    self._log_line("> hibernate until_arrival", separate=True)
                     self._log_lines(
                         presenter.build_command_output(
                             repl._run_hibernate,
@@ -1317,9 +1324,9 @@ class RetornoTextualApp(App):
                     self._pending_wake_on_low_battery = False
                 else:
                     if action.__class__.__name__ == "Travel":
-                        self._log_line(f"> nav {getattr(action, 'node_id', '?')}")
+                        self._log_line(f"> nav {getattr(action, 'node_id', '?')}", separate=True)
                     else:
-                        self._log_line(f"> {action.__class__.__name__.lower()}")
+                        self._log_line(f"> {action.__class__.__name__.lower()}", separate=True)
                     ev = self.loop.apply_action(action)
                     if ev:
                         audio_enabled = False
@@ -1353,7 +1360,7 @@ class RetornoTextualApp(App):
             self._history.append(text)
         self._history_index = len(self._history)
         self._history_current = ""
-        self._log_line(f"> {text}")
+        self._log_line(f"> {text}", separate=True)
         try:
             parsed = parse_command(text)
         except ParseError as e:

@@ -71,7 +71,8 @@ ENERGY
 
 === LORE ===
 
-- [ ] Sistematizar y darle un sentido de minijuego a build_procedural_salvage_mail_content. La idea de los mails generados proceduralmente debe ser esta: que te ofrezcan indirectamente información útil para planear tus viajes. En esos mails tiene que haber un número determinado de categorías de información que pueden o no cubrirse, como, por ejemplo: nivel de radiación de un nodo, si tenía o no información relevante ese nodo, estado de su casco, si había drones, etc. De este modo el jugador irá obteniendo información que le servirá para seguir avanzando. Es decir que estos mails procedurales le sirven para obtener información de destinos que le puede ser útil de cara a organizarse y planificar su próximo viaje, o saber qué lugares evitar de momento, o a qué lugares le interesa acudir. Estos mails tambien tiene que servir para otra cosa: distribuir una serie de consejos generales (seleccionados de una batería) acerca del universo, de cómo obrar, de peligros de las zonas o consejos, etc.
+- [ ] Sistematizar y darle un sentido de minijuego a build_procedural_salvage_mail_content. La idea de los mails generados proceduralmente debe ser esta: que te ofrezcan indirectamente información útil para planear tus viajes. En esos mails tiene que haber un número determinado de categorías de información que pueden o no cubrirse, como, por ejemplo: nivel de radiación de un nodo en su último contacto, si tenía o no información relevante ese nodo, estado de su casco en su último contacto, si había drones en su último contacto, etc. De este modo el jugador irá obteniendo información que le servirá para seguir avanzando. Es decir que estos mails procedurales le sirven para obtener información de destinos que le puede ser útil de cara a organizarse y planificar su próximo viaje, o saber qué lugares evitar de momento, o a qué lugares le interesa acudir. Estos mails tambien tiene que servir para otra cosa: distribuir una serie de consejos generales (seleccionados de una batería) acerca del universo, de cómo obrar, de peligros de las zonas o consejos, etc. [Una nota acerca de cómo se obtiene ahora mismo la información de la radiación que tiene un nodo:
+ship survey ahora muestra node_radiation en la salida; si el nodo ya fue visitado o está dentro del alcance actual de sensores, imprime el valor en rad/s; si no, devuelve unknown/desconocida]
 
 - [!] Ideas para “formas de aparecer”. Además de las ya planteadas (salvage data, uplink, recibir mensaje automático o no automático, captar mensaje perdido en el espacio):
   
@@ -170,26 +171,30 @@ ENERGY
 - [x] Quiero un sonido específico para cuando sale el mensaje de "Action blocked".
 - [ ] Sonido de advertencia cuando aumenta la radiación.
 
-- [ ] Comprobar que efectivamente está funcionando el volumen configurable de los beeps, etc.
+- [x] Comprobar que efectivamente está funcionando el volumen configurable de los beeps, etc.
 
 
 === OTROS / SIN CATALOGAR ===
 
-- [!] Necesitamos que el log se guarde y cargue al cargar partida! Al menos un número determinado del log. De otro modo es fácil perderse, no acordarse de dónde se estaba o qué se había hecho. Otra solución sería guardar un archivo con todo (o parte) del log, y crear un comando que te permitiera imprimir las últimas x líneas.
+
+
+- [DESCARTADO] Necesitamos que el log se guarde y cargue al cargar partida! Al menos un número determinado del log. De otro modo es fácil perderse, no acordarse de dónde se estaba o qué se había hecho. Otra solución sería guardar un archivo con todo (o parte) del log, y crear un comando que te permitiera imprimir las últimas x líneas. [P.D. YA EXISTE EL COMANDO LOGS]
+
+- [ ] Actualmente el comando ship survey es un pelín confuso?
 
 - [!] Necesitamos un comando que te liste el camino que has seguido. El orden de los nodos que has visitado. Incluso estaría bien que junto a los nodos por los que has pasado apareciera entre paréntesis o algo un listado de los nodos que eran accesibles desde él.
 
-- [!] Necesitamos un comando que, para cada nodo sin ruta conocida, nos diga desde qué nodos conocidos es posible calcular una ruta (con route solve) a ese nodo. Es decir, desde qué nodos conocidos "route solve" tiene alcance para calcular una ruta hasta el nodo deseado. Para no multiplicar comandos, se me ocurre que esto podría ser una función extendida del propio comando "route solve <node_id>": si <node_id> está dentro del rango, se procede como de costumbre; si no lo está, se emite el mensaje habitual de "target out of sensor range", y a continuación un listado de los nodos conocidos desde los cuales el <node_id> introducido está dentro del rango de route solve. De este modo el jugador siempre podrá saber a qué nodos tiene que lograr llegar para poder constuir una ruta a su nodo objetivo último.
+- [!] Necesitamos un comando que, para cada nodo sin ruta conocida, nos diga desde qué nodos conocidos es posible calcular una ruta (con route solve) a ese nodo. Es decir, desde qué nodos conocidos "route solve" tiene alcance para calcular una ruta hasta el nodo deseado. Para no multiplicar comandos, se me ocurre que esto podría ser una función extendida del propio comando "route solve <node_id>": si <node_id> está dentro del rango, se procede como de costumbre; si no lo está, se emite el mensaje habitual de "target out of sensor range" y a continuación un listado de los nodos conocidos desde los cuales el <node_id> introducido está dentro del rango de route solve. De este modo el jugador siempre podrá saber a qué nodos tiene que lograr llegar para poder constuir una ruta a su nodo objetivo último.
 
 - [ ] Al hacer dock el autocompletado tiene que ser contextual. No tiene sentido que el autocompletado te liste todos los contactos conocidos cuando estás en órbita de un nodo. Cuando estás en órbita de un nodo tu única posibilidad de dock es con el nodo que estás orbitando. De hecho, debería valer como alias el comando "dock" a secas, sin introducir el <node_id>.
 
-- [ ] Implementar un drone recall all, y que "drone recall" a secas, es decir sin especificar el id del drone, equivalga a un drone recall all.
+- [x] Implementar un drone recall all, y que "drone recall" a secas, es decir sin especificar el id del drone, equivalga a un drone recall all.
 
-- [!] La operación de scan debe llevar algún tiempo. Y disparar algún sonido si detecta un contacto nuevo (por ejemplo el cue "info").
+- [!] La operación de scan debe llevar algún tiempo (configurable desde el balance.py). Y disparar algún sonido si detecta un contacto nuevo (por ejemplo el cue "info").
 
-- [ ] La orden nav contacts debería listar también la radiación del nodo, si es conocida.
+- [x] La orden ship survey debería listar también la radiación del nodo, si es conocida, o decir que es desconocida si es desconocida.
 
-- [ ] Llueven contactos y rutas. Sólo con haber pasado por 3 o 4 nodos, tengo repleto el mapa de contactos. y rutas. Hay que balancear esto, pues de otro modo esta información pierde valor.
+- [x] Llueven contactos y rutas. Sólo con haber pasado por 3 o 4 nodos, tengo repleto el mapa de contactos. y rutas. Hay que balancear esto, pues de otro modo esta información pierde valor.
 
 - [ ] Tiene que haber un aliciente claro para explorar los nodos del sector antes de dar el salto al siguiente. Un salto de muchos años de hibernación tiene que tener riesgos. No debe tampoco haber muchas rutas que conecten un sector con otro. Lo normal ha de ser que haya una.
 

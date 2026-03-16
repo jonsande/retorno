@@ -1964,106 +1964,9 @@ class Engine:
             )
 
         if isinstance(action, DroneRecall):
-            drone = state.ship.drones.get(action.drone_id)
-            if not drone:
-                event = self._make_event(
-                    state,
-                    EventType.BOOT_BLOCKED,
-                    Severity.WARN,
-                    SourceRef(kind="drone", id=action.drone_id),
-                    f"Recall blocked: drone {action.drone_id} not found",
-                    data={"message_key": "boot_blocked", "reason": "drone_missing", "drone_id": action.drone_id},
-                )
-                self._record_event(state.events, event)
-                return [event]
-            if drone.status != DroneStatus.DEPLOYED:
-                event = self._make_event(
-                    state,
-                    EventType.BOOT_BLOCKED,
-                    Severity.WARN,
-                    SourceRef(kind="drone", id=drone.drone_id),
-                    f"Recall blocked: {drone.drone_id} not deployed",
-                    data={"message_key": "boot_blocked", "reason": "drone_not_deployed", "drone_id": drone.drone_id},
-                )
-                self._record_event(state.events, event)
-                return [event]
-            if not self._drone_has_min_integrity(state, drone, Balance.DRONE_RECALL_MIN_INTEGRITY):
-                event = self._make_event(
-                    state,
-                    EventType.BOOT_BLOCKED,
-                    Severity.WARN,
-                    SourceRef(kind="drone", id=drone.drone_id),
-                    f"Recall blocked: {drone.drone_id} integrity too low",
-                    data={
-                        "message_key": "boot_blocked",
-                        "reason": "drone_too_damaged",
-                        "drone_id": drone.drone_id,
-                        "integrity": drone.integrity,
-                    },
-                )
-                self._record_event(state.events, event)
-                return [event]
-            if not self._drone_has_min_battery(state, drone, Balance.DRONE_MIN_BATTERY_FOR_RECALL):
-                event = self._make_event(
-                    state,
-                    EventType.BOOT_BLOCKED,
-                    Severity.WARN,
-                    SourceRef(kind="drone", id=drone.drone_id),
-                    f"Recall blocked: {drone.drone_id} battery too low",
-                    data={
-                        "message_key": "boot_blocked",
-                        "reason": "drone_low_battery",
-                        "drone_id": drone.drone_id,
-                        "battery": drone.battery,
-                        "threshold": Balance.DRONE_MIN_BATTERY_FOR_RECALL,
-                    },
-                )
-                self._record_event(state.events, event)
-                return [event]
-            if drone.location.kind == "world_node":
-                if state.ship.docked_node_id != drone.location.id:
-                    event = self._make_event(
-                        state,
-                        EventType.BOOT_BLOCKED,
-                        Severity.WARN,
-                        SourceRef(kind="drone", id=drone.drone_id),
-                        f"Recall blocked: ship not docked at {drone.location.id}",
-                        data={"message_key": "boot_blocked", "reason": "recall_not_docked", "node_id": drone.location.id},
-                    )
-                    self._record_event(state.events, event)
-                    return [event]
-            if not self._drone_has_min_integrity(state, drone, Balance.DRONE_RECALL_MIN_INTEGRITY):
-                event = self._make_event(
-                    state,
-                    EventType.BOOT_BLOCKED,
-                    Severity.WARN,
-                    SourceRef(kind="drone", id=drone.drone_id),
-                    f"Recall blocked: {drone.drone_id} integrity too low",
-                    data={
-                        "message_key": "boot_blocked",
-                        "reason": "drone_too_damaged",
-                        "drone_id": drone.drone_id,
-                        "integrity": drone.integrity,
-                    },
-                )
-                self._record_event(state.events, event)
-                return [event]
-            pre_events: list[Event] = []
-            support_warning = self._emit_drone_bay_support_warning(state, action)
-            if support_warning:
-                self._record_event(state.events, support_warning)
-                pre_events.append(support_warning)
-            bay_state = self._drone_bay_state(state)
-            profile = self._drone_profile(state, drone)
-            eta = Balance.RECALL_TIME_S * self._drone_bay_eta_mult(state) * profile.move_time_mult_effective
-            return pre_events + self._enqueue_job(
-                state,
-                JobType.RECALL_DRONE,
-                TargetRef(kind="drone", id=drone.drone_id),
-                owner_id=drone.drone_id,
-                eta_s=eta,
-                params={"drone_id": drone.drone_id, "bay_state_at_start": bay_state.value if bay_state else ""},
-            )
+            if action.all_drones or action.drone_id is None:
+                return self._apply_recall_all(state)
+            return self._apply_recall_single(state, action, action.drone_id)
 
         if isinstance(action, Repair):
             drone = state.ship.drones.get(action.drone_id)
@@ -4530,6 +4433,114 @@ class Engine:
             },
         )
         return pre_events + [queued_event]
+
+    def _apply_recall_all(self, state: GameState) -> list[Event]:
+        deployed_ids = [
+            drone.drone_id
+            for drone in state.ship.drones.values()
+            if drone.status == DroneStatus.DEPLOYED
+        ]
+        if not deployed_ids:
+            event = self._make_event(
+                state,
+                EventType.BOOT_BLOCKED,
+                Severity.WARN,
+                SourceRef(kind="ship", id=state.ship.ship_id),
+                "Recall blocked: no deployed drones",
+                data={"message_key": "boot_blocked", "reason": "no_deployed_drones"},
+            )
+            self._record_event(state.events, event)
+            return [event]
+
+        events: list[Event] = []
+        for drone_id in deployed_ids:
+            events.extend(self._apply_recall_single(state, DroneRecall(drone_id=drone_id), drone_id))
+        return events
+
+    def _apply_recall_single(self, state: GameState, action: DroneRecall, drone_id: str) -> list[Event]:
+        drone = state.ship.drones.get(drone_id)
+        if not drone:
+            event = self._make_event(
+                state,
+                EventType.BOOT_BLOCKED,
+                Severity.WARN,
+                SourceRef(kind="drone", id=drone_id),
+                f"Recall blocked: drone {drone_id} not found",
+                data={"message_key": "boot_blocked", "reason": "drone_missing", "drone_id": drone_id},
+            )
+            self._record_event(state.events, event)
+            return [event]
+        if drone.status != DroneStatus.DEPLOYED:
+            event = self._make_event(
+                state,
+                EventType.BOOT_BLOCKED,
+                Severity.WARN,
+                SourceRef(kind="drone", id=drone.drone_id),
+                f"Recall blocked: {drone.drone_id} not deployed",
+                data={"message_key": "boot_blocked", "reason": "drone_not_deployed", "drone_id": drone.drone_id},
+            )
+            self._record_event(state.events, event)
+            return [event]
+        if not self._drone_has_min_integrity(state, drone, Balance.DRONE_RECALL_MIN_INTEGRITY):
+            event = self._make_event(
+                state,
+                EventType.BOOT_BLOCKED,
+                Severity.WARN,
+                SourceRef(kind="drone", id=drone.drone_id),
+                f"Recall blocked: {drone.drone_id} integrity too low",
+                data={
+                    "message_key": "boot_blocked",
+                    "reason": "drone_too_damaged",
+                    "drone_id": drone.drone_id,
+                    "integrity": drone.integrity,
+                },
+            )
+            self._record_event(state.events, event)
+            return [event]
+        if not self._drone_has_min_battery(state, drone, Balance.DRONE_MIN_BATTERY_FOR_RECALL):
+            event = self._make_event(
+                state,
+                EventType.BOOT_BLOCKED,
+                Severity.WARN,
+                SourceRef(kind="drone", id=drone.drone_id),
+                f"Recall blocked: {drone.drone_id} battery too low",
+                data={
+                    "message_key": "boot_blocked",
+                    "reason": "drone_low_battery",
+                    "drone_id": drone.drone_id,
+                    "battery": drone.battery,
+                    "threshold": Balance.DRONE_MIN_BATTERY_FOR_RECALL,
+                },
+            )
+            self._record_event(state.events, event)
+            return [event]
+        if drone.location.kind == "world_node" and state.ship.docked_node_id != drone.location.id:
+            event = self._make_event(
+                state,
+                EventType.BOOT_BLOCKED,
+                Severity.WARN,
+                SourceRef(kind="drone", id=drone.drone_id),
+                f"Recall blocked: ship not docked at {drone.location.id}",
+                data={"message_key": "boot_blocked", "reason": "recall_not_docked", "node_id": drone.location.id},
+            )
+            self._record_event(state.events, event)
+            return [event]
+        pre_events: list[Event] = []
+        support_warning = self._emit_drone_bay_support_warning(state, action)
+        if support_warning:
+            self._record_event(state.events, support_warning)
+            pre_events.append(support_warning)
+        bay_state = self._drone_bay_state(state)
+        profile = self._drone_profile(state, drone)
+        eta = Balance.RECALL_TIME_S * self._drone_bay_eta_mult(state) * profile.move_time_mult_effective
+        return pre_events + self._enqueue_job(
+            state,
+            JobType.RECALL_DRONE,
+            TargetRef(kind="drone", id=drone.drone_id),
+            owner_id=drone.drone_id,
+            eta_s=eta,
+            params={"drone_id": drone.drone_id, "bay_state_at_start": bay_state.value if bay_state else ""},
+        )
 
     def _update_alerts(self, state: GameState, p_load: float, p_gen: float, power_quality: float) -> list[Event]:
         events: list[Event] = []

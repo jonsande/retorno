@@ -316,7 +316,7 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ("drone salvage drones <drone_id> [node_id]", "alias of salvage drone", "alias de salvage drone"),
                 ("drone salvage data <drone_id> [node_id]", "salvage data from node", "recupera datos del nodo"),
                 ("drone reboot <drone_id>", "reboot drone", "reinicia dron"),
-                ("drone recall <drone_id>", "recall drone to ship", "retorna dron a la nave"),
+                ("drone recall [<drone_id>|all]", "recall one or all drones to ship", "retorna uno o todos los drones a la nave"),
             ],
         ),
         (
@@ -5019,6 +5019,11 @@ def render_ship_survey(state, target_id: str) -> None:
 
     ship_id = getattr(state.ship, "ship_id", "RETORNO_SHIP")
     target_norm = target_id.strip()
+    locale = state.os.locale.value
+    unknown_radiation = {
+        "en": "unknown",
+        "es": "desconocida",
+    }
     print("\n=== SHIP SURVEY ===")
 
     if target_norm in {ship_id, "RETORNO_SHIP"}:
@@ -5036,11 +5041,11 @@ def render_ship_survey(state, target_id: str) -> None:
         print(f"visited: {visited}")
         print("route: self")
         print("availability: onboard")
+        print(f"node_radiation: {max(0.0, float(state.ship.radiation_env_rad_per_s)):.4f}rad/s")
         return
 
     node = state.world.space.nodes.get(target_norm)
     if not node:
-        locale = state.os.locale.value
         msg = {
             "en": f"ship survey: unknown node ({target_norm})",
             "es": f"ship survey: nodo desconocido ({target_norm})",
@@ -5065,6 +5070,11 @@ def render_ship_survey(state, target_id: str) -> None:
     route = target_norm == current_id or target_norm in state.world.known_links.get(current_id, set())
     visited = target_norm in state.world.visited_nodes
     in_sensor_range = distance <= state.ship.sensors_range_ly
+    radiation_known = visited or in_sensor_range
+    if radiation_known:
+        radiation_line = f"{max(0.0, float(node.radiation_rad_per_s)):.4f}rad/s"
+    else:
+        radiation_line = unknown_radiation.get(locale, unknown_radiation["en"])
     print(f"id: {target_norm}")
     print(f"name: {node.name}")
     print(f"kind: {node.kind}")
@@ -5075,6 +5085,7 @@ def render_ship_survey(state, target_id: str) -> None:
     print(f"known_contact: {'yes' if known else 'no'}")
     print(f"known_route_from_current: {'yes' if route else 'no'}")
     print(f"in_sensor_range: {'yes' if in_sensor_range else 'no'}")
+    print(f"node_radiation: {radiation_line}")
 
 
 def _format_age_short(seconds: float) -> str:
@@ -6615,8 +6626,11 @@ def main() -> None:
                             c for c in ["status", "deploy", "deploy!", "move", "survey", "reboot", "recall", "autorecall", "repair", "install", "uninstall", "salvage"]
                             if c.startswith(text)
                         ]
-                    elif len(tokens) == 3 and tokens[1] in {"status", "deploy", "deploy!", "reboot", "recall", "autorecall", "repair", "move", "install", "uninstall", "survey"}:
+                    elif len(tokens) == 3 and tokens[1] in {"status", "deploy", "deploy!", "reboot", "autorecall", "repair", "move", "install", "uninstall", "survey"}:
                         candidates = [d for d in drones if d.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "recall":
+                        candidates = [c for c in ["all"] if c.startswith(text)]
+                        candidates += [d for d in drones if d.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
                         candidates = [t for t in drone_deploy_targets if t.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "move":

@@ -30,6 +30,10 @@ def main() -> None:
         salvage_candidates = set(app._get_completion_candidates(state, "drone salvage data D1 ", ""))
         assert salvage_candidates == {"ECHO_7"}, salvage_candidates
 
+        recall_candidates = set(app._get_completion_candidates(state, "drone recall ", ""))
+        assert "D1" in recall_candidates, recall_candidates
+        assert "all" in recall_candidates, recall_candidates
+
         # module inspect should complete from full catalog, not only inventory.
         state.ship.cargo_modules = []
         state.ship.manifest_modules = []

@@ -104,9 +104,9 @@ _PARSE_ERROR_MESSAGES = {
         "usage_power_on": "Usage: power on <system_id>",
         "usage_power_off": "Usage: power off <system_id>",
         "usage_shutdown": "Usage: shutdown <system_id>",
-        "usage_drone": "Usage: drone status [drone_id] | drone deploy <drone_id> <sector_id> | drone move <drone_id> <target_id> | drone survey <drone_id> [node_id] | drone recall <drone_id> | drone autorecall <drone_id> <on|off|amount_percent> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id> | drone uninstall <drone_id> <module_id>",
+        "usage_drone": "Usage: drone status [drone_id] | drone deploy <drone_id> <sector_id> | drone move <drone_id> <target_id> | drone survey <drone_id> [node_id] | drone recall [<drone_id>|all] | drone autorecall <drone_id> <on|off|amount_percent> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id> | drone uninstall <drone_id> <module_id>",
         "usage_drone_status": "Usage: drone status [drone_id]",
-        "usage_drone_recall": "Usage: drone recall <drone_id>",
+        "usage_drone_recall": "Usage: drone recall [<drone_id>|all]",
         "usage_drone_reboot": "Usage: drone reboot <drone_id>",
         "usage_drone_repair": "Usage: drone repair <drone_id> <target_id>",
         "usage_drone_move": "Usage: drone move <drone_id> <target_id>",
@@ -187,9 +187,9 @@ _PARSE_ERROR_MESSAGES = {
         "usage_power_on": "Uso: power on <system_id>",
         "usage_power_off": "Uso: power off <system_id>",
         "usage_shutdown": "Uso: shutdown <system_id>",
-        "usage_drone": "Uso: drone status [drone_id] | drone deploy <drone_id> <sector_id> | drone move <drone_id> <target_id> | drone survey <drone_id> [node_id] | drone recall <drone_id> | drone autorecall <drone_id> <on|off|porcentaje> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id> | drone uninstall <drone_id> <module_id>",
+        "usage_drone": "Uso: drone status [drone_id] | drone deploy <drone_id> <sector_id> | drone move <drone_id> <target_id> | drone survey <drone_id> [node_id] | drone recall [<drone_id>|all] | drone autorecall <drone_id> <on|off|porcentaje> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id> | drone uninstall <drone_id> <module_id>",
         "usage_drone_status": "Uso: drone status [drone_id]",
-        "usage_drone_recall": "Uso: drone recall <drone_id>",
+        "usage_drone_recall": "Uso: drone recall [<drone_id>|all]",
         "usage_drone_reboot": "Uso: drone reboot <drone_id>",
         "usage_drone_repair": "Uso: drone repair <drone_id> <target_id>",
         "usage_drone_move": "Uso: drone move <drone_id> <target_id>",
@@ -669,8 +669,12 @@ def parse_command(line: str):
                 return ("DRONE_STATUS", args[1])
             raise ParseError("usage_drone_status")
         if sub == "recall":
+            if len(args) == 1:
+                return DroneRecall(all_drones=True)
             if len(args) != 2:
                 raise ParseError("usage_drone_recall")
+            if args[1].lower() == "all":
+                return DroneRecall(all_drones=True)
             return DroneRecall(drone_id=args[1])
         if sub == "reboot":
             if len(args) != 2:
