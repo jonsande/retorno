@@ -8,7 +8,7 @@ Requisitos (gating)
 - El estado energético debe permitir operación activa de escaneo.
 
 Comportamiento operativo
-- Encola un job de scan con ETA basada en `Balance.SCAN_TIME_S`.
+- Encola un job de scan con un barrido activo temporizado.
 - Al completarse, actualiza conciencia local de contactos y puede revelar eventos de detección.
 - Si descubre contactos nuevos, dispara el evento `signal_detected` y su cue asociado.
 - Si cambia el contexto operativo antes de completar, el job puede interrumpirse.

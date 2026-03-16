@@ -14,8 +14,8 @@ Requirements (gating)
 - Both modes require enough scrap for initial reservation.
 
 Job outcomes
-- Repair jobs have low base fail chance (`Balance.REPAIR_JOB_FAIL_P_BASE`).
-- On failure, only a configurable scrap fraction is consumed; the remainder is refunded (`Balance.REPAIR_JOB_FAIL_SCRAP_CONSUME_FRACTION`).
+- Repair jobs have a low chance of failure.
+- On failure, only part of the reserved scrap is consumed; the remainder is refunded.
 
 Operational notes
 - Drone repair consumes operator battery and reserved scrap.

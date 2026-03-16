@@ -5,19 +5,19 @@ config set ambientsound <on|off>
 config set theme <linux|amber|green|ice>
 
 Propósito
-- Inspeccionar y modificar configuración de la interfaz de operador.
+- Inspeccionar y ajustar los parámetros sensoriales y de presentación de terminal del operador.
 
 Comportamiento operativo
-- `config show` imprime la configuración activa, incluyendo el backend de audio activo cuando esté disponible.
-- `config set lang <en|es>` cambia localización de comandos/interfaz.
-- `config set audio <on|off>` activa o desactiva todo el audio del juego.
-- `config set ambientsound <on|off>` activa o desactiva el loop ambiental sin silenciar el resto del sistema.
-- `config set theme <linux|amber|green|ice>` cambia la paleta de color activa en CLI y Textual.
+- `config show` muestra el perfil actual de presentación sensorial y de terminal.
+- `config set lang <en|es>` selecciona el idioma en que el operador percibe manuales y mensajes de terminal.
+- `config set audio <on|off>` activa o suprime toda la señal auditiva neural.
+- `config set ambientsound <on|off>` activa o suprime la capa ambiental sin desactivar el resto de la señal auditiva.
+- `config set theme <linux|amber|green|ice>` cambia la paleta visual activa de la proyección terminal del operador.
 
 Notas de uso
 - El cambio de idioma afecta manuales, mensajes y preferencia de archivos localizados.
-- Las preferencias de audio persisten y afectan tanto a CLI como a la interfaz Textual.
-- El preset de color persiste y se aplica tanto al REPL como a la interfaz Textual.
+- Las preferencias de audio permanecen activas hasta que se cambien de nuevo.
+- La paleta visual elegida permanece activa hasta que se cambie de nuevo.
 
 Comandos relacionados
 - `status`, `man <topic>`, `cat <path>`

@@ -8,7 +8,7 @@ Comportamiento operativo
   - modulos instalados en nave,
   - modulos instalados en drones agrupados por `drone_id`,
   - modulos en inventario agrupados por scope (`ship`/`drone`).
-- Para drones se muestra ocupacion de slots frente a capacidad.
+- Para drones se muestra `módulos montados / capacidad`.
 - La seccion de inventario usa vista de manifiesto; si esta desactualizada, ejecuta `cargo audit`.
 
 Comandos relacionados

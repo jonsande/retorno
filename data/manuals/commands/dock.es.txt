@@ -9,7 +9,7 @@ Requisitos (gating)
 - El objetivo debe ser un contacto conocido y un nodo compatible con acoplamiento.
 
 Comportamiento
-- `dock` encola un trabajo temporizado (`Balance.DOCK_TIME_S`).
+- `dock` encola un trabajo temporizado.
 - El acoplamiento puede interrumpirse si el contexto cambia antes de completar.
 - `job cancel <job_id>` puede abortar un dock activo.
 

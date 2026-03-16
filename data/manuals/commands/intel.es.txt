@@ -26,7 +26,7 @@ intel import <path>
 - Bloques opcionales:
   [INTEL] ... [/INTEL]
   - Si el bloque contiene un LINK, se importa como ruta.
-  - Si contiene un node_id, name o id de sector, se añade el nodo authored correspondiente como contacto conocido.
+  - Si contiene un node_id, name o id de sector, se añade el registro de navegación correspondiente como contacto conocido.
   - La intel corrupta puede no resolverse o generar un nuevo contacto hub.
 - Archivos en /data/nav, /mail o /logs pueden auto‑importar al hacer cat.
 

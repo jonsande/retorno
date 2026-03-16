@@ -27,3 +27,8 @@ def load_startup_sequence_lines(locale: str) -> list[str]:
 
 def load_hibernate_start_sequence_lines(locale: str) -> list[str]:
     return load_lore_sequence_lines("hibernate", "hibernate_start_sequence", locale)
+
+
+def load_hibernate_wake_sequence_lines(locale: str, *, emergency: bool) -> list[str]:
+    name = "hibernate_wake_sequence_emergency" if emergency else "hibernate_wake_sequence_normal"
+    return load_lore_sequence_lines("hibernate", name, locale)

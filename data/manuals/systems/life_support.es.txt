@@ -19,7 +19,7 @@ Notas operativas
 Impacto en comandos por estado
 - LIMITED: hibernación bloqueada.
 - CRITICAL: hibernación bloqueada.
-- OFFLINE: inicia cuenta atrás de viabilidad (gracia configurable). Al agotarse, estado terminal y comandos muy restringidos.
+- OFFLINE: inicia cuenta atrás de viabilidad. Al agotarse, estado terminal y comandos muy restringidos.
 
 Comandos relacionados
 - status, alerts, diag life_support

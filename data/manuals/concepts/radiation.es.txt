@@ -13,11 +13,10 @@ Origen ambiental
 - Fuera de tránsito: radiación ambiental del nodo actual.
 - En tránsito: promedio de radiación ambiental entre origen y destino.
 - El acoplamiento no crea modelo de transferencia separado; la exposición acoplada sigue el nodo.
-- Nodos authored (`data/locations`): se respeta `radiation_rad_per_s` configurada en el archivo.
-- Nodos procedurales: `env_rad` se calcula con base configurable + modificadores por región/tipo y variación aleatoria determinista por semilla.
-  - Región: `bulge` > `disk` > `halo`.
-  - Tipo: nodos `wreck` (kind `ship`) tienen multiplicador superior.
-  - Suelo: siempre se fuerza un mínimo positivo (`> 0`) para nodos procedurales.
+- La radiación sigue patrones regionales amplios y también anomalías locales.
+  - Región: `bulge` suele registrar más carga que `disk`, y `disk` más que `halo`.
+  - Tipo: los nodos `wreck` (kind `ship`) suelen leer más alto que el corredor circundante.
+  - Suelo: incluso el espacio más limpio conserva una dosis de fondo no nula.
 
 Interacción con casco
 - La integridad de casco (`hull`) es protección global de nave (`0..1`).

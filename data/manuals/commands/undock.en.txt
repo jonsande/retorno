@@ -8,7 +8,7 @@ Requirements (gating)
 - Action must pass current power-state restrictions.
 
 Behavior
-- Undock queues a timed job (`Balance.UNDOCK_TIME_S`).
+- Undock queues a timed job.
 - Job can be interrupted if dock state changes during execution.
 - `job cancel <job_id>` can abort the active undock job.
 

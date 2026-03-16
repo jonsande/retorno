@@ -1,0 +1,12 @@
+[core_os] Integridad de programación de despertar: OK
+Evento de salida de criostasis verificado
+Escaneo de bóveda criogénica... ok
+OBJETIVO seleccionado: Sarcophagus-05
+Secuencia de descriogenización: INICIO (perfil programado)
+Gradiente térmico estabilizado
+Descongelación neuroquímica: PARCIAL
+Recuperación de vías motoras: FALLO (fallo del sistema indeterminado)
+Constantes vitales del huésped: nominales
+Conscious Interface Recovery Protocol (CIRP): ARMADO
+Enlace de terminal neural: EN LÍNEA
+Despertar del operador confirmado

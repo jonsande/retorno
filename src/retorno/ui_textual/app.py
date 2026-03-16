@@ -35,7 +35,11 @@ from retorno.runtime.operator_config import (
     config_value_choices,
     resolve_help_verbose,
 )
-from retorno.runtime.startup import load_hibernate_start_sequence_lines, load_startup_sequence_lines
+from retorno.runtime.startup import (
+    load_hibernate_start_sequence_lines,
+    load_hibernate_wake_sequence_lines,
+    load_startup_sequence_lines,
+)
 from retorno.ui_theme import get_theme_palette, normalize_theme_preset, render_rich_block, render_rich_line
 from retorno.ui_textual import presenter
 from retorno.io.save_load import (
@@ -254,6 +258,7 @@ class RetornoTextualApp(App):
         self._startup_sequence_running = False
         self._startup_sequence_skip = False
         self._hibernate_sequence_running = False
+        self._hibernate_panel_blackout = False
         self._audio_notice = ""
         try:
             self._audio_manager = AudioManager(load_audio_config())
@@ -410,6 +415,12 @@ class RetornoTextualApp(App):
         if clear_buffer:
             self._log_buffer.clear()
 
+    def _render_panel_blackout(self) -> None:
+        self.query_one("#header", Static).update("")
+        self.query_one("#power", Static).update("")
+        for widget_id in ("status", "alerts", "jobs", "log"):
+            self.query_one(f"#{widget_id}", RichLog).clear()
+
     async def _run_hibernate_start_sequence(self, years: float, wake_on_low_battery: bool) -> None:
         if self._hibernate_sequence_running:
             return
@@ -419,16 +430,68 @@ class RetornoTextualApp(App):
         try:
             with self.loop.with_lock() as state:
                 locale = state.os.locale.value
-            lines = load_hibernate_start_sequence_lines(locale)
-            typewriter = Balance.HIBERNATE_SEQUENCE_TYPEWRITER
-            cps = max(1, int(Balance.HIBERNATE_SEQUENCE_TYPEWRITER_CPS))
-            line_delay_s = max(0.0, float(Balance.HIBERNATE_SEQUENCE_LINE_DELAY_S))
+            start_lines = load_hibernate_start_sequence_lines(locale)
+            start_typewriter = Balance.HIBERNATE_SEQUENCE_TYPEWRITER
+            start_cps = max(1, int(Balance.HIBERNATE_SEQUENCE_TYPEWRITER_CPS))
+            start_line_delay_s = max(0.0, float(Balance.HIBERNATE_SEQUENCE_LINE_DELAY_S))
             countdown_s = max(0, int(Balance.HIBERNATE_SEQUENCE_COUNTDOWN_S))
-            base_lines = list(self._log_buffer)
-            rendered_lines: list[str] = []
+            wake_blackout_s = max(0.0, float(Balance.HIBERNATE_WAKE_PANEL_BLACKOUT_S))
+            wake_typewriter = Balance.HIBERNATE_WAKE_SEQUENCE_TYPEWRITER
+            wake_cps = max(1, int(Balance.HIBERNATE_WAKE_SEQUENCE_TYPEWRITER_CPS))
+            wake_line_delay_s = max(0.0, float(Balance.HIBERNATE_WAKE_SEQUENCE_LINE_DELAY_S))
             log = self.query_one("#log", RichLog)
 
-            def _render_snapshot(current_line: str | None) -> None:
+            async def _play_log_sequence(
+                lines: list[str],
+                *,
+                typewriter: bool,
+                cps: int,
+                line_delay_s: float,
+                persist_to_buffer: bool,
+            ) -> None:
+                base_lines = list(self._log_buffer)
+                rendered_lines: list[str] = []
+
+                def _render_snapshot(current_line: str | None) -> None:
+                    log.clear()
+                    for line in base_lines:
+                        self._write_rich_line(log, line)
+                    for line in rendered_lines:
+                        self._write_rich_line(log, line)
+                    if current_line is not None:
+                        self._write_rich_line(log, current_line)
+
+                for line in lines:
+                    if typewriter:
+                        current = ""
+                        for ch in line:
+                            current += ch
+                            _render_snapshot(current)
+                            await asyncio.sleep(1.0 / cps)
+                        rendered_lines.append(line)
+                        _render_snapshot(None)
+                    else:
+                        rendered_lines.append(line)
+                        _render_snapshot(None)
+                    if persist_to_buffer:
+                        self._log_buffer.append(line)
+                        if len(self._log_buffer) > 2000:
+                            self._log_buffer = self._log_buffer[-2000:]
+                    if line_delay_s > 0.0:
+                        await asyncio.sleep(line_delay_s)
+
+            await _play_log_sequence(
+                start_lines,
+                typewriter=start_typewriter,
+                cps=start_cps,
+                line_delay_s=start_line_delay_s,
+                persist_to_buffer=False,
+            )
+
+            base_lines = list(self._log_buffer)
+            rendered_lines = list(start_lines)
+
+            def _render_countdown_snapshot(current_line: str | None) -> None:
                 log.clear()
                 for line in base_lines:
                     self._write_rich_line(log, line)
@@ -437,37 +500,44 @@ class RetornoTextualApp(App):
                 if current_line is not None:
                     self._write_rich_line(log, current_line)
 
-            for line in lines:
-                if typewriter:
-                    current = ""
-                    for ch in line:
-                        current += ch
-                        _render_snapshot(current)
-                        await asyncio.sleep(1.0 / cps)
-                    rendered_lines.append(line)
-                    _render_snapshot(None)
-                else:
-                    rendered_lines.append(line)
-                    _render_snapshot(None)
-                if line_delay_s > 0.0:
-                    await asyncio.sleep(line_delay_s)
-
             for remaining in range(countdown_s, -1, -1):
-                _render_snapshot(repl._hibernate_countdown_line(locale, remaining))
+                _render_countdown_snapshot(repl._hibernate_countdown_line(locale, remaining))
                 if remaining > 0:
                     await asyncio.sleep(1.0)
 
             self._clear_log_widget(clear_buffer=True)
-            lines = presenter.build_command_output(
-                repl._run_hibernate,
+            result = repl._execute_hibernate(
                 self.loop,
                 years,
                 wake_on_low_battery=wake_on_low_battery,
+            )
+            self._hibernate_panel_blackout = True
+            self._render_panel_blackout()
+            if wake_blackout_s > 0.0:
+                await asyncio.sleep(wake_blackout_s)
+            self._hibernate_panel_blackout = False
+            self.refresh_panels()
+            wake_lines = load_hibernate_wake_sequence_lines(
+                locale,
+                emergency=repl._hibernate_wake_is_emergency(result),
+            )
+            await _play_log_sequence(
+                wake_lines,
+                typewriter=wake_typewriter,
+                cps=wake_cps,
+                line_delay_s=wake_line_delay_s,
+                persist_to_buffer=True,
+            )
+            lines = presenter.build_command_output(
+                repl._render_hibernate_result,
+                self.loop,
+                result,
             )
             self._log_lines(lines)
         except Exception as e:
             self._log_line(f"[ERROR] hibernate failed: {e}")
         finally:
+            self._hibernate_panel_blackout = False
             input_widget.disabled = False
             self._hibernate_sequence_running = False
             self.refresh_panels()
@@ -1274,6 +1344,9 @@ class RetornoTextualApp(App):
         input_widget.styles.color = palette.foreground
 
     def refresh_panels(self) -> None:
+        if self._hibernate_panel_blackout:
+            self._render_panel_blackout()
+            return
         with self.loop.with_lock() as state:
             theme_preset = normalize_theme_preset(getattr(state.os, "theme_preset", "linux"))
             header = presenter.build_header(state)

@@ -14,8 +14,8 @@ Requisitos (gating)
 - Ambos modos requieren chatarra suficiente para la reserva inicial.
 
 Resultados de job
-- Los jobs de reparación tienen probabilidad base baja de fallo (`Balance.REPAIR_JOB_FAIL_P_BASE`).
-- En fallo, solo se consume una fracción configurable de la chatarra reservada; el resto se reembolsa (`Balance.REPAIR_JOB_FAIL_SCRAP_CONSUME_FRACTION`).
+- Los jobs de reparación tienen una probabilidad baja de fallo.
+- En fallo, solo se consume una parte de la chatarra reservada; el resto se reembolsa.
 
 Notas operativas
 - La reparación con dron consume batería del operador y chatarra reservada.

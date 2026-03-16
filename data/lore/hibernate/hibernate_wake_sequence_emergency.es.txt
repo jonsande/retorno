@@ -1,0 +1,11 @@
+[core_os] Integridad de programación de despertar: ANULADA
+Interrupción crítica detectada; salida de criostasis forzada
+Escaneo de bóveda criogénica... degradado pero operativo
+OBJETIVO seleccionado: Sarcophagus-05
+Secuencia de descriogenización: INICIO (perfil de emergencia)
+Gradiente térmico forzado a banda de recuperación
+Descongelación neuroquímica: acelerada
+Recuperación motora: parcial
+Constantes vitales del huésped: nominales
+Enlace de terminal neural: EN LÍNEA
+Intervención manual posiblemente requerida

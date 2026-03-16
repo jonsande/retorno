@@ -1,0 +1,13 @@
+[core_os] Wake schedule integrity: OK
+Cryostasis exit event verified
+CRYO VAULT status scan... ok
+TARGET selected: Sarcophagus-05
+Decryo sequence: INIT (scheduled profile)
+Thermal gradient stabilized
+Neurochemical thaw: PARTIAL
+Motor pathway recovery: FAIL (indeterminate system fault)
+Host vitals: nominal
+Conscious Interface Recovery Protocol (CIRP): ARMED
+Neural terminal link: ONLINE
+Operator wake confirmed
+

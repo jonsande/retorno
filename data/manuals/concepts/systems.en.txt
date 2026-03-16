@@ -50,7 +50,7 @@ Minimum survival set (when core_os is OFFLINE or terminal_lock is active)
 - status
 - logs, alerts, jobs
 - log copy [n], alerts explain <alert_key>, jobs <n|all>
-- debug on|off|status, debug arcs, debug lore, debug deadnodes, debug modules, debug galaxy, debug galaxy map <scale>, debug worldgen sector <sector_id>, debug graph all, debug seed <n>, debug scenario <preset>
+- maintenance diagnostics, when authorized
 
 life_support
 - What it is: host capsule life support (atmosphere, thermal, perfusion).
@@ -131,7 +131,7 @@ Base note: except for emergency/minimal-terminal exceptions, all commands depend
 - drone -> drones + drone_bay for deploy/support/module operations; drone-module install/uninstall require drone_bay NOMINAL + energy_distribution online, while ship-module install/uninstall keep legacy drone-operated flow.
 - hibernate -> life_support nominal/upgraded + Q >= 0.40 + no brownout.
 - install -> legacy; redirects to drone install/drone uninstall command family.
-- intel -> core_os (no hard dedicated-system requirement in current implementation).
+- intel -> core_os.
 - inventory -> core_os (manifest read).
 - inventory_update -> data_core >= limited + datad running (through cargo/inventory audit).
 - job -> core_os (active job management).

@@ -8,7 +8,7 @@ Requisitos (gating)
 - La acción debe superar las restricciones del estado energético actual.
 
 Comportamiento
-- `undock` encola un trabajo temporizado (`Balance.UNDOCK_TIME_S`).
+- `undock` encola un trabajo temporizado.
 - El trabajo puede interrumpirse si cambia el estado de acoplamiento durante la ejecución.
 - `job cancel <job_id>` puede abortar el undock activo.
 

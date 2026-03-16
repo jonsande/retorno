@@ -1,0 +1,11 @@
+[core_os] Wake schedule integrity: OVERRIDDEN
+Critical interrupt detected; cryostasis exit forced
+CRYO VAULT status scan... degraded but responsive
+TARGET selected: Sarcophagus-05
+Decryo sequence: INIT (emergency profile)
+Thermal gradient forced to recovery band
+Neurochemical thaw: accelerated
+Motor recovery: partial
+Host vitals: nominal
+Neural terminal link: ONLINE
+Manual intervention may be required

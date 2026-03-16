@@ -1,20 +1,21 @@
 from __future__ import annotations
 
 import argparse
-from retorno.bootstrap import create_initial_state_prologue, create_initial_state_sandbox
-import os
+from dataclasses import dataclass
 import hashlib
 import math
+import os
 import random
 import readline
 import select
-import subprocess
 import shutil
+import subprocess
 import sys
 import termios
 import time
 import tty
 from pathlib import Path
+from retorno.bootstrap import create_initial_state_prologue, create_initial_state_sandbox
 from retorno.audio.config import AudioConfigError, load_audio_config
 from retorno.audio.manager import AudioManager
 from retorno.core.engine import Engine
@@ -41,7 +42,11 @@ from retorno.core.power_policy import is_parsed_command_allowed_in_core_os_criti
 from retorno.model.events import Event, EventType, Severity, SourceRef
 from retorno.model.jobs import JobStatus, JobType, active_job_display_ids
 from retorno.runtime.data_loader import load_modules, load_arcs, load_locations, load_worldgen_archetypes, load_worldgen_templates
-from retorno.runtime.startup import load_hibernate_start_sequence_lines, load_startup_sequence_lines
+from retorno.runtime.startup import (
+    load_hibernate_start_sequence_lines,
+    load_hibernate_wake_sequence_lines,
+    load_startup_sequence_lines,
+)
 from retorno.config.balance import Balance
 from retorno.io.save_load import (
     LoadGameResult,
@@ -74,6 +79,19 @@ from retorno.model.world import (
 from retorno.model.world import SpaceNode, region_for_pos
 from retorno.worldgen.generator import ensure_sector_generated, procedural_radiation_for_node, sync_sector_state_for_node
 from retorno.util.timefmt import format_elapsed_long, format_elapsed_short
+
+
+@dataclass
+class HibernateRunResult:
+    actual_years: float
+    start_soc: float
+    end_soc: float
+    start_health: dict[str, float]
+    end_health: dict[str, float]
+    events_to_render: list[tuple[str, Event]]
+    recovery_events: list[Event]
+    woke_early: bool
+    wake_reason: str | None
 
 
 def _maybe_run_startup_sequence(locale: str) -> None:
@@ -232,6 +250,42 @@ def _play_hibernate_start_sequence(locale: str) -> None:
         sys.stdout.write("\n")
         sys.stdout.flush()
     print("\033[2J\033[H", end="")
+
+
+def _hibernate_wake_panel_blackout_s() -> float:
+    return max(0.0, float(Balance.HIBERNATE_WAKE_PANEL_BLACKOUT_S))
+
+
+def _hibernate_wake_sequence_typewriter() -> bool:
+    return bool(Balance.HIBERNATE_WAKE_SEQUENCE_TYPEWRITER)
+
+
+def _hibernate_wake_sequence_cps() -> int:
+    return max(1, int(Balance.HIBERNATE_WAKE_SEQUENCE_TYPEWRITER_CPS))
+
+
+def _hibernate_wake_sequence_line_delay_s() -> float:
+    return max(0.0, float(Balance.HIBERNATE_WAKE_SEQUENCE_LINE_DELAY_S))
+
+
+def _hibernate_wake_is_emergency(result: HibernateRunResult) -> bool:
+    return bool(result.woke_early)
+
+
+def _play_hibernate_wake_sequence(locale: str, result: HibernateRunResult) -> None:
+    lines = load_hibernate_wake_sequence_lines(
+        locale,
+        emergency=_hibernate_wake_is_emergency(result),
+    )
+    if not lines:
+        return
+    _play_terminal_sequence(
+        lines,
+        typewriter=_hibernate_wake_sequence_typewriter(),
+        cps=_hibernate_wake_sequence_cps(),
+        line_delay_s=_hibernate_wake_sequence_line_delay_s(),
+        skippable=False,
+    )
 
 def print_help(locale: str = "en", verbose: bool = False) -> None:
     lang = "es" if locale == "es" else "en"
@@ -5949,11 +6003,10 @@ def _hibernate_reached_env_threshold(state) -> bool:
     return float(state.ship.radiation_env_rad_per_s) >= _hibernate_env_radiation_threshold()
 
 
-def _run_hibernate(loop, years: float, wake_on_low_battery: bool = False) -> None:
+def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False) -> HibernateRunResult:
     total_s = max(0.0, years * Balance.YEAR_S)
     if total_s <= 0:
-        print("hibernate: nothing to do (duration <= 0)")
-        return
+        raise ValueError("hibernate: nothing to do (duration <= 0)")
     events_to_render: list[tuple[str, Event]] = []
     actual_years = years
     start_t = 0.0
@@ -6041,22 +6094,38 @@ def _run_hibernate(loop, years: float, wake_on_low_battery: bool = False) -> Non
         loop.set_auto_tick(was_auto)
     filtered = [pair for pair in step_events if pair[1].severity == Severity.CRITICAL or pair[1].type in {EventType.ARRIVED}]
     events_to_render.extend(filtered)
+    recovery_events: list[Event] = []
     with loop.with_lock() as locked_state:
-        if events_to_render:
-            render_events(locked_state, events_to_render)
         recovery_events = ensure_exploration_recovery(locked_state, "hibernate_end")
-        _render_and_store_events(locked_state, recovery_events)
-        if woke_early:
+    return HibernateRunResult(
+        actual_years=actual_years,
+        start_soc=start_soc,
+        end_soc=end_soc,
+        start_health=start_health,
+        end_health=end_health,
+        events_to_render=events_to_render,
+        recovery_events=recovery_events,
+        woke_early=woke_early,
+        wake_reason=wake_reason,
+    )
+
+
+def _render_hibernate_result(loop, result: HibernateRunResult) -> None:
+    with loop.with_lock() as locked_state:
+        if result.events_to_render:
+            render_events(locked_state, result.events_to_render)
+        _render_and_store_events(locked_state, result.recovery_events)
+        if result.woke_early:
             locale = locked_state.os.locale.value
             msg = None
-            if wake_reason:
-                if wake_reason == f"event:{EventType.DRONE_LOW_BATTERY.value}":
+            if result.wake_reason:
+                if result.wake_reason == f"event:{EventType.DRONE_LOW_BATTERY.value}":
                     msg = {
                         "en": "Hibernation interrupted: drone low battery",
                         "es": "Hibernación interrumpida: batería baja en dron",
                     }
-                elif wake_reason.startswith("terminal:"):
-                    terminal_reason = wake_reason.split(":", 1)[1]
+                elif result.wake_reason.startswith("terminal:"):
+                    terminal_reason = result.wake_reason.split(":", 1)[1]
                     if terminal_reason in {"life_support_offline", "life_support_critical"}:
                         msg = {
                             "en": "Hibernation interrupted: life support is no longer viable",
@@ -6067,34 +6136,42 @@ def _run_hibernate(loop, years: float, wake_on_low_battery: bool = False) -> Non
                             "en": "Hibernation interrupted: core_os went offline",
                             "es": "Hibernación interrumpida: core_os pasó a offline",
                         }
-                elif wake_reason.startswith("critical_system:"):
-                    _, system_id, to_state = wake_reason.split(":", 2)
+                elif result.wake_reason.startswith("critical_system:"):
+                    _, system_id, to_state = result.wake_reason.split(":", 2)
                     msg = {
                         "en": f"Hibernation interrupted: critical system '{system_id}' reached {to_state}",
                         "es": f"Hibernación interrumpida: el sistema crítico '{system_id}' alcanzó {to_state}",
                     }
-                elif wake_reason.startswith("env_radiation_threshold:"):
-                    threshold_txt = wake_reason.split(":", 1)[1]
+                elif result.wake_reason.startswith("env_radiation_threshold:"):
+                    threshold_txt = result.wake_reason.split(":", 1)[1]
                     msg = {
                         "en": f"Hibernation interrupted: ambient radiation reached threshold ({threshold_txt} rad/s)",
                         "es": f"Hibernación interrumpida: la radiación ambiental alcanzó el umbral ({threshold_txt} rad/s)",
                     }
             if not msg:
                 msg = {
-                    "en": f"Hibernation interrupted: {wake_reason or 'unknown reason'}",
-                    "es": f"Hibernación interrumpida: {wake_reason or 'motivo desconocido'}",
+                    "en": f"Hibernation interrupted: {result.wake_reason or 'unknown reason'}",
+                    "es": f"Hibernación interrumpida: {result.wake_reason or 'motivo desconocido'}",
                 }
             print(f"[WARN] {msg.get(locale, msg['en'])}")
-        days = actual_years * (Balance.YEAR_S / Balance.DAY_S)
-        print(f"Advanced time by {actual_years:.2f} years ({days:.1f} days).")
-        # digest de degradación para críticos
-        if start_health:
-            print("Hibernate digest (critical systems):")
-            for sid, h0 in start_health.items():
-                h1 = end_health.get(sid, h0)
-                dh = h1 - h0
-                print(f"- {sid}: Δhealth={dh:+.3f} now={h1:.3f}")
-        print(f"SoC: start={start_soc:.3f} end={end_soc:.3f}")
+    days = result.actual_years * (Balance.YEAR_S / Balance.DAY_S)
+    print(f"Advanced time by {result.actual_years:.2f} years ({days:.1f} days).")
+    if result.start_health:
+        print("Hibernate digest (critical systems):")
+        for sid, h0 in result.start_health.items():
+            h1 = result.end_health.get(sid, h0)
+            dh = h1 - h0
+            print(f"- {sid}: Δhealth={dh:+.3f} now={h1:.3f}")
+    print(f"SoC: start={result.start_soc:.3f} end={result.end_soc:.3f}")
+
+
+def _run_hibernate(loop, years: float, wake_on_low_battery: bool = False) -> None:
+    try:
+        result = _execute_hibernate(loop, years, wake_on_low_battery=wake_on_low_battery)
+    except ValueError as exc:
+        print(str(exc))
+        return
+    _render_hibernate_result(loop, result)
 
 
 def _confirm_hibernate_non_cruise(state) -> bool:
@@ -7512,7 +7589,12 @@ def main() -> None:
             with loop.with_lock() as locked_state:
                 locale = locked_state.os.locale.value
             _play_hibernate_start_sequence(locale)
-            _run_hibernate(loop, years, wake_on_low_battery=wake_on_low)
+            result = _execute_hibernate(loop, years, wake_on_low_battery=wake_on_low)
+            blackout_s = _hibernate_wake_panel_blackout_s()
+            if blackout_s > 0.0:
+                time.sleep(blackout_s)
+            _play_hibernate_wake_sequence(locale, result)
+            _render_hibernate_result(loop, result)
             continue
 
         # Acciones del motor

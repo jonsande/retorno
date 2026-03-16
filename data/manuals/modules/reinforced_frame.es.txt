@@ -1,7 +1,7 @@
 DOSSIER DE MÓDULO — reinforced_frame
 
 Rol
-- Paquete de refuerzo estructural para builds de dron orientadas a supervivencia.
+- Paquete de refuerzo estructural para configuraciones de dron orientadas a supervivencia.
 
 Efecto operativo
 - Scope: `drone` (coste de slots: 1).

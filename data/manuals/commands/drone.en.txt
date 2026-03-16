@@ -22,11 +22,11 @@ Requirements (gating)
 - Deploy/recall/reboot/repair/salvage require a valid drone and battery/integrity gates.
 - World-node operations require drone and ship to remain co-located at that node.
 - `drone install <drone_id> <module_id>` resolves by module scope:
-  - `scope=ship`: legacy ship-module flow (operator drone deployed on ship, module in inventory, scrap cost available).
-  - `scope=drone`: bay operation over target drone (`docked` in `drone_bay`, `drone_bay=NOMINAL`, `energy_distribution!=OFFLINE`, free slots).
+  - if `scope=ship`, requirements: operator drone deployed on ship, module in inventory, scrap cost available.
+  - if `scope=drone`, requirements: `docked` in `drone_bay`, `drone_bay=NOMINAL`, `energy_distribution!=OFFLINE`, free slots.
 - `drone uninstall <drone_id> <module_id>` resolves by module scope:
-  - `scope=ship`: legacy ship-module uninstall flow (operator drone deployed on ship, module installed on ship, bay support online).
-  - `scope=drone`: bay operation over target drone (`docked` in `drone_bay`, `drone_bay=NOMINAL`, `energy_distribution!=OFFLINE`).
+  - if `scope=ship`, requirements: operator drone deployed on ship, module installed on ship, bay support online.
+  - if `scope=drone`, requirements: `docked` in `drone_bay`, `drone_bay=NOMINAL`, `energy_distribution!=OFFLINE`.
 
 Operational behavior
 - Drone modules do not mutate base stats destructively.

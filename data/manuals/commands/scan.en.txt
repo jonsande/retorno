@@ -8,7 +8,7 @@ Requirements (gating)
 - Power state must allow active scanning operations.
 
 Operational behavior
-- Queues a scan job with ETA based on `Balance.SCAN_TIME_S`.
+- Queues a scan job with a timed active sweep.
 - On completion, updates local contact awareness and may reveal detection events.
 - If new contacts are discovered, it emits `signal_detected` and its mapped cue.
 - If operating context changes before completion, the job may be interrupted.

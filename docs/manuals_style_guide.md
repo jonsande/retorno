@@ -12,6 +12,7 @@ Goal: keep manuals diegetic, clear, detailed, and structurally uniform.
 - Use section headers consistently (same order per template family).
 - Prefer operational language: conditions, impact, recovery, and related commands.
 - Avoid implementation noise (`TODO`, `mvp`, speculative behavior) in published manuals.
+- The content of the manuals must be diegetic.
 
 ## Template Families
 

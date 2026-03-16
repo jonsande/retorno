@@ -9,7 +9,7 @@ Requirements (gating)
 - Target must be a known contact and dock-capable node.
 
 Behavior
-- Dock queues a timed job (`Balance.DOCK_TIME_S`).
+- Dock queues a timed job.
 - Dock can be interrupted if context changes before completion.
 - `job cancel <job_id>` can abort an active dock job.
 

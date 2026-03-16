@@ -12,7 +12,7 @@ Efecto operativo
 Notas de integración
 - La recarga en bahia respeta maximos efectivos y carga hasta el nuevo techo de bateria.
 - Instalacion/desinstalacion por operacion de bahia (`drone_bay=NOMINAL`, distribucion online, dron objetivo acoplado).
-- Encaja con presets de carga o reparacion cuando los ciclos son largos.
+- habitual en configuraciones para carga o reparacion cuando los ciclos son largos.
 
 Nota de campo
 - Seleccion habitual cuando el cuello de botella es la frecuencia de retorno y no la velocidad de accion.

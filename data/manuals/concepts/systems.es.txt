@@ -50,7 +50,7 @@ Set minimo de supervivencia (cuando core_os esta OFFLINE o hay terminal_lock)
 - status
 - logs, alerts, jobs
 - log copy [n], alerts explain <alert_key>, jobs <n|all>
-- debug on|off|status, debug arcs, debug lore, debug deadnodes, debug modules, debug galaxy, debug galaxy map <scale>, debug worldgen sector <sector_id>, debug graph all, debug seed <n>, debug scenario <preset>
+- diagnosticos de mantenimiento, si estan autorizados
 
 life_support
 - Qué es: soporte vital del sarcofago (atmosfera, termica, perfusion).
@@ -131,7 +131,7 @@ Nota base: salvo excepciones de emergencia/terminal minima, todos dependen de qu
 - drone -> drones + drone_bay para deploy/soporte/operaciones de modulos; install/uninstall de modulos de dron requieren drone_bay NOMINAL + energy_distribution online, mientras install/uninstall de modulos de nave conservan flujo legado operado por dron.
 - hibernate -> life_support nominal/upgraded + Q >= 0.40 + sin brownout.
 - install -> heredado; redirige a la familia drone install/drone uninstall.
-- intel -> core_os (sin requisito duro de sistema dedicado en la implementacion actual).
+- intel -> core_os.
 - inventory -> core_os (lectura de manifiesto).
 - inventory_update -> data_core >= limited + datad running (via cargo/inventory audit).
 - job -> core_os (gestion de jobs activos).

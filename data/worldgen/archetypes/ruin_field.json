@@ -3,17 +3,17 @@
   "node_count_min": 1,
   "node_count_max": 3,
   "kind_weights": {
-    "station": 0.2,
-    "relay": 0.15,
+    "station": 0.05,
+    "relay": 0.08,
     "ship": 1.0,
-    "derelict": 1.2
+    "derelict": 1.5
   },
   "kind_caps": {
     "station": 1,
     "relay": 1,
     "waystation": 0,
     "ship": 2,
-    "derelict": 2
+    "derelict": 3
   },
   "forbidden_kinds": ["waystation"],
   "intersector_link_max": 1,

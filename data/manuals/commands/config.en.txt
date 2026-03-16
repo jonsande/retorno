@@ -5,19 +5,19 @@ config set ambientsound <on|off>
 config set theme <linux|amber|green|ice>
 
 Purpose
-- Inspect and modify operator interface configuration.
+- Inspect and adjust operator sensory and terminal presentation settings.
 
 Operational behavior
-- `config show` prints current runtime configuration, including active audio backend when available.
-- `config set lang <en|es>` switches command/UI localization.
-- `config set audio <on|off>` enables or disables all game audio.
-- `config set ambientsound <on|off>` enables or disables the ambient loop without muting the whole audio system.
-- `config set theme <linux|amber|green|ice>` switches the active color preset in CLI and Textual.
+- `config show` displays the current sensory and terminal presentation profile.
+- `config set lang <en|es>` selects the language in which manuals and terminal messages are presented to the operator.
+- `config set audio <on|off>` enables or suppresses the full neural audio feed.
+- `config set ambientsound <on|off>` enables or suppresses the ambient layer while keeping the rest of the audio feed available.
+- `config set theme <linux|amber|green|ice>` changes the active display palette for the operator terminal projection.
 
 Usage notes
 - Language switch affects manuals, messages, and localized file preference.
-- Audio preferences are persistent and affect both CLI and Textual sessions.
-- Color preset is persistent and affects both CLI and Textual sessions.
+- Audio preferences remain in effect until changed again.
+- Display palette preference remains in effect until changed again.
 
 Related commands
 - `status`, `man <topic>`, `cat <path>`
