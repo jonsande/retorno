@@ -53,6 +53,7 @@ from retorno.core.lore import (
     survey_reports_data_signatures,
 )
 from retorno.core.deadnodes import evaluate_dead_nodes
+from retorno.core.exploration_recovery import ensure_exploration_recovery
 from retorno.core.power_policy import (
     is_action_allowed_in_critical_state,
     is_critical_power_state,
@@ -94,6 +95,7 @@ class Engine:
         # Update effective generation based on power_core state.
         state.ship.power.p_gen_kw = self._compute_p_gen(state)
 
+        arrived_this_tick = False
         if state.ship.in_transit and state.clock.t >= state.ship.arrival_t:
             state.ship.in_transit = False
             state.ship.current_node_id = state.ship.transit_to or state.ship.current_node_id
@@ -121,9 +123,12 @@ class Engine:
                     },
                 )
             )
+            arrived_this_tick = True
 
         events.extend(self._process_jobs(state, dt))
         run_lore_scheduler_tick(state)
+        if arrived_this_tick:
+            events.extend(ensure_exploration_recovery(state, "arrival"))
 
         events.extend(self._enforce_distribution_collapse(state))
 
@@ -3697,6 +3702,7 @@ class Engine:
             events.extend(lore_result.events)
             recompute_node_completion(state, job.target.id)
             events.extend(evaluate_dead_nodes(state, "dock", debug=state.os.debug_enabled))
+            events.extend(ensure_exploration_recovery(state, "dock"))
             return events
 
         if job.job_type == JobType.UNDOCK and job.target:
@@ -3893,6 +3899,7 @@ class Engine:
             )
             events.extend(lore_result.events)
             events.extend(evaluate_dead_nodes(state, "salvage_data", debug=state.os.debug_enabled))
+            events.extend(ensure_exploration_recovery(state, "salvage_data"))
             return events
 
         if job.job_type == JobType.SURVEY_DRONE and job.target:
@@ -4039,6 +4046,7 @@ class Engine:
                 )
             )
             events.extend(evaluate_dead_nodes(state, "route", debug=state.os.debug_enabled))
+            events.extend(ensure_exploration_recovery(state, "route"))
             return events
 
         if job.job_type == JobType.INSTALL_MODULE and job.target:

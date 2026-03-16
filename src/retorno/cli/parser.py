@@ -56,7 +56,7 @@ _PARSE_ERROR_MESSAGES = {
         "debug_seed_int": "debug seed: <n> must be an integer",
         "debug_add_amount_int": "debug add: amount must be an integer",
         "debug_add_amount_gt0": "debug add: amount must be > 0",
-        "usage_debug": "Usage: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules | debug galaxy | debug galaxy map <sector|local|regional|global> | debug add scrap <amount> | debug add module <module_id> [count] | debug add drone[s] [count]",
+        "usage_debug": "Usage: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules | debug galaxy | debug galaxy map <sector|local|regional|global> | debug worldgen sector <sector_id> | debug graph all | debug add scrap <amount> | debug add module <module_id> [count] | debug add drone[s] [count]",
         "usage_dock": "Usage: dock <node_id>",
         "usage_undock": "Usage: undock",
         "usage_nav": "Usage: nav map sectors|graph [node_id]|path <node_id>|routes|contacts|galaxy [sector|local|regional|global] | nav <node_id> | nav --no-cruise <node_id> | nav abort",
@@ -139,7 +139,7 @@ _PARSE_ERROR_MESSAGES = {
         "debug_seed_int": "debug seed: <n> debe ser entero",
         "debug_add_amount_int": "debug add: amount debe ser entero",
         "debug_add_amount_gt0": "debug add: amount debe ser > 0",
-        "usage_debug": "Uso: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules | debug galaxy | debug galaxy map <sector|local|regional|global> | debug add scrap <amount> | debug add module <module_id> [count] | debug add drone[s] [count]",
+        "usage_debug": "Uso: debug on|off|status | debug scenario prologue|sandbox|dev | debug seed <n> | debug arcs | debug lore | debug deadnodes | debug modules | debug galaxy | debug galaxy map <sector|local|regional|global> | debug worldgen sector <sector_id> | debug graph all | debug add scrap <amount> | debug add module <module_id> [count] | debug add drone[s] [count]",
         "usage_dock": "Uso: dock <node_id>",
         "usage_undock": "Uso: undock",
         "usage_nav": "Uso: nav map sectors|graph [node_id]|path <node_id>|routes|contacts|galaxy [sector|local|regional|global] | nav <node_id> | nav --no-cruise <node_id> | nav abort",
@@ -421,6 +421,10 @@ def parse_command(line: str):
             return ("DEBUG_GALAXY", None)
         if len(args) == 3 and args[0] == "galaxy" and args[1] == "map" and args[2] in galaxy_scales:
             return ("DEBUG_GALAXY_MAP", args[2])
+        if len(args) == 3 and args[0] == "worldgen" and args[1] == "sector":
+            return ("DEBUG_WORLDGEN_SECTOR", args[2])
+        if len(args) == 2 and args[0] == "graph" and args[1] == "all":
+            return ("DEBUG_GRAPH_ALL", None)
         if len(args) != 1 or args[0] not in {"on", "off", "status"}:
             raise ParseError("usage_debug")
         return ("DEBUG", args[0])

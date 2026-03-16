@@ -15,6 +15,7 @@ from retorno.io.save_load import (
     resolve_save_path,
     save_single_slot,
 )
+from retorno.worldgen.generator import ensure_sector_generated
 
 
 def main() -> None:
@@ -28,6 +29,7 @@ def main() -> None:
         state.meta.rng_counter = 77
         state.ship.in_transit = True
         state.ship.arrival_t = 4567.0
+        ensure_sector_generated(state, "S+000_+000_+000")
         engine = Engine()
         deploy_events = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="PWR-A2"))
         assert deploy_events, "Expected deploy job to be queued for save/load test"
@@ -41,6 +43,13 @@ def main() -> None:
         assert loaded.state.ship.in_transit is True, "Transit flag should persist across save/load"
         assert loaded.state.ship.arrival_t == 4567.0, "Arrival ETA should persist across save/load"
         assert loaded.state.jobs.active_job_ids, "Active jobs should persist across save/load"
+        assert loaded.state.world.sparse_guardrail_done is True, "Sparse guardrail flag should persist across save/load"
+        origin_sector = loaded.state.world.sector_states.get("S+000_+000_+000")
+        assert origin_sector is not None, "Expected origin SectorGenState after save/load"
+        assert origin_sector.topology_hub_node_id == "ECHO_7", origin_sector
+        assert origin_sector.playable_hub_node_id == "ECHO_7", origin_sector
+        echo = loaded.state.world.space.nodes["ECHO_7"]
+        assert echo.is_hub is True and echo.is_topology_hub is True, "Hub flags must persist across save/load"
         first_job_id = loaded.state.jobs.active_job_ids[0]
         first_job = loaded.state.jobs.jobs[first_job_id]
         assert first_job.eta_s > 0, "Job ETA should persist across save/load"

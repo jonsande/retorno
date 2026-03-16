@@ -26,6 +26,7 @@ from retorno.core.lore import (
     sync_node_pools_for_known_nodes,
 )
 from retorno.core.deadnodes import evaluate_dead_nodes
+from retorno.core.exploration_recovery import ensure_exploration_recovery, uplink_blocked_reason
 from retorno.core.actions import Action, AuthRecover, Hibernate, RouteSolve, Status
 from retorno.runtime.loop import GameLoop
 from retorno.runtime.operator_config import (
@@ -39,7 +40,7 @@ from retorno.runtime.operator_config import (
 from retorno.core.power_policy import is_parsed_command_allowed_in_core_os_critical
 from retorno.model.events import Event, EventType, Severity, SourceRef
 from retorno.model.jobs import JobStatus, JobType, active_job_display_ids
-from retorno.runtime.data_loader import load_modules, load_arcs, load_locations, load_worldgen_templates
+from retorno.runtime.data_loader import load_modules, load_arcs, load_locations, load_worldgen_archetypes, load_worldgen_templates
 from retorno.runtime.startup import load_startup_sequence_lines
 from retorno.config.balance import Balance
 from retorno.io.save_load import (
@@ -70,7 +71,7 @@ from retorno.model.world import (
     sector_id_for_pos,
 )
 from retorno.model.world import SpaceNode, region_for_pos
-from retorno.worldgen.generator import ensure_sector_generated, procedural_radiation_for_node
+from retorno.worldgen.generator import ensure_sector_generated, procedural_radiation_for_node, sync_sector_state_for_node
 from retorno.util.timefmt import format_elapsed_long, format_elapsed_short
 
 
@@ -335,6 +336,17 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ("ls /manuals/commands", "list command manuals", "lista manuales de comandos"),
                 ("man navigation", "open navigation manual", "abre manual de navegación"),
                 ("cat /mail/inbox/0001.txt", "read inbox file directly", "lee archivo de correo directamente"),
+            ],
+        ),
+        (
+            "Debug",
+            "Debug",
+            [
+                ("debug on|off|status", "toggle debug mode", "activa o desactiva modo debug"),
+                ("debug galaxy", "show worldgen and galaxy summary", "muestra resumen de galaxia y worldgen"),
+                ("debug galaxy map <sector|local|regional|global>", "show debug galaxy map", "muestra mapa galáctico debug"),
+                ("debug worldgen sector <sector_id>", "dump one materialized/generated sector", "vuelca un sector materializado/generado"),
+                ("debug graph all", "dump full materialized graph", "vuelca el grafo materializado completo"),
             ],
         ),
     ]
@@ -2499,6 +2511,22 @@ def _radiation_band_id(value: float) -> str:
     return "low"
 
 
+def _weighted_choice(rng: random.Random, weights: dict[str, float]) -> str | None:
+    items = [(key, max(0.0, float(weight))) for key, weight in weights.items() if max(0.0, float(weight)) > 0.0]
+    if not items:
+        return None
+    total = sum(weight for _, weight in items)
+    if total <= 0.0:
+        return None
+    roll = rng.random() * total
+    upto = 0.0
+    for key, weight in items:
+        upto += weight
+        if roll <= upto:
+            return key
+    return items[-1][0]
+
+
 def render_debug_galaxy(state) -> None:
     print("\n=== DEBUG GALAXY ===")
     op_cx = float(Balance.GALAXY_OP_REGION_CENTER_X_LY)
@@ -2590,6 +2618,32 @@ def render_debug_galaxy(state) -> None:
     print(
         f"- link_cap: max_hop={capped:.1f}ly known_links={known_link_total} over_cap={known_link_over_cap}"
     )
+    archetypes = load_worldgen_archetypes()
+    current_sector_state = state.world.sector_states.get(psector)
+    if current_sector_state:
+        archetype_cfg = archetypes.get(current_sector_state.archetype, {})
+        caps = archetype_cfg.get("kind_caps", {}) or {}
+        forbidden = sorted(str(item) for item in (archetype_cfg.get("forbidden_kinds", []) or []))
+        caps_txt = ",".join(f"{kind}:{int(caps[kind])}" for kind in sorted(caps)) or "-"
+        forbidden_txt = ",".join(forbidden) or "-"
+        print(
+            f"- current_sector_gen: generated=yes region={current_sector_state.region or phys_region} "
+            f"archetype={current_sector_state.archetype or '-'} nodes={len(current_sector_state.node_ids)} "
+            f"topology_hub={current_sector_state.topology_hub_node_id or '-'} "
+            f"playable_hub={current_sector_state.playable_hub_node_id or '-'} "
+            f"internal_links={int(current_sector_state.internal_link_count)} "
+            f"intersector_links={int(current_sector_state.intersector_link_count)}"
+        )
+        print(
+            "  archetype_cfg: "
+            f"caps={caps_txt} forbidden={forbidden_txt} "
+            f"playable_hub_prob={float(archetype_cfg.get('playable_hub_prob', 0.0) or 0.0):.2f} "
+            f"intersector_link_max={int(archetype_cfg.get('intersector_link_max', 0) or 0)} "
+            f"intersector_link_prob={float(archetype_cfg.get('intersector_link_prob', 0.0) or 0.0):.2f} "
+            f"extra_internal_link_prob={float(archetype_cfg.get('extra_internal_link_prob', 0.0) or 0.0):.2f}"
+        )
+    else:
+        print(f"- current_sector_gen: generated={'yes' if psector in state.world.generated_sectors else 'no'} region={phys_region} archetype=(not_generated)")
     if state.world.current_node_id == "UNKNOWN_00":
         if phys_region != "disk":
             print("! warning: prologue start node UNKNOWN_00 is not in physical disk")
@@ -2639,49 +2693,422 @@ def render_debug_galaxy(state) -> None:
     else:
         print("- procedural_rad_live: (no procedural nodes loaded)")
 
-    # Deterministic synthetic estimate for the current seed/model.
     templates = load_worldgen_templates()
-    weights = {k: float(v) for k, v in op_region_counts.items() if k in {"bulge", "disk", "halo"} and float(v) > 0.0}
+    sector_states = sorted(state.world.sector_states.values(), key=lambda item: item.sector_id)
+    if sector_states:
+        archetype_counts: dict[str, int] = {}
+        archetype_node_totals: dict[str, int] = {}
+        archetype_inter_totals: dict[str, int] = {}
+        dead_ends = 0
+        single_exit = 0
+        multi_exit = 0
+        for sector_state in sector_states:
+            archetype = sector_state.archetype or "unknown"
+            archetype_counts[archetype] = archetype_counts.get(archetype, 0) + 1
+            archetype_node_totals[archetype] = archetype_node_totals.get(archetype, 0) + len(sector_state.node_ids)
+            archetype_inter_totals[archetype] = archetype_inter_totals.get(archetype, 0) + int(sector_state.intersector_link_count)
+            if int(sector_state.intersector_link_count) <= 0:
+                dead_ends += 1
+            elif int(sector_state.intersector_link_count) == 1:
+                single_exit += 1
+            else:
+                multi_exit += 1
+        total_sector_nodes = sum(len(sector_state.node_ids) for sector_state in sector_states)
+        print(
+            f"- sector_archetypes: materialized={len(sector_states)} mean_nodes={total_sector_nodes/len(sector_states):.2f} "
+            f"dead_ends={dead_ends} single_exit={single_exit} multi_exit={multi_exit}"
+        )
+        for archetype in sorted(archetype_counts):
+            count = archetype_counts[archetype]
+            print(
+                f"  archetype[{archetype}]: sectors={count} "
+                f"mean_nodes={archetype_node_totals[archetype]/count:.2f} "
+                f"mean_intersector={archetype_inter_totals[archetype]/count:.2f}"
+            )
+    else:
+        print("- sector_archetypes: (no materialized sectors)")
+
+    weights = {k: float(v) for k, v in phys_region_counts.items() if k in {"bulge", "disk", "halo"} and float(v) > 0.0}
     if not weights:
-        weights = {"disk": 1.0}
-    total_w = sum(weights.values())
-    if total_w <= 0.0:
-        weights = {"disk": 1.0}
-        total_w = 1.0
+        weights = {phys_region if phys_region in {"bulge", "disk", "halo"} else "disk": 1.0}
+    total_w = sum(weights.values()) or 1.0
     acc: list[tuple[str, float]] = []
     running = 0.0
     for reg, w in sorted(weights.items()):
         running += w / total_w
         acc.append((reg, running))
     rng = random.Random(state.meta.rng_seed ^ 0xA5A5A5A5)
-    syn_count = 6000
-    syn_bands: dict[str, int] = {"low": 0, "elevated": 0, "high": 0, "extreme": 0}
-    for i in range(syn_count):
-        r = rng.random()
+    syn_count = 4096
+    syn_nodes_total = 0
+    syn_playable_hub = 0
+    syn_bins = {"0": 0, "1": 0, "2": 0, "3+": 0}
+    syn_archetypes: dict[str, int] = {}
+    for _ in range(syn_count):
+        roll = rng.random()
         reg = acc[-1][0]
         for name, cutoff in acc:
-            if r <= cutoff:
+            if roll <= cutoff:
                 reg = name
                 break
         tmpl = templates.get(reg) or templates.get("disk") or {}
-        kind_weights = tmpl.get("kind_weights", {}) or {}
-        ship_w = max(0.0, float(kind_weights.get("ship", 0.10)))
-        total_kind = sum(max(0.0, float(v)) for v in kind_weights.values()) or 1.0
-        kind = "ship" if rng.random() < (ship_w / total_kind) else "station"
-        value = procedural_radiation_for_node(state.meta.rng_seed, f"SYN_{reg}_{kind}_{i:05d}", kind, reg)
-        syn_bands[_radiation_band_id(value)] += 1
-    print(
-        "- procedural_rad_synth[seed]: "
-        f"low={100.0*syn_bands['low']/syn_count:.2f}% "
-        f"elevated={100.0*syn_bands['elevated']/syn_count:.2f}% "
-        f"high={100.0*syn_bands['high']/syn_count:.2f}% "
-        f"extreme={100.0*syn_bands['extreme']/syn_count:.2f}%"
+        archetype = _weighted_choice(rng, tmpl.get("archetype_weights", {}) or {}) or "empty"
+        cfg = archetypes.get(archetype) or archetypes.get("empty") or {}
+        min_nodes = int(cfg.get("node_count_min", 0) or 0)
+        max_nodes = int(cfg.get("node_count_max", 0) or 0)
+        if max_nodes < min_nodes:
+            max_nodes = min_nodes
+        node_count = rng.randint(max(0, min_nodes), max(0, max_nodes))
+        syn_nodes_total += node_count
+        syn_archetypes[archetype] = syn_archetypes.get(archetype, 0) + 1
+        if node_count <= 0:
+            syn_bins["0"] += 1
+        elif node_count == 1:
+            syn_bins["1"] += 1
+        elif node_count == 2:
+            syn_bins["2"] += 1
+        else:
+            syn_bins["3+"] += 1
+        hub_prob = max(0.0, min(1.0, float(cfg.get("playable_hub_prob", 0.0) or 0.0)))
+        if rng.random() <= hub_prob:
+            syn_playable_hub += 1
+    archetype_txt = " ".join(
+        f"{name}={100.0 * count / syn_count:.1f}%"
+        for name, count in sorted(syn_archetypes.items())
     )
+    print(
+        "- sparse_synth[seed]: "
+        f"mean_nodes={syn_nodes_total/syn_count:.2f} "
+        f"zero={100.0*syn_bins['0']/syn_count:.1f}% "
+        f"one={100.0*syn_bins['1']/syn_count:.1f}% "
+        f"two={100.0*syn_bins['2']/syn_count:.1f}% "
+        f"three_plus={100.0*syn_bins['3+']/syn_count:.1f}% "
+        f"playable_hub={100.0*syn_playable_hub/syn_count:.1f}%"
+    )
+    print(f"  sparse_synth_archetypes: {archetype_txt or '-'}")
 
 
 def render_debug_galaxy_map(state, scale: str | None) -> None:
     print("\n=== DEBUG GALAXY MAP ===")
     render_nav_map_galaxy(state, scale, include_all_loaded=True)
+    sector_id = sector_id_for_pos(*state.world.current_pos_ly)
+    sector_state = state.world.sector_states.get(sector_id)
+    if sector_state and sector_state.archetype:
+        print(f"- current_sector_archetype: {sector_state.archetype}")
+
+
+def _yn(flag: bool) -> str:
+    return "yes" if flag else "no"
+
+
+def _counts_text(values: dict[str, int]) -> str:
+    if not values:
+        return "-"
+    return " ".join(f"{key}={values[key]}" for key in sorted(values))
+
+
+def _loaded_sector_node_ids(state, sector_id: str) -> list[str]:
+    sector_state = state.world.sector_states.get(sector_id)
+    if sector_state:
+        return sorted(sector_state.node_ids)
+    return sorted(
+        node.node_id
+        for node in state.world.space.nodes.values()
+        if sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly) == sector_id
+    )
+
+
+def render_debug_worldgen_sector(state, sector_id: str) -> None:
+    print("\n=== DEBUG WORLDGEN SECTOR ===")
+    coords = _sector_coords_from_id(sector_id)
+    if coords is None:
+        print(f"- invalid_sector_id: {sector_id}")
+        return
+
+    before_generated = set(state.world.generated_sectors)
+    ensure_sector_generated(state, sector_id)
+    after_generated = set(state.world.generated_sectors)
+    generated_now = sector_id not in before_generated and sector_id in after_generated
+    cluster_generated = sorted(after_generated - before_generated)
+
+    center = _sector_center_ly(sector_id)
+    sx, sy, sz = coords
+    origin = (sx * SECTOR_SIZE_LY, sy * SECTOR_SIZE_LY, sz * SECTOR_SIZE_LY)
+    op_region = _sector_region_operational(sector_id)
+    phys_region = _sector_region_physical(sector_id)
+    sector_state = state.world.sector_states.get(sector_id)
+    archetypes = load_worldgen_archetypes()
+    authored_ids = _authored_node_ids()
+    node_ids = _loaded_sector_node_ids(state, sector_id)
+    nodes = [state.world.space.nodes[node_id] for node_id in node_ids if node_id in state.world.space.nodes]
+    authored_count = sum(1 for node_id in node_ids if node_id in authored_ids)
+    procedural_count = max(0, len(node_ids) - authored_count)
+
+    placements_by_node: dict[str, list[str]] = {}
+    for piece_key, node_id in sorted(state.world.lore_placements.piece_to_node.items()):
+        channel = state.world.lore_placements.piece_channel_bindings.get(piece_key, "-")
+        status = "delivered" if piece_key in state.world.lore.delivered else "pending"
+        placements_by_node.setdefault(node_id, []).append(f"{piece_key}@{channel}[{status}]")
+
+    intel_refs = [
+        item
+        for item in state.world.intel
+        if item.sector_id == sector_id
+        or item.from_id in node_ids
+        or item.to_id in node_ids
+        or (item.coord and sector_id_for_pos(*item.coord) == sector_id)
+    ]
+    intel_by_kind: dict[str, int] = {}
+    for item in intel_refs:
+        intel_by_kind[item.kind] = intel_by_kind.get(item.kind, 0) + 1
+
+    force_hidden = sorted(node_id for node_id in node_ids if node_id in state.world.forced_hidden_nodes)
+    pool_nodes = sorted(node_id for node_id in node_ids if node_id in state.world.node_pools)
+    dead_nodes = sorted(node_id for node_id in node_ids if node_id in state.world.dead_nodes)
+
+    print(
+        f"- sector={sector_id} generated_now={_yn(generated_now)} "
+        f"cluster_generated={_map_preview(cluster_generated, max_items=12)}"
+    )
+    if center is not None:
+        print(
+            f"- geometry: origin=({origin[0]:.2f},{origin[1]:.2f},{origin[2]:.2f}) "
+            f"center=({center[0]:.2f},{center[1]:.2f},{center[2]:.2f})"
+        )
+    print(f"- region: operational={op_region} physical={phys_region}")
+
+    if sector_state:
+        archetype_cfg = archetypes.get(sector_state.archetype, {})
+        caps = archetype_cfg.get("kind_caps", {}) or {}
+        forbidden = sorted(str(item) for item in (archetype_cfg.get("forbidden_kinds", []) or []))
+        caps_txt = ",".join(f"{kind}:{int(caps[kind])}" for kind in sorted(caps)) or "-"
+        forbidden_txt = ",".join(forbidden) or "-"
+        print(
+            f"- sector_state: archetype={sector_state.archetype or '-'} nodes={len(node_ids)} "
+            f"authored={authored_count} procedural={procedural_count}"
+        )
+        print(
+            f"- hubs: topology={sector_state.topology_hub_node_id or '-'} "
+            f"playable={sector_state.playable_hub_node_id or '-'}"
+        )
+        print(
+            f"- budgets: internal_links={int(sector_state.internal_link_count)} "
+            f"intersector_links={int(sector_state.intersector_link_count)}/"
+            f"{int(archetype_cfg.get('intersector_link_max', 0) or 0)} "
+            f"playable_hub_prob={float(archetype_cfg.get('playable_hub_prob', 0.0) or 0.0):.2f} "
+            f"intersector_link_prob={float(archetype_cfg.get('intersector_link_prob', 0.0) or 0.0):.2f} "
+            f"extra_internal_link_prob={float(archetype_cfg.get('extra_internal_link_prob', 0.0) or 0.0):.2f}"
+        )
+        print(f"- rules: caps={caps_txt} forbidden={forbidden_txt}")
+    else:
+        print("- sector_state: (missing)")
+
+    print(
+        f"- overlays: lore_bindings={sum(len(v) for v in placements_by_node.values())} "
+        f"node_pools={len(pool_nodes)} intel_refs={len(intel_refs)} "
+        f"forced_hidden={len(force_hidden)} dead_nodes={len(dead_nodes)}"
+    )
+    if intel_by_kind:
+        print(f"  intel_by_kind: {_counts_text(intel_by_kind)}")
+
+    neighbors = [sid for sid in _neighbor_sectors_2d(sector_id) if sid != sector_id]
+    if neighbors:
+        print("- local_ring:")
+        for neighbor_id in sorted(neighbors):
+            neighbor_state = state.world.sector_states.get(neighbor_id)
+            if neighbor_state:
+                print(
+                    f"  {neighbor_id}: archetype={neighbor_state.archetype or '-'} "
+                    f"nodes={len(neighbor_state.node_ids)} "
+                    f"playable_hub={neighbor_state.playable_hub_node_id or '-'} "
+                    f"intersector_links={int(neighbor_state.intersector_link_count)}"
+                )
+            else:
+                print(f"  {neighbor_id}: (not materialized)")
+
+    if not nodes:
+        print("- nodes: (none)")
+        return
+
+    print("- nodes:")
+    for node in nodes:
+        marker = "*" if node.node_id == state.world.current_node_id else ""
+        internal_links: list[str] = []
+        intersector_links: list[str] = []
+        for dest_id in sorted(node.links):
+            dest = state.world.space.nodes.get(dest_id)
+            if not dest:
+                continue
+            dest_sector = sector_id_for_pos(dest.x_ly, dest.y_ly, dest.z_ly)
+            if dest_sector == sector_id:
+                internal_links.append(dest_id)
+            else:
+                intersector_links.append(dest_id)
+        known_links = sorted(
+            dest_id for dest_id in state.world.known_links.get(node.node_id, set()) if dest_id in state.world.space.nodes
+        )
+        pool = state.world.node_pools.get(node.node_id)
+        lore_items = placements_by_node.get(node.node_id, [])
+        print(
+            f"  - {node.node_id}{marker} ({node.name}, {node.kind}) "
+            f"authored={_yn(node.node_id in authored_ids)} "
+            f"known_node={_yn(node.node_id in state.world.known_nodes)} "
+            f"known_contact={_yn(node.node_id in state.world.known_contacts)} "
+            f"visited={_yn(node.node_id in state.world.visited_nodes)} "
+            f"hidden={_yn(node.node_id in state.world.forced_hidden_nodes)} "
+            f"deadnode={_yn(node.node_id in state.world.dead_nodes)}"
+        )
+        print(
+            f"    pos=({node.x_ly:.2f},{node.y_ly:.2f},{node.z_ly:.2f}) "
+            f"rad={float(node.radiation_rad_per_s):.4f} "
+            f"playable_hub={_yn(node.is_hub)} topology_hub={_yn(node.is_topology_hub)}"
+        )
+        print(
+            f"    salvage: scrap={int(getattr(node, 'salvage_scrap_available', 0) or 0)} "
+            f"modules={len(getattr(node, 'salvage_modules_available', []) or [])} "
+            f"drones={int(getattr(node, 'recoverable_drones_count', 0) or 0)}"
+        )
+        if pool:
+            print(
+                f"    pool: window_open={_yn(pool.window_open)} node_cleaned={_yn(pool.node_cleaned)} "
+                f"scrap_complete={_yn(pool.scrap_complete)} data_complete={_yn(pool.data_complete)} "
+                f"extras_complete={_yn(pool.extras_complete)} uplink_data_consumed={_yn(pool.uplink_data_consumed)}"
+            )
+        if lore_items:
+            print(f"    lore: {_map_preview(sorted(lore_items), max_items=8)}")
+        print(f"    links_internal: {_map_preview(internal_links, max_items=12)}")
+        print(f"    links_intersector: {_map_preview(intersector_links, max_items=12)}")
+        print(f"    known_links: {_map_preview(known_links, max_items=12)}")
+
+
+def render_debug_graph_all(state) -> None:
+    print("\n=== DEBUG GRAPH ALL ===")
+    ship_id = getattr(state.ship, "ship_id", "RETORNO_SHIP")
+    authored_ids = _authored_node_ids()
+    all_nodes = sorted(
+        [node for node in state.world.space.nodes.values() if node.node_id != ship_id],
+        key=lambda node: (sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly), node.node_id),
+    )
+    all_node_ids = {node.node_id for node in all_nodes}
+    physical_adj: dict[str, set[str]] = {node.node_id: set() for node in all_nodes}
+    known_adj: dict[str, set[str]] = {node.node_id: set() for node in all_nodes}
+
+    for node in all_nodes:
+        for dest_id in node.links:
+            if dest_id in all_node_ids and dest_id != node.node_id:
+                physical_adj[node.node_id].add(dest_id)
+    for src, dests in state.world.known_links.items():
+        if src not in known_adj:
+            continue
+        for dst in dests:
+            if dst in known_adj and dst != src:
+                known_adj[src].add(dst)
+
+    physical_edges: list[tuple[str, str]] = []
+    seen_edges: set[tuple[str, str]] = set()
+    for src, dests in sorted(physical_adj.items()):
+        for dst in sorted(dests):
+            edge = tuple(sorted((src, dst)))
+            if edge in seen_edges:
+                continue
+            seen_edges.add(edge)
+            physical_edges.append(edge)
+
+    known_edges: list[tuple[str, str]] = []
+    seen_known_edges: set[tuple[str, str]] = set()
+    for src, dests in sorted(known_adj.items()):
+        for dst in sorted(dests):
+            edge = tuple(sorted((src, dst)))
+            if edge in seen_known_edges:
+                continue
+            seen_known_edges.add(edge)
+            known_edges.append(edge)
+
+    sector_ids: set[str] = set(state.world.generated_sectors)
+    for node in all_nodes:
+        sector_ids.add(sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly))
+    sector_ids = {sid for sid in sector_ids if sid}
+
+    kind_counts: dict[str, int] = {}
+    for node in all_nodes:
+        kind_counts[node.kind] = kind_counts.get(node.kind, 0) + 1
+    archetype_counts: dict[str, int] = {}
+    for sector_state in state.world.sector_states.values():
+        archetype = sector_state.archetype or "unknown"
+        archetype_counts[archetype] = archetype_counts.get(archetype, 0) + 1
+
+    physical_components = _map_component_count(all_node_ids, physical_adj) if all_node_ids else 0
+    known_components = _map_component_count(all_node_ids, known_adj) if all_node_ids else 0
+    playable_hubs = sum(1 for node in all_nodes if node.is_hub)
+    topology_hubs = sum(1 for node in all_nodes if node.is_topology_hub)
+    authored_count = sum(1 for node in all_nodes if node.node_id in authored_ids)
+    procedural_count = max(0, len(all_nodes) - authored_count)
+    dead_end_sectors = sum(
+        1 for sector_state in state.world.sector_states.values() if int(sector_state.intersector_link_count) <= 0
+    )
+    print(
+        f"- totals: materialized_sectors={len(sector_ids)} nodes={len(all_nodes)} "
+        f"physical_edges={len(physical_edges)} known_edges={len(known_edges)} "
+        f"physical_components={physical_components} known_components={known_components}"
+    )
+    print(
+        f"- composition: authored={authored_count} procedural={procedural_count} "
+        f"playable_hubs={playable_hubs} topology_hubs={topology_hubs} "
+        f"forced_hidden={len(state.world.forced_hidden_nodes)} node_pools={len(state.world.node_pools)} "
+        f"intel={len(state.world.intel)} lore_placements={len(state.world.lore_placements.piece_to_node)} "
+        f"dead_nodes={len(state.world.dead_nodes)} dead_end_sectors={dead_end_sectors}"
+    )
+    print(f"- by_kind: {_counts_text(kind_counts)}")
+    print(f"- by_archetype: {_counts_text(archetype_counts)}")
+
+    print("- sectors:")
+    for sector_id in sorted(sector_ids):
+        node_ids = _loaded_sector_node_ids(state, sector_id)
+        sector_state = state.world.sector_states.get(sector_id)
+        authored_sector = sum(1 for node_id in node_ids if node_id in authored_ids)
+        known_sector = sum(1 for node_id in node_ids if node_id in state.world.known_nodes or node_id in state.world.known_contacts)
+        print(
+            f"  - {sector_id}: archetype={(sector_state.archetype if sector_state else '-') or '-'} "
+            f"nodes={len(node_ids)} authored={authored_sector} known={known_sector} "
+            f"topology_hub={(sector_state.topology_hub_node_id if sector_state else '-') or '-'} "
+            f"playable_hub={(sector_state.playable_hub_node_id if sector_state else '-') or '-'} "
+            f"intersector_links={int(sector_state.intersector_link_count) if sector_state else 0}"
+        )
+
+    print("- nodes:")
+    if not all_nodes:
+        print("  (none)")
+    for node in all_nodes:
+        sector_id = sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly)
+        phys_links = sorted(physical_adj.get(node.node_id, set()))
+        known_links = sorted(known_adj.get(node.node_id, set()))
+        marker = "*" if node.node_id == state.world.current_node_id else ""
+        print(
+            f"  - {node.node_id}{marker}: sector={sector_id} kind={node.kind} "
+            f"authored={_yn(node.node_id in authored_ids)} "
+            f"known={_yn(node.node_id in state.world.known_nodes or node.node_id in state.world.known_contacts)} "
+            f"visited={_yn(node.node_id in state.world.visited_nodes)} "
+            f"hidden={_yn(node.node_id in state.world.forced_hidden_nodes)} "
+            f"playable_hub={_yn(node.is_hub)} topology_hub={_yn(node.is_topology_hub)} "
+            f"degree_phys={len(phys_links)} degree_known={len(known_links)}"
+        )
+        print(f"    links_phys: {_map_preview(phys_links, max_items=14)}")
+        print(f"    links_known: {_map_preview(known_links, max_items=14)}")
+
+    print("- physical_edges:")
+    if not physical_edges:
+        print("  (none)")
+    for left_id, right_id in physical_edges:
+        left = state.world.space.nodes.get(left_id)
+        right = state.world.space.nodes.get(right_id)
+        left_sector = sector_id_for_pos(left.x_ly, left.y_ly, left.z_ly) if left else "-"
+        right_sector = sector_id_for_pos(right.x_ly, right.y_ly, right.z_ly) if right else "-"
+        edge_type = "internal" if left_sector == right_sector else "intersector"
+        dist = distance_between_nodes_ly(state.world, left_id, right_id)
+        known = right_id in known_adj.get(left_id, set()) or left_id in known_adj.get(right_id, set())
+        print(
+            f"  - {left_id} <-> {right_id} "
+            f"dist={(dist or 0.0):.2f}ly type={edge_type} known={_yn(known)}"
+        )
 
 
 def _next_debug_drone_id(state) -> str:
@@ -2882,6 +3309,7 @@ def _scan_and_discover(state) -> tuple[list[str], list[str], list[str], list[str
         return Balance.SENSORS_DETECT_P_NEAR + (Balance.SENSORS_DETECT_P_FAR - Balance.SENSORS_DETECT_P_NEAR) * t
 
     state.meta.rng_counter += 1
+    recovery_entry_id = getattr(state.world.exploration_recovery, "entry_node_id", None)
     for nid, n in state.world.space.nodes.items():
         dx = n.x_ly - x
         dy = n.y_ly - y
@@ -2889,11 +3317,13 @@ def _scan_and_discover(state) -> tuple[list[str], list[str], list[str], list[str
         dist2 = dx * dx + dy * dy + dz * dz
         if dist2 <= r * r:
             dist = dist2 ** 0.5
-            p = max(0.0, min(1.0, _chance_for(dist) * state_p))
-            seed = _hash64(state.meta.rng_seed + state.meta.rng_counter, f"scan:{nid}:{int(state.clock.t)}")
-            rng = random.Random(seed)
-            if rng.random() > p:
-                continue
+            guaranteed_recovery_detect = nid == recovery_entry_id and nid not in state.world.known_nodes
+            if not guaranteed_recovery_detect:
+                p = max(0.0, min(1.0, _chance_for(dist) * state_p))
+                seed = _hash64(state.meta.rng_seed + state.meta.rng_counter, f"scan:{nid}:{int(state.clock.t)}")
+                rng = random.Random(seed)
+                if rng.random() > p:
+                    continue
             seen.append(nid)
             is_new = nid not in state.world.known_nodes
             if is_new:
@@ -3054,180 +3484,6 @@ def _try_add_known_link_with_cap(
     added = add_known_link(state.world, from_id, to_id, bidirectional=bidirectional)
     return added, False, dist
 
-
-def _known_routes_to_unvisited(state, current_id: str) -> list[str]:
-    routes = state.world.known_links.get(current_id, set())
-    return [nid for nid in routes if nid not in state.world.visited_nodes]
-
-def _has_global_unvisited_route_within_range(state) -> bool:
-    current_id = state.world.current_node_id
-    current = state.world.space.nodes.get(current_id)
-    if not current:
-        return False
-    max_dist = Balance.MOBILITY_FAILSAFE_MAX_DIST_LY
-    for from_id, tos in state.world.known_links.items():
-        for to_id in tos:
-            if to_id in state.world.visited_nodes:
-                continue
-            dest = state.world.space.nodes.get(to_id)
-            if not dest:
-                continue
-            dx = dest.x_ly - current.x_ly
-            dy = dest.y_ly - current.y_ly
-            dz = dest.z_ly - current.z_ly
-            dist = (dx * dx + dy * dy + dz * dz) ** 0.5
-            if dist <= max_dist:
-                return True
-    return False
-
-
-def _pick_mobility_failsafe_target(state) -> str | None:
-    current_id = state.world.current_node_id
-    current = state.world.space.nodes.get(current_id)
-    if not current:
-        return None
-    authored = _authored_node_ids()
-    known = state.world.known_links.get(current_id, set())
-    locked_primary_targets = _locked_primary_targets(state)
-    max_dist = Balance.MOBILITY_FAILSAFE_MAX_DIST_LY
-
-    def _candidates() -> list[tuple[float, str]]:
-        found: list[tuple[float, str]] = []
-        for node in state.world.space.nodes.values():
-            if node.node_id == current_id or node.node_id in authored:
-                continue
-            if node.node_id in locked_primary_targets:
-                continue
-            if node.kind not in {"relay", "station", "waystation"}:
-                continue
-            if node.node_id in known:
-                continue
-            dx = node.x_ly - current.x_ly
-            dy = node.y_ly - current.y_ly
-            dz = node.z_ly - current.z_ly
-            dist = (dx * dx + dy * dy + dz * dz) ** 0.5
-            if dist <= max_dist:
-                found.append((dist, node.node_id))
-        return found
-
-    candidates = _candidates()
-    if not candidates:
-        sector_id = sector_id_for_pos(current.x_ly, current.y_ly, current.z_ly)
-        try:
-            _, sx, sy, sz = sector_id[1:].split("_")
-            sx_i = int(sx)
-            sy_i = int(sy)
-            sz_i = int(sz)
-        except Exception:
-            sx_i = sy_i = sz_i = 0
-        for dx in (-1, 0, 1):
-            for dy in (-1, 0, 1):
-                if dx == 0 and dy == 0:
-                    continue
-                neighbor_id = f"S{sx_i+dx:+04d}_{sy_i+dy:+04d}_{sz_i:+04d}"
-                ensure_sector_generated(state, neighbor_id)
-        candidates = _candidates()
-    if not candidates:
-        return None
-    candidates.sort()
-    return candidates[0][1]
-
-
-def _apply_mobility_failsafe(state, added: list[str]) -> str | None:
-    dest = _pick_mobility_failsafe_target(state)
-    if not dest:
-        return None
-    current_id = state.world.current_node_id
-    added_link, blocked_by_cap, dist_ly = _try_add_known_link_with_cap(
-        state, current_id, dest, bidirectional=True
-    )
-    if blocked_by_cap:
-        locale = state.os.locale.value
-        msg = {
-            "en": f"signal_rejected :: {current_id} -> {dest} exceeds hop cap ({(dist_ly or 0.0):.2f}ly > {Balance.MAX_ROUTE_HOP_LY:.1f}ly)",
-            "es": f"signal_descartada :: {current_id} -> {dest} excede el cap de salto ({(dist_ly or 0.0):.2f}ly > {Balance.MAX_ROUTE_HOP_LY:.1f}ly)",
-        }
-        print(msg.get(locale, msg["en"]))
-        return None
-    if not added_link:
-        return None
-    state.world.known_nodes.add(dest)
-    state.world.known_contacts.add(dest)
-    confidence = 0.45
-    record_intel(
-        state.world,
-        t=state.clock.t,
-        kind="link",
-        from_id=current_id,
-        to_id=dest,
-        confidence=confidence,
-        source_kind="signal",
-        source_ref=current_id,
-        note="weak bearing / degraded table",
-    )
-    state.world.mobility_failsafe_count += 1
-    state.world.mobility_hints.append(
-        {
-            "t": state.clock.t,
-            "from": current_id,
-            "to": dest,
-            "confidence": confidence,
-            "source_kind": "signal",
-        }
-    )
-    if dest not in added:
-        added.append(dest)
-    locale = state.os.locale.value
-    msg = {
-        "en": f"signal_detected :: weak bearing to {dest}",
-        "es": f"signal_detected :: señal débil hacia {dest}",
-    }
-    print(msg.get(locale, msg["en"]))
-    events_out: list[tuple[str, Event]] = []
-    _emit_runtime_event(
-        state,
-        events_out,
-        "cmd",
-        EventType.SIGNAL_DETECTED,
-        Severity.INFO,
-        SourceRef(kind="world", id=dest),
-        msg.get(locale, msg["en"]),
-        data={"from": current_id, "to": dest, "confidence": confidence},
-    )
-    return dest
-
-
-def _uplink_blocked_reason(state) -> str | None:
-    if state.ship.in_transit:
-        return "in_transit"
-    if state.ship.power.brownout:
-        return "brownout_active"
-    q = state.ship.power.power_quality
-    if q < Balance.POWER_QUALITY_COLLAPSE_THRESHOLD:
-        return "power_quality_collapse"
-    if q < Balance.POWER_QUALITY_BLOCK_THRESHOLD:
-        return "power_quality_low"
-    if state.ship.docked_node_id != state.world.current_node_id:
-        return "not_docked"
-    node = state.world.space.nodes.get(state.world.current_node_id)
-    if not node or node.kind not in {"relay", "station", "waystation"}:
-        return "not_relay"
-    system = state.ship.systems.get("data_core")
-    if not system:
-        return "missing_data_core"
-    if system.forced_offline and state.ship.op_mode == "CRUISE":
-        return "data_core_shed"
-    if system.state == SystemState.OFFLINE:
-        return "data_core_offline"
-    if not system.service or system.service.service_name != "datad":
-        return "datad_not_installed"
-    if not system.service.is_running:
-        return "datad_not_running"
-    if _state_rank(system.state) < _state_rank(SystemState.LIMITED):
-        return "data_core_degraded"
-    return None
-
-
 def _core_os_limited_blocks(parsed) -> bool:
     if parsed == "UPLINK":
         return True
@@ -3264,6 +3520,8 @@ def _terminal_state_allows(parsed) -> bool:
             "DEBUG_MODULES",
             "DEBUG_GALAXY",
             "DEBUG_GALAXY_MAP",
+            "DEBUG_WORLDGEN_SECTOR",
+            "DEBUG_GRAPH_ALL",
             "DEBUG_SEED",
             "DEBUG_SCENARIO",
         }:
@@ -3367,7 +3625,7 @@ def _hibernate_soc_warning(state) -> str | None:
 
 
 def _handle_uplink(state) -> None:
-    reason = _uplink_blocked_reason(state)
+    reason = uplink_blocked_reason(state)
     locale = state.os.locale.value
     q = state.ship.power.power_quality
     soc = (state.ship.power.e_batt_kwh / state.ship.power.e_batt_max_kwh) if state.ship.power.e_batt_max_kwh else 0.0
@@ -3457,16 +3715,6 @@ def _handle_uplink(state) -> None:
         state.world.mobility_no_new_uplink_count = 0
     else:
         state.world.mobility_no_new_uplink_count += 1
-        no_local_unvisited = len(_known_routes_to_unvisited(state, current_node_id)) == 0
-        no_global_unvisited = not _has_global_unvisited_route_within_range(state)
-        if (
-            state.world.mobility_no_new_uplink_count >= Balance.UPLINK_FAILSAFE_N
-            and no_local_unvisited
-            and no_global_unvisited
-        ):
-            failover = _apply_mobility_failsafe(state, added)
-            if failover:
-                state.world.mobility_no_new_uplink_count = 0
 
     if added:
         for nid in added:
@@ -3510,22 +3758,18 @@ def _handle_uplink(state) -> None:
         print(cap_msg.get(locale, cap_msg["en"]))
     lore_ctx = build_lore_context(state, current_node_id)
     lore_result = maybe_deliver_lore(state, "uplink", lore_ctx, count_trigger=False)
-    if added or lore_result.files or lore_result.events:
+    _render_and_store_events(state, lore_result.events)
+    dead_events = evaluate_dead_nodes(state, "uplink", debug=state.os.debug_enabled)
+    _render_and_store_events(state, dead_events)
+    recovery_events: list[Event] = []
+    if not added and state.world.mobility_no_new_uplink_count >= Balance.UPLINK_FAILSAFE_N:
+        recovery_events = ensure_exploration_recovery(state, "uplink")
+        if recovery_events:
+            state.world.mobility_no_new_uplink_count = 0
+    _render_and_store_events(state, recovery_events)
+    if added or lore_result.files or lore_result.events or recovery_events:
         counters = state.world.lore.counters
         counters["uplink_count"] = counters.get("uplink_count", 0) + 1
-    if lore_result.events:
-        render_events(state, [("cmd", e) for e in lore_result.events])
-        for e in lore_result.events:
-            state.events.recent.append(e)
-        if len(state.events.recent) > 50:
-            state.events.recent = state.events.recent[-50:]
-    dead_events = evaluate_dead_nodes(state, "uplink", debug=state.os.debug_enabled)
-    if dead_events:
-        render_events(state, [("cmd", e) for e in dead_events])
-        for e in dead_events:
-            state.events.recent.append(e)
-        if len(state.events.recent) > 50:
-            state.events.recent = state.events.recent[-50:]
     if pool:
         pool.uplink_data_consumed = True
         recompute_node_completion(state, current_node_id)
@@ -3950,6 +4194,7 @@ def _handle_intel_import(state, path: str) -> None:
                 )
                 node.region = region
                 state.world.space.nodes[nid] = node
+                sync_sector_state_for_node(state, nid)
             if nid not in state.world.known_nodes:
                 state.world.known_intel[nid] = {"source": path, "coord": [x, y, z]}
                 state.world.known_nodes.add(nid)
@@ -4122,6 +4367,7 @@ def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str
                 )
                 node.region = region
                 state.world.space.nodes[nid] = node
+                sync_sector_state_for_node(state, nid)
             if nid not in state.world.known_nodes:
                 state.world.known_intel[nid] = {"source": source_path, "coord": [x, y, z]}
                 state.world.known_nodes.add(nid)
@@ -5388,7 +5634,18 @@ def _emit_runtime_event(state, events_out, origin: str, event_type: EventType, s
     events_out.append((origin, event))
 
 
- 
+def _store_recent_events(state, events: list[Event]) -> None:
+    for event in events:
+        state.events.recent.append(event)
+    if len(state.events.recent) > 50:
+        state.events.recent = state.events.recent[-50:]
+
+
+def _render_and_store_events(state, events: list[Event], *, origin: str = "cmd") -> None:
+    if not events:
+        return
+    render_events(state, [(origin, event) for event in events])
+    _store_recent_events(state, events)
 
 
 def _apply_salvage_loot(loop, state, events):
@@ -5569,6 +5826,8 @@ def _run_hibernate(loop, years: float, wake_on_low_battery: bool = False) -> Non
     with loop.with_lock() as locked_state:
         if events_to_render:
             render_events(locked_state, events_to_render)
+        recovery_events = ensure_exploration_recovery(locked_state, "hibernate_end")
+        _render_and_store_events(locked_state, recovery_events)
         if woke_early:
             locale = locked_state.os.locale.value
             msg = None
@@ -6234,6 +6493,14 @@ def main() -> None:
                         candidates = [c for c in ["map"] if c.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "galaxy" and tokens[2] == "map":
                         candidates = [c for c in ["sector", "local", "regional", "global"] if c.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "worldgen":
+                        candidates = [c for c in ["sector"] if c.startswith(text)]
+                    elif len(tokens) == 4 and tokens[1] == "worldgen" and tokens[2] == "sector":
+                        sector_candidates = set(locked_state.world.generated_sectors)
+                        sector_candidates.add(sector_id_for_pos(*locked_state.world.current_pos_ly))
+                        candidates = [sid for sid in sorted(sector_candidates) if sid.startswith(text.upper())]
+                    elif len(tokens) == 3 and tokens[1] == "graph":
+                        candidates = [c for c in ["all"] if c.startswith(text)]
                 elif cmd == "module":
                     if len(tokens) == 2:
                         candidates = [c for c in ["inspect"] if c.startswith(text)]
@@ -6650,6 +6917,20 @@ def main() -> None:
                     continue
                 render_debug_galaxy_map(locked_state, parsed[1])
             continue
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_WORLDGEN_SECTOR":
+            with loop.with_lock() as locked_state:
+                if not locked_state.os.debug_enabled:
+                    print("debug worldgen sector: available only in DEBUG mode. Use: debug on")
+                    continue
+                render_debug_worldgen_sector(locked_state, str(parsed[1]))
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_GRAPH_ALL":
+            with loop.with_lock() as locked_state:
+                if not locked_state.os.debug_enabled:
+                    print("debug graph all: available only in DEBUG mode. Use: debug on")
+                    continue
+                render_debug_graph_all(locked_state)
+            continue
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SEED":
             with loop.with_lock() as locked_state:
                 if not locked_state.os.debug_enabled:
@@ -6727,12 +7008,9 @@ def main() -> None:
                 if discovered:
                     print(f"(scan) new: {', '.join(sorted(discovered))}")
                 dead_events = evaluate_dead_nodes(locked_state, "scan", debug=locked_state.os.debug_enabled)
-                if dead_events:
-                    render_events(locked_state, [("cmd", e) for e in dead_events])
-                    for e in dead_events:
-                        locked_state.events.recent.append(e)
-                    if len(locked_state.events.recent) > 50:
-                        locked_state.events.recent = locked_state.events.recent[-50:]
+                _render_and_store_events(locked_state, dead_events)
+                recovery_events = ensure_exploration_recovery(locked_state, "scan")
+                _render_and_store_events(locked_state, recovery_events)
             continue
         if parsed == "INVENTORY":
             _drain_auto_events()

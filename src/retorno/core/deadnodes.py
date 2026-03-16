@@ -4,10 +4,10 @@ import math
 import random
 
 from retorno.config.balance import Balance
-from retorno.model.events import Event, EventType, Severity, SourceRef
-from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path, register_mail
+from retorno.core.lore import write_local_intel
+from retorno.model.events import Event
 from retorno.model.world import DeadNodeState, SpaceNode
-from retorno.worldgen.generator import _generate_node_id, _name_from_node_id
+from retorno.worldgen.generator import _generate_node_id, _name_from_node_id, sync_sector_state_for_node
 
 
 def _hash_rng(seed: int, *parts: str) -> random.Random:
@@ -19,13 +19,6 @@ def _hash_rng(seed: int, *parts: str) -> random.Random:
             h &= 0xFFFFFFFFFFFFFFFF
     h ^= seed & 0xFFFFFFFFFFFFFFFF
     return random.Random(h)
-
-
-def _ensure_dir(fs: dict, path: str) -> None:
-    if path not in fs:
-        fs[path] = FSNode(path=path, node_type=FSNodeType.DIR, access=AccessLevel.GUEST)
-
-
 def _reachable_nodes(known_links: dict[str, set[str]], start_id: str) -> set[str]:
     if start_id not in known_links:
         return {start_id}
@@ -78,68 +71,6 @@ def _thresholds_for_node(state, node_id: str) -> tuple[int, int, float, float]:
     return stuck_uplinks, dead_uplinks, stuck_years, dead_years
 
 
-def _write_local_intel(state, channel: str, content: str) -> tuple[str, Event]:
-    seq = state.events.next_event_seq
-    state.events.next_event_seq += 1
-    if channel == "captured_signal":
-        _ensure_dir(state.os.fs, "/logs")
-        _ensure_dir(state.os.fs, "/logs/signals")
-        path = normalize_path(f"/logs/signals/{seq:04d}.{state.os.locale.value}.txt")
-        state.os.fs[path] = FSNode(path=path, node_type=FSNodeType.FILE, content=content, access=AccessLevel.GUEST)
-        msg = {
-            "en": f"signal_captured :: Narrowband capture stored at {path}",
-            "es": f"signal_captured :: Captura de banda estrecha guardada en {path}",
-        }.get(state.os.locale.value, f"signal_captured :: Signal captured: {path}")
-        ev = Event(
-            event_id=f"E{seq:05d}",
-            t=int(state.clock.t),
-            type=EventType.SIGNAL_CAPTURED,
-            severity=Severity.INFO,
-            source=SourceRef(kind="world", id=state.world.current_node_id),
-            message=msg,
-            data={"path": path},
-        )
-        return path, ev
-    if channel == "station_broadcast":
-        _ensure_dir(state.os.fs, "/logs")
-        _ensure_dir(state.os.fs, "/logs/broadcasts")
-        path = normalize_path(f"/logs/broadcasts/{state.world.current_node_id}_{seq:04d}.{state.os.locale.value}.txt")
-        state.os.fs[path] = FSNode(path=path, node_type=FSNodeType.FILE, content=content, access=AccessLevel.GUEST)
-        msg = {
-            "en": f"broadcast_received :: Station bulletin recorded at {path}",
-            "es": f"broadcast_received :: Boletín de estación registrado en {path}",
-        }.get(state.os.locale.value, f"broadcast_received :: Station broadcast: {path}")
-        ev = Event(
-            event_id=f"E{seq:05d}",
-            t=int(state.clock.t),
-            type=EventType.BROADCAST_RECEIVED,
-            severity=Severity.INFO,
-            source=SourceRef(kind="world", id=state.world.current_node_id),
-            message=msg,
-            data={"path": path},
-        )
-        return path, ev
-    _ensure_dir(state.os.fs, "/mail")
-    _ensure_dir(state.os.fs, "/mail/inbox")
-    path = normalize_path(f"/mail/inbox/{seq:04d}.{state.os.locale.value}.txt")
-    state.os.fs[path] = FSNode(path=path, node_type=FSNodeType.FILE, content=content, access=AccessLevel.GUEST)
-    register_mail(state.os, path, state.clock.t)
-    msg = {
-        "en": f"mail_received :: New internal memo queued: {path}",
-        "es": f"mail_received :: Nuevo memo interno en cola: {path}",
-    }.get(state.os.locale.value, f"mail_received :: New mail received: {path}")
-    ev = Event(
-        event_id=f"E{seq:05d}",
-        t=int(state.clock.t),
-        type=EventType.MAIL_RECEIVED,
-        severity=Severity.INFO,
-        source=SourceRef(kind="world", id=state.world.current_node_id),
-        message=msg,
-        data={"path": path},
-    )
-    return path, ev
-
-
 def _create_bridge_node(state, dead_node_id: str, attempt: int) -> SpaceNode | None:
     dead_node = state.world.space.nodes.get(dead_node_id)
     if not dead_node:
@@ -161,14 +92,18 @@ def _create_bridge_node(state, dead_node_id: str, attempt: int) -> SpaceNode | N
         y_ly=dead_node.y_ly + dy,
         z_ly=dead_node.z_ly + dz,
         is_hub=True,
+        is_topology_hub=True,
     )
     state.world.space.nodes[node_id] = node
+    sync_sector_state_for_node(state, node_id)
     return node
 
 
 def evaluate_dead_nodes(state, trigger: str, debug: bool = False) -> list[Event]:
     if not Balance.DEADNODE_FAILSAFE_ENABLED:
         return []
+    # Deadnodes protects against globally broken runs. It is not meant to erase
+    # every local dead end created by sparse worldgen.
     pool = getattr(state.world, "node_pools", {}).get(state.world.current_node_id)
     if pool and getattr(pool, "node_cleaned", False):
         return []
@@ -239,7 +174,7 @@ def evaluate_dead_nodes(state, trigger: str, debug: bool = False) -> list[Event]
                     f"LINK: {state.world.current_node_id} -> {bridge.node_id}\n"
                 )
                 channel = "captured_signal" if trigger != "dock" else "station_broadcast"
-                _path, ev = _write_local_intel(state, channel, content)
+                _path, ev = write_local_intel(state, channel, content)
                 events.append(ev)
                 st.attempts += 1
                 st.last_action_t = state.clock.t
@@ -253,7 +188,7 @@ def evaluate_dead_nodes(state, trigger: str, debug: bool = False) -> list[Event]
             f"LINK: {state.world.current_node_id} -> {node_id}\n"
         )
         channel = "captured_signal" if trigger != "dock" else "station_broadcast"
-        _path, ev = _write_local_intel(state, channel, content)
+        _path, ev = write_local_intel(state, channel, content)
         events.append(ev)
         st.attempts += 1
         st.last_action_t = state.clock.t

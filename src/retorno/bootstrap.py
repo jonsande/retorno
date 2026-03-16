@@ -248,8 +248,8 @@ def create_initial_state_sandbox() -> GameState:
         state.world.current_pos_ly = (node.x_ly, node.y_ly, node.z_ly)
 
     # Known contacts for testing
-    state.world.known_contacts.update({"ECHO_7", "HARBOR_12", "DERELICT_A3"})
-    state.world.known_nodes.update({"ECHO_7", "HARBOR_12", "DERELICT_A3"})
+    #state.world.known_contacts.update({"ECHO_7", "HARBOR_12", "DERELICT_A3"})
+    #state.world.known_nodes.update({"ECHO_7", "HARBOR_12", "DERELICT_A3"})
 
     # Give some cargo for testing
     state.ship.cargo_scrap = max(state.ship.cargo_scrap, Balance.STARTING_SCRAP)
@@ -350,7 +350,8 @@ def _bootstrap_locations(state: GameState, rng: random.Random, module_ids: list[
             if "is_hub" in node_cfg:
                 node.is_hub = bool(node_cfg.get("is_hub"))
             else:
-                node.is_hub = node.kind in {"relay", "station", "waystation", "ship", "derelict"}
+                node.is_hub = node.kind in {"relay", "station", "waystation"}
+            node.is_topology_hub = bool(node_cfg.get("is_topology_hub", node.is_hub))
             node.region = region_for_pos(node.x_ly, node.y_ly, node.z_ly)
             node.radiation_base = float(node_cfg.get("radiation_base", 0.0))
             salvage_cfg = loc.get("salvage") or {}

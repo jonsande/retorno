@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 class Balance:
-    DEFAULT_RNG_SEED = 36892
+    DEFAULT_RNG_SEED = 16891
     DAY_S = 86400.0
     YEAR_S = 365.0 * DAY_S
     # Legacy operational region model (kept for diagnostics/backward checks).
@@ -155,11 +155,11 @@ class Balance:
     DRONE_SURVEY_DATA_FALSE_NEGATIVE_P = 0.35
     # Recoverable drones by node kind (procedural + authored fallback).
     SALVAGE_DRONES_BY_KIND = {
-        "station": {"prob": 0.02, "min": 1, "max": 2},
-        "ship": {"prob": 0.08, "min": 1, "max": 3},
+        "station": {"prob": 0.25, "min": 1, "max": 2},
+        "ship": {"prob": 0.10, "min": 1, "max": 3},
         "derelict": {"prob": 0.06, "min": 1, "max": 2},
         "relay": {"prob": 0.00, "min": 0, "max": 0},
-        "waystation": {"prob": 0.01, "min": 1, "max": 1},
+        "waystation": {"prob": 0.09, "min": 1, "max": 1},
         "origin": {"prob": 0.00, "min": 0, "max": 0},
         "transit": {"prob": 0.00, "min": 0, "max": 0},
     }
@@ -200,6 +200,11 @@ class Balance:
     # Hard cap for any single travel hop or operational link publication.
     MAX_ROUTE_HOP_LY = 45.0
     UPLINK_FAILSAFE_N = 2
+    EXPLORATION_RECOVERY_ENABLED = True
+    EXPLORATION_RECOVERY_ENTRY_MIN_DIST_LY = 0.6
+    EXPLORATION_RECOVERY_ENTRY_MAX_DIST_LY = 1.8
+    EXPLORATION_RECOVERY_GATEWAY_MIN_DIST_LY = 12.0
+    EXPLORATION_RECOVERY_GATEWAY_MAX_DIST_LY = 22.0
     # If no new routes to unvisited nodes exist within this distance from the current node,
     # the mobility failsafe may trigger (after N uplinks with no new routes).
     MOBILITY_FAILSAFE_MAX_DIST_LY = 20.0

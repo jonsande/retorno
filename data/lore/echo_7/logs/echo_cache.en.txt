@@ -3,18 +3,14 @@ Ref: E7/OPS/CACHE/0007
 Access: ENG (read-only)
 Integrity: degraded (partial reconstruction)
 
-This file is a relay-side snapshot of cached routing and operational notes. It was generated automatically from housekeeping buffers and later reconstructed from incomplete storage blocks. Timestamps are unreliable; ordering is estimated.
+This report was compiled by the shipboard AI MINERVA_02L53 from a capture of operational notes extracted from the cached routes of ECHO-7. The report was generated automatically from housekeeping buffers and later reconstructed from incomplete storage blocks. A copy of this report was left on ECHO-7 on 19520dd, according to the internal clock of MINERVA_02L53.
 
-Over the last recorded period, the relay spent most of its duty cycle relaying low-band handshake traffic and short routing announcements. Long-range carriers were frequently unavailable, either due to upstream silence or local amplification faults. The relay’s route cache therefore skews toward nearby waystations and repeated corridor handoffs.
+Timestamps are unreliable. The most recent records date to 12520dd. During the last recorded period, the relay devoted most of its duty cycle to low-bandwidth protocol negotiation and short routing announcements. Long-range operators were frequently unavailable, whether due to upstream silence or local amplification faults. As a result, the route cache is weighted toward nearby waystations and repeated corridor handoffs.
 
-The token HARBOR-12 appears unusually often in the cached tables. That does not mean Harbor-12 was “important” in an abstract sense; it means many routes were being pushed through it. In practical terms: ships that still had working nav hardware were being told to pass through Harbor-12 rather than attempting long direct legs or relying on relays that were already failing intermittently.
+The token [INTEL] HARBOR_12 [/INTEL] appears with unusual frequency in the cached tables. Between 12003 and 12519dd, many routes were being passed through it. Ships that still had functioning navigation hardware were instructed to route through HARBOR-12 rather than attempt long direct legs or rely on relays that were already failing intermittently.
 
-A short operator annotation was found embedded in a routing packet payload. The relay preserved it because it matched a checksum profile; it does not indicate endorsement or validity. The text is reproduced verbatim:
+A brief operator note was found embedded in the payload of a routing packet. The relay preserved it because it matched a checksum profile. The text is reproduced verbatim:
 
-“Route maps are stale. Don’t waste time chasing the loud stuff. If a station answers, use it. Harbor-12 is still answering (for now). If you’re late, follow the corridor tables. If you’re early, don’t wait.”
+“Route maps are out of date. Don’t waste time chasing noise. If a station answers, use it. Harbor-12 is still answering (for now). If you’re late, follow the corridor tables. If you’re early, don’t wait.”
 
-[INTEL]
-HARBOR_12
-[/INTEL]
-
-End of recovered cache report.
+End of report.

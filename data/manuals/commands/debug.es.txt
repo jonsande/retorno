@@ -7,6 +7,8 @@ debug deadnodes
 debug modules
 debug galaxy
 debug galaxy map <sector|local|regional|global>
+debug worldgen sector <sector_id>
+debug graph all
 debug add scrap <amount>
 debug add module <module_id> [count]
 debug add drone[s] [count]
@@ -21,6 +23,8 @@ Comportamiento operativo
 - Los comandos de listado exponen registros internos de depuración.
 - `debug galaxy` emite informe de posición galáctica, vecindad de sectores y distribución de radiación procedural.
 - `debug galaxy map <scale>` dibuja el mapa ASCII galáctico en la escala indicada usando todos los nodos cargados.
+- `debug worldgen sector <sector_id>` materializa el sector pedido con el worldgen normal y vuelca arquetipo, hubs, nodos, overlays y enlaces físicos/conocidos de ese sector.
+- `debug graph all` vuelca el grafo materializado completo, con resumen por sectores, nodos y enlaces físicos.
 - `debug add scrap <amount>` inyecta scrap directamente al inventario de bodega.
 - `debug add module <module_id> [count]` inyecta uno o varios módulos desde el catálogo completo (scope nave y dron).
 - `debug add drone[s] [count]` crea drones acoplados en bahía para pruebas rápidas.

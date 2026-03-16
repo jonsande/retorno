@@ -1,13 +1,12 @@
 {
   "region": "halo",
-  "node_count_min": 0,
-  "node_count_max": 2,
   "z_sigma": 2.0,
-  "kind_weights": {
-    "derelict": 0.55,
-    "relay": 0.25,
-    "station": 0.10,
-    "ship": 0.10
+  "archetype_weights": {
+    "empty": 50,
+    "ruin_field": 25,
+    "relay_corridor": 5,
+    "isolated_station": 5,
+    "graveyard": 15
   },
   "salvage": {
     "scrap_min": 5,

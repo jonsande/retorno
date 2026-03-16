@@ -10,6 +10,8 @@
 
 === DRONES ===
 
+- [ ] No estoy seguro de que se estén generando drones recuperables en los nodos. Confirmar.
+
 - [ ] Necesitamos que se puedan recuperar (salvage) nuevos drones. Una sub-orden nueva: 'drone salvage drone' (que admita también el plural 'drone salvage drones'). Estoy incluye incluir tablas apropiadas en los hubs authored y correspondientes ajustes en la generación procedural del botín.
 
 - [ ] La orden "drone deploy <drone_id> <sector_id>" debería volver a admitir <system_id>, como hacía antes, pero generando un mensaque de que el drone se está desplegando en el sector_id en que se encuentra el system_id solicitado.
@@ -90,7 +92,7 @@ ENERGY
 
 === INTEL ===
 
- - [ ] [INTEL] S+003_-001_+001 [/INTEL] devuelve "corrupt data: no usable intel found". ¿Por qué? ¿Qué está mal con el formato? ¿No son unas coordenadas correctas?
+- [ ] [INTEL] S+003_-001_+001 [/INTEL] devuelve "corrupt data: no usable intel found". ¿Por qué? ¿Qué está mal con el formato? ¿No son unas coordenadas correctas?
 
 - [ ] Los incrustados [INTEL]...[/INTEL] no debe verlos el usuario.
 
@@ -168,11 +170,22 @@ ENERGY
 - [x] Quiero un sonido específico para cuando sale el mensaje de "Action blocked".
 - [ ] Sonido de advertencia cuando aumenta la radiación.
 
+- [ ] Comprobar que efectivamente está funcionando el volumen configurable de los beeps, etc.
 
 
 === OTROS / SIN CATALOGAR ===
 
-- [ ] La operación de scan debe llevar algún tiempo. Y disparar algún sonido.
+- [!] Necesitamos que el log se guarde y cargue al cargar partida! Al menos un número determinado del log. De otro modo es fácil perderse, no acordarse de dónde se estaba o qué se había hecho. Otra solución sería guardar un archivo con todo (o parte) del log, y crear un comando que te permitiera imprimir las últimas x líneas.
+
+- [!] Necesitamos un comando que te liste el camino que has seguido. El orden de los nodos que has visitado. Incluso estaría bien que junto a los nodos por los que has pasado apareciera entre paréntesis o algo un listado de los nodos que eran accesibles desde él.
+
+- [!] Necesitamos un comando que, para cada nodo sin ruta conocida, nos diga desde qué nodos conocidos es posible calcular una ruta (con route solve) a ese nodo. Es decir, desde qué nodos conocidos "route solve" tiene alcance para calcular una ruta hasta el nodo deseado. Para no multiplicar comandos, se me ocurre que esto podría ser una función extendida del propio comando "route solve <node_id>": si <node_id> está dentro del rango, se procede como de costumbre; si no lo está, se emite el mensaje habitual de "target out of sensor range", y a continuación un listado de los nodos conocidos desde los cuales el <node_id> introducido está dentro del rango de route solve. De este modo el jugador siempre podrá saber a qué nodos tiene que lograr llegar para poder constuir una ruta a su nodo objetivo último.
+
+- [ ] Al hacer dock el autocompletado tiene que ser contextual. No tiene sentido que el autocompletado te liste todos los contactos conocidos cuando estás en órbita de un nodo. Cuando estás en órbita de un nodo tu única posibilidad de dock es con el nodo que estás orbitando. De hecho, debería valer como alias el comando "dock" a secas, sin introducir el <node_id>.
+
+- [ ] Implementar un drone recall all, y que "drone recall" a secas, es decir sin especificar el id del drone, equivalga a un drone recall all.
+
+- [!] La operación de scan debe llevar algún tiempo. Y disparar algún sonido si detecta un contacto nuevo (por ejemplo el cue "info").
 
 - [ ] La orden nav contacts debería listar también la radiación del nodo, si es conocida.
 

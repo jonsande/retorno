@@ -1,0 +1,25 @@
+{
+  "archetype": "graveyard",
+  "node_count_min": 1,
+  "node_count_max": 3,
+  "kind_weights": {
+    "relay": 0.05,
+    "ship": 1.1,
+    "derelict": 1.3
+  },
+  "kind_caps": {
+    "station": 0,
+    "relay": 1,
+    "waystation": 0,
+    "ship": 2,
+    "derelict": 2
+  },
+  "forbidden_kinds": ["station", "waystation"],
+  "intersector_link_max": 1,
+  "intersector_link_prob": 0.06,
+  "playable_hub_prob": 0.04,
+  "playable_hub_kind_weights": {
+    "relay": 1.0
+  },
+  "extra_internal_link_prob": 0.05
+}

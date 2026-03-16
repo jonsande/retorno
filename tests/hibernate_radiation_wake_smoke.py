@@ -7,6 +7,7 @@ from retorno.bootstrap import create_initial_state_sandbox
 from retorno.cli import repl
 from retorno.config.balance import Balance
 from retorno.core.engine import Engine
+from retorno.model.world import SpaceNode
 from retorno.runtime.loop import GameLoop
 
 
@@ -15,10 +16,19 @@ def main() -> None:
     engine = Engine()
     loop = GameLoop(engine, state)
 
-    from_id = "ARCHIVE_01"
-    to_id = "DERELICT_A3"
+    from_id = state.world.current_node_id
+    to_id = "HIBERNATE_WAKE_TARGET"
     from_node = state.world.space.nodes[from_id]
-    to_node = state.world.space.nodes[to_id]
+    to_node = SpaceNode(
+        node_id=to_id,
+        name="Hibernate Wake Target",
+        kind="station",
+        region=from_node.region or "disk",
+        x_ly=from_node.x_ly + 1.0,
+        y_ly=from_node.y_ly,
+        z_ly=from_node.z_ly,
+    )
+    state.world.space.nodes[to_id] = to_node
     from_node.radiation_rad_per_s = 0.001
     to_node.radiation_rad_per_s = 0.009
 

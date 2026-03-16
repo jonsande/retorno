@@ -75,6 +75,20 @@ def load_worldgen_templates() -> dict[str, dict]:
     return templates
 
 
+def load_worldgen_archetypes() -> dict[str, dict]:
+    path = _DATA_ROOT / "worldgen" / "archetypes"
+    if not path.exists():
+        return {}
+    archetypes: dict[str, dict] = {}
+    for file in sorted(path.glob("*.json")):
+        with file.open("r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        archetype = str(data.get("archetype", "") or "").strip()
+        if archetype:
+            archetypes[archetype] = data
+    return archetypes
+
+
 
 def load_arcs() -> list[dict]:
     path = _DATA_ROOT / "arcs"

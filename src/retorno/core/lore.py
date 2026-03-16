@@ -26,6 +26,7 @@ from retorno.worldgen.generator import (
     _name_from_node_id,
     ensure_sector_generated,
     procedural_radiation_for_node,
+    sync_sector_state_for_node,
 )
 
 
@@ -144,6 +145,111 @@ def deliver_station_broadcast(state, node_id: str, content_ref: str, lang: str) 
     return path
 
 
+def write_local_intel(
+    state,
+    channel: str,
+    content: str,
+    *,
+    node_id: str | None = None,
+    source: SourceRef | None = None,
+    mail_from: str | None = None,
+    mail_subject: str | None = None,
+) -> tuple[str, Event]:
+    seq = state.events.next_event_seq
+    locale = state.os.locale.value
+    source = source or SourceRef(kind="world", id=node_id or state.world.current_node_id)
+
+    if channel == "captured_signal":
+        _ensure_dir(state.os.fs, "/logs")
+        _ensure_dir(state.os.fs, "/logs/signals")
+        path = normalize_path(f"/logs/signals/{seq:04d}.{locale}.txt")
+        state.os.fs[path] = FSNode(path=path, node_type=FSNodeType.FILE, content=content, access=AccessLevel.GUEST)
+        msg = {
+            "en": f"signal_captured :: Signal captured: {path} (hint: cat {path})",
+            "es": f"signal_captured :: Señal capturada: {path} (pista: cat {path})",
+        }.get(locale, f"signal_captured :: Signal captured: {path}")
+        event = Event(
+            event_id=f"E{seq:05d}",
+            t=int(state.clock.t),
+            type=EventType.SIGNAL_CAPTURED,
+            severity=Severity.INFO,
+            source=source,
+            message=msg,
+            data={"path": path},
+        )
+        state.events.next_event_seq += 1
+        return path, event
+
+    if channel == "station_broadcast":
+        _ensure_dir(state.os.fs, "/logs")
+        _ensure_dir(state.os.fs, "/logs/broadcasts")
+        base_node_id = node_id or state.world.current_node_id
+        path = normalize_path(f"/logs/broadcasts/{base_node_id}_{seq:04d}.{locale}.txt")
+        state.os.fs[path] = FSNode(path=path, node_type=FSNodeType.FILE, content=content, access=AccessLevel.GUEST)
+        msg = {
+            "en": f"broadcast_received :: Station broadcast: {path}",
+            "es": f"broadcast_received :: Emisión recibida: {path}",
+        }.get(locale, f"broadcast_received :: Station broadcast: {path}")
+        event = Event(
+            event_id=f"E{seq:05d}",
+            t=int(state.clock.t),
+            type=EventType.BROADCAST_RECEIVED,
+            severity=Severity.INFO,
+            source=source,
+            message=msg,
+            data={"path": path},
+        )
+        state.events.next_event_seq += 1
+        return path, event
+
+    if channel == "ship_os_mail":
+        _ensure_dir(state.os.fs, "/mail")
+        _ensure_dir(state.os.fs, "/mail/inbox")
+        path = normalize_path(f"/mail/inbox/{seq:04d}.{locale}.txt")
+        body = _mail_envelope_content(content, mail_from=mail_from, mail_subject=mail_subject)
+        state.os.fs[path] = FSNode(path=path, node_type=FSNodeType.FILE, content=body, access=AccessLevel.GUEST)
+        register_mail(state.os, path, state.clock.t)
+        msg = {
+            "en": f"mail_received :: New internal memo queued: {path}",
+            "es": f"mail_received :: Nuevo memo interno en cola: {path}",
+        }.get(locale, f"mail_received :: New mail received: {path}")
+        event = Event(
+            event_id=f"E{seq:05d}",
+            t=int(state.clock.t),
+            type=EventType.MAIL_RECEIVED,
+            severity=Severity.INFO,
+            source=source,
+            message=msg,
+            data={"path": path},
+        )
+        state.events.next_event_seq += 1
+        return path, event
+
+    if channel == "uplink_trace":
+        _ensure_dir(state.os.fs, "/logs")
+        _ensure_dir(state.os.fs, "/logs/nav")
+        base_node_id = node_id or state.world.current_node_id
+        path = normalize_path(f"/logs/nav/uplink_trace_{base_node_id}_{seq:05d}.txt")
+        state.os.fs[path] = FSNode(path=path, node_type=FSNodeType.FILE, content=content, access=AccessLevel.GUEST)
+        msg = {
+            "en": f"uplink_trace :: Degraded route table recovered: {path} (hint: cat {path})",
+            "es": f"uplink_trace :: Tabla degradada recuperada: {path} (pista: cat {path})",
+        }.get(locale, f"uplink_trace :: Degraded route table recovered: {path}")
+        event = Event(
+            event_id=f"E{seq:05d}",
+            t=int(state.clock.t),
+            type=EventType.UPLINK_TRACE_RECEIVED,
+            severity=Severity.INFO,
+            source=source,
+            message=msg,
+            data={"path": path},
+        )
+        state.events.next_event_seq += 1
+        return path, event
+
+    raise ValueError(f"Unsupported local intel channel: {channel}")
+
+
 def _known_node_ids(state) -> list[str]:
     known_nodes = set(getattr(state.world, "known_nodes", set()) or set())
     known_contacts = set(getattr(state.world, "known_contacts", set()) or set())
@@ -243,7 +349,7 @@ def _locked_primary_targets(state) -> set[str]:
 
 def _parse_sector_id(sector_id: str) -> tuple[int, int, int]:
     try:
-        _, sx, sy, sz = sector_id[1:].split("_")
+        sx, sy, sz = sector_id[1:].split("_")
         return int(sx), int(sy), int(sz)
     except Exception:
         return 0, 0, 0
@@ -258,9 +364,7 @@ def _precompute_uplink_route_pool_for_node(state, node_id: str, max_new: int = 3
 
     current_sector = sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly)
     sx, sy, sz = _parse_sector_id(current_sector)
-    for dx in (-1, 0, 1):
-        for dy in (-1, 0, 1):
-            ensure_sector_generated(state, f"S{sx+dx:+04d}_{sy+dy:+04d}_{sz:+04d}")
+    ensure_sector_generated(state, current_sector)
 
     routes = set(state.world.known_links.get(node_id, set()))
     locked_primary_targets = _locked_primary_targets(state)
@@ -292,7 +396,7 @@ def _precompute_uplink_route_pool_for_node(state, node_id: str, max_new: int = 3
         if nid == node_id or nid in routes:
             continue
         n = state.world.space.nodes.get(nid)
-        if n and n.kind in hub_kinds:
+        if n and n.is_hub:
             _add_candidate(nid, 10)
         elif n and n.kind in {"ship", "derelict"}:
             _add_candidate(nid, 2)
@@ -1321,6 +1425,54 @@ def _pick_anchor_for_coords(anchors: list[SpaceNode], x: float, y: float, z: flo
     return ranked[0] if ranked else None
 
 
+def register_hidden_anchored_node(
+    state,
+    *,
+    seed_key: str,
+    kind: str,
+    anchor_node_id: str,
+    x_ly: float,
+    y_ly: float,
+    z_ly: float,
+    force_hub: bool | None = None,
+) -> str | None:
+    anchor = state.world.space.nodes.get(anchor_node_id)
+    if not anchor:
+        return None
+    dx = anchor.x_ly - x_ly
+    dy = anchor.y_ly - y_ly
+    dz = anchor.z_ly - z_ly
+    if (dx * dx + dy * dy + dz * dz) ** 0.5 > float(Balance.MAX_ROUTE_HOP_LY):
+        return None
+
+    region = region_for_pos(x_ly, y_ly, z_ly)
+    seed = _stable_seed64(state.meta.rng_seed, "hidden_anchored_node", seed_key, anchor_node_id, kind, x_ly, y_ly, z_ly)
+    rng = random.Random(seed)
+    is_hub = force_hub if force_hub is not None else kind in {"relay", "station", "waystation"}
+    node_id = _generate_node_id(state, kind, rng)
+    node = SpaceNode(
+        node_id=node_id,
+        name=_name_from_node_id(node_id, kind),
+        kind=kind,
+        radiation_rad_per_s=procedural_radiation_for_node(state.meta.rng_seed, node_id, kind, region),
+        radiation_base=0.0,
+        region=region,
+        x_ly=x_ly,
+        y_ly=y_ly,
+        z_ly=z_ly,
+        is_hub=is_hub,
+        is_topology_hub=is_hub,
+    )
+    node.links.add(anchor.node_id)
+    anchor.links.add(node.node_id)
+    state.world.space.nodes[node_id] = node
+    sync_sector_state_for_node(state, node_id)
+    sync_sector_state_for_node(state, anchor.node_id)
+    state.world.forced_hidden_nodes.add(node_id)
+    sync_node_pools_for_known_nodes(state)
+    return node_id
+
+
 def _spawn_ad_hoc_candidate_for_forced_piece(state, piece_entry: dict) -> str | None:
     if not state.world.space.nodes:
         return None
@@ -1393,28 +1545,17 @@ def _spawn_ad_hoc_candidate_for_forced_piece(state, piece_entry: dict) -> str | 
     if not anchor:
         return None
 
-    node_id = _generate_node_id(state, kind, rng)
-    node = SpaceNode(
-        node_id=node_id,
-        name=_name_from_node_id(node_id, kind),
+    node_id = register_hidden_anchored_node(
+        state,
+        seed_key=piece_entry["piece_key"],
         kind=kind,
-        radiation_rad_per_s=procedural_radiation_for_node(state.meta.rng_seed, node_id, kind, region),
-        radiation_base=0.0,
-        region=region,
+        anchor_node_id=anchor.node_id,
         x_ly=x,
         y_ly=y,
         z_ly=z,
     )
-    dx = anchor.x_ly - node.x_ly
-    dy = anchor.y_ly - node.y_ly
-    dz = anchor.z_ly - node.z_ly
-    if (dx * dx + dy * dy + dz * dz) ** 0.5 > float(Balance.MAX_ROUTE_HOP_LY):
+    if not node_id:
         return None
-    node.links.add(anchor.node_id)
-    anchor.links.add(node.node_id)
-    state.world.space.nodes[node_id] = node
-    state.world.forced_hidden_nodes.add(node_id)
-    sync_node_pools_for_known_nodes(state)
     _seed_hidden_forced_breadcrumb(state, node_id, piece_entry["piece_key"])
     return node_id
 

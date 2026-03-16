@@ -1,13 +1,12 @@
 {
   "region": "bulge",
-  "node_count_min": 3,
-  "node_count_max": 7,
   "z_sigma": 0.8,
-  "kind_weights": {
-    "relay": 0.25,
-    "derelict": 0.25,
-    "station": 0.35,
-    "ship": 0.15
+  "archetype_weights": {
+    "empty": 30,
+    "ruin_field": 30,
+    "relay_corridor": 10,
+    "isolated_station": 10,
+    "graveyard": 20
   },
   "salvage": {
     "scrap_min": 15,

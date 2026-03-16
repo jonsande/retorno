@@ -1,0 +1,27 @@
+{
+  "archetype": "relay_corridor",
+  "node_count_min": 1,
+  "node_count_max": 2,
+  "kind_weights": {
+    "relay": 1.0,
+    "waystation": 0.8,
+    "ship": 0.4,
+    "derelict": 0.3
+  },
+  "kind_caps": {
+    "station": 0,
+    "relay": 1,
+    "waystation": 1,
+    "ship": 1,
+    "derelict": 1
+  },
+  "forbidden_kinds": ["station"],
+  "intersector_link_max": 2,
+  "intersector_link_prob": 0.85,
+  "playable_hub_prob": 0.9,
+  "playable_hub_kind_weights": {
+    "relay": 9.0,
+    "waystation": 7.0
+  },
+  "extra_internal_link_prob": 0.2
+}

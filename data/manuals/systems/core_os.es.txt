@@ -23,7 +23,7 @@ Set mínimo de supervivencia (terminal)
 - `alerts`, `alerts explain <alert_key>`.
 - `logs`, `log copy [n]`.
 - `jobs`, `jobs <n|all>`.
-- Debug de soporte: `debug on|off|status`, `debug arcs`, `debug lore`, `debug deadnodes`, `debug modules`, `debug seed <n>`, `debug scenario <preset>`.
+- Debug de soporte: `debug on|off|status`, `debug arcs`, `debug lore`, `debug deadnodes`, `debug modules`, `debug galaxy`, `debug galaxy map <scale>`, `debug worldgen sector <sector_id>`, `debug graph all`, `debug seed <n>`, `debug scenario <preset>`.
 
 Comandos relacionados
 - `status`, `alerts`, `logs`, `diag core_os`.

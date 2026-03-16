@@ -1424,6 +1424,8 @@ class RetornoTextualApp(App):
                 "JOBS",
                 "DEBUG_MODULES",
                 "DEBUG_GALAXY_MAP",
+                "DEBUG_WORLDGEN_SECTOR",
+                "DEBUG_GRAPH_ALL",
                 "NAV_MAP",
                 "SHIP_SURVEY",
                 "DRONE_STATUS",
@@ -1443,6 +1445,14 @@ class RetornoTextualApp(App):
                     self._log_line(line)
                 if discovered:
                     self._log_line(f"(scan) new: {', '.join(sorted(discovered))}")
+                dead_events = repl.evaluate_dead_nodes(state, "scan", debug=state.os.debug_enabled)
+                if dead_events:
+                    repl._store_recent_events(state, dead_events)
+                    self._log_lines(presenter.format_event_lines(state, [("cmd", e) for e in dead_events]))
+                recovery_events = repl.ensure_exploration_recovery(state, "scan")
+                if recovery_events:
+                    repl._store_recent_events(state, recovery_events)
+                    self._log_lines(presenter.format_event_lines(state, [("cmd", e) for e in recovery_events]))
             return
         if parsed == "JOBS":
             with self.loop.with_lock() as state:
@@ -1721,6 +1731,22 @@ class RetornoTextualApp(App):
                 self._log_lines(
                     presenter.build_command_output(repl.render_debug_galaxy_map, state, parsed[1])
                 )
+            return
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_WORLDGEN_SECTOR":
+            with self.loop.with_lock() as state:
+                if not state.os.debug_enabled:
+                    self._log_line("debug worldgen sector: available only in DEBUG mode. Use: debug on")
+                    return
+                self._log_lines(
+                    presenter.build_command_output(repl.render_debug_worldgen_sector, state, str(parsed[1]))
+                )
+            return
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_GRAPH_ALL":
+            with self.loop.with_lock() as state:
+                if not state.os.debug_enabled:
+                    self._log_line("debug graph all: available only in DEBUG mode. Use: debug on")
+                    return
+                self._log_lines(presenter.build_command_output(repl.render_debug_graph_all, state))
             return
 
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_SEED":

@@ -1,0 +1,22 @@
+{
+  "archetype": "empty",
+  "node_count_min": 0,
+  "node_count_max": 1,
+  "kind_weights": {
+    "ship": 1.0,
+    "derelict": 1.0
+  },
+  "kind_caps": {
+    "station": 0,
+    "relay": 0,
+    "waystation": 0,
+    "ship": 1,
+    "derelict": 1
+  },
+  "forbidden_kinds": ["station", "relay", "waystation"],
+  "intersector_link_max": 0,
+  "intersector_link_prob": 0.0,
+  "playable_hub_prob": 0.0,
+  "playable_hub_kind_weights": {},
+  "extra_internal_link_prob": 0.0
+}

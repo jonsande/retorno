@@ -45,6 +45,7 @@ class EventType(str, Enum):
     HIBERNATION_ENDED = "hibernation_ended"
     SERVICE_ALREADY_RUNNING = "service_already_running"
     UPLINK_COMPLETE = "uplink_complete"
+    UPLINK_TRACE_RECEIVED = "uplink_trace_received"
     DATA_SALVAGED = "data_salvaged"
     MAIL_RECEIVED = "mail_received"
     SIGNAL_CAPTURED = "signal_captured"

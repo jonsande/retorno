@@ -99,14 +99,6 @@ def build_jobs_lines(state) -> list[str]:
     for line in lines:
         if line.strip().lower().startswith("recent complete/failed"):
             break
-        if line.lstrip().startswith("- ") and ":" in line:
-            prefix, rest = line.split(":", 1)
-            # Replace job id prefix with drone_id if present.
-            if " owner=" in rest:
-                owner_part = rest.split(" owner=", 1)[1]
-                owner_id = owner_part.split()[0]
-                if owner_id != "-":
-                    line = f"- {owner_id}:{rest}"
         filtered.append(line)
     return filtered
 

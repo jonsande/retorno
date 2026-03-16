@@ -23,6 +23,7 @@ class SpaceNode:
     salvage_dry: bool = False
     links: set[str] = field(default_factory=set)
     is_hub: bool = False
+    is_topology_hub: bool = False
 
     def __setstate__(self, state) -> None:
         """Backward-compatible unpickle for slot additions."""
@@ -38,6 +39,8 @@ class SpaceNode:
         data = dict(slot_state)
         if "recoverable_drones_count" not in data:
             data["recoverable_drones_count"] = 0
+        if "is_topology_hub" not in data:
+            data["is_topology_hub"] = bool(data.get("is_hub", False))
 
         for f in fields(self):
             if f.name in data:
@@ -73,6 +76,19 @@ class IntelItem:
 
 
 @dataclass(slots=True)
+class SectorGenState:
+    sector_id: str = ""
+    region: str = ""
+    archetype: str = ""
+    node_ids: list[str] = field(default_factory=list)
+    topology_hub_node_id: str | None = None
+    playable_hub_node_id: str | None = None
+    internal_link_count: int = 0
+    intersector_link_count: int = 0
+    internal_links_built: bool = False
+
+
+@dataclass(slots=True)
 class WorldState:
     space: SpaceGraph = field(default_factory=SpaceGraph)
     known_contacts: set[str] = field(default_factory=set)
@@ -103,6 +119,42 @@ class WorldState:
     lore_placements: "LorePlacementState" = field(default_factory=lambda: LorePlacementState())
     dead_nodes: dict[str, "DeadNodeState"] = field(default_factory=dict)
     deadnode_log: list[str] = field(default_factory=list)
+    exploration_recovery: "ExplorationRecoveryState" = field(default_factory=lambda: ExplorationRecoveryState())
+    sector_states: dict[str, SectorGenState] = field(default_factory=dict)
+    intersector_link_pairs: set[str] = field(default_factory=set)
+    sparse_guardrail_done: bool = False
+
+    def __setstate__(self, state) -> None:
+        """Backward-compatible unpickle for slot additions."""
+        slot_state = state
+        if isinstance(state, tuple):
+            if len(state) == 2 and isinstance(state[1], dict):
+                slot_state = state[1]
+            elif len(state) == 2 and isinstance(state[0], dict):
+                slot_state = state[0]
+        if not isinstance(slot_state, dict):
+            raise TypeError(f"Unsupported WorldState pickle payload: {type(state)!r}")
+
+        data = dict(slot_state)
+        if "sector_states" not in data:
+            data["sector_states"] = {}
+        if "intersector_link_pairs" not in data:
+            data["intersector_link_pairs"] = set()
+        if "sparse_guardrail_done" not in data:
+            data["sparse_guardrail_done"] = False
+        if "exploration_recovery" not in data:
+            data["exploration_recovery"] = ExplorationRecoveryState()
+
+        for f in fields(self):
+            if f.name in data:
+                value = data[f.name]
+            elif f.default is not MISSING:
+                value = f.default
+            elif f.default_factory is not MISSING:
+                value = f.default_factory()
+            else:
+                continue
+            object.__setattr__(self, f.name, value)
 
 
 @dataclass(slots=True)
@@ -157,6 +209,20 @@ class DeadNodeState:
     attempts: int = 0
     last_action_t: float = 0.0
     bridge_node_id: str | None = None
+
+
+@dataclass(slots=True)
+class ExplorationRecoveryState:
+    generation: int = 0
+    anchor_node_id: str | None = None
+    entry_node_id: str | None = None
+    gateway_node_id: str | None = None
+    passive_hint_path: str | None = None
+    passive_hint_channel: str | None = None
+    passive_hint_t: float | None = None
+    dock_hint_path: str | None = None
+    dock_hint_delivered: bool = False
+    salvage_hint_seeded: bool = False
 
 
 SECTOR_SIZE_LY = 10.0

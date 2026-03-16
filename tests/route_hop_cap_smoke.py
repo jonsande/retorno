@@ -48,10 +48,7 @@ def _assert_worldgen_links_respect_cap() -> None:
     state = create_initial_state_sandbox()
     current = state.world.space.nodes[state.world.current_node_id]
     base_sid = sector_id_for_pos(current.x_ly, current.y_ly, current.z_ly)
-    sx, sy, sz = [int(p) for p in base_sid[1:].split("_")]
-    for dx in (-1, 0, 1):
-        for dy in (-1, 0, 1):
-            ensure_sector_generated(state, f"S{sx+dx:+04d}_{sy+dy:+04d}_{sz:+04d}")
+    ensure_sector_generated(state, base_sid)
 
     cap = float(Balance.MAX_ROUTE_HOP_LY)
     for node in state.world.space.nodes.values():

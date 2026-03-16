@@ -30,6 +30,31 @@
       "path": "/logs/echo_cache.es.txt",
       "access": "GUEST",
       "content_ref": "lore/echo_7/logs/echo_cache.es.txt"
+    },
+    {
+      "path": "/logs/echo_fragment_0002.txt",
+      "access": "GUEST",
+      "content_ref": "lore/echo_7/logs/echo_fragment_0002.txt"
+    },
+    {
+      "path": "/logs/echo_fragment_0001.txt",
+      "access": "GUEST",
+      "content": "LINK: ECHO_7 -> CURL_12\n"
+    },
+    {
+      "path": "/logs/echo_fragment_0003.txt",
+      "access": "GUEST",
+      "content_ref": "lore/echo_7/logs/echo_fragment_0003.txt"
+    },
+    {
+      "path": "/logs/echo_fragment_0004.txt",
+      "access": "GUEST",
+      "content_ref": "lore/echo_7/logs/echo_fragment_0004.txt"
+    },
+    {
+      "path": "/mail/inbox/0001.en.txt",
+      "access": "GUEST",
+      "content_ref": "lore/echo_7/mail/echo_mail_0001.en.txt"
     }
   ]
 }

@@ -50,7 +50,7 @@ Minimum survival set (when core_os is OFFLINE or terminal_lock is active)
 - status
 - logs, alerts, jobs
 - log copy [n], alerts explain <alert_key>, jobs <n|all>
-- debug on|off|status, debug arcs, debug lore, debug deadnodes, debug modules, debug seed <n>, debug scenario <preset>
+- debug on|off|status, debug arcs, debug lore, debug deadnodes, debug modules, debug galaxy, debug galaxy map <scale>, debug worldgen sector <sector_id>, debug graph all, debug seed <n>, debug scenario <preset>
 
 life_support
 - What it is: host capsule life support (atmosphere, thermal, perfusion).
