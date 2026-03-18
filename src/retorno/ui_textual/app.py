@@ -317,8 +317,12 @@ class RetornoTextualApp(App):
         self.set_interval(0.25, self.refresh_panels)
         self.refresh_panels()
         self._apply_panel_layout()
-        # Ensure input is focused on start.
-        self.call_later(lambda: self.query_one("#input", Input).focus())
+        if self._play_startup_sequence and Balance.STARTUP_SEQUENCE_ENABLED:
+            # Keep startup cinematic with no focused panel.
+            self.call_later(lambda: self.set_focus(None))
+        else:
+            # Ensure input is focused on start when no startup cinematic is running.
+            self.call_later(lambda: self.query_one("#input", Input).focus())
         self.call_after_refresh(self._start_startup_sequence)
 
     def _start_startup_sequence(self) -> None:
@@ -335,6 +339,7 @@ class RetornoTextualApp(App):
         self._startup_sequence_skip = False
         input_widget = self.query_one("#input", Input)
         input_widget.disabled = True
+        self.set_focus(None)
         locale = self.loop.state.os.locale.value
         lines = load_startup_sequence_lines(locale)
         if not lines:
@@ -342,6 +347,7 @@ class RetornoTextualApp(App):
             self._startup_panel_blackout = False
             input_widget.disabled = False
             self.refresh_panels()
+            self.call_later(input_widget.focus)
             return
         typewriter = Balance.STARTUP_SEQUENCE_TYPEWRITER
         cps = max(1, int(Balance.STARTUP_SEQUENCE_TYPEWRITER_CPS))
