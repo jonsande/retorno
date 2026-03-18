@@ -19,8 +19,8 @@ def main() -> None:
     assert dock_targets == ["ECHO_7"], f"Expected only current node for dock completion in orbit, got {dock_targets!r}"
 
     route_solve_targets = repl._route_solve_targets_for_completion(state)
-    assert route_solve_targets == ["CURL_12"], (
-        f"Expected only remote contacts without route from current node, got {route_solve_targets!r}"
+    assert route_solve_targets == ["ECHO_7"], (
+        f"Expected in-range unresolved route-solve targets from current node, got {route_solve_targets!r}"
     )
 
     add_known_link(state.world, "ECHO_7", "CURL_12", bidirectional=True)
@@ -33,11 +33,25 @@ def main() -> None:
     assert world_targets == ["ECHO_7"], f"Expected only current node while in orbit, got {world_targets!r}"
 
     move_targets = repl._drone_move_targets_for_completion(state)
+    expected_ship_sectors = {
+        "DCK-A1",
+        "STS-BAY",
+        "LFS-01",
+        "PWR-A1",
+        "PWR-A2",
+        "PRP-R1",
+        "BRG-01",
+        "SNS-R1",
+        "DRN-BAY",
+        "CRG-01",
+    }
+    assert expected_ship_sectors.issubset(set(move_targets)), move_targets
     assert "ECHO_7" in move_targets, move_targets
     assert "CURL_12" not in move_targets, move_targets
     assert "DRN-BAY" in move_targets, move_targets
 
     deploy_targets = repl._drone_deploy_targets_for_completion(state)
+    assert expected_ship_sectors.issubset(set(deploy_targets)), deploy_targets
     assert "ECHO_7" in deploy_targets, deploy_targets
     assert "CURL_12" not in deploy_targets, deploy_targets
     assert "DRN-BAY" in deploy_targets, deploy_targets

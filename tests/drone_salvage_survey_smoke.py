@@ -256,7 +256,7 @@ def main() -> None:
         d = state.ship.drones.get(did)
         assert d is not None, f"Missing salvaged drone {did}"
         assert d.status == DroneStatus.DOCKED, f"Salvaged drone {did} should be docked"
-        assert d.location.kind == "ship_sector" and d.location.id == "drone_bay", (
+        assert d.location.kind == "ship_sector" and d.location.id == "DRN-BAY", (
             f"Unexpected location for {did}: {d.location.kind}:{d.location.id}"
         )
 

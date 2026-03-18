@@ -8,5 +8,12 @@ Operational behavior
 - `ship sectors`: lists internal ship sectors and subsystem placement context.
 - `nav map sectors`: lists known world sectors and navigation coverage.
 
+RETORNO internal-sector set
+- `DCK-A1`, `STS-BAY`, `LFS-01`, `PWR-A1`, `PWR-A2`, `PRP-R1`, `BRG-01`, `SNS-R1`, `DRN-BAY`, `CRG-01`
+
+Sector-id convention
+- Internal sector ids are canonical/reusable per ship type/functional position.
+- Resolve uniqueness using ship/node context (for example `RETORNO_SHIP:BRG-01`).
+
 Related commands
 - `locate <id>`, `nav map graph`, `status`

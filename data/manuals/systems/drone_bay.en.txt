@@ -15,7 +15,7 @@ Operational dependencies
   - `energy_distribution` not `OFFLINE`.
 - Charging also depends on instantaneous power conditions (net generation / reserve).
 - Drone-module bay operations (`drone install` with `scope=drone`, `drone uninstall`) require:
-  - target drone docked in `drone_bay`,
+  - target drone docked in `DRN-BAY`,
   - `drone_bay == NOMINAL`,
   - `energy_distribution != OFFLINE`.
 - Ship-module install/uninstall (legacy operator flow) require bay support online (`drone_bay` not `OFFLINE`) but do not require `NOMINAL`.

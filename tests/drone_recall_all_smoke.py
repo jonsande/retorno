@@ -36,7 +36,7 @@ def main() -> None:
         drone_id="D3",
         name="Drone-03",
         status=DroneStatus.DOCKED,
-        location=DroneLocation(kind="ship_sector", id="drone_bay"),
+        location=DroneLocation(kind="ship_sector", id="DRN-BAY"),
     )
     state.ship.docked_node_id = "ECHO_7"
     state.world.current_node_id = "ECHO_7"

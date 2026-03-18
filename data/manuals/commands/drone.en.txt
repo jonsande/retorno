@@ -23,10 +23,10 @@ Requirements (gating)
 - World-node operations require drone and ship to remain co-located at that node.
 - `drone install <drone_id> <module_id>` resolves by module scope:
   - if `scope=ship`, requirements: operator drone deployed on ship, module in inventory, scrap cost available.
-  - if `scope=drone`, requirements: `docked` in `drone_bay`, `drone_bay=NOMINAL`, `energy_distribution!=OFFLINE`, free slots.
+  - if `scope=drone`, requirements: `docked` in `DRN-BAY`, `drone_bay=NOMINAL`, `energy_distribution!=OFFLINE`, free slots.
 - `drone uninstall <drone_id> <module_id>` resolves by module scope:
   - if `scope=ship`, requirements: operator drone deployed on ship, module installed on ship, bay support online.
-  - if `scope=drone`, requirements: `docked` in `drone_bay`, `drone_bay=NOMINAL`, `energy_distribution!=OFFLINE`.
+  - if `scope=drone`, requirements: `docked` in `DRN-BAY`, `drone_bay=NOMINAL`, `energy_distribution!=OFFLINE`.
 
 Operational behavior
 - Drone modules do not mutate base stats destructively.

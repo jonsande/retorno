@@ -12,6 +12,22 @@ Operational behavior
 - `ship sectors`: internal topology and placement.
 - `ship survey`: structured survey job/event pipeline (requires sensor/data stack availability).
 
+RETORNO canonical internal sectors
+- `DCK-A1`: Dock / Airlock
+- `STS-BAY`: Stasis Bay
+- `LFS-01`: Life Support
+- `PWR-A1`: Power Core
+- `PWR-A2`: Power Distribution
+- `PRP-R1`: Propulsion Room (reserved)
+- `BRG-01`: Bridge / Command
+- `SNS-R1`: Sensors Room
+- `DRN-BAY`: Drone Bay
+- `CRG-01`: Cargo Hold
+
+Sector-id convention
+- Sector ids are canonical and reusable across ships.
+- Global uniqueness comes from context (`ship_id:sector_id`), not from bare sector id.
+
 Usage notes
 - Use `ship systems` + `alerts` to triage failures before long operations.
 

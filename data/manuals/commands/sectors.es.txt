@@ -8,5 +8,12 @@ Comportamiento operativo
 - `ship sectors`: lista sectores internos y contexto de ubicación de subsistemas.
 - `nav map sectors`: lista sectores mundiales conocidos y cobertura de navegación.
 
+Set de sectores internos de RETORNO
+- `DCK-A1`, `STS-BAY`, `LFS-01`, `PWR-A1`, `PWR-A2`, `PRP-R1`, `BRG-01`, `SNS-R1`, `DRN-BAY`, `CRG-01`
+
+Convencion de ids de sector
+- Los ids internos son canonicos/reutilizables por tipo de nave y posicion funcional.
+- La unicidad se resuelve con el contexto nave/nodo (por ejemplo `RETORNO_SHIP:BRG-01`).
+
 Comandos relacionados
 - `locate <id>`, `nav map graph`, `status`

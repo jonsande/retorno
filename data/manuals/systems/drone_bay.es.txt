@@ -15,7 +15,7 @@ Dependencias operativas
   - `energy_distribution` fuera de `OFFLINE`.
 - La recarga tambien depende de condiciones electricas instantaneas (neto de generacion / reserva).
 - Las operaciones de modulos de dron en bahia (`drone install` con `scope=drone`, `drone uninstall`) requieren:
-  - dron objetivo acoplado en `drone_bay`,
+  - dron objetivo acoplado en `DRN-BAY`,
   - `drone_bay == NOMINAL`,
   - `energy_distribution != OFFLINE`.
 - La instalacion/desinstalacion de modulos de nave (flujo legado con dron operador) requiere soporte de bahia online (`drone_bay` no `OFFLINE`) pero no requiere `NOMINAL`.

@@ -3,8 +3,9 @@ from __future__ import annotations
 from retorno.core.gamestate import GameState
 from retorno.model.drones import DroneLocation, DroneState, DroneStatus
 from retorno.model.events import AlertState, Event, EventType, Severity, SourceRef
-from retorno.model.ship import PowerNetworkState, ShipSector
+from retorno.model.ship import PowerNetworkState
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, normalize_path, register_mail, _normalize_access
+from retorno.model.ship_layout import apply_retorno_canonical_layout, build_retorno_ship_sectors
 from retorno.model.systems import Dependency, ServiceState, ShipSystem, SystemState
 from retorno.model.world import SpaceNode, add_known_link, is_hop_within_cap, region_for_pos, sector_id_for_pos
 from retorno.worldgen.generator import ensure_sector_generated
@@ -47,7 +48,7 @@ def create_initial_state_prologue() -> GameState:
             name="Life Support",
             state=SystemState.NOMINAL,
             health=1.0,
-            sector_id="BRG-01",
+            sector_id="LFS-01",
             p_nom_kw=1.2,
             priority=1,
             base_decay_per_s=8.0e-11,
@@ -60,7 +61,7 @@ def create_initial_state_prologue() -> GameState:
             name="Power Core",
             state=SystemState.DAMAGED,
             health=0.6,
-            sector_id="PWR-A2",
+            sector_id="PWR-A1",
             p_nom_kw=0.2,
             priority=2,
             base_decay_per_s=1.0e-10,
@@ -140,7 +141,7 @@ def create_initial_state_prologue() -> GameState:
             name="Sensors",
             state=SystemState.OFFLINE,
             health=0.85,
-            sector_id="BRG-01",
+            sector_id="SNS-R1",
             p_nom_kw=0.7,
             priority=3,
             base_decay_per_s=9.0e-11,
@@ -162,18 +163,14 @@ def create_initial_state_prologue() -> GameState:
             drone_id="D1",
             name="Drone-01",
             status=DroneStatus.DOCKED,
-            location=DroneLocation(kind="ship_sector", id="drone_bay"),
+            location=DroneLocation(kind="ship_sector", id="DRN-BAY"),
             shield_factor=0.9,
         )
     }
     state.ship.cargo_scrap = Balance.STARTING_SCRAP
 
-    state.ship.sectors = {
-        "DRN-BAY": ShipSector(sector_id="DRN-BAY", name="Drone Bay", tags={"bay"}),
-        "PWR-A2": ShipSector(sector_id="PWR-A2", name="Power Trunk A2", tags={"power"}),
-        "BRG-01": ShipSector(sector_id="BRG-01", name="Bridge Access", tags={"restricted"}),
-        "CRG-01": ShipSector(sector_id="CRG-01", name="Cargo Hold", tags={"cargo"}),
-    }
+    state.ship.sectors = build_retorno_ship_sectors()
+    apply_retorno_canonical_layout(state)
 
     state.world.current_node_id = "UNKNOWN"
     state.ship.current_node_id = state.world.current_node_id
@@ -254,6 +251,7 @@ def create_initial_state_sandbox() -> GameState:
     # Give some cargo for testing
     state.ship.cargo_scrap = max(state.ship.cargo_scrap, Balance.STARTING_SCRAP)
     state.ship.manifest_dirty = True
+    apply_retorno_canonical_layout(state)
 
     return state
 

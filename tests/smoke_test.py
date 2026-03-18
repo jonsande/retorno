@@ -21,6 +21,28 @@ def main() -> None:
     engine = Engine()
     state = create_initial_state_prologue()
 
+    expected_sectors = [
+        "DCK-A1",
+        "STS-BAY",
+        "LFS-01",
+        "PWR-A1",
+        "PWR-A2",
+        "PRP-R1",
+        "BRG-01",
+        "SNS-R1",
+        "DRN-BAY",
+        "CRG-01",
+    ]
+    assert list(state.ship.sectors.keys()) == expected_sectors, state.ship.sectors
+    assert state.ship.systems["life_support"].sector_id == "LFS-01"
+    assert state.ship.systems["power_core"].sector_id == "PWR-A1"
+    assert state.ship.systems["energy_distribution"].sector_id == "PWR-A2"
+    assert state.ship.systems["core_os"].sector_id == "BRG-01"
+    assert state.ship.systems["data_core"].sector_id == "BRG-01"
+    assert state.ship.systems["security"].sector_id == "BRG-01"
+    assert state.ship.systems["sensors"].sector_id == "SNS-R1"
+    assert state.ship.systems["drone_bay"].sector_id == "DRN-BAY"
+
     # 1) Sanity: alerts iniciales existen
     assert "power_net_deficit" in state.events.alerts, "Missing initial POWER_NET_DEFICIT alert"
     assert "power_core_degraded" in state.events.alerts, "Missing initial POWER_CORE_DEGRADED alert"
@@ -30,7 +52,7 @@ def main() -> None:
     engine.tick(state, 1.0)
 
     # 3) Intentar desplegar dron al inicio: debe encolar job.
-    ev = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="PWR-A2"))
+    ev = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="PWR-A1"))
     assert ev and all(e.severity.value != "warn" for e in ev), (
         "DroneDeploy should enqueue at start; events: " + ", ".join([e.message for e in ev])
     )

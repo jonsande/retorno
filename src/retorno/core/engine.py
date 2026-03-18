@@ -74,6 +74,7 @@ from retorno.model.jobs import (
     finalize_job,
     job_id_numeric_suffix,
 )
+from retorno.model.ship_layout import canonical_ship_sector_id, drone_bay_sector_id_for_ship
 from retorno.model.world import SECTOR_SIZE_LY, add_known_link, is_hop_within_cap, record_intel, SpaceNode, sector_id_for_pos
 from retorno.runtime.data_loader import load_locations, load_modules
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path, mount_files
@@ -883,13 +884,16 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            if target_drone.location.kind != "ship_sector" or target_drone.location.id != "drone_bay":
+            if (
+                target_drone.location.kind != "ship_sector"
+                or canonical_ship_sector_id(target_drone.location.id) != self._drone_bay_sector_id(state)
+            ):
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
                     Severity.WARN,
                     SourceRef(kind="drone", id=target_drone.drone_id),
-                    f"Install blocked: {target_drone.drone_id} is not in drone_bay",
+                    f"Install blocked: {target_drone.drone_id} is not in DRN-BAY",
                     data={
                         "message_key": "boot_blocked",
                         "reason": "drone_not_in_bay",
@@ -1133,13 +1137,16 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            if target_drone.location.kind != "ship_sector" or target_drone.location.id != "drone_bay":
+            if (
+                target_drone.location.kind != "ship_sector"
+                or canonical_ship_sector_id(target_drone.location.id) != self._drone_bay_sector_id(state)
+            ):
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
                     Severity.WARN,
                     SourceRef(kind="drone", id=target_drone.drone_id),
-                    f"Uninstall blocked: {target_drone.drone_id} is not in drone_bay",
+                    f"Uninstall blocked: {target_drone.drone_id} is not in DRN-BAY",
                     data={"message_key": "boot_blocked", "reason": "drone_not_in_bay", "drone_id": target_drone.drone_id},
                 )
                 self._record_event(state.events, event)
@@ -1684,33 +1691,35 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
+            requested_target_id = str(action.sector_id)
+            canonical_target_id = canonical_ship_sector_id(requested_target_id)
             target_kind = "ship_sector"
-            target_id = action.sector_id
-            if action.sector_id in state.world.space.nodes:
-                if state.ship.docked_node_id != action.sector_id:
+            target_id = canonical_target_id
+            if requested_target_id in state.world.space.nodes:
+                if state.ship.docked_node_id != requested_target_id:
                     event = self._make_event(
                         state,
                         EventType.BOOT_BLOCKED,
                         Severity.WARN,
-                        SourceRef(kind="world", id=action.sector_id),
-                        f"Drone deploy blocked: ship not docked at {action.sector_id}",
-                        data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": action.sector_id},
+                        SourceRef(kind="world", id=requested_target_id),
+                        f"Drone deploy blocked: ship not docked at {requested_target_id}",
+                        data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": requested_target_id},
                     )
                     self._record_event(state.events, event)
                     return [event]
                 target_kind = "world_node"
-                target_id = action.sector_id
-            elif action.sector_id not in state.ship.sectors:
+                target_id = requested_target_id
+            elif canonical_target_id not in state.ship.sectors:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
                     Severity.WARN,
                     SourceRef(kind="ship", id=state.ship.ship_id),
-                    f"Drone deploy blocked: ship sector {action.sector_id} not found",
+                    f"Drone deploy blocked: ship sector {requested_target_id} not found",
                     data={
                         "message_key": "boot_blocked",
                         "reason": "ship_sector_missing",
-                        "sector_id": action.sector_id,
+                        "sector_id": requested_target_id,
                         "hint_key": "deploy_target_hint",
                     },
                 )
@@ -1852,18 +1861,13 @@ class Engine:
                 self._record_event(state.events, event)
                 return [event]
             target_kind = None
-            target_id = action.target_id
-            if target_id == state.ship.ship_id:
+            requested_target_id = str(action.target_id)
+            target_id = requested_target_id
+            if requested_target_id == state.ship.ship_id:
                 # Alias to bring the drone back to the ship via bay sector.
-                bay_sector_id = next(
-                    (
-                        sid
-                        for sid, sector in state.ship.sectors.items()
-                        if "bay" in getattr(sector, "tags", set())
-                    ),
-                    "DRN-BAY",
-                )
-                target_id = bay_sector_id
+                target_id = self._drone_bay_sector_id(state)
+            elif requested_target_id not in state.world.space.nodes:
+                target_id = canonical_ship_sector_id(requested_target_id)
             if target_id in state.ship.sectors:
                 if drone.location.kind == "world_node":
                     if state.ship.docked_node_id != drone.location.id:
@@ -1889,7 +1893,8 @@ class Engine:
                     self._record_event(state.events, event)
                     return [event]
                 target_kind = "ship_sector"
-            elif target_id in state.world.space.nodes:
+            elif requested_target_id in state.world.space.nodes:
+                target_id = requested_target_id
                 if state.ship.docked_node_id != target_id:
                     event = self._make_event(
                         state,
@@ -2123,6 +2128,30 @@ class Engine:
                     SourceRef(kind="ship_system", id=action.system_id),
                     f"Repair blocked: system {action.system_id} not found",
                     data={"message_key": "boot_blocked", "reason": "system_missing", "system_id": action.system_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            target_sector_id = canonical_ship_sector_id(target_system.sector_id)
+            drone_sector_id = (
+                canonical_ship_sector_id(drone.location.id)
+                if drone.location.kind == "ship_sector"
+                else str(drone.location.id)
+            )
+            if drone.location.kind != "ship_sector" or drone_sector_id != target_sector_id:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=target_system.system_id),
+                    f"Repair blocked: target system {target_system.system_id} not at operator location",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "system_target_not_co_located",
+                        "system_id": target_system.system_id,
+                        "drone_id": drone.drone_id,
+                        "drone_sector_id": drone_sector_id,
+                        "target_sector_id": target_sector_id,
+                    },
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -3675,7 +3704,7 @@ class Engine:
                 p_success = self._clamp(integrity, Balance.DRONE_REBOOT_P_MIN, Balance.DRONE_REBOOT_P_MAX)
                 if rng.random() < p_success:
                     drone.status = DroneStatus.DOCKED
-                    drone.location = DroneLocation(kind="ship_sector", id="drone_bay")
+                    drone.location = DroneLocation(kind="ship_sector", id=self._drone_bay_sector_id(state))
                     drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_RECALL)
                     drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_REBOOT)
                     events.append(
@@ -3720,7 +3749,7 @@ class Engine:
                 p_success = self._clamp(drone.integrity, Balance.DRONE_RECALL_P_MIN, Balance.DRONE_RECALL_P_MAX)
                 if rng.random() < p_success:
                     drone.status = DroneStatus.DOCKED
-                    drone.location = DroneLocation(kind="ship_sector", id="drone_bay")
+                    drone.location = DroneLocation(kind="ship_sector", id=self._drone_bay_sector_id(state))
                     events.append(
                         self._make_job_outcome_event(
                             state,
@@ -4051,7 +4080,7 @@ class Engine:
                         drone_id=drone_id,
                         name=f"Drone-{drone_id[1:].zfill(2)}",
                         status=DroneStatus.DOCKED,
-                        location=DroneLocation(kind="ship_sector", id="drone_bay"),
+                        location=DroneLocation(kind="ship_sector", id=self._drone_bay_sector_id(state)),
                         integrity=integrity,
                         battery=battery,
                         dose_rad=dose,
@@ -5279,6 +5308,9 @@ class Engine:
             return SystemState.OFFLINE
         return drone_bay.state
 
+    def _drone_bay_sector_id(self, state: GameState) -> str:
+        return drone_bay_sector_id_for_ship(state.ship)
+
     def _drone_bay_charge_rate_mult(self, state: GameState) -> float:
         bay_state = self._drone_bay_state(state)
         if bay_state == SystemState.LIMITED:
@@ -5368,7 +5400,7 @@ class Engine:
             for drone in state.ship.drones.values()
             if drone.status == DroneStatus.DOCKED
             and drone.location.kind == "ship_sector"
-            and drone.location.id == "drone_bay"
+            and canonical_ship_sector_id(drone.location.id) == self._drone_bay_sector_id(state)
         ]
         needs_charge_count = 0
         needs_repair_count = 0

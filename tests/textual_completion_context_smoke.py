@@ -56,10 +56,19 @@ def main() -> None:
         assert out_of_range_id not in nav_candidates, nav_candidates
 
         deploy_candidates = set(app._get_completion_candidates(state, "drone deploy D1 ", ""))
-        assert "BRG-01" in deploy_candidates, deploy_candidates
-        assert "CRG-01" in deploy_candidates, deploy_candidates
-        assert "DRN-BAY" in deploy_candidates, deploy_candidates
-        assert "PWR-A2" in deploy_candidates, deploy_candidates
+        expected_ship_sectors = {
+            "DCK-A1",
+            "STS-BAY",
+            "LFS-01",
+            "PWR-A1",
+            "PWR-A2",
+            "PRP-R1",
+            "BRG-01",
+            "SNS-R1",
+            "DRN-BAY",
+            "CRG-01",
+        }
+        assert expected_ship_sectors.issubset(deploy_candidates), deploy_candidates
         assert "ECHO_7" in deploy_candidates, deploy_candidates
         assert "CURL_12" not in deploy_candidates, deploy_candidates
         assert in_range_id not in deploy_candidates, deploy_candidates

@@ -6,9 +6,15 @@
 
 > ship sectors
 === RETORNO SHIP SECTORS ===
-- DRN-BAY: Drone Bay [bay]
-- PWR-A2: Power Trunk A2 [power]
-- BRG-01: Bridge Access [restricted]
+- DCK-A1: Dock / Airlock [airlock,dock]
+- STS-BAY: Stasis Bay [medical,stasis]
+- LFS-01: Life Support [life_support]
+- PWR-A1: Power Core [generation,power]
+- PWR-A2: Power Distribution [distribution,power]
+- PRP-R1: Propulsion Room [propulsion,reserved]
+- BRG-01: Bridge / Command [bridge,command,restricted]
+- SNS-R1: Sensors Room [sensors]
+- DRN-BAY: Drone Bay [bay,drone]
 - CRG-01: Cargo Hold [cargo]
 
 > log copy 9
@@ -16,19 +22,19 @@
 
 > locate life_support
 system_id: life_support
-ship_sector: BRG-01 (Bridge Access)
+ship_sector: LFS-01 (Life Support)
 
 > locate core_os
 system_id: core_os
-ship_sector: BRG-01 (Bridge Access)
+ship_sector: BRG-01 (Bridge / Command)
 
 > locate power_core
 system_id: power_core
-ship_sector: PWR-A2 (Power Trunk A2)
+ship_sector: PWR-A1 (Power Core)
 
 > locate energy_distribution
 system_id: energy_distribution
-ship_sector: PWR-A2 (Power Trunk A2)
+ship_sector: PWR-A2 (Power Distribution)
 
 > locate drone_bay
 system_id: drone_bay
@@ -36,14 +42,14 @@ ship_sector: DRN-BAY (Drone Bay)
 
 > locate security
 system_id: security
-ship_sector: BRG-01 (Bridge Access)
+ship_sector: BRG-01 (Bridge / Command)
 
 > locate data_core
 system_id: data_core
-ship_sector: BRG-01 (Bridge Access)
+ship_sector: BRG-01 (Bridge / Command)
 
 > locate sensors
 system_id: sensors
-ship_sector: BRG-01 (Bridge Access)
+ship_sector: SNS-R1 (Sensors Room)
 
 > log copy 100

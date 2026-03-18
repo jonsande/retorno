@@ -41,6 +41,11 @@ from retorno.runtime.operator_config import (
 from retorno.core.power_policy import is_parsed_command_allowed_in_core_os_critical
 from retorno.model.events import Event, EventType, Severity, SourceRef
 from retorno.model.jobs import JobStatus, JobType, active_job_display_ids
+from retorno.model.ship_layout import (
+    canonical_ship_sector_id,
+    drone_bay_sector_id_for_ship,
+    ship_sector_name_for_locale,
+)
 from retorno.runtime.data_loader import load_modules, load_arcs, load_locations, load_worldgen_archetypes, load_worldgen_templates
 from retorno.runtime.startup import (
     clear_terminal_screen,
@@ -1021,8 +1026,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "es": "Instalación bloqueada: sin slots libres de módulos de dron ({slots_used}/{slots_max})",
         },
         "drone_not_in_bay": {
-            "en": "Module operation blocked: target drone is not docked in drone_bay ({drone_id})",
-            "es": "Operación de módulo bloqueada: el dron objetivo no está acoplado en drone_bay ({drone_id})",
+            "en": "Module operation blocked: target drone is not docked in DRN-BAY ({drone_id})",
+            "es": "Operacion de modulo bloqueada: el dron objetivo no esta acoplado en DRN-BAY ({drone_id})",
         },
         "drone_bay_not_nominal": {
             "en": "Module operation blocked: drone_bay must be NOMINAL",
@@ -1055,6 +1060,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "drone_target_not_co_located": {
             "en": "Repair blocked: target drone not at operator location ({drone_id})",
             "es": "Reparación bloqueada: dron objetivo fuera de la ubicación del operador ({drone_id})",
+        },
+        "system_target_not_co_located": {
+            "en": "Repair blocked: target system not at operator location ({system_id}: {target_sector_id}, drone at {drone_sector_id})",
+            "es": "Reparación bloqueada: sistema objetivo fuera de la ubicación del operador ({system_id}: {target_sector_id}, dron en {drone_sector_id})",
         },
         "invalid_target": {
             "en": "Action blocked: invalid target",
@@ -2084,11 +2093,13 @@ def render_diag(state, system_id: str) -> None:
     print("\n=== DIAG ===")
     print(f"id: {sys.system_id}")
     print(f"name: {sys.name}")
-    sector = state.ship.sectors.get(sys.sector_id)
+    locale = state.os.locale.value
+    sector_id = canonical_ship_sector_id(sys.sector_id)
+    sector = state.ship.sectors.get(sector_id)
     if sector:
-        print(f"location: {sys.sector_id} ({sector.name})")
+        print(f"location: {sector_id} ({ship_sector_name_for_locale(sector_id, locale, fallback=sector.name)})")
     else:
-        print(f"location: {sys.sector_id}")
+        print(f"location: {sector_id}")
     print(f"state: {sys.state.value}")
     print(f"health: {sys.health:.2f}")
     print(f"p_nom: {sys.p_nom_kw:.2f} kW  p_eff: {sys.p_effective_kw():.2f} kW")
@@ -3413,13 +3424,14 @@ def debug_add_drones(state, count: int = 1) -> None:
         print("debug add drone: count must be > 0")
         return
     created: list[str] = []
+    bay_sector_id = drone_bay_sector_id_for_ship(state.ship)
     for _ in range(count):
         drone_id = _next_debug_drone_id(state)
         state.ship.drones[drone_id] = DroneState(
             drone_id=drone_id,
             name=f"Drone-{drone_id[1:].zfill(2)}",
             status=DroneStatus.DOCKED,
-            location=DroneLocation(kind="ship_sector", id="drone_bay"),
+            location=DroneLocation(kind="ship_sector", id=bay_sector_id),
             shield_factor=0.9,
             battery=1.0,
             integrity=1.0,
@@ -4663,9 +4675,11 @@ def render_ship_sectors(state) -> None:
     if not state.ship.sectors:
         print("(none)")
         return
+    locale = state.os.locale.value
     for sid, sector in state.ship.sectors.items():
         tags = ",".join(sorted(sector.tags)) if sector.tags else "-"
-        print(f"- {sid}: {sector.name} [{tags}]")
+        visible_name = ship_sector_name_for_locale(sid, locale, fallback=sector.name)
+        print(f"- {sid}: {visible_name} [{tags}]")
 
 
 def render_sectors(state) -> None:
@@ -5210,13 +5224,15 @@ def render_nav_map(state, mode: str, map_arg: str | None = None) -> None:
 def render_locate(state, system_id: str) -> None:
     sys = state.ship.systems.get(system_id)
     if sys:
-        sector = state.ship.sectors.get(sys.sector_id)
+        locale = state.os.locale.value
+        sector_id = canonical_ship_sector_id(sys.sector_id)
+        sector = state.ship.sectors.get(sector_id)
         if sector:
             print(f"system_id: {system_id}")
-            print(f"ship_sector: {sys.sector_id} ({sector.name})")
+            print(f"ship_sector: {sector_id} ({ship_sector_name_for_locale(sector_id, locale, fallback=sector.name)})")
         else:
             print(f"system_id: {system_id}")
-            print(f"ship_sector: {sys.sector_id}")
+            print(f"ship_sector: {sector_id}")
         return
     node = state.world.space.nodes.get(system_id)
     if not node:
@@ -6518,7 +6534,7 @@ def render_alert_explain(state, alert_key: str) -> None:
             )
 
         print("Battery charging conditions:")
-        print("- Drone must be docked in drone_bay and battery below its effective maximum")
+        print("- Drone must be docked in DRN-BAY and battery below its effective maximum")
         print("- drone_bay must not be OFFLINE")
         print("- energy_distribution must not be OFFLINE")
         print(
@@ -6526,11 +6542,11 @@ def render_alert_explain(state, alert_key: str) -> None:
             f"SoC > 0 with net >= {Balance.DRONE_CHARGE_NET_MIN_KW:.2f}kW (slow charge)"
         )
         print("Integrity passive-repair conditions:")
-        print("- Drone must be docked in drone_bay and integrity below its effective maximum")
+        print("- Drone must be docked in DRN-BAY and integrity below its effective maximum")
         print("- drone_bay and energy_distribution must be available (not OFFLINE)")
         print("- Ship must have enough scrap for passive repair cost of the current bay state")
         print("Drone decontamination conditions:")
-        print("- Drone must be docked in drone_bay")
+        print("- Drone must be docked in DRN-BAY")
         print("- drone_bay must not be OFFLINE")
         print("- energy_distribution must not be OFFLINE")
         print("- Decontamination does not require positive net power or scrap")

@@ -64,7 +64,7 @@ def _prepare_deployed_drone(state, drone_id: str = "D1") -> None:
 def _prepare_docked_drone(state, drone_id: str = "D1") -> None:
     drone = state.ship.drones[drone_id]
     drone.status = DroneStatus.DOCKED
-    drone.location = DroneLocation(kind="ship_sector", id="drone_bay")
+    drone.location = DroneLocation(kind="ship_sector", id="DRN-BAY")
     drone.battery = 0.0
     drone.integrity = 1.0
 
@@ -74,7 +74,7 @@ def _add_d2(state) -> None:
         drone_id="D2",
         name="Drone-02",
         status=DroneStatus.DOCKED,
-        location=DroneLocation(kind="ship_sector", id="drone_bay"),
+        location=DroneLocation(kind="ship_sector", id="DRN-BAY"),
         battery=1.0,
         integrity=0.5,
     )
@@ -107,9 +107,9 @@ def main() -> None:
     state = _fresh_state()
     _add_d2(state)
     _prepare_deployed_drone(state, "D1")
-    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="drone_bay")
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="DRN-BAY")
     state.ship.drones["D2"].status = DroneStatus.DOCKED
-    state.ship.drones["D2"].location = DroneLocation(kind="ship_sector", id="drone_bay")
+    state.ship.drones["D2"].location = DroneLocation(kind="ship_sector", id="DRN-BAY")
     state.ship.drones["D2"].integrity = 0.5
     state.ship.cargo_scrap = 999
     events = engine.apply_action(state, Repair(drone_id="D1", system_id="D2"))
@@ -121,6 +121,7 @@ def main() -> None:
     # Ship-system repair uses the shared active repair amount for every system, including distribution.
     state = _fresh_state()
     _prepare_deployed_drone(state, "D1")
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="PWR-A2")
     state.ship.systems["energy_distribution"].health = 0.4
     state.ship.cargo_scrap = 100
     queued = engine.apply_action(state, Repair(drone_id="D1", system_id="energy_distribution"))
@@ -135,6 +136,7 @@ def main() -> None:
     # Repair jobs charge only for the repair that can still be applied to the target.
     state = _fresh_state()
     _prepare_deployed_drone(state, "D1")
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="SNS-R1")
     state.ship.systems["sensors"].health = 0.95
     state.ship.cargo_scrap = 100
     queued = engine.apply_action(state, Repair(drone_id="D1", system_id="sensors"))
@@ -148,9 +150,9 @@ def main() -> None:
     state = _fresh_state()
     _add_d2(state)
     _prepare_deployed_drone(state, "D1")
-    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="drone_bay")
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="DRN-BAY")
     state.ship.drones["D2"].status = DroneStatus.DOCKED
-    state.ship.drones["D2"].location = DroneLocation(kind="ship_sector", id="drone_bay")
+    state.ship.drones["D2"].location = DroneLocation(kind="ship_sector", id="DRN-BAY")
     state.ship.drones["D2"].integrity = 0.95
     state.ship.cargo_scrap = 100
     queued = engine.apply_action(state, Repair(drone_id="D1", system_id="D2"))
@@ -183,6 +185,7 @@ def main() -> None:
         Balance.REPAIR_JOB_FAIL_SCRAP_CONSUME_FRACTION = 0.25
         state = _fresh_state()
         _prepare_deployed_drone(state, "D1")
+        state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="SNS-R1")
         state.ship.systems["sensors"].health = 0.2
         pre_health = state.ship.systems["sensors"].health
         state.ship.cargo_scrap = 100
@@ -210,6 +213,7 @@ def main() -> None:
     # Ship-system repair blocked if target system is already at max integrity.
     state = _fresh_state()
     _prepare_deployed_drone(state, "D1")
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="SNS-R1")
     state.ship.systems["sensors"].health = 1.0
     state.ship.cargo_scrap = 100
     blocked = engine.apply_action(state, Repair(drone_id="D1", system_id="sensors"))
@@ -234,9 +238,17 @@ def main() -> None:
     _add_d2(state)
     _prepare_deployed_drone(state, "D1")
     state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="PWR-A2")
-    state.ship.drones["D2"].location = DroneLocation(kind="ship_sector", id="drone_bay")
+    state.ship.drones["D2"].location = DroneLocation(kind="ship_sector", id="DRN-BAY")
     blocked = engine.apply_action(state, Repair(drone_id="D1", system_id="D2"))
     _assert_blocked_reason(blocked, "drone_target_not_co_located")
+
+    # Ship-system repair blocked if target system is not co-located with operator drone.
+    state = _fresh_state()
+    _prepare_deployed_drone(state, "D1")
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="PWR-A2")
+    state.ship.systems["sensors"].health = 0.7
+    blocked = engine.apply_action(state, Repair(drone_id="D1", system_id="sensors"))
+    _assert_blocked_reason(blocked, "system_target_not_co_located")
 
     # No circular lock: power on drone_bay does not require distribution nominal.
     state = _fresh_state()
@@ -458,7 +470,11 @@ def main() -> None:
     _prepare_deployed_drone(state)
     moved = engine.apply_action(state, DroneMove(drone_id="D1", target_id="PWR-A2"))
     assert any(e.type == EventType.JOB_QUEUED for e in moved), moved
-    repaired = engine.apply_action(state, Repair(drone_id="D1", system_id="sensors"))
+    engine.tick(state, _active_job_eta(state, JobType.MOVE_DRONE) + 1.0)
+    assert state.ship.drones["D1"].location.kind == "ship_sector"
+    assert state.ship.drones["D1"].location.id == "PWR-A2"
+    state.ship.systems["energy_distribution"].health = 0.8
+    repaired = engine.apply_action(state, Repair(drone_id="D1", system_id="energy_distribution"))
     assert any(e.type == EventType.JOB_QUEUED for e in repaired), repaired
 
     state = _fresh_state()
@@ -535,6 +551,7 @@ def main() -> None:
     state = _fresh_state()
     state.ship.power.power_quality = 0.24
     _prepare_deployed_drone(state)
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="SNS-R1")
     route_events = engine.apply_action(state, parse_command("route solve ECHO_7"))
     _assert_blocked_reason(route_events, "critical_power_state")
     repair_events = engine.apply_action(state, Repair(drone_id="D1", system_id="sensors"))

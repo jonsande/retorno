@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from retorno.core.gamestate import GameState
+from retorno.model.ship_layout import apply_retorno_canonical_layout
 
 _SAVE_MAGIC = b"RETORNO_SAVE_V2"
 _LEGACY_SAVE_MAGICS = {b"RETORNO_SAVE_V1"}
@@ -95,6 +96,7 @@ def load_single_slot(save_path: str | Path | None = None, user: str | None = Non
     if path.exists():
         try:
             state = _load_from_file(path)
+            apply_retorno_canonical_layout(state)
             return LoadGameResult(state=state, source="primary", path=path)
         except Exception as exc:  # noqa: BLE001
             primary_error = exc
@@ -102,6 +104,7 @@ def load_single_slot(save_path: str | Path | None = None, user: str | None = Non
     if backup_path.exists():
         try:
             state = _load_from_file(backup_path)
+            apply_retorno_canonical_layout(state)
             return LoadGameResult(state=state, source="backup", path=backup_path)
         except Exception as backup_error:  # noqa: BLE001
             msg = (

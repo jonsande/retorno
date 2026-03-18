@@ -12,6 +12,22 @@ Comportamiento operativo
 - `ship sectors`: topología interna y ubicación.
 - `ship survey`: pipeline de survey estructurado (requiere disponibilidad de pila sensor/datos).
 
+Sectores internos canónicos de RETORNO
+- `DCK-A1`: Darsena / Exclusa
+- `STS-BAY`: Bahia de Estasis
+- `LFS-01`: Soporte Vital
+- `PWR-A1`: Nucleo de Potencia
+- `PWR-A2`: Distribucion de Energia
+- `PRP-R1`: Sala de Propulsion (reservado)
+- `BRG-01`: Puente / Mando
+- `SNS-R1`: Sala de Sensores
+- `DRN-BAY`: Bahia de Drones
+- `CRG-01`: Bodega de Carga
+
+Convencion de id de sector
+- Los ids de sector son canonicos y reutilizables entre naves.
+- La unicidad global viene del contexto (`ship_id:sector_id`), no del id de sector desnudo.
+
 Notas de uso
 - Usa `ship systems` + `alerts` para triage de fallos antes de operaciones largas.
 

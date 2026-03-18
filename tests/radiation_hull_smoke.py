@@ -116,7 +116,7 @@ def main() -> None:
         drone_id="D2",
         name="Drone-02",
         status=DroneStatus.DOCKED,
-        location=DroneLocation(kind="ship_sector", id="drone_bay"),
+        location=DroneLocation(kind="ship_sector", id="DRN-BAY"),
         dose_rad=0.0,
     )
     engine.tick(state, 100.0)
@@ -140,7 +140,7 @@ def main() -> None:
     state = _fresh_state()
     drone = state.ship.drones["D1"]
     drone.status = DroneStatus.DOCKED
-    drone.location = DroneLocation(kind="ship_sector", id="drone_bay")
+    drone.location = DroneLocation(kind="ship_sector", id="DRN-BAY")
     drone.dose_rad = 5.0
     engine._update_drone_maintenance(state, 10.0)  # noqa: SLF001
     assert drone.dose_rad < 5.0, drone.dose_rad
@@ -149,7 +149,7 @@ def main() -> None:
     state = _fresh_state()
     drone = state.ship.drones["D1"]
     drone.status = DroneStatus.DOCKED
-    drone.location = DroneLocation(kind="ship_sector", id="drone_bay")
+    drone.location = DroneLocation(kind="ship_sector", id="DRN-BAY")
     drone.dose_rad = 5.0
     state.ship.systems["drone_bay"].state = SystemState.OFFLINE
     engine._update_drone_maintenance(state, 10.0)  # noqa: SLF001
@@ -158,7 +158,7 @@ def main() -> None:
     state = _fresh_state()
     drone = state.ship.drones["D1"]
     drone.status = DroneStatus.DOCKED
-    drone.location = DroneLocation(kind="ship_sector", id="drone_bay")
+    drone.location = DroneLocation(kind="ship_sector", id="DRN-BAY")
     drone.dose_rad = 5.0
     state.ship.systems["energy_distribution"].state = SystemState.OFFLINE
     engine._update_drone_maintenance(state, 10.0)  # noqa: SLF001

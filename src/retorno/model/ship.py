@@ -148,6 +148,8 @@ class ShipState:
 
 @dataclass(slots=True)
 class ShipSector:
+    # Canonical local id (for example BRG-01). Global uniqueness is contextual:
+    # ship_id + ":" + sector_id.
     sector_id: str
     name: str
     tags: set[str] = field(default_factory=set)

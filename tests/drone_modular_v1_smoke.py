@@ -128,7 +128,7 @@ def main() -> None:
     _set_bay_ready(state)
     drone = state.ship.drones["D1"]
     drone.status = DroneStatus.DOCKED
-    drone.location = DroneLocation(kind="ship_sector", id="drone_bay")
+    drone.location = DroneLocation(kind="ship_sector", id="DRN-BAY")
     state.ship.cargo_modules = ["utility_cargo_frame"]
     state.ship.cargo_scrap = utility_cargo_scrap_cost
 
@@ -150,7 +150,7 @@ def main() -> None:
     _set_bay_ready(scrap_blocked_state)
     scrap_drone = scrap_blocked_state.ship.drones["D1"]
     scrap_drone.status = DroneStatus.DOCKED
-    scrap_drone.location = DroneLocation(kind="ship_sector", id="drone_bay")
+    scrap_drone.location = DroneLocation(kind="ship_sector", id="DRN-BAY")
     scrap_blocked_state.ship.cargo_modules = ["utility_cargo_frame"]
     scrap_blocked_state.ship.cargo_scrap = utility_cargo_scrap_cost - 1
     blocked_scrap = engine.apply_action(scrap_blocked_state, Install(drone_id="D1", module_id="utility_cargo_frame"))
@@ -224,7 +224,7 @@ def main() -> None:
     _set_bay_ready(maint_state)
     mdrone = maint_state.ship.drones["D1"]
     mdrone.status = DroneStatus.DOCKED
-    mdrone.location = DroneLocation(kind="ship_sector", id="drone_bay")
+    mdrone.location = DroneLocation(kind="ship_sector", id="DRN-BAY")
     mdrone.installed_modules = ["high_density_cell", "reinforced_frame"]
     mdrone.battery = 1.0
     mdrone.integrity = 1.0

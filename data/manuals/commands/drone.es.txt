@@ -23,10 +23,10 @@ Requisitos (gating)
 - Operaciones en `world_node` requieren mantener co-localizacion entre dron y nave en ese nodo.
 - `drone install <drone_id> <module_id>` se resuelve por scope del modulo:
   - si `scope=ship`, requisitos: dron operador desplegado en nave, modulo en inventario, chatarra suficiente.
-  - si `scope=drone`, requisitos: `docked` en `drone_bay`, `drone_bay=NOMINAL`, `energy_distribution!=OFFLINE`, slots libres.
+  - si `scope=drone`, requisitos: `docked` en `DRN-BAY`, `drone_bay=NOMINAL`, `energy_distribution!=OFFLINE`, slots libres.
 - `drone uninstall <drone_id> <module_id>` se resuelve por scope del modulo:
   - si `scope=ship`, requisitos: dron operador desplegado en nave, modulo instalado en nave, soporte de bahia online.
-  - si `scope=drone`, requisitos: `docked` en `drone_bay`, `drone_bay=NOMINAL`, `energy_distribution!=OFFLINE`.
+  - si `scope=drone`, requisitos: `docked` en `DRN-BAY`, `drone_bay=NOMINAL`, `energy_distribution!=OFFLINE`.
 
 Comportamiento operativo
 - Los modulos de dron no mutan de forma destructiva los stats base.

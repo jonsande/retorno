@@ -66,7 +66,7 @@ def main() -> None:
         drone = state.ship.drones[drone_id]
         assert drone.status == DroneStatus.DOCKED, (drone_id, drone.status)
         assert drone.location.kind == "ship_sector", (drone_id, drone.location)
-        assert drone.location.id == "drone_bay", (drone_id, drone.location)
+        assert drone.location.id == "DRN-BAY", (drone_id, drone.location)
 
     print("DEBUG ADD COMMANDS SMOKE PASSED")
 
