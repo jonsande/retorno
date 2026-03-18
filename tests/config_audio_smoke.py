@@ -14,6 +14,11 @@ def main() -> None:
     assert parse_command("help") == "HELP"
     assert parse_command("help --verbose") == "HELP_VERBOSE"
     assert parse_command("help --no-verbose") == "HELP_NO_VERBOSE"
+    assert parse_command("music list") == "MUSIC_LIST"
+    assert parse_command("music stop") == "MUSIC_STOP"
+    assert parse_command("music status") == "MUSIC_STATUS"
+    assert parse_command("music play blue_danube") == ("MUSIC_PLAY", "blue_danube")
+    assert parse_command("music volume 75") == ("MUSIC_VOLUME", 0.75)
     assert parse_command("config set lang es") == ("CONFIG_SET", "lang", "es")
     assert parse_command("config set verbose off") == ("CONFIG_SET", "verbose", "off")
     assert parse_command("config set audio off") == ("CONFIG_SET", "audio", "off")
@@ -65,6 +70,8 @@ def main() -> None:
     assert not any(" - " in line for line in concise_help if line.startswith("  "))
 
     verbose_help = presenter.build_help_lines(state, verbose=True)
+    assert any("music list - lista pistas de música disponibles" in line for line in verbose_help)
+    assert any("music status - muestra el estado actual de la música" in line for line in verbose_help)
     assert any("help --verbose - muestra comandos con descripciones breves" in line for line in verbose_help)
     assert any("help --no-verbose - muestra comandos sin descripciones" in line for line in verbose_help)
     assert any("config set verbose <on|off> - activa o desactiva la verbosidad por defecto de help" in line for line in verbose_help)

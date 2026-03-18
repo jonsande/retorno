@@ -331,6 +331,17 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
             ],
         ),
         (
+            "Audio",
+            "Audio",
+            [
+                ("music list", "list available music tracks", "lista pistas de música disponibles"),
+                ("music play <track_id>", "play one music track", "reproduce una pista de música"),
+                ("music stop", "stop current music track", "detiene la pista musical actual"),
+                ("music volume <0-100>", "set music playback volume", "ajusta el volumen de reproducción musical"),
+                ("music status", "show current music playback state", "muestra el estado actual de la música"),
+            ],
+        ),
+        (
             "Info",
             "Información",
             [
@@ -465,6 +476,93 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 lines.append(f"  {command}")
         lines.append("")
     print("\n".join(lines).rstrip())
+
+
+def build_music_list_lines(audio_manager: AudioManager, locale: str = "en") -> list[str]:
+    tracks = audio_manager.list_music_tracks()
+    if not tracks:
+        return ["No music tracks available" if locale != "es" else "No hay pistas de música disponibles"]
+    lines = ["Available tracks:" if locale != "es" else "Pistas disponibles:"]
+    for track in tracks:
+        duration = _format_track_duration(track.duration_s)
+        if duration:
+            lines.append(f"  {track.track_id} - {track.title} ({duration})")
+        else:
+            lines.append(f"  {track.track_id} - {track.title}")
+    return lines
+
+
+def build_music_status_lines(audio_manager: AudioManager, locale: str = "en") -> list[str]:
+    status = audio_manager.music_status()
+    lines = [
+        f"music: {'playing' if status.is_playing else 'stopped'}"
+        if locale != "es"
+        else f"music: {'reproduciendo' if status.is_playing else 'detenida'}"
+    ]
+    if status.track_id and status.title:
+        lines.append(f"track: {status.track_id} - {status.title}")
+    lines.append(f"volume: {int(round(status.volume * 100.0))}%")
+    lines.append(
+        f"ambient_ducking: {'on' if status.ambient_ducked else 'off'}"
+        if locale != "es"
+        else f"atenuacion_ambiente: {'on' if status.ambient_ducked else 'off'}"
+    )
+    return lines
+
+
+def apply_music_volume(os_state, audio_manager: AudioManager, volume: float, locale: str = "en") -> str:
+    volume = max(0.0, min(float(volume), 1.0))
+    os_state.audio.music_volume = volume
+    audio_manager.apply_music_preferences(volume)
+    percent = int(round(volume * 100.0))
+    return (
+        f"Music volume set to {percent}%"
+        if locale != "es"
+        else f"Volumen de música configurado a {percent}%"
+    )
+
+
+def play_music_track(
+    os_state,
+    audio_manager: AudioManager,
+    track_id: str,
+    locale: str = "en",
+) -> list[str]:
+    if not os_state.audio.enabled:
+        return ["music: audio is off" if locale != "es" else "music: el audio está apagado"]
+    track = audio_manager.play_music(os_state.audio.enabled, track_id)
+    if track is None:
+        return [
+            f"music: unknown track id '{track_id}'" if locale != "es" else f"music: id de pista desconocido '{track_id}'"
+        ]
+    duration = _format_track_duration(track.duration_s)
+    if duration:
+        return [
+            f"music: playing {track.track_id} - {track.title} ({duration})"
+            if locale != "es"
+            else f"music: reproduciendo {track.track_id} - {track.title} ({duration})"
+        ]
+    return [
+        f"music: playing {track.track_id} - {track.title}"
+        if locale != "es"
+        else f"music: reproduciendo {track.track_id} - {track.title}"
+    ]
+
+
+def stop_music_track(audio_manager: AudioManager, locale: str = "en") -> str:
+    audio_manager.stop_music()
+    return "music: stopped" if locale != "es" else "music: detenida"
+
+
+def _format_track_duration(duration_s: float | None) -> str | None:
+    if duration_s is None or duration_s <= 0.0:
+        return None
+    total_seconds = int(round(duration_s))
+    minutes, seconds = divmod(total_seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours > 0:
+        return f"{hours:d}:{minutes:02d}:{seconds:02d}"
+    return f"{minutes:02d}:{seconds:02d}"
 
 
 class SafeDict(dict):
@@ -6622,15 +6720,16 @@ def main() -> None:
     loop = GameLoop(engine, state, tick_s=1.0)
     loop.step(1.0)
     audio_enabled, ambient_enabled = audio_flags(state.os)
+    music_volume = state.os.audio.music_volume
     if audio_manager is not None:
-        audio_manager.prepare_session(audio_enabled, ambient_enabled, startup_audio_context)
+        audio_manager.prepare_session(audio_enabled, ambient_enabled, startup_audio_context, music_volume)
     run_console_entry_gate(
         [startup_message, audio_warning],
         state.os.locale.value,
         clear_after=True,
     )
     if audio_manager is not None:
-        audio_manager.start(audio_enabled, ambient_enabled)
+        audio_manager.start(audio_enabled, ambient_enabled, music_volume)
         audio_manager.play_startup(audio_enabled, startup_audio_context)
     if play_startup_sequence:
         _maybe_run_startup_sequence(state.os.locale.value)
@@ -6642,6 +6741,7 @@ def main() -> None:
 
     base_commands = [
         "help",
+        "music",
         "clear",
         "ls",
         "cat",
@@ -6723,12 +6823,20 @@ def main() -> None:
                         if sys.service and sys.service.is_installed:
                             services.append(sys.service.service_name)
                     fs_paths = list(locked_state.os.fs.keys())
+                music_track_ids = [track.track_id for track in audio_manager.list_music_tracks()] if audio_manager is not None else []
 
                 if len(tokens) == 1:
                     candidates = [c for c in base_commands if c.startswith(text)]
                 elif cmd == "help":
                     if len(tokens) == 2:
                         candidates = [c for c in ["--verbose", "-v", "--no-verbose"] if c.startswith(text)]
+                elif cmd == "music":
+                    if len(tokens) == 2:
+                        candidates = [c for c in ["list", "play", "stop", "volume", "status"] if c.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "play":
+                        candidates = [track_id for track_id in music_track_ids if track_id.startswith(text)]
+                    elif len(tokens) == 3 and tokens[1] == "volume":
+                        candidates = [c for c in ["0", "25", "50", "75", "100"] if c.startswith(text)]
                 elif cmd == "diag" or cmd == "about" or cmd == "locate":
                     candidates = [s for s in systems if s.startswith(text)]
                 elif cmd == "boot":
@@ -7167,6 +7275,70 @@ def main() -> None:
             continue
         if parsed == "CLEAR":
             print("\033[2J\033[H", end="")
+            continue
+        if parsed == "MUSIC_LIST":
+            with loop.with_lock() as locked_state:
+                locale = locked_state.os.locale.value
+            if audio_manager is None:
+                print("music: unavailable" if locale != "es" else "music: no disponible")
+            else:
+                for line in build_music_list_lines(audio_manager, locale):
+                    print(line)
+                notice = audio_manager.consume_notice()
+                if notice:
+                    print(notice)
+            continue
+        if parsed == "MUSIC_STATUS":
+            with loop.with_lock() as locked_state:
+                locale = locked_state.os.locale.value
+            if audio_manager is None:
+                print("music: unavailable" if locale != "es" else "music: no disponible")
+            else:
+                for line in build_music_status_lines(audio_manager, locale):
+                    print(line)
+                notice = audio_manager.consume_notice()
+                if notice:
+                    print(notice)
+            continue
+        if parsed == "MUSIC_STOP":
+            with loop.with_lock() as locked_state:
+                locale = locked_state.os.locale.value
+            if audio_manager is None:
+                print("music: unavailable" if locale != "es" else "music: no disponible")
+            else:
+                print(stop_music_track(audio_manager, locale))
+                notice = audio_manager.consume_notice()
+                if notice:
+                    print(notice)
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "MUSIC_PLAY":
+            with loop.with_lock() as locked_state:
+                locale = locked_state.os.locale.value
+                lines = (
+                    ["music: unavailable" if locale != "es" else "music: no disponible"]
+                    if audio_manager is None
+                    else play_music_track(locked_state.os, audio_manager, str(parsed[1]), locale)
+                )
+            for line in lines:
+                print(line)
+            if audio_manager is not None:
+                notice = audio_manager.consume_notice()
+                if notice:
+                    print(notice)
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "MUSIC_VOLUME":
+            with loop.with_lock() as locked_state:
+                locale = locked_state.os.locale.value
+                message = (
+                    "music: unavailable" if locale != "es" else "music: no disponible"
+                )
+                if audio_manager is not None:
+                    message = apply_music_volume(locked_state.os, audio_manager, float(parsed[1]), locale)
+            print(message)
+            if audio_manager is not None:
+                notice = audio_manager.consume_notice()
+                if notice:
+                    print(notice)
             continue
         if parsed == "CONFIG_SHOW":
             backend_name = audio_manager.backend.name if audio_manager is not None else None

@@ -1,0 +1,24 @@
+music list
+music play <track_id>
+music stop
+music volume <0-100>
+music status
+
+Purpose
+- Inspect and control diegetic music playback from the ship music archive.
+
+Operational behavior
+- `music list` scans the onboard music archive and lists each available track id.
+- `music play <track_id>` plays one track on the music channel without interrupting ambient or alert audio.
+- `music stop` stops the current music track.
+- `music volume <0-100>` sets the current music playback volume for the session and saved operator profile.
+- `music status` shows whether music is currently playing, which track is active, the configured volume, and whether ambient ducking is active.
+
+Usage notes
+- Tracks are discovered from `retorno/data/music`.
+- Music does not autoplay the next track when the current one ends.
+- While music is active, ambient audio is slightly attenuated according to `audio_config.json`.
+- If global audio is disabled with `config set audio off`, music playback is suppressed.
+
+Related commands
+- `config show`, `config set audio <on|off>`, `config set ambientsound <on|off>`

@@ -10,6 +10,12 @@
     "new_game_cue": "intro_booting",
     "load_game_cue": "intro_loading"
   },
+  "music": {
+    "default_volume": 0.60,
+    "ambient_ducking_gain": 0.82,
+    "fade_in_s": 0.01,
+    "fade_out_s": 0.03
+  },
   "defaults": {
     "event": {
     "cue": "alert_ping"

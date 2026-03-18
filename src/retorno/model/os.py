@@ -36,6 +36,22 @@ class FSNode:
 class AudioSettings:
     enabled: bool = True
     ambient_enabled: bool = True
+    music_volume: float | None = None
+
+    def __setstate__(self, state) -> None:
+        slot_state = state
+        if isinstance(state, tuple):
+            if len(state) == 2 and isinstance(state[1], dict):
+                slot_state = state[1]
+            elif len(state) == 2 and isinstance(state[0], dict):
+                slot_state = state[0]
+        if not isinstance(slot_state, dict):
+            raise TypeError(f"Unsupported AudioSettings pickle payload: {type(state)!r}")
+        data = dict(slot_state)
+        object.__setattr__(self, "enabled", bool(data.get("enabled", True)))
+        object.__setattr__(self, "ambient_enabled", bool(data.get("ambient_enabled", True)))
+        music_volume = data.get("music_volume")
+        object.__setattr__(self, "music_volume", None if music_volume in {None, ""} else float(music_volume))
 
 
 @dataclass(slots=True)

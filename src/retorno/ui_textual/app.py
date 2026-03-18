@@ -275,6 +275,7 @@ class RetornoTextualApp(App):
                 audio_enabled,
                 ambient_enabled,
                 self._startup_audio_context,
+                self.loop.state.os.audio.music_volume,
             )
         self._panel_visible = {
             "status": True,
@@ -299,7 +300,7 @@ class RetornoTextualApp(App):
         self._apply_theme(normalize_theme_preset(getattr(self.loop.state.os, "theme_preset", self._theme_preset)))
         if self._audio_manager is not None:
             audio_enabled, ambient_enabled = audio_flags(self.loop.state.os)
-            self._audio_manager.start(audio_enabled, ambient_enabled)
+            self._audio_manager.start(audio_enabled, ambient_enabled, self.loop.state.os.audio.music_volume)
             self._audio_manager.play_startup(audio_enabled, self._startup_audio_context)
             self._audio_manager.consume_notice()
         self.loop.step(1.0)
@@ -735,6 +736,7 @@ class RetornoTextualApp(App):
         candidates: list[str] = []
         base_commands = [
             "help",
+            "music",
             "clear",
             "status",
             "jobs",
@@ -799,6 +801,7 @@ class RetornoTextualApp(App):
             if sys.service and sys.service.is_installed:
                 services.append(sys.service.service_name)
         fs_paths = list(state.os.fs.keys())
+        music_track_ids = [track.track_id for track in self._audio_manager.list_music_tracks()] if self._audio_manager is not None else []
 
         if not tokens:
             return [c for c in base_commands if c.startswith(text)]
@@ -807,6 +810,13 @@ class RetornoTextualApp(App):
         if cmd == "help":
             if len(tokens) == 2:
                 return [c for c in ["--verbose", "-v", "--no-verbose"] if c.startswith(text)]
+        if cmd == "music":
+            if len(tokens) == 2:
+                return [c for c in ["list", "play", "stop", "volume", "status"] if c.startswith(text)]
+            if len(tokens) == 3 and tokens[1] == "play":
+                return [track_id for track_id in music_track_ids if track_id.startswith(text)]
+            if len(tokens) == 3 and tokens[1] == "volume":
+                return [c for c in ["0", "25", "50", "75", "100"] if c.startswith(text)]
         if cmd in {"diag", "about", "locate"}:
             return [s for s in systems if s.startswith(text)]
         if cmd == "boot":
@@ -1616,6 +1626,8 @@ class RetornoTextualApp(App):
             "POWER_STATUS",
             "CONFIG_SHOW",
             "AUTH_STATUS",
+            "MUSIC_LIST",
+            "MUSIC_STATUS",
         }
         if (isinstance(parsed, str) and parsed in info_tokens) or (
             isinstance(parsed, tuple)
@@ -1642,6 +1654,67 @@ class RetornoTextualApp(App):
         ):
             self._drain_auto_to_log()
 
+        if parsed == "MUSIC_LIST":
+            with self.loop.with_lock() as state:
+                locale = state.os.locale.value
+            if self._audio_manager is None:
+                self._log_line("music: unavailable" if locale != "es" else "music: no disponible")
+            else:
+                self._log_lines(repl.build_music_list_lines(self._audio_manager, locale))
+                notice = self._audio_manager.consume_notice()
+                if notice:
+                    self._log_line(notice)
+            return
+        if parsed == "MUSIC_STATUS":
+            with self.loop.with_lock() as state:
+                locale = state.os.locale.value
+            if self._audio_manager is None:
+                self._log_line("music: unavailable" if locale != "es" else "music: no disponible")
+            else:
+                self._log_lines(repl.build_music_status_lines(self._audio_manager, locale))
+                notice = self._audio_manager.consume_notice()
+                if notice:
+                    self._log_line(notice)
+            return
+        if parsed == "MUSIC_STOP":
+            with self.loop.with_lock() as state:
+                locale = state.os.locale.value
+            if self._audio_manager is None:
+                self._log_line("music: unavailable" if locale != "es" else "music: no disponible")
+            else:
+                self._log_line(repl.stop_music_track(self._audio_manager, locale))
+                notice = self._audio_manager.consume_notice()
+                if notice:
+                    self._log_line(notice)
+            return
+        if isinstance(parsed, tuple) and parsed[0] == "MUSIC_PLAY":
+            with self.loop.with_lock() as state:
+                locale = state.os.locale.value
+                lines = (
+                    ["music: unavailable" if locale != "es" else "music: no disponible"]
+                    if self._audio_manager is None
+                    else repl.play_music_track(state.os, self._audio_manager, str(parsed[1]), locale)
+                )
+            self._log_lines(lines)
+            if self._audio_manager is not None:
+                notice = self._audio_manager.consume_notice()
+                if notice:
+                    self._log_line(notice)
+            return
+        if isinstance(parsed, tuple) and parsed[0] == "MUSIC_VOLUME":
+            with self.loop.with_lock() as state:
+                locale = state.os.locale.value
+                message = (
+                    "music: unavailable" if locale != "es" else "music: no disponible"
+                )
+                if self._audio_manager is not None:
+                    message = repl.apply_music_volume(state.os, self._audio_manager, float(parsed[1]), locale)
+            self._log_line(message)
+            if self._audio_manager is not None:
+                notice = self._audio_manager.consume_notice()
+                if notice:
+                    self._log_line(notice)
+            return
         if parsed == "JOBS":
             with self.loop.with_lock() as state:
                 self._log_lines(presenter.build_command_output(repl.render_jobs, state))

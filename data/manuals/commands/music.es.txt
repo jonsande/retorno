@@ -1,0 +1,24 @@
+music list
+music play <track_id>
+music stop
+music volume <0-100>
+music status
+
+Propósito
+- Inspeccionar y controlar la reproducción de música diegética desde el archivo musical de la nave.
+
+Comportamiento operativo
+- `music list` inspecciona el archivo musical de a bordo y lista el id de cada pista disponible.
+- `music play <track_id>` reproduce una pista en el canal de música sin interrumpir el ambiente ni los sonidos de alerta.
+- `music stop` detiene la pista musical actual.
+- `music volume <0-100>` ajusta el volumen actual de la música para la sesión y el perfil persistente del operador.
+- `music status` muestra si hay música reproduciéndose, qué pista está activa, el volumen configurado y si la atenuación del ambiente está activa.
+
+Notas de uso
+- Las pistas se descubren automáticamente en `retorno/data/music`.
+- La siguiente pista no se reproduce automáticamente cuando termina la actual.
+- Mientras la música está activa, el sonido ambiente se atenúa ligeramente según `audio_config.json`.
+- Si el audio global está desactivado con `config set audio off`, la música no se reproduce.
+
+Comandos relacionados
+- `config show`, `config set audio <on|off>`, `config set ambientsound <on|off>`

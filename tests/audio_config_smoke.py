@@ -25,6 +25,9 @@ def main() -> None:
     assert config.default_event_route is not None
     assert config.default_event_route.cue_id == "alert_ping"
     assert config.warnings == ()
+    assert config.music.default_volume == 0.60
+    assert config.music.ambient_ducking_gain == 0.82
+    assert config.music.tracks
     assert config.event_routes["power_net_deficit"].cue_id == "alert_ping"
     assert config.event_routes["power_bus_instability:critical"].cue_id == "alert_critical"
     assert config.event_routes["low_power_quality:critical"].cue_id == "alert_critical"
@@ -51,8 +54,13 @@ def main() -> None:
     load_startup = config.cues["intro_loading"]
     assert load_startup.mode == "once"
     assert load_startup.channel == "startup"
-    assert load_startup.path.name == "info.mp3"
     assert load_startup.path.exists()
+
+    first_track = config.music.tracks[0]
+    assert first_track.path.parent.name == "music"
+    assert first_track.path.exists()
+    assert first_track.track_id
+    assert first_track.title
 
     print("AUDIO CONFIG SMOKE PASSED")
 

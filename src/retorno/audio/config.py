@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -8,6 +9,8 @@ from pathlib import Path
 
 _DATA_ROOT = Path(__file__).resolve().parents[3] / "data"
 _DEFAULT_AUDIO_CONFIG_PATH = _DATA_ROOT / "audio_config.json"
+_MUSIC_ROOT = _DATA_ROOT / "music"
+_MUSIC_EXTENSIONS = {".mp3", ".ogg", ".wav", ".flac", ".m4a", ".aac"}
 
 
 class AudioConfigError(RuntimeError):
@@ -36,6 +39,23 @@ class AudioEventRoute:
 
 
 @dataclass(slots=True, frozen=True)
+class AudioMusicTrack:
+    track_id: str
+    title: str
+    path: Path
+    duration_s: float | None = None
+
+
+@dataclass(slots=True, frozen=True)
+class AudioMusicConfig:
+    default_volume: float = 0.6
+    ambient_ducking_gain: float = 0.8
+    fade_in_s: float = 0.01
+    fade_out_s: float = 0.03
+    tracks: tuple[AudioMusicTrack, ...] = ()
+
+
+@dataclass(slots=True, frozen=True)
 class AudioConfig:
     version: int
     preferred_backends: tuple[str, ...] = ("ffplay",)
@@ -46,6 +66,7 @@ class AudioConfig:
     cues: dict[str, AudioCueConfig] = field(default_factory=dict)
     event_routes: dict[str, AudioEventRoute] = field(default_factory=dict)
     default_event_route: AudioEventRoute | None = None
+    music: AudioMusicConfig = field(default_factory=AudioMusicConfig)
     warnings: tuple[str, ...] = ()
 
 
@@ -189,6 +210,8 @@ def load_audio_config(path: str | Path | None = None) -> AudioConfig:
             warnings.append(str(exc))
             default_event_route = None
 
+    music = _load_music_config(raw.get("music"), warnings)
+
     return AudioConfig(
         version=version,
         preferred_backends=preferred_backends,
@@ -199,6 +222,7 @@ def load_audio_config(path: str | Path | None = None) -> AudioConfig:
         cues=cues,
         event_routes=event_routes,
         default_event_route=default_event_route,
+        music=music,
         warnings=tuple(warnings),
     )
 
@@ -265,3 +289,69 @@ def _probe_audio_asset(path: Path) -> tuple[float | None, int | None, int | None
         sample_count = max(1, int(round(duration_s * sample_rate)))
 
     return duration_s, sample_rate, sample_count
+
+
+def _load_music_config(raw_music: object, warnings: list[str]) -> AudioMusicConfig:
+    default_config = AudioMusicConfig(tracks=_scan_music_tracks(warnings))
+    if raw_music is None or raw_music == "":
+        return default_config
+    if not isinstance(raw_music, dict):
+        warnings.append("audio.music must be an object")
+        return default_config
+    try:
+        default_volume = max(0.0, min(_float_value(raw_music, "default_volume", default_config.default_volume), 1.0))
+        ambient_ducking_gain = max(
+            0.0,
+            min(_float_value(raw_music, "ambient_ducking_gain", default_config.ambient_ducking_gain), 1.0),
+        )
+        fade_in_s = max(0.0, _float_value(raw_music, "fade_in_s", default_config.fade_in_s))
+        fade_out_s = max(0.0, _float_value(raw_music, "fade_out_s", default_config.fade_out_s))
+    except AudioConfigError as exc:
+        warnings.append(str(exc))
+        return default_config
+    return AudioMusicConfig(
+        default_volume=default_volume,
+        ambient_ducking_gain=ambient_ducking_gain,
+        fade_in_s=fade_in_s,
+        fade_out_s=fade_out_s,
+        tracks=default_config.tracks,
+    )
+
+
+def _scan_music_tracks(warnings: list[str]) -> tuple[AudioMusicTrack, ...]:
+    if not _MUSIC_ROOT.exists() or not _MUSIC_ROOT.is_dir():
+        return ()
+    tracks: list[AudioMusicTrack] = []
+    seen_ids: set[str] = set()
+    for path in sorted(_MUSIC_ROOT.iterdir(), key=lambda item: item.name.lower()):
+        if not path.is_file() or path.suffix.lower() not in _MUSIC_EXTENSIONS:
+            continue
+        try:
+            duration_s, _, _ = _probe_audio_asset(path)
+            track_id = _unique_track_id(_slugify_track_id(path.stem), seen_ids)
+            tracks.append(
+                AudioMusicTrack(
+                    track_id=track_id,
+                    title=path.stem,
+                    path=path.resolve(),
+                    duration_s=duration_s,
+                )
+            )
+        except Exception as exc:
+            warnings.append(f"music track skipped '{path.name}': {exc}")
+    return tuple(tracks)
+
+
+def _slugify_track_id(value: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", value.strip().lower()).strip("_")
+    return slug or "track"
+
+
+def _unique_track_id(base: str, seen_ids: set[str]) -> str:
+    candidate = base
+    counter = 2
+    while candidate in seen_ids:
+        candidate = f"{base}_{counter}"
+        counter += 1
+    seen_ids.add(candidate)
+    return candidate

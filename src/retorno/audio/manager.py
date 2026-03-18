@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass
 from typing import Iterable
 
-from retorno.audio.config import AudioConfig, AudioCueConfig
+from retorno.audio.config import AudioConfig, AudioCueConfig, AudioMusicTrack
 from retorno.model.events import Event, EventType, Severity
 
 
@@ -37,6 +37,15 @@ class _Voice:
     played_frames_total: int = 0
 
 
+@dataclass(slots=True, frozen=True)
+class AudioMusicStatus:
+    track_id: str | None
+    title: str | None
+    is_playing: bool
+    volume: float
+    ambient_ducked: bool
+
+
 class _AudioBackend:
     def prepare(self, cue: AudioCueConfig) -> None:
         return
@@ -52,6 +61,12 @@ class _AudioBackend:
 
     def is_available(self) -> bool:
         raise NotImplementedError
+
+    def set_channel_gain(self, channel: str, gain: float) -> None:
+        return
+
+    def is_channel_active(self, channel: str) -> bool:
+        return False
 
     def consume_notice(self) -> str | None:
         return None
@@ -81,6 +96,12 @@ class NullAudioBackend(_AudioBackend):
     def is_available(self) -> bool:
         return False
 
+    def set_channel_gain(self, channel: str, gain: float) -> None:
+        return
+
+    def is_channel_active(self, channel: str) -> bool:
+        return False
+
     @property
     def name(self) -> str:
         return "null"
@@ -91,6 +112,7 @@ class PygameMixerAudioBackend(_AudioBackend):
     _CHANNELS = 2
     _STOP_FADE_MS = 60
     _MIXER_BUFFER = 4096
+    _FIXED_CHANNEL_ORDER = ("ambient", "startup", "music")
 
     def __init__(self) -> None:
         os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
@@ -126,10 +148,10 @@ class PygameMixerAudioBackend(_AudioBackend):
 
         self._sounds: dict[str, object] = {}
         self._channels: dict[str, object] = {
-            "ambient": pygame.mixer.Channel(0),
-            "startup": pygame.mixer.Channel(1),
+            name: pygame.mixer.Channel(idx) for idx, name in enumerate(self._FIXED_CHANNEL_ORDER)
         }
-        self._next_dynamic_channel = 2
+        self._channel_gains: dict[str, float] = {name: 1.0 for name in self._channels}
+        self._next_dynamic_channel = len(self._FIXED_CHANNEL_ORDER)
 
     def play(self, cue: AudioCueConfig) -> None:
         self.prepare(cue)
@@ -140,13 +162,19 @@ class PygameMixerAudioBackend(_AudioBackend):
             channel = self._channels[cue.channel]
         else:
             dynamic_idx = self._next_dynamic_channel
-            self._next_dynamic_channel = 2 + ((self._next_dynamic_channel - 1) % 14)
+            self._next_dynamic_channel += 1
+            if self._next_dynamic_channel >= 16:
+                self._next_dynamic_channel = len(self._FIXED_CHANNEL_ORDER)
             channel = self._pygame.mixer.Channel(dynamic_idx)
             self._channels[cue.channel] = channel
+        try:
+            channel.set_volume(float(self._channel_gains.get(cue.channel, 1.0)))
+        except Exception:
+            pass
 
-        if cue.mode == "loop":
+        if cue.mode == "loop" or cue.channel in self._FIXED_CHANNEL_ORDER:
             channel.stop()
-            channel.play(sound, loops=-1)
+            channel.play(sound, loops=-1 if cue.mode == "loop" else 0)
         else:
             channel.play(sound)
 
@@ -169,6 +197,25 @@ class PygameMixerAudioBackend(_AudioBackend):
 
     def is_available(self) -> bool:
         return True
+
+    def set_channel_gain(self, channel: str, gain: float) -> None:
+        gain = max(0.0, min(float(gain), 1.0))
+        self._channel_gains[channel] = gain
+        mixer_channel = self._channels.get(channel)
+        if mixer_channel is not None:
+            try:
+                mixer_channel.set_volume(gain)
+            except Exception:
+                pass
+
+    def is_channel_active(self, channel: str) -> bool:
+        mixer_channel = self._channels.get(channel)
+        if mixer_channel is None:
+            return False
+        try:
+            return bool(mixer_channel.get_busy())
+        except Exception:
+            return False
 
     @property
     def name(self) -> str:
@@ -213,6 +260,7 @@ class PcmMixerAudioBackend(_AudioBackend):
     _OUTPUT_CHANNELS = 2
     _CHUNK_FRAMES = 2048
     _PULSE_BUFFER_DURATION_MS = 40
+    _FIXED_CHANNELS = {"ambient", "startup", "music"}
 
     def __init__(self, binary: str, device: str) -> None:
         self._binary = binary
@@ -223,6 +271,7 @@ class PcmMixerAudioBackend(_AudioBackend):
         self._process: subprocess.Popen[bytes] | None = None
         self._voices: dict[str, _Voice] = {}
         self._decoded_cache: dict[str, _DecodedCue] = {}
+        self._channel_gains: dict[str, float] = {}
         self._ephemeral_seq = 0
         self._notice: str | None = None
         self._ensure_process()
@@ -231,11 +280,11 @@ class PcmMixerAudioBackend(_AudioBackend):
         self.prepare(cue)
         decoded = self._decoded_cache[cue.cue_id]
         channel = cue.channel
-        if cue.mode == "once":
+        if cue.mode == "once" and cue.channel not in self._FIXED_CHANNELS:
             channel = f"{cue.channel}#{self._ephemeral_seq}"
             self._ephemeral_seq += 1
         with self._lock:
-            if cue.mode == "loop":
+            if cue.mode == "loop" or cue.channel in self._FIXED_CHANNELS:
                 self._voices.pop(channel, None)
             self._voices[channel] = _Voice(
                 channel=channel,
@@ -256,6 +305,14 @@ class PcmMixerAudioBackend(_AudioBackend):
 
     def is_available(self) -> bool:
         return True
+
+    def set_channel_gain(self, channel: str, gain: float) -> None:
+        with self._lock:
+            self._channel_gains[channel] = max(0.0, min(float(gain), 1.0))
+
+    def is_channel_active(self, channel: str) -> bool:
+        with self._lock:
+            return any(voice_channel == channel for voice_channel in self._voices)
 
     def consume_notice(self) -> str | None:
         with self._lock:
@@ -438,6 +495,7 @@ class PcmMixerAudioBackend(_AudioBackend):
                 continue
             with self._lock:
                 voices = list(self._voices.values())
+                channel_gains = dict(self._channel_gains)
             mixed = [0.0] * chunk_len
             finished_channels: list[str] = []
             for voice in voices:
@@ -464,6 +522,7 @@ class PcmMixerAudioBackend(_AudioBackend):
                             break
                     gain = 1.0
                     gain *= float(voice.cue.volume)
+                    gain *= float(channel_gains.get(voice.channel.split("#", 1)[0], 1.0))
                     if fade_in_frames > 0:
                         if voice.loop:
                             age_frame = voice.played_frames_total + frame_idx
@@ -522,6 +581,8 @@ class PcmMixerAudioBackend(_AudioBackend):
 
 
 class FfplayAudioBackend(_AudioBackend):
+    _FIXED_CHANNELS = {"ambient", "startup", "music"}
+
     def __init__(self, binary: str) -> None:
         self._binary = binary
         self._handles: dict[str, _PlaybackHandle] = {}
@@ -530,7 +591,7 @@ class FfplayAudioBackend(_AudioBackend):
     def play(self, cue: AudioCueConfig) -> None:
         self._reap_finished()
         channel = cue.channel
-        if cue.mode == "once":
+        if cue.mode == "once" and cue.channel not in self._FIXED_CHANNELS:
             channel = f"{cue.channel}#{self._ephemeral_seq}"
             self._ephemeral_seq += 1
         else:
@@ -565,6 +626,11 @@ class FfplayAudioBackend(_AudioBackend):
 
     def is_available(self) -> bool:
         return True
+
+    def is_channel_active(self, channel: str) -> bool:
+        self._reap_finished()
+        handle = self._handles.get(channel)
+        return handle is not None and handle.process.poll() is None
 
     @property
     def name(self) -> str:
@@ -609,6 +675,8 @@ class FfplayAudioBackend(_AudioBackend):
 
 
 class FfmpegDeviceAudioBackend(_AudioBackend):
+    _FIXED_CHANNELS = {"ambient", "startup", "music"}
+
     def __init__(self, binary: str, device: str) -> None:
         self._binary = binary
         self._device = device
@@ -618,7 +686,7 @@ class FfmpegDeviceAudioBackend(_AudioBackend):
     def play(self, cue: AudioCueConfig) -> None:
         self._reap_finished()
         channel = cue.channel
-        if cue.mode == "once":
+        if cue.mode == "once" and cue.channel not in self._FIXED_CHANNELS:
             channel = f"{cue.channel}#{self._ephemeral_seq}"
             self._ephemeral_seq += 1
         else:
@@ -653,6 +721,11 @@ class FfmpegDeviceAudioBackend(_AudioBackend):
 
     def is_available(self) -> bool:
         return True
+
+    def is_channel_active(self, channel: str) -> bool:
+        self._reap_finished()
+        handle = self._handles.get(channel)
+        return handle is not None and handle.process.poll() is None
 
     @property
     def name(self) -> str:
@@ -752,8 +825,24 @@ class AudioManager:
             backend_notice = f"[WARN] Audio backend unavailable: {reason}"
             self.notice = f"{self.notice}; {backend_notice}" if self.notice else backend_notice
         self._event_last_played: dict[str, float] = {}
+        self._music_lock = threading.Lock()
+        self._music_tracks = {track.track_id: track for track in self.config.music.tracks}
+        self._music_volume = float(self.config.music.default_volume)
+        self._music_track_id: str | None = None
+        self._ambient_ducked = False
+        self._monitor_stop = threading.Event()
+        self._monitor_thread = threading.Thread(target=self._monitor_music_state, daemon=True)
+        self._monitor_thread.start()
+        self._apply_music_channel_gain()
+        self._refresh_ambient_ducking()
 
-    def start(self, audio_enabled: bool, ambient_enabled: bool) -> None:
+    def start(
+        self,
+        audio_enabled: bool,
+        ambient_enabled: bool,
+        music_volume: float | None = None,
+    ) -> None:
+        self.apply_music_preferences(music_volume)
         self.apply_preferences(audio_enabled, ambient_enabled)
 
     def prepare_session(
@@ -761,7 +850,9 @@ class AudioManager:
         audio_enabled: bool,
         ambient_enabled: bool,
         startup_context: str | None = None,
+        music_volume: float | None = None,
     ) -> None:
+        self.apply_music_preferences(music_volume)
         if not audio_enabled:
             return
         if ambient_enabled and self.config.ambient_cue_id:
@@ -786,11 +877,17 @@ class AudioManager:
         self._safe_play(cue)
 
     def shutdown(self) -> None:
+        self._monitor_stop.set()
+        if self._monitor_thread.is_alive():
+            self._monitor_thread.join(timeout=0.5)
         self.backend.stop_all()
 
     def apply_preferences(self, audio_enabled: bool, ambient_enabled: bool) -> None:
         if not audio_enabled:
             self.backend.stop_all()
+            with self._music_lock:
+                self._music_track_id = None
+                self._ambient_ducked = False
             return
         ambient_cue_id = self.config.ambient_cue_id
         if not ambient_cue_id:
@@ -799,9 +896,56 @@ class AudioManager:
             cue = self.config.cues.get(ambient_cue_id)
             if cue is not None:
                 self._safe_play(cue)
+                self._refresh_ambient_ducking()
         else:
             ambient_channel = self.config.cues[ambient_cue_id].channel
             self.backend.stop_channel(ambient_channel)
+
+    def apply_music_preferences(self, music_volume: float | None) -> None:
+        with self._music_lock:
+            if music_volume in {None, ""}:
+                self._music_volume = float(self.config.music.default_volume)
+            else:
+                self._music_volume = max(0.0, min(float(music_volume), 1.0))
+        self._apply_music_channel_gain()
+
+    def list_music_tracks(self) -> tuple[AudioMusicTrack, ...]:
+        return self.config.music.tracks
+
+    def play_music(self, audio_enabled: bool, track_id: str) -> AudioMusicTrack | None:
+        if not audio_enabled:
+            return None
+        track = self._music_tracks.get(track_id)
+        if track is None:
+            return None
+        self._apply_music_channel_gain()
+        cue = self._music_track_to_cue(track)
+        self.backend.stop_channel("music")
+        self._safe_play(cue)
+        with self._music_lock:
+            self._music_track_id = track.track_id
+        self._refresh_ambient_ducking()
+        return track
+
+    def stop_music(self) -> None:
+        self.backend.stop_channel("music")
+        with self._music_lock:
+            self._music_track_id = None
+        self._refresh_ambient_ducking()
+
+    def music_status(self) -> AudioMusicStatus:
+        is_playing = self.backend.is_channel_active("music")
+        with self._music_lock:
+            if not is_playing:
+                self._music_track_id = None
+            track = self._music_tracks.get(self._music_track_id or "")
+            return AudioMusicStatus(
+                track_id=track.track_id if track is not None else None,
+                title=track.title if track is not None else None,
+                is_playing=is_playing,
+                volume=self._music_volume,
+                ambient_ducked=self._ambient_ducked,
+            )
 
     def handle_event_batch(
         self,
@@ -907,3 +1051,43 @@ class AudioManager:
         if startup_context == "load_game":
             return self.config.startup_load_game_cue_id or self.config.startup_cue_id
         return self.config.startup_cue_id
+
+    def _music_track_to_cue(self, track: AudioMusicTrack) -> AudioCueConfig:
+        return AudioCueConfig(
+            cue_id=f"music:{track.track_id}",
+            path=track.path,
+            mode="once",
+            channel="music",
+            volume=1.0,
+            duration_s=track.duration_s,
+            fade_in_s=self.config.music.fade_in_s,
+            fade_out_s=self.config.music.fade_out_s,
+        )
+
+    def _apply_music_channel_gain(self) -> None:
+        try:
+            self.backend.set_channel_gain("music", self._music_volume)
+        except Exception:
+            return
+
+    def _refresh_ambient_ducking(self) -> None:
+        ambient_cue_id = self.config.ambient_cue_id
+        if not ambient_cue_id:
+            return
+        ambient_channel = self.config.cues[ambient_cue_id].channel
+        should_duck = self.backend.is_channel_active("music") and self.config.music.ambient_ducking_gain < 1.0
+        gain = self.config.music.ambient_ducking_gain if should_duck else 1.0
+        try:
+            self.backend.set_channel_gain(ambient_channel, gain)
+        except Exception:
+            return
+        with self._music_lock:
+            self._ambient_ducked = should_duck
+
+    def _monitor_music_state(self) -> None:
+        while not self._monitor_stop.wait(0.1):
+            is_playing = self.backend.is_channel_active("music")
+            with self._music_lock:
+                if not is_playing:
+                    self._music_track_id = None
+            self._refresh_ambient_ducking()

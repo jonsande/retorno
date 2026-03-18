@@ -46,6 +46,9 @@ class ParseError(Exception):
 _PARSE_ERROR_MESSAGES = {
     "en": {
         "usage_help": "Usage: help [--verbose|-v|--no-verbose]",
+        "usage_music": "Usage: music list | music play <track_id> | music stop | music volume <0-100> | music status",
+        "music_volume_number": "music volume: <0-100> must be a number",
+        "music_volume_range": "music volume: <0-100> must be between 0 and 100",
         "usage_job_cancel": "Usage: job cancel <job_id>",
         "usage_alerts": "Usage: alerts | alerts explain <alert_key>",
         "usage_log_copy": "Usage: log copy [n]",
@@ -130,6 +133,9 @@ _PARSE_ERROR_MESSAGES = {
     },
     "es": {
         "usage_help": "Uso: help [--verbose|-v|--no-verbose]",
+        "usage_music": "Uso: music list | music play <track_id> | music stop | music volume <0-100> | music status",
+        "music_volume_number": "music volume: <0-100> debe ser numérico",
+        "music_volume_range": "music volume: <0-100> debe estar entre 0 y 100",
         "usage_job_cancel": "Uso: job cancel <job_id>",
         "usage_alerts": "Uso: alerts | alerts explain <alert_key>",
         "usage_log_copy": "Uso: log copy [n]",
@@ -246,6 +252,25 @@ def parse_command(line: str):
         raise ParseError("usage_help")
     if cmd == "clear":
         return "CLEAR"
+
+    if cmd == "music":
+        if len(args) == 1 and args[0] == "list":
+            return "MUSIC_LIST"
+        if len(args) == 1 and args[0] == "stop":
+            return "MUSIC_STOP"
+        if len(args) == 1 and args[0] == "status":
+            return "MUSIC_STATUS"
+        if len(args) == 2 and args[0] == "play":
+            return ("MUSIC_PLAY", args[1])
+        if len(args) == 2 and args[0] == "volume":
+            try:
+                percent = float(args[1])
+            except ValueError as e:
+                raise ParseError("music_volume_number") from e
+            if not (0.0 <= percent <= 100.0):
+                raise ParseError("music_volume_range")
+            return ("MUSIC_VOLUME", percent / 100.0)
+        raise ParseError("usage_music")
 
     if cmd == "contacts":
         if len(args) == 0:
@@ -799,6 +824,7 @@ def parse_command(line: str):
 def _suggest_command(cmd: str) -> str | None:
     commands = [
         "help",
+        "music",
         "status",
         "jobs",
         "job",
