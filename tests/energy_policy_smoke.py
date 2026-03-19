@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from retorno.bootstrap import create_initial_state_prologue
+from retorno.cli import repl
 from retorno.cli.parser import ParseError, parse_command
 from retorno.config.balance import Balance
 from retorno.core.actions import (
@@ -11,9 +12,11 @@ from retorno.core.actions import (
     DroneRecall,
     DroneReboot,
     Install,
+    JobCancel,
     PowerPlan,
     PowerShed,
     Repair,
+    RepairAutoMoveDecision,
     SelfTestRepair,
     SystemOn,
     Undock,
@@ -130,7 +133,14 @@ def main() -> None:
     assert queued_job.params.get("repair_amount") == Balance.ACTIVE_REPAIR_SYSTEM_AMOUNT
     expected_scrap = max(1, int(round(Balance.ACTIVE_REPAIR_SYSTEM_AMOUNT * Balance.REPAIR_SCRAP_PER_HEALTH)))
     assert queued_job.params.get("repair_scrap") == expected_scrap
-    engine.tick(state, Balance.REPAIR_TIME_S + 1.0)
+    completed = engine.tick(state, Balance.REPAIR_TIME_S + 1.0)
+    repair_completed = [
+        e
+        for e in completed
+        if e.type == EventType.JOB_COMPLETED and e.data.get("message_key") == "job_completed_repair"
+    ]
+    assert repair_completed, completed
+    assert int(repair_completed[0].data.get("scrap_spent", -1)) == expected_scrap
     assert abs(state.ship.systems["energy_distribution"].health - (0.4 + Balance.ACTIVE_REPAIR_SYSTEM_AMOUNT)) < 1e-6
 
     # Repair jobs charge only for the repair that can still be applied to the target.
@@ -146,6 +156,50 @@ def main() -> None:
     assert queued_job.params.get("repair_scrap") == 1
     engine.tick(state, Balance.REPAIR_TIME_S + 1.0)
     assert abs(state.ship.systems["sensors"].health - 1.0) < 1e-6
+
+    # System max health is not hardcoded to 1.0 for repair gate/cap checks.
+    state = _fresh_state()
+    _prepare_deployed_drone(state, "D1")
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="SNS-R1")
+    state.ship.systems["sensors"].health_max_effective = 1.2
+    state.ship.systems["sensors"].health = 1.0
+    state.ship.cargo_scrap = 100
+    queued = engine.apply_action(state, Repair(drone_id="D1", system_id="sensors"))
+    assert any(e.type == EventType.JOB_QUEUED for e in queued), queued
+    engine.tick(state, Balance.REPAIR_TIME_S + 1.0)
+    assert state.ship.systems["sensors"].health > 1.0
+    assert state.ship.systems["sensors"].health <= 1.2
+    state.ship.systems["sensors"].health = 1.2
+    blocked_max = engine.apply_action(state, Repair(drone_id="D1", system_id="sensors"))
+    _assert_blocked_reason(blocked_max, "already_nominal")
+
+    # Full-health systems are not repairable even when drone and system are in different sectors.
+    state = _fresh_state()
+    _prepare_deployed_drone(state, "D1")
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="STS-BAY")
+    state.ship.systems["power_core"].health = 1.0
+    state.ship.cargo_scrap = 100
+    assert repl._repair_auto_move_confirmation_prompt(state, Repair(drone_id="D1", system_id="power_core")) is None
+    blocked_full = engine.apply_action(state, Repair(drone_id="D1", system_id="power_core"))
+    _assert_blocked_reason(blocked_full, "already_nominal")
+    assert state.ship.cargo_scrap == 100
+    assert not state.jobs.active_job_ids, state.jobs.active_job_ids
+
+    # Queued repairs that become nominal before execution are skipped and refund reserved scrap.
+    state = _fresh_state()
+    _prepare_deployed_drone(state, "D1")
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="PWR-A1")
+    state.ship.systems["power_core"].health = 0.4
+    state.ship.cargo_scrap = 100
+    queued = engine.apply_action(state, Repair(drone_id="D1", system_id="power_core"))
+    assert any(e.type == EventType.JOB_QUEUED for e in queued), queued
+    reserved_scrap = int(state.jobs.jobs[state.jobs.active_job_ids[-1]].params.get("repair_scrap", 0))
+    assert state.ship.cargo_scrap == 100 - reserved_scrap
+    state.ship.systems["power_core"].health = 1.0
+    interrupted = engine.tick(state, Balance.REPAIR_TIME_S + 1.0)
+    assert any(e.data.get("message_key") == "job_failed_repair_already_nominal" for e in interrupted), interrupted
+    assert state.ship.cargo_scrap == 100, state.ship.cargo_scrap
+    assert not state.jobs.active_job_ids, state.jobs.active_job_ids
 
     state = _fresh_state()
     _add_d2(state)
@@ -476,6 +530,132 @@ def main() -> None:
     state.ship.systems["energy_distribution"].health = 0.8
     repaired = engine.apply_action(state, Repair(drone_id="D1", system_id="energy_distribution"))
     assert any(e.type == EventType.JOB_QUEUED for e in repaired), repaired
+
+    state = _fresh_state()
+    _prepare_deployed_drone(state)
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="PWR-A1")
+    blocked_move = engine.apply_action(state, DroneMove(drone_id="D1", target_id="PWR-A1"))
+    _assert_blocked_reason(blocked_move, "drone_already_at_target")
+    assert not state.jobs.active_job_ids, state.jobs.active_job_ids
+
+    state = _fresh_state()
+    _prepare_deployed_drone(state)
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="DRN-BAY")
+    first_move = engine.apply_action(state, DroneMove(drone_id="D1", target_id="PWR-A1"))
+    assert any(e.type == EventType.JOB_QUEUED for e in first_move), first_move
+    duplicate_move = engine.apply_action(state, DroneMove(drone_id="D1", target_id="PWR-A1"))
+    _assert_blocked_reason(duplicate_move, "drone_move_already_queued")
+    assert len(state.jobs.active_job_ids) == 1, state.jobs.active_job_ids
+
+    state = _fresh_state()
+    _prepare_deployed_drone(state)
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="PWR-A1")
+    state.ship.systems["energy_distribution"].health = 0.4
+    state.ship.cargo_scrap = 100
+    queued_auto_move = engine.apply_action(state, Repair(drone_id="D1", system_id="energy_distribution", auto_move=True))
+    queued_events = [e for e in queued_auto_move if e.type == EventType.JOB_QUEUED]
+    assert len(queued_events) == 2, queued_auto_move
+    first_job = state.jobs.jobs[state.jobs.active_job_ids[0]]
+    second_job = state.jobs.jobs[state.jobs.active_job_ids[1]]
+    assert first_job.job_type == JobType.MOVE_DRONE, first_job
+    assert second_job.job_type == JobType.REPAIR_SYSTEM, second_job
+    engine.tick(state, _active_job_eta(state, JobType.MOVE_DRONE) + 1.0)
+    assert state.ship.drones["D1"].location.id == "PWR-A2", state.ship.drones["D1"].location
+    before_health = state.ship.systems["energy_distribution"].health
+    engine.tick(state, _active_job_eta(state, JobType.REPAIR_SYSTEM) + 1.0)
+    assert state.ship.systems["energy_distribution"].health > before_health
+
+    state = _fresh_state()
+    _prepare_deployed_drone(state)
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="PWR-A1")
+    state.ship.systems["energy_distribution"].health = 0.4
+    state.ship.cargo_scrap = 100
+    queued_auto_move = engine.apply_action(state, Repair(drone_id="D1", system_id="energy_distribution", auto_move=True))
+    assert len([e for e in queued_auto_move if e.type == EventType.JOB_QUEUED]) == 2, queued_auto_move
+    move_job = state.jobs.jobs[state.jobs.active_job_ids[0]]
+    cancel_events = engine.apply_action(state, JobCancel(job_id=move_job.job_id))
+    assert any(e.type == EventType.JOB_FAILED for e in cancel_events), cancel_events
+    interrupted = engine.tick(state, _active_job_eta(state, JobType.REPAIR_SYSTEM) + 1.0)
+    assert any(e.data.get("message_key") == "job_failed_repair_context_changed" for e in interrupted), interrupted
+
+    # If a valid repair is queued and the drone is moved away before it starts, repair must fail by context change.
+    state = _fresh_state()
+    _prepare_deployed_drone(state)
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="PWR-A1")
+    state.ship.systems["power_core"].health = 0.4
+    state.ship.cargo_scrap = 100
+    queued_move = engine.apply_action(state, DroneMove(drone_id="D1", target_id="BRG-01"))
+    assert any(e.type == EventType.JOB_QUEUED for e in queued_move), queued_move
+    queued_repair = engine.apply_action(state, Repair(drone_id="D1", system_id="power_core"))
+    assert any(e.type == EventType.JOB_QUEUED for e in queued_repair), queued_repair
+    engine.tick(state, _active_job_eta(state, JobType.MOVE_DRONE) + 1.0)
+    interrupted = engine.tick(state, _active_job_eta(state, JobType.REPAIR_SYSTEM) + 1.0)
+    assert any(e.data.get("message_key") == "job_failed_repair_context_changed" for e in interrupted), interrupted
+
+    # While the drone already has queued work, a non-co-located repair should enqueue without immediate co-location block.
+    state = _fresh_state()
+    _prepare_deployed_drone(state)
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="STS-BAY")
+    state.ship.systems["energy_distribution"].health = 0.4
+    state.ship.systems["power_core"].health = 0.4
+    state.ship.systems["sensors"].health = 0.4
+    state.ship.cargo_scrap = 100
+    first_repair = engine.apply_action(state, Repair(drone_id="D1", system_id="energy_distribution", auto_move=True))
+    assert len([e for e in first_repair if e.type == EventType.JOB_QUEUED]) == 2, first_repair
+    deferred_repair = engine.apply_action(state, Repair(drone_id="D1", system_id="power_core"))
+    assert any(e.type == EventType.JOB_QUEUED for e in deferred_repair), deferred_repair
+    third_repair = engine.apply_action(state, Repair(drone_id="D1", system_id="sensors"))
+    assert any(e.type == EventType.JOB_QUEUED for e in third_repair), third_repair
+    assert not any(
+        e.type == EventType.BOOT_BLOCKED and e.data.get("reason") == "system_target_not_co_located"
+        for e in deferred_repair
+    ), deferred_repair
+    assert (
+        repl._repair_auto_move_confirmation_prompt(state, Repair(drone_id="D1", system_id="power_core")) is None
+    )
+    forced_prompt = repl._repair_auto_move_confirmation_prompt(
+        state,
+        Repair(drone_id="D1", system_id="power_core"),
+        ignore_active_jobs=True,
+    )
+    assert forced_prompt is not None
+    queued_job = state.jobs.jobs[state.jobs.active_job_ids[-1]]
+    assert queued_job.job_type == JobType.REPAIR_SYSTEM, queued_job
+    assert queued_job.params.get("defer_auto_move_confirmation") is True
+    engine.tick(state, _active_job_eta(state, JobType.MOVE_DRONE) + 1.0)
+    engine.tick(state, _active_job_eta(state, JobType.REPAIR_SYSTEM) + 1.0)
+    deferred_interrupted = engine.tick(state, _active_job_eta(state, JobType.REPAIR_SYSTEM) + 1.0)
+    assert any(
+        e.data.get("reason") == "repair_auto_move_confirmation_required"
+    for e in deferred_interrupted
+    ), deferred_interrupted
+    waiting_jobs = [
+        state.jobs.jobs[job_id]
+        for job_id in state.jobs.active_job_ids
+        if state.jobs.jobs[job_id].params.get("awaiting_auto_move_confirmation")
+    ]
+    assert len(waiting_jobs) == 1, waiting_jobs
+    waiting_job = waiting_jobs[0]
+    assert waiting_job.target and waiting_job.target.id == "power_core", waiting_job
+    assert any(
+        state.jobs.jobs[job_id].target
+        and state.jobs.jobs[job_id].target.id == "sensors"
+        and state.jobs.jobs[job_id].status == JobStatus.QUEUED
+        for job_id in state.jobs.active_job_ids
+    ), state.jobs.active_job_ids
+    no_progress = engine.tick(state, 10.0)
+    assert not any(
+        e.data.get("reason") == "repair_auto_move_confirmation_required"
+        for e in no_progress
+    ), no_progress
+    assert waiting_job.internal_id in state.jobs.active_job_ids
+    decision_events = engine.apply_action(state, RepairAutoMoveDecision(job_id=waiting_job.job_id, auto_move=True))
+    assert any(
+        e.type == EventType.JOB_QUEUED and e.data.get("job_type") == JobType.MOVE_DRONE.value
+        for e in decision_events
+    ), decision_events
+    active_types = [state.jobs.jobs[job_id].job_type for job_id in state.jobs.active_job_ids]
+    assert active_types[0] == JobType.MOVE_DRONE, active_types
 
     state = _fresh_state()
     state.ship.systems["drone_bay"].state = SystemState.OFFLINE

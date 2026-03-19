@@ -1,55 +1,68 @@
-> sectors
-[ERROR] Command 'sectors' was removed. Use: ship sectors
+[core_os] wake schedule integrity: FAIL (chronometry desync)
+[core_os] Multiple wake timers unreadable or outside valid bounds.
+[core_os] No authorized medical staff response detected.
+[core_os] Entering autonomous emergency recovery protocol.
+AUTONOMOUS RECOVERY PROTOCOL engaged
+CRYO VAULT status scan... ok
+TARGET selected: Sarcophagus-05
+Decryo sequence: INIT (emergency profile)
+Thermal gradient stabilized
+Neurochemical thaw: PARTIAL
+Motor pathway recovery: FAIL (indeterminate system fault)
+Host vitals: nominal
+Conscious Interface Recovery Protocol (CIRP): ARMED
+Neural terminal link: ONLINE
+Manual operations required
+Timebase fault detected: internal clock invalid
+Chronology reset: Year 1 / Day 1 / 00:00:00
+Awaiting operator input
 
-> sector
-[ERROR] Unknown command: sector
+[INFO] new mail detected.
+Tip: use 'mail inbox' to list messages.
+Tip: use 'mail read <id|latest>' or 'cat <path>' to read.
+Tip: if you still don't remember the command instructions, manuals are under /manuals (try: ls /manuals/commands, man <topic>).
+Tip: use 'config set lang' to change ship_os languaje
+Tip: use 'help' to see available commands.
+Tip: use TAB key for list and autocomplete available commands, id's, paths, etc.
 
-> ship sectors
-=== RETORNO SHIP SECTORS ===
-- DCK-A1: Dock / Airlock [airlock,dock]
-- STS-BAY: Stasis Bay [medical,stasis]
-- LFS-01: Life Support [life_support]
-- PWR-A1: Power Core [generation,power]
-- PWR-A2: Power Distribution [distribution,power]
-- PRP-R1: Propulsion Room [propulsion,reserved]
-- BRG-01: Bridge / Command [bridge,command,restricted]
-- SNS-R1: Sensors Room [sensors]
-- DRN-BAY: Drone Bay [bay,drone]
-- CRG-01: Cargo Hold [cargo]
+> drone deploy D1 SNS-R1
+[CMD] [INFO] job_queued :: J1 deploy_drone target=ship_sector:SNS-R1 ETA=13s
 
-> log copy 9
-(log) clipboard unavailable; wrote 9 lines to /home/jon/prog/retorno_case/retorno/log_copy.txt
+> drone move D1 SNS-R1
+[CMD] [WARN] boot_blocked :: Action blocked: drone not deployed (D1)
+[AUTO] Drone deployed to SNS-R1
 
-> locate life_support
-system_id: life_support
-ship_sector: LFS-01 (Life Support)
+> drone move D1 SNS-R1
+[CMD] [WARN] boot_blocked :: Action blocked: drone already at destination (SNS-R1)
 
-> locate core_os
-system_id: core_os
-ship_sector: BRG-01 (Bridge / Command)
+> drone move D1 STS-BAY
+[CMD] [INFO] job_queued :: J1 move_drone target=ship_sector:STS-BAY ETA=13s
 
-> locate power_core
-system_id: power_core
-ship_sector: PWR-A1 (Power Core)
+> drone move D1 STS-BAY
+[CMD] [WARN] boot_blocked :: Action blocked: drone already has an active move to destination (STS-BAY)
 
-> locate energy_distribution
-system_id: energy_distribution
-ship_sector: PWR-A2 (Power Distribution)
+> drone move D1 SNS-R1
+[CMD] [WARN] boot_blocked :: Action blocked: drone already at destination (SNS-R1)
+[AUTO] [INFO] job_completed :: CJ2 Drone moved to STS-BAY
 
-> locate drone_bay
-system_id: drone_bay
-ship_sector: DRN-BAY (Drone Bay)
+> drone move D1 STS-BAY
+[CMD] [WARN] boot_blocked :: Action blocked: drone already at destination (STS-BAY)
 
-> locate security
-system_id: security
-ship_sector: BRG-01 (Bridge / Command)
+> drone repair D1 energy_distribution
+WARNING: D1 is in STS-BAY, but energy_distribution is in PWR-A2. Auto-move the drone to PWR-A2 and queue the repair? [y/N] 
 
-> locate data_core
-system_id: data_core
-ship_sector: BRG-01 (Bridge / Command)
+> repair
+[CMD] [INFO] job_queued :: J1 move_drone target=ship_sector:PWR-A2 ETA=13s
+[CMD] [INFO] job_queued :: J2 repair_system target=ship_system:energy_distribution ETA=45s
 
-> locate sensors
-system_id: sensors
-ship_sector: SNS-R1 (Sensors Room)
+> debug on
+DEBUG mode enabled
 
-> log copy 100
+> drone repair D1 power_core
+WARNING: D1 is in STS-BAY, but power_core is in PWR-A1. Auto-move the drone to PWR-A1 and queue the repair? [y/N] 
+
+> repair
+[CMD] [INFO] job_queued :: J3 move_drone target=ship_sector:PWR-A1 ETA=13s
+[CMD] [INFO] job_queued :: J4 repair_system target=ship_system:power_core ETA=45s
+
+> log copy 90

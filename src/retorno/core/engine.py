@@ -38,6 +38,7 @@ from retorno.core.actions import (
     Travel,
     TravelAbort,
     JobCancel,
+    RepairAutoMoveDecision,
 )
 from retorno.core.gamestate import GameState
 from retorno.core.lore import (
@@ -1410,6 +1411,205 @@ class Engine:
             self._record_event(state.events, event)
             return [event]
 
+        if isinstance(action, RepairAutoMoveDecision):
+            job_key = self._resolve_job_key(state.jobs, action.job_id)
+            job = state.jobs.jobs.get(job_key) if job_key else None
+            if not job:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    f"Repair decision blocked: job {action.job_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "job_missing", "job_id": action.job_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if job.status in {JobStatus.COMPLETED, JobStatus.CANCELLED, JobStatus.FAILED}:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    f"Repair decision blocked: job {action.job_id} already {job.status.value}",
+                    data={"message_key": "boot_blocked", "reason": "job_not_active", "job_id": action.job_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if job.job_type != JobType.REPAIR_SYSTEM or not bool(job.params.get("awaiting_auto_move_confirmation")):
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    f"Repair decision blocked: job {action.job_id} not waiting for auto-move confirmation",
+                    data={"message_key": "boot_blocked", "reason": "job_not_active", "job_id": action.job_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+
+            drone_id = str(job.params.get("drone_id", "") or "")
+            system_id = str(job.target.id if job.target else job.params.get("system_id", "") or "")
+            target_system = state.ship.systems.get(system_id) if system_id else None
+            target_system_max_health = (
+                self._system_health_max_effective(target_system)
+                if target_system is not None
+                else 1.0
+            )
+            required_kind = str(job.params.get("required_operator_location_kind", "ship_sector") or "ship_sector")
+            inferred_required_id = canonical_ship_sector_id(target_system.sector_id) if target_system else ""
+            required_id = str(job.params.get("required_operator_location_id", inferred_required_id) or "")
+            drone = state.ship.drones.get(drone_id) if drone_id else None
+            drone_sector_id = (
+                canonical_ship_sector_id(drone.location.id)
+                if drone and drone.location.kind == "ship_sector"
+                else str(getattr(getattr(drone, "location", None), "id", "?"))
+            )
+            if target_system and target_system.health >= target_system_max_health:
+                scrap_refunded = self._refund_reserved_repair_scrap(state, job)
+                job.params.pop("awaiting_auto_move_confirmation", None)
+                job.params.pop("defer_auto_move_confirmation", None)
+                self._finalize_job(state.jobs, job, JobStatus.CANCELLED)
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.INFO,
+                    SourceRef(kind="ship_system", id=system_id or ""),
+                    f"Repair skipped: {system_id or '?'} already at full integrity",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "already_nominal",
+                        "system_id": system_id or "",
+                        "scrap_refunded": scrap_refunded,
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
+
+            if not action.auto_move:
+                job.params.pop("awaiting_auto_move_confirmation", None)
+                job.params.pop("defer_auto_move_confirmation", None)
+                self._finalize_job(state.jobs, job, JobStatus.CANCELLED)
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=system_id or ""),
+                    f"Repair blocked: target system {system_id or '?'} not at operator location",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "system_target_not_co_located",
+                        "system_id": system_id or "",
+                        "drone_id": drone_id,
+                        "drone_sector_id": drone_sector_id,
+                        "target_sector_id": required_id,
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
+
+            if not drone or drone.status != DroneStatus.DEPLOYED or required_kind != "ship_sector":
+                job.params.pop("awaiting_auto_move_confirmation", None)
+                job.params.pop("defer_auto_move_confirmation", None)
+                self._finalize_job(state.jobs, job, JobStatus.FAILED)
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=system_id or ""),
+                    f"Repair blocked: target system {system_id or '?'} not at operator location",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "system_target_not_co_located",
+                        "system_id": system_id or "",
+                        "drone_id": drone_id,
+                        "drone_sector_id": drone_sector_id,
+                        "target_sector_id": required_id,
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
+
+            if not self._drone_has_min_integrity(state, drone, Balance.DRONE_MOVE_MIN_INTEGRITY):
+                job.params.pop("awaiting_auto_move_confirmation", None)
+                job.params.pop("defer_auto_move_confirmation", None)
+                self._finalize_job(state.jobs, job, JobStatus.FAILED)
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Drone move blocked: {drone.drone_id} integrity too low",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "drone_too_damaged",
+                        "drone_id": drone.drone_id,
+                        "integrity": drone.integrity,
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
+
+            if not self._drone_has_min_battery(state, drone, Balance.DRONE_MIN_BATTERY_FOR_TASK):
+                job.params.pop("awaiting_auto_move_confirmation", None)
+                job.params.pop("defer_auto_move_confirmation", None)
+                self._finalize_job(state.jobs, job, JobStatus.FAILED)
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Move blocked: {drone.drone_id} battery too low",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "drone_low_battery",
+                        "drone_id": drone.drone_id,
+                        "battery": drone.battery,
+                        "threshold": Balance.DRONE_MIN_BATTERY_FOR_TASK,
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
+
+            move_target, move_blocked = self._resolve_drone_move_target_ref(state, drone, required_id)
+            if move_blocked is not None or move_target is None:
+                job.params.pop("awaiting_auto_move_confirmation", None)
+                job.params.pop("defer_auto_move_confirmation", None)
+                self._finalize_job(state.jobs, job, JobStatus.FAILED)
+                blocked_event = move_blocked or self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="ship_system", id=system_id or ""),
+                    f"Repair blocked: target system {system_id or '?'} not at operator location",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "system_target_not_co_located",
+                        "system_id": system_id or "",
+                        "drone_id": drone_id,
+                        "drone_sector_id": drone_sector_id,
+                        "target_sector_id": required_id,
+                    },
+                )
+                self._record_event(state.events, blocked_event)
+                return [blocked_event]
+
+            insert_index = (
+                state.jobs.active_job_ids.index(job_key)
+                if job_key in state.jobs.active_job_ids
+                else len(state.jobs.active_job_ids)
+            )
+            job.params.pop("awaiting_auto_move_confirmation", None)
+            job.params.pop("defer_auto_move_confirmation", None)
+            job.status = JobStatus.QUEUED
+            move_events = self._enqueue_drone_move_job(state, drone, move_target)
+            move_job_key = str(move_events[0].data.get("job_key", "") or "") if move_events else ""
+            if move_job_key and move_job_key in state.jobs.active_job_ids:
+                state.jobs.active_job_ids.remove(move_job_key)
+                insert_index = min(insert_index, len(state.jobs.active_job_ids))
+                state.jobs.active_job_ids.insert(insert_index, move_job_key)
+            return move_events
+
         if isinstance(action, Scan):
             blocked = self._scan_blocked_event(state)
             if blocked is not None:
@@ -1860,61 +2060,41 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            target_kind = None
-            requested_target_id = str(action.target_id)
-            target_id = requested_target_id
-            if requested_target_id == state.ship.ship_id:
-                # Alias to bring the drone back to the ship via bay sector.
-                target_id = self._drone_bay_sector_id(state)
-            elif requested_target_id not in state.world.space.nodes:
-                target_id = canonical_ship_sector_id(requested_target_id)
-            if target_id in state.ship.sectors:
-                if drone.location.kind == "world_node":
-                    if state.ship.docked_node_id != drone.location.id:
-                        event = self._make_event(
-                            state,
-                            EventType.BOOT_BLOCKED,
-                            Severity.WARN,
-                            SourceRef(kind="drone", id=drone.drone_id),
-                            f"Drone move blocked: ship not docked at {drone.location.id}",
-                            data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": drone.location.id},
-                        )
-                        self._record_event(state.events, event)
-                        return [event]
-                elif drone.location.kind != "ship_sector":
-                    event = self._make_event(
-                        state,
-                        EventType.BOOT_BLOCKED,
-                        Severity.WARN,
-                        SourceRef(kind="drone", id=drone.drone_id),
-                        f"Drone move blocked: {drone.drone_id} not on ship",
-                        data={"message_key": "boot_blocked", "reason": "not_on_ship", "drone_id": drone.drone_id},
-                    )
-                    self._record_event(state.events, event)
-                    return [event]
-                target_kind = "ship_sector"
-            elif requested_target_id in state.world.space.nodes:
-                target_id = requested_target_id
-                if state.ship.docked_node_id != target_id:
-                    event = self._make_event(
-                        state,
-                        EventType.BOOT_BLOCKED,
-                        Severity.WARN,
-                        SourceRef(kind="world", id=target_id),
-                        f"Drone move blocked: ship not docked at {target_id}",
-                        data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": target_id},
-                    )
-                    self._record_event(state.events, event)
-                    return [event]
-                target_kind = "world_node"
-            else:
+            move_target, blocked_event = self._resolve_drone_move_target_ref(state, drone, str(action.target_id))
+            if blocked_event is not None:
+                self._record_event(state.events, blocked_event)
+                return [blocked_event]
+            if move_target is None:
+                return []
+            if drone.location.kind == move_target.kind and drone.location.id == move_target.id:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
                     Severity.WARN,
                     SourceRef(kind="drone", id=drone.drone_id),
-                    f"Drone move blocked: target {target_id} not found",
-                    data={"message_key": "boot_blocked", "reason": "target_missing", "target_id": target_id},
+                    f"Drone move blocked: {drone.drone_id} already at {move_target.id}",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "drone_already_at_target",
+                        "drone_id": drone.drone_id,
+                        "target_id": move_target.id,
+                    },
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if self._has_active_drone_move_to_target(state, drone.drone_id, move_target):
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Drone move blocked: {drone.drone_id} already has an active move to {move_target.id}",
+                    data={
+                        "message_key": "boot_blocked",
+                        "reason": "drone_move_already_queued",
+                        "drone_id": drone.drone_id,
+                        "target_id": move_target.id,
+                    },
                 )
                 self._record_event(state.events, event)
                 return [event]
@@ -1935,15 +2115,7 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            profile = self._drone_profile(state, drone)
-            return self._enqueue_job(
-                state,
-                JobType.MOVE_DRONE,
-                TargetRef(kind=target_kind, id=target_id),
-                owner_id=drone.drone_id,
-                eta_s=Balance.DEPLOY_TIME_S * profile.move_time_mult_effective,
-                params={"drone_id": drone.drone_id},
-            )
+            return self._enqueue_drone_move_job(state, drone, move_target)
 
         if isinstance(action, DroneReboot):
             drone = state.ship.drones.get(action.drone_id)
@@ -1992,6 +2164,7 @@ class Engine:
 
         if isinstance(action, Repair):
             drone = state.ship.drones.get(action.drone_id)
+            defer_auto_move_confirmation = False
             if not drone:
                 event = self._make_event(
                     state,
@@ -2131,31 +2304,8 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            target_sector_id = canonical_ship_sector_id(target_system.sector_id)
-            drone_sector_id = (
-                canonical_ship_sector_id(drone.location.id)
-                if drone.location.kind == "ship_sector"
-                else str(drone.location.id)
-            )
-            if drone.location.kind != "ship_sector" or drone_sector_id != target_sector_id:
-                event = self._make_event(
-                    state,
-                    EventType.BOOT_BLOCKED,
-                    Severity.WARN,
-                    SourceRef(kind="ship_system", id=target_system.system_id),
-                    f"Repair blocked: target system {target_system.system_id} not at operator location",
-                    data={
-                        "message_key": "boot_blocked",
-                        "reason": "system_target_not_co_located",
-                        "system_id": target_system.system_id,
-                        "drone_id": drone.drone_id,
-                        "drone_sector_id": drone_sector_id,
-                        "target_sector_id": target_sector_id,
-                    },
-                )
-                self._record_event(state.events, event)
-                return [event]
-            if target_system.health >= 1.0:
+            target_system_max_health = self._system_health_max_effective(target_system)
+            if target_system.health >= target_system_max_health:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
@@ -2170,6 +2320,135 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
+            target_sector_id = canonical_ship_sector_id(target_system.sector_id)
+            drone_sector_id = (
+                canonical_ship_sector_id(drone.location.id)
+                if drone.location.kind == "ship_sector"
+                else str(drone.location.id)
+            )
+            if drone.location.kind != "ship_sector" or drone_sector_id != target_sector_id:
+                if action.auto_move and drone.location.kind == "ship_sector":
+                    if not self._drone_has_min_integrity(state, drone, Balance.DRONE_MOVE_MIN_INTEGRITY):
+                        event = self._make_event(
+                            state,
+                            EventType.BOOT_BLOCKED,
+                            Severity.WARN,
+                            SourceRef(kind="drone", id=drone.drone_id),
+                            f"Drone move blocked: {drone.drone_id} integrity too low",
+                            data={
+                                "message_key": "boot_blocked",
+                                "reason": "drone_too_damaged",
+                                "drone_id": drone.drone_id,
+                                "integrity": drone.integrity,
+                            },
+                        )
+                        self._record_event(state.events, event)
+                        return [event]
+                    move_target, move_blocked = self._resolve_drone_move_target_ref(state, drone, target_sector_id)
+                    if move_blocked is not None:
+                        self._record_event(state.events, move_blocked)
+                        return [move_blocked]
+                    if move_target is not None:
+                        pre_events: list[Event] = []
+                        if is_critical_power_state(state):
+                            if is_critical_system_id(target_system.system_id):
+                                info = self._make_event(
+                                    state,
+                                    EventType.ACTION_WARNING,
+                                    Severity.INFO,
+                                    SourceRef(kind="ship_system", id=target_system.system_id),
+                                    "Emergency recovery override: critical repair authorized",
+                                    data={
+                                        "message_key": "critical_repair_override",
+                                        "system_id": target_system.system_id,
+                                        "drone_id": action.drone_id,
+                                    },
+                                )
+                                self._record_event(state.events, info)
+                                pre_events.append(info)
+                            else:
+                                warn = self._make_event(
+                                    state,
+                                    EventType.ACTION_WARNING,
+                                    Severity.WARN,
+                                    SourceRef(kind="ship_system", id=target_system.system_id),
+                                    "Warning: repairing non-critical systems during critical power state may worsen survival odds",
+                                    data={
+                                        "message_key": "noncritical_repair_warning",
+                                        "system_id": target_system.system_id,
+                                        "drone_id": action.drone_id,
+                                    },
+                                )
+                                self._record_event(state.events, warn)
+                                pre_events.append(warn)
+
+                        repair_amount = self._effective_repair_amount(
+                            target_system.health,
+                            target_system_max_health,
+                            Balance.ACTIVE_REPAIR_SYSTEM_AMOUNT,
+                        )
+                        profile = self._drone_profile(state, drone)
+                        repair_scrap = self._repair_scrap_cost(
+                            repair_amount,
+                            Balance.REPAIR_SCRAP_PER_HEALTH,
+                            profile.repair_scrap_cost_mult_effective,
+                        )
+                        if state.ship.cargo_scrap < repair_scrap:
+                            event = self._make_event(
+                                state,
+                                EventType.BOOT_BLOCKED,
+                                Severity.WARN,
+                                SourceRef(kind="ship", id=state.ship.ship_id),
+                                f"Repair blocked: insufficient scrap ({state.ship.cargo_scrap}/{repair_scrap})",
+                                data={
+                                    "message_key": "boot_blocked",
+                                    "reason": "scrap_insufficient_repair",
+                                    "scrap_cost": repair_scrap,
+                                },
+                            )
+                            self._record_event(state.events, event)
+                            return pre_events + [event]
+                        state.ship.cargo_scrap = max(0, state.ship.cargo_scrap - repair_scrap)
+                        state.ship.manifest_dirty = True
+                        params = {
+                            "drone_id": action.drone_id,
+                            "repair_amount": repair_amount,
+                            "repair_scrap": repair_scrap,
+                            "repair_fail_p_mult": profile.repair_fail_p_mult_effective,
+                            "repair_scrap_cost_mult": profile.repair_scrap_cost_mult_effective,
+                            "required_operator_location_kind": move_target.kind,
+                            "required_operator_location_id": move_target.id,
+                        }
+                        move_events = self._enqueue_drone_move_job(state, drone, move_target)
+                        repair_events = self._enqueue_job(
+                            state,
+                            JobType.REPAIR_SYSTEM,
+                            TargetRef(kind="ship_system", id=action.system_id),
+                            owner_id=action.drone_id,
+                            eta_s=Balance.REPAIR_TIME_S * profile.repair_time_mult_effective,
+                            params=params,
+                        )
+                        return pre_events + move_events + repair_events
+                if self._has_active_jobs_for_owner(state, action.drone_id):
+                    defer_auto_move_confirmation = True
+                else:
+                    event = self._make_event(
+                        state,
+                        EventType.BOOT_BLOCKED,
+                        Severity.WARN,
+                        SourceRef(kind="ship_system", id=target_system.system_id),
+                        f"Repair blocked: target system {target_system.system_id} not at operator location",
+                        data={
+                            "message_key": "boot_blocked",
+                            "reason": "system_target_not_co_located",
+                            "system_id": target_system.system_id,
+                            "drone_id": drone.drone_id,
+                            "drone_sector_id": drone_sector_id,
+                            "target_sector_id": target_sector_id,
+                        },
+                    )
+                    self._record_event(state.events, event)
+                    return [event]
 
             pre_events: list[Event] = []
             if is_critical_power_state(state):
@@ -2206,7 +2485,7 @@ class Engine:
 
             repair_amount = self._effective_repair_amount(
                 target_system.health,
-                1.0,
+                target_system_max_health,
                 Balance.ACTIVE_REPAIR_SYSTEM_AMOUNT,
             )
             profile = self._drone_profile(state, drone)
@@ -2238,7 +2517,11 @@ class Engine:
                 "repair_scrap": repair_scrap,
                 "repair_fail_p_mult": profile.repair_fail_p_mult_effective,
                 "repair_scrap_cost_mult": profile.repair_scrap_cost_mult_effective,
+                "required_operator_location_kind": "ship_sector",
+                "required_operator_location_id": target_sector_id,
             }
+            if defer_auto_move_confirmation:
+                params["defer_auto_move_confirmation"] = True
             profile = self._drone_profile(state, drone)
             return pre_events + self._enqueue_job(
                 state,
@@ -2262,7 +2545,8 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            if system.health >= 1.0:
+            system_max_health = self._system_health_max_effective(system)
+            if system.health >= system_max_health:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
@@ -2288,7 +2572,11 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            repair_amount = self._effective_repair_amount(system.health, 1.0, Balance.SELFTEST_REPAIR_AMOUNT)
+            repair_amount = self._effective_repair_amount(
+                system.health,
+                system_max_health,
+                Balance.SELFTEST_REPAIR_AMOUNT,
+            )
             repair_scrap = self._repair_scrap_cost(
                 repair_amount,
                 Balance.SELFTEST_REPAIR_SCRAP_PER_HEALTH,
@@ -3006,12 +3294,6 @@ class Engine:
             if not job or job.status in (JobStatus.COMPLETED, JobStatus.CANCELLED, JobStatus.FAILED):
                 completed.append(job_id)
                 continue
-            interrupted = self._check_job_interruption(state, job)
-            if interrupted is not None:
-                job.status = JobStatus.FAILED
-                events.append(interrupted)
-                completed.append(job_id)
-                continue
             if job.status == JobStatus.QUEUED:
                 if job.owner_id and job.owner_id in running_by_owner:
                     continue
@@ -3022,6 +3304,17 @@ class Engine:
                     running_by_owner.add(job.owner_id)
                 if job.job_type == JobType.ROUTE_SOLVE:
                     route_solve_running = True
+            interrupted = self._check_job_interruption(state, job)
+            if interrupted is not None:
+                if str(interrupted.data.get("reason", "")) == "repair_auto_move_confirmation_required":
+                    events.append(interrupted)
+                    continue
+                job.status = JobStatus.FAILED
+                events.append(interrupted)
+                completed.append(job_id)
+                continue
+            if bool(job.params.get("awaiting_auto_move_confirmation")):
+                continue
             if job.params.get("emergency"):
                 failed_event = self._maybe_fail_emergency_job(state, job, dt)
                 if failed_event:
@@ -3049,6 +3342,101 @@ class Engine:
         return events
 
     def _check_job_interruption(self, state: GameState, job: Job) -> Event | None:
+        if job.job_type == JobType.REPAIR_SYSTEM:
+            drone_id = str(job.params.get("drone_id", "") or "")
+            target_system_id = str(job.target.id if job.target else "")
+            target_system = state.ship.systems.get(target_system_id) if target_system_id else None
+            target_system_max_health = (
+                self._system_health_max_effective(target_system)
+                if target_system is not None
+                else 1.0
+            )
+            required_kind = str(job.params.get("required_operator_location_kind", "ship_sector") or "ship_sector")
+            inferred_required_id = canonical_ship_sector_id(target_system.sector_id) if target_system else ""
+            required_id = str(job.params.get("required_operator_location_id", inferred_required_id) or "")
+            if target_system and target_system.health >= target_system_max_health:
+                scrap_refunded = self._refund_reserved_repair_scrap(state, job)
+                event = self._make_job_outcome_event(
+                    state,
+                    job,
+                    EventType.JOB_FAILED,
+                    Severity.INFO,
+                    SourceRef(kind="ship_system", id=target_system.system_id),
+                    f"Repair skipped: {target_system.system_id} already at full integrity",
+                    data={
+                        "job_type": job.job_type.value,
+                        "system_id": target_system.system_id,
+                        "message_key": "job_failed_repair_already_nominal",
+                        "reason": "already_nominal",
+                        "scrap_refunded": scrap_refunded,
+                    },
+                )
+                self._record_event(state.events, event)
+                return event
+            if bool(job.params.get("awaiting_auto_move_confirmation")):
+                return None
+            if required_id and drone_id:
+                drone = state.ship.drones.get(drone_id)
+                current_kind = getattr(getattr(drone, "location", None), "kind", "?")
+                current_id_raw = getattr(getattr(drone, "location", None), "id", "?")
+                current_id = canonical_ship_sector_id(current_id_raw) if current_kind == "ship_sector" else str(current_id_raw)
+                if (
+                    not drone
+                    or drone.status != DroneStatus.DEPLOYED
+                    or current_kind != required_kind
+                    or current_id != required_id
+                ):
+                    if (
+                        bool(job.params.get("defer_auto_move_confirmation"))
+                        and drone
+                        and drone.status == DroneStatus.DEPLOYED
+                        and current_kind == "ship_sector"
+                        and required_kind == "ship_sector"
+                    ):
+                        job.params["awaiting_auto_move_confirmation"] = True
+                        event = self._make_event(
+                            state,
+                            EventType.ACTION_WARNING,
+                            Severity.WARN,
+                            SourceRef(kind="ship_system", id=job.target.id if job.target else ""),
+                            (
+                                f"Repair waiting for decision: {drone_id} is in {current_id}, "
+                                f"but {job.target.id if job.target else '?'} requires {required_id}"
+                            ),
+                            data={
+                                "job_id": job.job_id,
+                                "job_key": job.internal_id or job.job_id,
+                                "job_type": job.job_type.value,
+                                "system_id": job.target.id if job.target else "",
+                                "drone_id": drone_id,
+                                "target_sector_id": required_id,
+                                "drone_sector_id": current_id,
+                                "message_key": "repair_auto_move_confirmation_required",
+                                "reason": "repair_auto_move_confirmation_required",
+                            },
+                        )
+                        self._record_event(state.events, event)
+                        return event
+                    event = self._make_job_outcome_event(
+                        state,
+                        job,
+                        EventType.JOB_FAILED,
+                        Severity.WARN,
+                        SourceRef(kind="ship_system", id=job.target.id if job.target else ""),
+                        f"Repair interrupted: operator drone no longer at required sector for {job.target.id if job.target else '?'}",
+                        data={
+                            "job_type": job.job_type.value,
+                            "system_id": job.target.id if job.target else "",
+                            "drone_id": drone_id,
+                            "target_sector_id": required_id,
+                            "drone_sector_id": current_id,
+                            "message_key": "job_failed_repair_context_changed",
+                            "reason": "repair_context_changed",
+                        },
+                    )
+                    self._record_event(state.events, event)
+                    return event
+
         if job.job_type == JobType.SCAN:
             blocked = self._scan_block_details(state)
             if blocked is not None:
@@ -3236,11 +3624,27 @@ class Engine:
         missing = max(0.0, float(maximum) - float(current))
         return max(0.0, min(float(nominal_amount), missing))
 
+    def _system_health_max_effective(self, system: ShipSystem) -> float:
+        return max(0.000001, float(getattr(system, "health_max_effective", 1.0) or 1.0))
+
     def _repair_scrap_cost(self, repair_amount: float, scrap_per_full: float, cost_mult: float = 1.0) -> int:
         if repair_amount <= 0.0:
             return 0
         base_cost = max(1, int(round(float(repair_amount) * float(scrap_per_full))))
         return max(1, int(round(base_cost * float(cost_mult))))
+
+    def _reserved_repair_scrap(self, job: Job) -> int:
+        return max(0, int(round(float(job.params.get("repair_scrap", 0) or 0))))
+
+    def _refund_reserved_repair_scrap(self, state: GameState, job: Job) -> int:
+        reserved = self._reserved_repair_scrap(job)
+        already_refunded = max(0, int(round(float(job.params.get("repair_scrap_refunded", 0) or 0))))
+        refund = max(0, reserved - already_refunded)
+        if refund > 0:
+            state.ship.cargo_scrap += refund
+            state.ship.manifest_dirty = True
+            job.params["repair_scrap_refunded"] = already_refunded + refund
+        return refund
 
     def _maybe_fail_repair_job(self, state: GameState, job: Job) -> Event | None:
         if job.job_type not in {JobType.REPAIR_SYSTEM, JobType.REPAIR_DRONE, JobType.SELFTEST_REPAIR}:
@@ -3505,7 +3909,7 @@ class Engine:
             system = state.ship.systems.get(job.target.id)
             if system:
                 repair_amount = float(job.params.get("repair_amount", Balance.SELFTEST_REPAIR_AMOUNT))
-                system.health = min(1.0, system.health + repair_amount)
+                system.health = min(self._system_health_max_effective(system), system.health + repair_amount)
                 self._apply_health_state(system, state, events, cause="selftest")
                 events.append(
                     self._make_job_outcome_event(
@@ -3527,7 +3931,10 @@ class Engine:
             if system:
                 self._drain_repair_operator_battery(state, job)
                 repair_amount = float(job.params.get("repair_amount", Balance.ACTIVE_REPAIR_SYSTEM_AMOUNT))
-                system.health = min(1.0, system.health + repair_amount)
+                scrap_required = self._reserved_repair_scrap(job)
+                scrap_refunded = max(0, int(round(float(job.params.get("repair_scrap_refunded", 0) or 0))))
+                scrap_spent = max(0, scrap_required - scrap_refunded)
+                system.health = min(self._system_health_max_effective(system), system.health + repair_amount)
                 if system.system_id == "energy_distribution":
                     system.state_locked = False
                 self._apply_health_state(system, state, events, cause="repair")
@@ -3542,6 +3949,7 @@ class Engine:
                         data={
                             "job_type": job.job_type.value,
                             "system_id": system.system_id,
+                            "scrap_spent": scrap_spent,
                             "message_key": "job_completed_repair",
                         },
                     )
@@ -4623,6 +5031,17 @@ class Engine:
                 events.extend(auto_recall_events)
         return events
 
+    def _has_active_jobs_for_owner(self, state: GameState, owner_id: str) -> bool:
+        for job_id in state.jobs.active_job_ids:
+            job = state.jobs.jobs.get(job_id)
+            if not job:
+                continue
+            if job.owner_id != owner_id:
+                continue
+            if job.status in {JobStatus.QUEUED, JobStatus.RUNNING}:
+                return True
+        return False
+
     def _drone_has_active_job(self, state: GameState, drone_id: str, job_type: JobType) -> bool:
         for job_id in state.jobs.active_job_ids:
             job = state.jobs.jobs.get(job_id)
@@ -5091,6 +5510,94 @@ class Engine:
         )
         self._record_event(state.events, event)
         return [event]
+
+    def _resolve_drone_move_target_ref(
+        self,
+        state: GameState,
+        drone: DroneState,
+        requested_target_id: str,
+    ) -> tuple[TargetRef | None, Event | None]:
+        target_id = requested_target_id
+        if requested_target_id == state.ship.ship_id:
+            target_id = self._drone_bay_sector_id(state)
+        elif requested_target_id not in state.world.space.nodes:
+            target_id = canonical_ship_sector_id(requested_target_id)
+
+        if target_id in state.ship.sectors:
+            if drone.location.kind == "world_node":
+                if state.ship.docked_node_id != drone.location.id:
+                    event = self._make_event(
+                        state,
+                        EventType.BOOT_BLOCKED,
+                        Severity.WARN,
+                        SourceRef(kind="drone", id=drone.drone_id),
+                        f"Drone move blocked: ship not docked at {drone.location.id}",
+                        data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": drone.location.id},
+                    )
+                    return None, event
+            elif drone.location.kind != "ship_sector":
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="drone", id=drone.drone_id),
+                    f"Drone move blocked: {drone.drone_id} not on ship",
+                    data={"message_key": "boot_blocked", "reason": "not_on_ship", "drone_id": drone.drone_id},
+                )
+                return None, event
+            return TargetRef(kind="ship_sector", id=target_id), None
+
+        if requested_target_id in state.world.space.nodes:
+            target_id = requested_target_id
+            if state.ship.docked_node_id != target_id:
+                event = self._make_event(
+                    state,
+                    EventType.BOOT_BLOCKED,
+                    Severity.WARN,
+                    SourceRef(kind="world", id=target_id),
+                    f"Drone move blocked: ship not docked at {target_id}",
+                    data={"message_key": "boot_blocked", "reason": "not_docked", "node_id": target_id},
+                )
+                return None, event
+            return TargetRef(kind="world_node", id=target_id), None
+
+        event = self._make_event(
+            state,
+            EventType.BOOT_BLOCKED,
+            Severity.WARN,
+            SourceRef(kind="drone", id=drone.drone_id),
+            f"Drone move blocked: target {target_id} not found",
+            data={"message_key": "boot_blocked", "reason": "target_missing", "target_id": target_id},
+        )
+        return None, event
+
+    def _enqueue_drone_move_job(self, state: GameState, drone: DroneState, target: TargetRef) -> list[Event]:
+        profile = self._drone_profile(state, drone)
+        return self._enqueue_job(
+            state,
+            JobType.MOVE_DRONE,
+            target,
+            owner_id=drone.drone_id,
+            eta_s=Balance.DEPLOY_TIME_S * profile.move_time_mult_effective,
+            params={"drone_id": drone.drone_id},
+        )
+
+    def _has_active_drone_move_to_target(self, state: GameState, drone_id: str, target: TargetRef) -> bool:
+        for active_job_id in list(state.jobs.active_job_ids):
+            active_job = state.jobs.jobs.get(active_job_id)
+            if not active_job:
+                continue
+            if active_job.job_type != JobType.MOVE_DRONE:
+                continue
+            if active_job.status not in {JobStatus.QUEUED, JobStatus.RUNNING}:
+                continue
+            if active_job.owner_id != drone_id:
+                continue
+            if not active_job.target:
+                continue
+            if active_job.target.kind == target.kind and active_job.target.id == target.id:
+                return True
+        return False
 
     def _job_source(
         self,

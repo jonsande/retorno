@@ -47,7 +47,7 @@ class ShipSystem:
     system_id: str
     name: str
     state: SystemState
-    health: float  # 0..1
+    health: float  # 0..health_max_effective
 
     p_nom_kw: float
     priority: int  # 1..5
@@ -56,6 +56,7 @@ class ShipSystem:
     k_power: float
     k_rad: float
 
+    health_max_effective: float = 1.0
     sector_id: str = "UNKNOWN"
     state_locked: bool = False
     forced_offline: bool = False

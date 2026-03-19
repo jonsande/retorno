@@ -19,7 +19,7 @@ from retorno.bootstrap import create_initial_state_prologue, create_initial_stat
 from retorno.cli.parser import ParseError, parse_command, format_parse_error
 from retorno.cli import repl
 from retorno.core.engine import Engine
-from retorno.core.actions import Hibernate
+from retorno.core.actions import Hibernate, Repair, RepairAutoMoveDecision
 from retorno.config.balance import Balance
 from retorno.model.events import EventType, Severity
 from retorno.model.drones import DroneStatus
@@ -1209,6 +1209,16 @@ class RetornoTextualApp(App):
         self._log_line(self._pending_confirm_prompt)
         return True
 
+    def _confirm_repair_auto_move_needed(self, state, action: Repair) -> bool:
+        prompt = repl._repair_auto_move_confirmation_prompt(state, action)
+        if prompt is None:
+            return False
+        self._pending_confirm_action = ("REPAIR_AUTO_MOVE", action)
+        self._pending_confirm_prompt = prompt
+        self._pending_confirm_locale = state.os.locale.value
+        self._log_line(self._pending_confirm_prompt)
+        return True
+
     def _confirm_travel_abort_needed(self, state) -> bool:
         locale = state.os.locale.value
         prompts = {
@@ -1429,6 +1439,28 @@ class RetornoTextualApp(App):
                 notice = self._audio_manager.consume_notice()
                 if notice:
                     self._log_line(notice)
+            self._queue_deferred_repair_auto_move_prompt(auto_events)
+
+    def _queue_deferred_repair_auto_move_prompt(self, auto_events) -> None:
+        if self._pending_confirm_action is not None:
+            return
+        deferred_prompts = repl._deferred_repair_auto_move_actions(auto_events)
+        if not deferred_prompts:
+            return
+        with self.loop.with_lock() as state:
+            for deferred_prompt in deferred_prompts:
+                prompt = repl._repair_auto_move_confirmation_prompt(
+                    state,
+                    deferred_prompt.repair,
+                    ignore_active_jobs=True,
+                )
+                if prompt is None:
+                    continue
+                self._pending_confirm_action = ("REPAIR_AUTO_MOVE_DEFERRED", deferred_prompt)
+                self._pending_confirm_prompt = prompt
+                self._pending_confirm_locale = state.os.locale.value
+                self._log_line(self._pending_confirm_prompt)
+                break
 
     def _startup_tips(self, locale: str) -> list[str]:
         tips = {
@@ -1467,6 +1499,7 @@ class RetornoTextualApp(App):
             notice = self._audio_manager.consume_notice()
             if notice:
                 self._log_line(notice)
+        self._queue_deferred_repair_auto_move_prompt(auto_events)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         text = event.value.strip()
@@ -1484,6 +1517,8 @@ class RetornoTextualApp(App):
             if locale == "es":
                 yes = {"s", "si", "sí", "y", "yes"}
             action = self._pending_confirm_action
+            confirm_kind = action[0] if isinstance(action, tuple) else None
+            confirm_payload = action[1] if isinstance(action, tuple) and len(action) > 1 else action
             self._pending_confirm_action = None
             self._pending_confirm_prompt = ""
             if action == "HIBERNATE_WAKE":
@@ -1541,20 +1576,26 @@ class RetornoTextualApp(App):
                     self._pending_hibernate_requires_non_cruise = False
                     self._pending_wake_on_low_battery = False
                 else:
-                    if action.__class__.__name__ == "Travel":
-                        self._log_line(f"> nav {getattr(action, 'node_id', '?')}", separate=True)
+                    if confirm_kind == "REPAIR_AUTO_MOVE_DEFERRED":
+                        resolved_action = RepairAutoMoveDecision(job_id=confirm_payload.job_id, auto_move=True)
+                    elif confirm_kind == "REPAIR_AUTO_MOVE":
+                        resolved_action = repl._repair_with_auto_move(confirm_payload)
                     else:
-                        self._log_line(f"> {action.__class__.__name__.lower()}", separate=True)
-                    ev = self.loop.apply_action(action)
+                        resolved_action = confirm_payload
+                    if resolved_action.__class__.__name__ == "Travel":
+                        self._log_line(f"> nav {getattr(resolved_action, 'node_id', '?')}", separate=True)
+                    else:
+                        self._log_line(f"> {resolved_action.__class__.__name__.lower()}", separate=True)
+                    ev = self.loop.apply_action(resolved_action)
                     if ev:
                         audio_enabled = False
                         with self.loop.with_lock() as state:
                             lines = presenter.format_event_lines(state, [("cmd", e) for e in ev])
                             audio_enabled = state.os.audio.enabled
-                            if action.__class__.__name__ == "Travel":
+                            if resolved_action.__class__.__name__ == "Travel":
                                 for e in ev:
                                     if e.type == "travel_started" or e.type == repl.EventType.TRAVEL_STARTED:
-                                        dest = e.data.get("to", getattr(action, "node_id", "?"))
+                                        dest = e.data.get("to", getattr(resolved_action, "node_id", "?"))
                                         msg = {
                                             "en": f"(nav) confirmed: en route to {dest}",
                                             "es": f"(nav) confirmado: rumbo a {dest}",
@@ -1563,11 +1604,39 @@ class RetornoTextualApp(App):
                                         break
                         self._log_lines(lines)
                         if self._audio_manager is not None:
+                                self._audio_manager.handle_event_batch(audio_enabled, ev)
+                                notice = self._audio_manager.consume_notice()
+                                if notice:
+                                    self._log_line(notice)
+            else:
+                if confirm_kind == "REPAIR_AUTO_MOVE_DEFERRED":
+                    ev = self.loop.apply_action(RepairAutoMoveDecision(job_id=confirm_payload.job_id, auto_move=False))
+                    if ev:
+                        audio_enabled = False
+                        with self.loop.with_lock() as state:
+                            lines = presenter.format_event_lines(state, [("cmd", e) for e in ev])
+                            audio_enabled = state.os.audio.enabled
+                        self._log_lines(lines)
+                        if self._audio_manager is not None:
                             self._audio_manager.handle_event_batch(audio_enabled, ev)
                             notice = self._audio_manager.consume_notice()
                             if notice:
                                 self._log_line(notice)
-            else:
+                    return
+                if confirm_kind == "REPAIR_AUTO_MOVE":
+                    ev = self.loop.apply_action(confirm_payload)
+                    if ev:
+                        audio_enabled = False
+                        with self.loop.with_lock() as state:
+                            lines = presenter.format_event_lines(state, [("cmd", e) for e in ev])
+                            audio_enabled = state.os.audio.enabled
+                        self._log_lines(lines)
+                        if self._audio_manager is not None:
+                            self._audio_manager.handle_event_batch(audio_enabled, ev)
+                            notice = self._audio_manager.consume_notice()
+                            if notice:
+                                self._log_line(notice)
+                    return
                 if isinstance(action, str) and action in {"HIBERNATE_DRONES", "HIBERNATE_WAKE", "HIBERNATE_NON_CRUISE"}:
                     self._pending_hibernate_parsed = None
                     self._pending_hibernate_requires_non_cruise = False
@@ -1767,6 +1836,7 @@ class RetornoTextualApp(App):
                     notice = self._audio_manager.consume_notice()
                     if notice:
                         self._log_line(notice)
+                self._queue_deferred_repair_auto_move_prompt(auto_ev)
             return
         if parsed == "UPLINK":
             with self.loop.with_lock() as state:
@@ -1939,6 +2009,10 @@ class RetornoTextualApp(App):
                         return
                 elif self._confirm_abandon_drones_needed(state, parsed):
                     return
+        if isinstance(parsed, Repair):
+            with self.loop.with_lock() as state:
+                if self._confirm_repair_auto_move_needed(state, parsed):
+                    return
 
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG":
             mode = parsed[1]
@@ -2104,6 +2178,7 @@ class RetornoTextualApp(App):
                 notice = self._audio_manager.consume_notice()
                 if notice:
                     self._log_line(notice)
+            self._queue_deferred_repair_auto_move_prompt(step_pairs)
             return
 
         if isinstance(parsed, Hibernate):

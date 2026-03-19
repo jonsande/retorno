@@ -28,7 +28,7 @@ from retorno.core.lore import (
 )
 from retorno.core.deadnodes import evaluate_dead_nodes
 from retorno.core.exploration_recovery import ensure_exploration_recovery, uplink_blocked_reason
-from retorno.core.actions import Action, AuthRecover, Hibernate, RouteSolve, Status
+from retorno.core.actions import Action, AuthRecover, Hibernate, Repair, RepairAutoMoveDecision, RouteSolve, Status
 from retorno.runtime.loop import GameLoop
 from retorno.runtime.operator_config import (
     apply_config_value,
@@ -99,6 +99,12 @@ class HibernateRunResult:
     recovery_events: list[Event]
     woke_early: bool
     wake_reason: str | None
+
+
+@dataclass
+class DeferredRepairAutoMovePrompt:
+    job_id: str
+    repair: Repair
 
 
 def _maybe_run_startup_sequence(locale: str) -> None:
@@ -913,6 +919,14 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Action blocked: drone already deployed ({drone_id})",
             "es": "Acción bloqueada: dron ya desplegado ({drone_id})",
         },
+        "drone_already_at_target": {
+            "en": "Action blocked: drone already at destination ({target_id})",
+            "es": "Acción bloqueada: el dron ya está en destino ({target_id})",
+        },
+        "drone_move_already_queued": {
+            "en": "Action blocked: drone already has an active move to destination ({target_id})",
+            "es": "Acción bloqueada: el dron ya tiene un movimiento activo hacia el destino ({target_id})",
+        },
         "drone_disabled": {
             "en": "Action blocked: drone disabled ({drone_id})",
             "es": "Acción bloqueada: dron deshabilitado ({drone_id})",
@@ -1132,8 +1146,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
     }
     job_completed_keys = {
         "job_completed_repair": {
-            "en": "Repair completed for {system_id}",
-            "es": "Reparación completada en {system_id}",
+            "en": "Repair completed for {system_id} (scrap spent: {scrap_spent})",
+            "es": "Reparación completada en {system_id} (chatarra gastada: {scrap_spent})",
         },
         "job_completed_drone_repair": {
             "en": "Drone repair completed for {drone_id}",
@@ -1199,6 +1213,24 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "es": (
                 "Reparación fallida en {target_id}. "
                 "Se consumió {scrap_consumed}/{scrap_required} chatarra (reembolso: {scrap_refunded})"
+            ),
+        },
+        "job_failed_repair_already_nominal": {
+            "en": "Repair skipped for {system_id}: target already nominal (refund: {scrap_refunded})",
+            "es": "Reparación omitida en {system_id}: objetivo ya nominal (reembolso: {scrap_refunded})",
+        },
+        "job_failed_repair_context_changed": {
+            "en": "Repair interrupted: operator drone is no longer at {target_sector_id} ({drone_id} at {drone_sector_id})",
+            "es": "Reparación interrumpida: el dron operador ya no está en {target_sector_id} ({drone_id} en {drone_sector_id})",
+        },
+        "job_failed_repair_auto_move_confirmation_required": {
+            "en": (
+                "Repair waiting for decision: {drone_id} is in {drone_sector_id}, "
+                "but target requires {target_sector_id}"
+            ),
+            "es": (
+                "Reparación pendiente de decisión: {drone_id} está en {drone_sector_id}, "
+                "pero el objetivo requiere {target_sector_id}"
             ),
         },
         "job_completed_salvage": {
@@ -5709,6 +5741,119 @@ def _handle_intel_export(state, path: str) -> None:
     print(f"(intel) export written to {path} ({len(lines)} lines)")
 
 
+def _has_active_jobs_for_owner(state, owner_id: str) -> bool:
+    for job_id in state.jobs.active_job_ids:
+        job = state.jobs.jobs.get(job_id)
+        if not job:
+            continue
+        if job.owner_id != owner_id:
+            continue
+        if job.status in {JobStatus.QUEUED, JobStatus.RUNNING}:
+            return True
+    return False
+
+
+def _repair_auto_move_confirmation_context(
+    state,
+    action: Repair,
+    *,
+    ignore_active_jobs: bool = False,
+) -> dict[str, str] | None:
+    drone = state.ship.drones.get(action.drone_id)
+    if not drone or drone.status != DroneStatus.DEPLOYED or drone.location.kind != "ship_sector":
+        return None
+    if not ignore_active_jobs and _has_active_jobs_for_owner(state, drone.drone_id):
+        return None
+    target_system = state.ship.systems.get(action.system_id)
+    if not target_system:
+        return None
+    target_system_max_health = max(0.000001, float(getattr(target_system, "health_max_effective", 1.0) or 1.0))
+    if target_system.health >= target_system_max_health:
+        return None
+    drone_sector_id = canonical_ship_sector_id(drone.location.id)
+    target_sector_id = canonical_ship_sector_id(target_system.sector_id)
+    if drone_sector_id == target_sector_id:
+        return None
+    return {
+        "drone_id": drone.drone_id,
+        "system_id": target_system.system_id,
+        "drone_sector_id": drone_sector_id,
+        "target_sector_id": target_sector_id,
+    }
+
+
+def _repair_auto_move_confirmation_prompt(
+    state,
+    action: Repair,
+    *,
+    ignore_active_jobs: bool = False,
+) -> str | None:
+    context = _repair_auto_move_confirmation_context(
+        state,
+        action,
+        ignore_active_jobs=ignore_active_jobs,
+    )
+    if context is None:
+        return None
+    locale = state.os.locale.value
+    prompts = {
+        "en": (
+            "WARNING: {drone_id} is in {drone_sector_id}, but {system_id} is in {target_sector_id}. "
+            "Auto-move the drone to {target_sector_id} and queue the repair? [y/N] "
+        ),
+        "es": (
+            "ADVERTENCIA: {drone_id} está en {drone_sector_id}, pero {system_id} se encuentra en {target_sector_id}. "
+            "¿Desplazar automáticamente el dron a {target_sector_id} y encolar la reparación? [s/N] "
+        ),
+    }
+    template = prompts.get(locale, prompts["en"])
+    return template.format(**context)
+
+
+def _confirm_repair_auto_move(
+    state,
+    action: Repair,
+    *,
+    ignore_active_jobs: bool = False,
+) -> bool:
+    prompt = _repair_auto_move_confirmation_prompt(
+        state,
+        action,
+        ignore_active_jobs=ignore_active_jobs,
+    )
+    if prompt is None:
+        return False
+    reply = input(prompt).strip().lower()
+    if state.os.locale.value == "es":
+        return reply in {"s", "si", "sí", "y", "yes"}
+    return reply in {"y", "yes"}
+
+
+def _repair_with_auto_move(action: Repair) -> Repair:
+    return Repair(drone_id=action.drone_id, system_id=action.system_id, auto_move=True)
+
+
+def _deferred_repair_auto_move_actions(events: list[tuple[str, Event]]) -> list[DeferredRepairAutoMovePrompt]:
+    actions: list[DeferredRepairAutoMovePrompt] = []
+    for item in events:
+        event = item[1] if isinstance(item, tuple) and len(item) == 2 else item
+        if not isinstance(event, Event):
+            continue
+        if str(event.data.get("reason", "")) != "repair_auto_move_confirmation_required":
+            continue
+        job_id = str(event.data.get("job_key", "") or event.data.get("job_id", "") or "").strip()
+        drone_id = str(event.data.get("drone_id", "") or "").strip()
+        system_id = str(event.data.get("system_id", "") or "").strip()
+        if job_id and drone_id and system_id:
+            actions.append(
+                DeferredRepairAutoMovePrompt(
+                    job_id=job_id,
+                    repair=Repair(drone_id=drone_id, system_id=system_id),
+                )
+            )
+    return actions
+
+
 def _confirm_abandon_drones(state, action) -> bool:
     if not state.ship.drones:
         return True
@@ -7184,6 +7329,31 @@ def main() -> None:
         except Exception:
             pass
 
+    def _handle_deferred_repair_auto_move_prompts(events: list[tuple[str, Event]]) -> None:
+        deferred_repairs = _deferred_repair_auto_move_actions(events)
+        for deferred_prompt in deferred_repairs:
+            with loop.with_lock() as locked_state:
+                auto_move = _confirm_repair_auto_move(
+                    locked_state,
+                    deferred_prompt.repair,
+                    ignore_active_jobs=True,
+                )
+            followup_action = RepairAutoMoveDecision(
+                job_id=deferred_prompt.job_id,
+                auto_move=auto_move,
+            )
+            followup_events = loop.apply_action(followup_action)
+            followup_audio_enabled = False
+            with loop.with_lock() as locked_state:
+                _apply_salvage_loot(loop, locked_state, followup_events)
+                render_events(locked_state, followup_events)
+                followup_audio_enabled = locked_state.os.audio.enabled
+            if audio_manager is not None:
+                audio_manager.handle_event_batch(followup_audio_enabled, followup_events)
+                notice = audio_manager.consume_notice()
+                if notice:
+                    print(notice)
+
     def _drain_auto_events() -> None:
         auto_ev = loop.drain_events()
         if auto_ev:
@@ -7197,6 +7367,7 @@ def main() -> None:
                 notice = audio_manager.consume_notice()
                 if notice:
                     print(notice)
+            _handle_deferred_repair_auto_move_prompts(auto_ev)
 
     # print("RETORNO (prologue)")
     # print("\nTip: cat /mail/inbox/0000.notice.txt")
@@ -7254,18 +7425,7 @@ def main() -> None:
                     print(notice)
             continue
 
-        ev = loop.drain_events()
-        if ev:
-            audio_enabled = False
-            with loop.with_lock() as locked_state:
-                _apply_salvage_loot(loop, locked_state, ev)
-                render_events(locked_state, ev)
-                audio_enabled = locked_state.os.audio.enabled
-            if audio_manager is not None:
-                audio_manager.handle_event_batch(audio_enabled, ev)
-                notice = audio_manager.consume_notice()
-                if notice:
-                    print(notice)
+        _drain_auto_events()
 
         if parsed == "EXIT":
             _stop_and_persist()
@@ -7615,17 +7775,7 @@ def main() -> None:
                 notice = audio_manager.consume_notice()
                 if notice:
                     print(notice)
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                audio_enabled = False
-                with loop.with_lock() as locked_state:
-                    render_events(locked_state, auto_ev)
-                    audio_enabled = locked_state.os.audio.enabled
-                if audio_manager is not None:
-                    audio_manager.handle_event_batch(audio_enabled, auto_ev)
-                    notice = audio_manager.consume_notice()
-                    if notice:
-                        print(notice)
+            _drain_auto_events()
             continue
         if parsed == "INTEL_LIST":
             _drain_auto_events()
@@ -7647,18 +7797,7 @@ def main() -> None:
             with loop.with_lock() as locked_state:
                 _apply_salvage_loot(loop, locked_state, ev)
                 render_events(locked_state, ev)
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                audio_enabled = False
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
-                    audio_enabled = locked_state.os.audio.enabled
-                if audio_manager is not None:
-                    audio_manager.handle_event_batch(audio_enabled, auto_ev)
-                    notice = audio_manager.consume_notice()
-                    if notice:
-                        print(notice)
+            _drain_auto_events()
             continue
         if parsed == "UPLINK":
             _drain_auto_events()
@@ -7735,18 +7874,8 @@ def main() -> None:
                 notice = audio_manager.consume_notice()
                 if notice:
                     print(notice)
-            auto_ev = loop.drain_events()
-            if auto_ev:
-                audio_enabled = False
-                with loop.with_lock() as locked_state:
-                    _apply_salvage_loot(loop, locked_state, auto_ev)
-                    render_events(locked_state, auto_ev)
-                    audio_enabled = locked_state.os.audio.enabled
-                if audio_manager is not None:
-                    audio_manager.handle_event_batch(audio_enabled, auto_ev)
-                    notice = audio_manager.consume_notice()
-                    if notice:
-                        print(notice)
+            _handle_deferred_repair_auto_move_prompts(cmd_events)
+            _drain_auto_events()
             continue
         if isinstance(parsed, Hibernate):
             _drain_auto_events()
@@ -7810,6 +7939,28 @@ def main() -> None:
                         continue
                 elif not _confirm_abandon_drones(locked_state, parsed):
                     continue
+        if isinstance(parsed, Repair):
+            with loop.with_lock() as locked_state:
+                repair_auto_move_prompt = _repair_auto_move_confirmation_prompt(locked_state, parsed)
+            if repair_auto_move_prompt is not None:
+                confirm_auto_move = False
+                with loop.with_lock() as locked_state:
+                    confirm_auto_move = _confirm_repair_auto_move(locked_state, parsed)
+                if confirm_auto_move:
+                    parsed = _repair_with_auto_move(parsed)
+                else:
+                    ev = loop.apply_action(parsed)
+                    audio_enabled = False
+                    with loop.with_lock() as locked_state:
+                        _apply_salvage_loot(loop, locked_state, ev)
+                        render_events(locked_state, ev)
+                        audio_enabled = locked_state.os.audio.enabled
+                    if audio_manager is not None:
+                        audio_manager.handle_event_batch(audio_enabled, ev)
+                        notice = audio_manager.consume_notice()
+                        if notice:
+                            print(notice)
+                    continue
 
         ev = loop.apply_action(parsed)
         audio_enabled = False
@@ -7834,18 +7985,7 @@ def main() -> None:
             notice = audio_manager.consume_notice()
             if notice:
                 print(notice)
-        auto_ev = loop.drain_events()
-        if auto_ev:
-            audio_enabled = False
-            with loop.with_lock() as locked_state:
-                _apply_salvage_loot(loop, locked_state, auto_ev)
-                render_events(locked_state, auto_ev)
-                audio_enabled = locked_state.os.audio.enabled
-            if audio_manager is not None:
-                audio_manager.handle_event_batch(audio_enabled, auto_ev)
-                notice = audio_manager.consume_notice()
-                if notice:
-                    print(notice)
+        _drain_auto_events()
 
     _stop_and_persist()
     print("bye")
