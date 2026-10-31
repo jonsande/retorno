@@ -49,6 +49,7 @@ class DroneMove(Action):
 class Repair(Action):
     drone_id: str
     system_id: str
+    auto_move: bool = False
 
 
 @dataclass(slots=True)
@@ -150,6 +151,12 @@ class CargoAudit(Action):
 @dataclass(slots=True)
 class JobCancel(Action):
     job_id: str
+
+
+@dataclass(slots=True)
+class RepairAutoMoveDecision(Action):
+    job_id: str
+    auto_move: bool
 
 
 @dataclass(slots=True)
