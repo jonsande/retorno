@@ -21,7 +21,7 @@ def main() -> None:
     state = create_initial_state_sandbox()
 
     state.ship.drones["D1"].status = DroneStatus.DEPLOYED
-    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="PWR-A2")
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="BUS-A2")
     state.ship.drones["D1"].battery = 1.0
     state.ship.drones["D1"].integrity = 1.0
     state.ship.drones["D2"] = DroneState(

@@ -17,8 +17,8 @@ Sectores internos canónicos de RETORNO
 - `STS-BAY`: Bahia de Estasis
 - `LFS-01`: Soporte Vital
 - `PWR-A1`: Nucleo de Potencia
-- `PWR-A2`: Distribucion de Energia
-- `PRP-R1`: Sala de Propulsion (reservado)
+- `BUS-A2`: Distribucion de Energia
+- `ENG-R1`: Sala de máquinas / Propulsión (reservado)
 - `BRG-01`: Puente / Mando
 - `SNS-R1`: Sala de Sensores
 - `DRN-BAY`: Bahia de Drones

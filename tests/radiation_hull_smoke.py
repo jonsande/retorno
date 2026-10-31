@@ -110,7 +110,7 @@ def main() -> None:
     state = _fresh_state()
     _set_node(state, "ARCHIVE_01")
     state.ship.drones["D1"].status = DroneStatus.DEPLOYED
-    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="PWR-A2")
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="BUS-A2")
     state.ship.drones["D1"].dose_rad = 0.0
     state.ship.drones["D2"] = DroneState(
         drone_id="D2",
@@ -129,7 +129,7 @@ def main() -> None:
         state = _fresh_state()
         drone = state.ship.drones["D1"]
         drone.status = DroneStatus.DEPLOYED
-        drone.location = DroneLocation(kind="ship_sector", id="PWR-A2")
+        drone.location = DroneLocation(kind="ship_sector", id="BUS-A2")
         drone.integrity = 1.0
         drone.dose_rad = dose
         engine._update_drone_maintenance(state, 1000.0)  # noqa: SLF001
@@ -185,7 +185,7 @@ def main() -> None:
 
     drone = state.ship.drones["D1"]
     drone.status = DroneStatus.DEPLOYED
-    drone.location = DroneLocation(kind="ship_sector", id="PWR-A2")
+    drone.location = DroneLocation(kind="ship_sector", id="BUS-A2")
     drone.dose_rad = Balance.RAD_LEVEL_DRONE_DOSE_HIGH - 0.01
     drone.radiation_level = "elevated"
     drone_cross_events = engine.tick(state, 1.0)

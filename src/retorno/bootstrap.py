@@ -75,7 +75,7 @@ def create_initial_state_prologue() -> GameState:
             state=SystemState.DAMAGED,
             health=0.7,
             state_locked=True,
-            sector_id="PWR-A2",
+            sector_id="BUS-A2",
             p_nom_kw=0.3,
             priority=2,
             base_decay_per_s=8.0e-11,

@@ -9,7 +9,7 @@ Comportamiento operativo
 - `nav map sectors`: lista sectores mundiales conocidos y cobertura de navegación.
 
 Set de sectores internos de RETORNO
-- `DCK-A1`, `STS-BAY`, `LFS-01`, `PWR-A1`, `PWR-A2`, `PRP-R1`, `BRG-01`, `SNS-R1`, `DRN-BAY`, `CRG-01`
+- `DCK-A1`, `STS-BAY`, `LFS-01`, `PWR-A1`, `BUS-A2`, `ENG-R1`, `BRG-01`, `SNS-R1`, `DRN-BAY`, `CRG-01`
 
 Convencion de ids de sector
 - Los ids internos son canonicos/reutilizables por tipo de nave y posicion funcional.

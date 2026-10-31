@@ -124,7 +124,7 @@ def main() -> None:
     # Ship-system repair uses the shared active repair amount for every system, including distribution.
     state = _fresh_state()
     _prepare_deployed_drone(state, "D1")
-    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="PWR-A2")
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="BUS-A2")
     state.ship.systems["energy_distribution"].health = 0.4
     state.ship.cargo_scrap = 100
     queued = engine.apply_action(state, Repair(drone_id="D1", system_id="energy_distribution"))
@@ -291,7 +291,7 @@ def main() -> None:
     state = _fresh_state()
     _add_d2(state)
     _prepare_deployed_drone(state, "D1")
-    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="PWR-A2")
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="BUS-A2")
     state.ship.drones["D2"].location = DroneLocation(kind="ship_sector", id="DRN-BAY")
     blocked = engine.apply_action(state, Repair(drone_id="D1", system_id="D2"))
     _assert_blocked_reason(blocked, "drone_target_not_co_located")
@@ -299,7 +299,7 @@ def main() -> None:
     # Ship-system repair blocked if target system is not co-located with operator drone.
     state = _fresh_state()
     _prepare_deployed_drone(state, "D1")
-    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="PWR-A2")
+    state.ship.drones["D1"].location = DroneLocation(kind="ship_sector", id="BUS-A2")
     state.ship.systems["sensors"].health = 0.7
     blocked = engine.apply_action(state, Repair(drone_id="D1", system_id="sensors"))
     _assert_blocked_reason(blocked, "system_target_not_co_located")
@@ -338,7 +338,7 @@ def main() -> None:
     # LIMITED eta multipliers for bay-assisted actions.
     state = _fresh_state()
     state.ship.systems["drone_bay"].state = SystemState.LIMITED
-    events = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="PWR-A2", emergency=False))
+    events = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="BUS-A2", emergency=False))
     assert any(e.type == EventType.JOB_QUEUED for e in events), events
     assert abs(_active_job_eta(state, JobType.DEPLOY_DRONE) - Balance.DEPLOY_TIME_S * 1.5) < 1e-6
 
@@ -463,7 +463,7 @@ def main() -> None:
     # DAMAGED eta multipliers + charge multiplier.
     state = _fresh_state()
     state.ship.systems["drone_bay"].state = SystemState.DAMAGED
-    events = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="PWR-A2", emergency=False))
+    events = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="BUS-A2", emergency=False))
     assert any(e.type == EventType.JOB_QUEUED for e in events), events
     assert abs(_active_job_eta(state, JobType.DEPLOY_DRONE) - Balance.DEPLOY_TIME_S * 2.0) < 1e-6
 
@@ -482,7 +482,7 @@ def main() -> None:
     old_p = Balance.DRONE_BAY_DAMAGED_INTEGRITY_RISK_P
     try:
         Balance.DRONE_BAY_DAMAGED_INTEGRITY_RISK_P = 1.0
-        events = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="PWR-A2", emergency=False))
+        events = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="BUS-A2", emergency=False))
         assert any(e.type == EventType.JOB_QUEUED for e in events), events
         engine.tick(state, 120.0)
         assert state.ship.drones["D1"].integrity <= 1.0 - Balance.DRONE_BAY_DAMAGED_INTEGRITY_HIT
@@ -494,9 +494,9 @@ def main() -> None:
     state = _fresh_state()
     state.ship.systems["drone_bay"].state = SystemState.OFFLINE
     state.ship.systems["drone_bay"].forced_offline = True
-    normal = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="PWR-A2", emergency=False))
+    normal = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="BUS-A2", emergency=False))
     _assert_blocked_reason(normal, "drone_bay_deploy_offline")
-    emergency = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="PWR-A2", emergency=True))
+    emergency = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="BUS-A2", emergency=True))
     assert any(e.type == EventType.JOB_QUEUED for e in emergency), emergency
 
     # Precedence check: in critical power state, normal deploy should still return drone_bay-specific reason.
@@ -504,7 +504,7 @@ def main() -> None:
     state.ship.power.power_quality = 0.20  # critical
     state.ship.systems["drone_bay"].state = SystemState.OFFLINE
     state.ship.systems["drone_bay"].forced_offline = True
-    critical_normal = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="PWR-A2", emergency=False))
+    critical_normal = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="BUS-A2", emergency=False))
     _assert_blocked_reason(critical_normal, "drone_bay_deploy_offline")
 
     state = _fresh_state()
@@ -522,11 +522,11 @@ def main() -> None:
     state.ship.systems["drone_bay"].state = SystemState.OFFLINE
     state.ship.systems["drone_bay"].forced_offline = True
     _prepare_deployed_drone(state)
-    moved = engine.apply_action(state, DroneMove(drone_id="D1", target_id="PWR-A2"))
+    moved = engine.apply_action(state, DroneMove(drone_id="D1", target_id="BUS-A2"))
     assert any(e.type == EventType.JOB_QUEUED for e in moved), moved
     engine.tick(state, _active_job_eta(state, JobType.MOVE_DRONE) + 1.0)
     assert state.ship.drones["D1"].location.kind == "ship_sector"
-    assert state.ship.drones["D1"].location.id == "PWR-A2"
+    assert state.ship.drones["D1"].location.id == "BUS-A2"
     state.ship.systems["energy_distribution"].health = 0.8
     repaired = engine.apply_action(state, Repair(drone_id="D1", system_id="energy_distribution"))
     assert any(e.type == EventType.JOB_QUEUED for e in repaired), repaired
@@ -560,7 +560,7 @@ def main() -> None:
     assert first_job.job_type == JobType.MOVE_DRONE, first_job
     assert second_job.job_type == JobType.REPAIR_SYSTEM, second_job
     engine.tick(state, _active_job_eta(state, JobType.MOVE_DRONE) + 1.0)
-    assert state.ship.drones["D1"].location.id == "PWR-A2", state.ship.drones["D1"].location
+    assert state.ship.drones["D1"].location.id == "BUS-A2", state.ship.drones["D1"].location
     before_health = state.ship.systems["energy_distribution"].health
     engine.tick(state, _active_job_eta(state, JobType.REPAIR_SYSTEM) + 1.0)
     assert state.ship.systems["energy_distribution"].health > before_health

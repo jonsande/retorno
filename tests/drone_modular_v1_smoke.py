@@ -69,7 +69,7 @@ def _recall_eta_with_modules(installed_modules: list[str]) -> float:
     _set_bay_ready(state)
     drone = state.ship.drones["D1"]
     drone.status = DroneStatus.DEPLOYED
-    drone.location = DroneLocation(kind="ship_sector", id="PWR-A2")
+    drone.location = DroneLocation(kind="ship_sector", id="BUS-A2")
     drone.battery = 1.0
     drone.integrity = 1.0
     drone.installed_modules = list(installed_modules)

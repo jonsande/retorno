@@ -9,7 +9,7 @@ Operational behavior
 - `nav map sectors`: lists known world sectors and navigation coverage.
 
 RETORNO internal-sector set
-- `DCK-A1`, `STS-BAY`, `LFS-01`, `PWR-A1`, `PWR-A2`, `PRP-R1`, `BRG-01`, `SNS-R1`, `DRN-BAY`, `CRG-01`
+- `DCK-A1`, `STS-BAY`, `LFS-01`, `PWR-A1`, `BUS-A2`, `ENG-R1`, `BRG-01`, `SNS-R1`, `DRN-BAY`, `CRG-01`
 
 Sector-id convention
 - Internal sector ids are canonical/reusable per ship type/functional position.

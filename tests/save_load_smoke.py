@@ -31,7 +31,7 @@ def main() -> None:
         state.ship.arrival_t = 4567.0
         ensure_sector_generated(state, "S+000_+000_+000")
         engine = Engine()
-        deploy_events = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="PWR-A2"))
+        deploy_events = engine.apply_action(state, DroneDeploy(drone_id="D1", sector_id="BUS-A2"))
         assert deploy_events, "Expected deploy job to be queued for save/load test"
         save_single_slot(state, slot_path)
 

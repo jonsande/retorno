@@ -25,8 +25,8 @@ RETORNO_CANONICAL_SECTORS: tuple[CanonicalSectorSpec, ...] = (
     CanonicalSectorSpec("STS-BAY", "Stasis Bay", "Bahia de Estasis", ("stasis", "medical")),
     CanonicalSectorSpec("LFS-01", "Life Support", "Soporte Vital", ("life_support",)),
     CanonicalSectorSpec("PWR-A1", "Power Core", "Nucleo de Potencia", ("power", "generation")),
-    CanonicalSectorSpec("PWR-A2", "Power Distribution", "Distribucion de Energia", ("power", "distribution")),
-    CanonicalSectorSpec("PRP-R1", "Propulsion Room", "Sala de Propulsion", ("propulsion", "reserved")),
+    CanonicalSectorSpec("BUS-A2", "Power Distribution", "Distribucion de Energia", ("power", "distribution")),
+    CanonicalSectorSpec("ENG-R1", "Engine room / Propulsion", "Sala de máquinas / Propulsión", ("propulsion", "reserved")),
     CanonicalSectorSpec("BRG-01", "Bridge / Command", "Puente / Mando", ("bridge", "command", "restricted")),
     CanonicalSectorSpec("SNS-R1", "Sensors Room", "Sala de Sensores", ("sensors",)),
     CanonicalSectorSpec("DRN-BAY", "Drone Bay", "Bahia de Drones", ("drone", "bay")),
@@ -44,7 +44,7 @@ RETORNO_SYSTEM_TO_SECTOR: dict[str, str] = {
     "data_core": "BRG-01",
     "security": "BRG-01",
     "power_core": "PWR-A1",
-    "energy_distribution": "PWR-A2",
+    "energy_distribution": "BUS-A2",
     "sensors": "SNS-R1",
     "drone_bay": "DRN-BAY",
 }
@@ -52,6 +52,8 @@ RETORNO_SYSTEM_TO_SECTOR: dict[str, str] = {
 # Internal-only aliases for save/state migration.
 RETORNO_LEGACY_SHIP_SECTOR_ALIASES: dict[str, str] = {
     "drone_bay": "DRN-BAY",
+    "PWR-A2": "BUS-A2",
+    "PRP-R1": "ENG-R1",
 }
 
 
@@ -65,6 +67,9 @@ def canonical_ship_sector_id(sector_id: str) -> str:
     if alias_target:
         return alias_target
     upper_sid = sid.upper()
+    alias_target = RETORNO_LEGACY_SHIP_SECTOR_ALIASES.get(upper_sid)
+    if alias_target:
+        return alias_target
     if upper_sid in RETORNO_CANONICAL_SECTOR_IDS:
         return upper_sid
     return sid

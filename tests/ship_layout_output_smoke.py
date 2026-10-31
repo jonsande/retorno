@@ -6,6 +6,7 @@ from contextlib import redirect_stdout
 from retorno.bootstrap import create_initial_state_prologue
 from retorno.cli import repl
 from retorno.model.os import Locale
+from retorno.model.ship_layout import canonical_ship_sector_id
 
 
 def _capture(fn, *args) -> str:
@@ -17,14 +18,18 @@ def _capture(fn, *args) -> str:
 
 def main() -> None:
     state = create_initial_state_prologue()
+    assert canonical_ship_sector_id("PWR-A2") == "BUS-A2"
+    assert canonical_ship_sector_id("pwr-a2") == "BUS-A2"
+    assert canonical_ship_sector_id("PRP-R1") == "ENG-R1"
+    assert canonical_ship_sector_id("prp-r1") == "ENG-R1"
 
     expected_order = [
         "DCK-A1",
         "STS-BAY",
         "LFS-01",
         "PWR-A1",
-        "PWR-A2",
-        "PRP-R1",
+        "BUS-A2",
+        "ENG-R1",
         "BRG-01",
         "SNS-R1",
         "DRN-BAY",
@@ -37,13 +42,15 @@ def main() -> None:
     for sid in expected_order:
         assert f"- {sid}:" in out_en, out_en
     assert "DCK-A1: Dock / Airlock" in out_en, out_en
-    assert "PWR-A2: Power Distribution" in out_en, out_en
+    assert "BUS-A2: Power Distribution" in out_en, out_en
+    assert "ENG-R1: Engine room / Propulsion" in out_en, out_en
     assert "SNS-R1: Sensors Room" in out_en, out_en
 
     state.os.locale = Locale.ES
     out_es = _capture(repl.render_ship_sectors, state)
     assert "DCK-A1: Darsena / Exclusa" in out_es, out_es
     assert "PWR-A1: Nucleo de Potencia" in out_es, out_es
+    assert "ENG-R1: Sala de máquinas / Propulsión" in out_es, out_es
     assert "SNS-R1: Sala de Sensores" in out_es, out_es
 
     state.os.locale = Locale.EN

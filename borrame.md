@@ -34,11 +34,11 @@ SPOILERS!
 
 Solución al puzzle/tutorial inicial:
 
-drone deploy! D1 PWR-A2
+drone deploy! D1 BUS-A2
 
 Si falla...
     drone reboot D1   (tantas veces como haga falta)
-    drone deploy! D1 PWR-A2
+    drone deploy! D1 BUS-A2
 
 drone repair D1 power_core
 drone repair D1 energy_distribution
