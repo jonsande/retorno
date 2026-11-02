@@ -24,6 +24,8 @@ Spanish version: [README.es.md](README.es.md)
 | [Universo físico y generación procedural](systems/world-generation.es.md) | Spanish counterpart of the universe and worldgen reference. | **Verified**; maintained as a language pair with the English document. |
 | [Discovery, navigation, and intel](systems/discovery-navigation-intel.md) | Canonical reference for player knowledge, scan, route solve, uplink, intel import, travel, narrative protection, and failsafes. | **Verified** against production code and focused tests. It distinguishes implemented behavior, one failing fixture expectation, and pending decisions; no arcs are currently active. |
 | [Descubrimiento, navegación e intel](systems/discovery-navigation-intel.es.md) | Spanish counterpart of the discovery and navigation reference. | **Verified**; maintained as a language pair with the English document. |
+| [Lore scheduler, arcs, and singles](systems/lore-scheduler.md) | Canonical reference for narrative placement, channels, forcing, pools, unlocks, and active content. | **Verified** against production code, active data, and safe tests. It separates fixture evidence, real content, and end-to-end gaps; it records three outdated fixtures without changing product or tests. |
+| [Scheduler de lore, arcos y singles](systems/lore-scheduler.es.md) | Spanish counterpart of the narrative scheduler reference. | **Verified**; maintained as a language pair with the English document. |
 | [Content loading contract](content-loading.md) | Defines which content paths the current loaders read directly, non-recursively, or recursively; also inventories inactive arc and location templates. | **Verified** against `src/retorno/runtime/data_loader.py`, `src/retorno/bootstrap.py`, `src/retorno/runtime/startup.py`, and the data tree at commit `2ffb1ab`. |
 | [Contrato de carga de contenido](content-loading.es.md) | Spanish counterpart of the content loading contract. | **Verified**; maintained as a language pair with the English document. |
 
@@ -50,7 +52,8 @@ Spanish version: [README.es.md](README.es.md)
 
 ## Planned documentation work
 
-Later phases should revise the arc/lore guides from the unified scheduler
-implementation, deepen failsafe documentation, and add a global verification
-matrix linking behavior to tests. Proposals should live separately from
-documents that describe implemented behavior.
+The canonical scheduler reference now reconstructs the unified implementation.
+Later phases should use it to revise the historical arc/lore guides, deepen
+failsafe documentation, and add a global verification matrix linking behavior
+to tests. Proposals should live separately from documents that describe
+implemented behavior.

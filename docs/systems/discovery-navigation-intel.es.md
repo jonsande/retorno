@@ -170,7 +170,9 @@ El destino debe estar dentro de `ship.sensors_range_ly` y del cap global
 La acción **no exige que el destino esté en `known_nodes` o `known_contacts`**.
 La compleción de comandos sólo propone contactos conocidos y en rango, pero un
 id físico escrito manualmente puede resolver una ruta hacia un nodo todavía
-desconocido.
+desconocido. Permitirlo fue una decisión de diseño deliberada confirmada por el
+desarrollador. La razón original no está documentada y podrá revisarse más
+adelante si conviene mantener este comportamiento.
 
 Si la ruta ya existe, el comando intenta refinar la distancia local sin encolar
 trabajo; si no puede, informa que la ruta ya era conocida. En otro caso encola
@@ -231,7 +233,8 @@ añaden rutas, no escriben otro log y no incrementan el contador de uplinks.
 `intel import <path>` procesa cualquier archivo accesible del filesystem del
 juego. `cat <path>` autoimporta únicamente rutas reconocidas de navegación,
 mail o logs (`/data/nav`, `/mail`, `/logs` y sus equivalentes bajo `/remote`).
-Leer un correo con `mail read` no invoca por sí mismo la autoimportación.
+`mail read <id|latest>` resuelve la ruta del correo y llama a `render_cat()`;
+por tanto, también autoimporta la intel contenida en una ruta de mail reconocida.
 
 La procedencia y confianza dependen de la ruta: mail usa 0.7; logs, fragmentos
 y manuales importados explícitamente usan normalmente 0.8.
@@ -533,7 +536,8 @@ Lagunas de cobertura:
 
 1. Decidir si `known_nodes` debe sustituir formalmente a `known_contacts` o si se
    requiere una única API que preserve ambos.
-2. Decidir si route solve debe exigir descubrimiento previo y revalidar el
+2. Revisar posteriormente si conviene mantener la decisión deliberada de no
+   exigir descubrimiento previo en route solve, y decidir si debe revalidar el
    origen al completar.
 3. Definir si toda ruta conocida debe corresponder a nodos y/o aristas físicas,
    y cómo tratar intel dangling.

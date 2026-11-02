@@ -169,6 +169,9 @@ global `MAX_ROUTE_HOP_LY` cap (45 ly).
 The action **does not require the destination to be in `known_nodes` or
 `known_contacts`**. Completion only suggests known in-range contacts, but a
 manually entered physical id can solve a route to a node that is still unknown.
+Allowing this was a deliberate design decision confirmed by the developer. Its
+original rationale is undocumented, and whether to retain the behavior may be
+reviewed later.
 
 If the route already exists, the command tries to refine local distance without
 queuing a job; otherwise it reports that the route was already known. In other
@@ -227,7 +230,8 @@ no additional log, and do not increment the uplink counter.
 `intel import <path>` processes any accessible in-game filesystem file.
 `cat <path>` auto-imports only recognized navigation, mail, or log paths
 (`/data/nav`, `/mail`, `/logs`, and their `/remote` equivalents). Reading mail
-with `mail read` does not itself invoke auto-import.
+with `mail read <id|latest>` resolves the mail path and calls `render_cat()`;
+therefore it also auto-imports intel from a recognized mail path.
 
 Provenance and confidence depend on path: mail uses 0.7; logs, fragments, and
 explicitly imported manuals normally use 0.8.
@@ -517,8 +521,9 @@ Coverage gaps:
 
 1. Decide whether `known_nodes` should formally replace `known_contacts` or a
    single API should preserve both.
-2. Decide whether route solve should require prior discovery and revalidate its
-   origin on completion.
+2. Revisit later whether to retain the deliberate choice not to require prior
+   discovery for route solve, and decide whether it should revalidate its origin
+   on completion.
 3. Define whether every known route must correspond to physical nodes and/or
    edges, and how dangling intel should behave.
 4. Determine whether narrative protection should be global or remain a partial
