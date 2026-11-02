@@ -20,6 +20,8 @@ Spanish version: [README.es.md](README.es.md)
 
 | Document | Purpose | Status |
 | --- | --- | --- |
+| [Physical universe and procedural generation](systems/world-generation.md) | Canonical reference for the spatial model, regions, sectors, worldgen, topology, authored content, and determinism. | **Verified** against code, active data, and tests at commit `3658577`. It records known gaps and the sector diagnostic's materializing effect; it does not fully cover navigation, lore, or failsafes. |
+| [Universo físico y generación procedural](systems/world-generation.es.md) | Spanish counterpart of the universe and worldgen reference. | **Verified**; maintained as a language pair with the English document. |
 | [Content loading contract](content-loading.md) | Defines which content paths the current loaders read directly, non-recursively, or recursively; also inventories inactive arc and location templates. | **Verified** against `src/retorno/runtime/data_loader.py`, `src/retorno/bootstrap.py`, `src/retorno/runtime/startup.py`, and the data tree at commit `2ffb1ab`. |
 | [Contrato de carga de contenido](content-loading.es.md) | Spanish counterpart of the content loading contract. | **Verified**; maintained as a language pair with the English document. |
 
@@ -46,8 +48,8 @@ Spanish version: [README.es.md](README.es.md)
 
 ## Planned documentation work
 
-Later phases should revise the arc/lore guides from the unified scheduler
-implementation, document navigation and failsafes, and add a verification
-matrix linking behavior to tests. Proposals should live separately from
-documents that describe implemented behavior.
-
+Later phases should document navigation and discovery on top of the established
+physical model, revise the arc/lore guides from the unified scheduler
+implementation, document failsafes, and add a verification matrix linking
+behavior to tests. Proposals should live separately from documents that
+describe implemented behavior.

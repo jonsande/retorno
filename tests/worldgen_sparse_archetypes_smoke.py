@@ -8,6 +8,39 @@ from retorno.worldgen.generator import ensure_sector_generated
 
 _ALL_ARCHETYPES = {"empty", "ruin_field", "relay_corridor", "isolated_station", "graveyard"}
 
+_EXPECTED_ARCHETYPE_RULES = {
+    "empty": {
+        "node_count": (0, 1),
+        "kind_caps": {"station": 0, "relay": 0, "waystation": 0, "ship": 1, "derelict": 1},
+        "forbidden_kinds": {"station", "relay", "waystation"},
+        "intersector_link_max": 0,
+    },
+    "ruin_field": {
+        "node_count": (1, 3),
+        "kind_caps": {"station": 1, "relay": 1, "waystation": 0, "ship": 2, "derelict": 3},
+        "forbidden_kinds": {"waystation"},
+        "intersector_link_max": 1,
+    },
+    "relay_corridor": {
+        "node_count": (2, 3),
+        "kind_caps": {"station": 0, "relay": 1, "waystation": 1, "ship": 1, "derelict": 2},
+        "forbidden_kinds": {"station"},
+        "intersector_link_max": 2,
+    },
+    "isolated_station": {
+        "node_count": (1, 2),
+        "kind_caps": {"station": 1, "relay": 0, "waystation": 1, "ship": 1, "derelict": 1},
+        "forbidden_kinds": {"relay"},
+        "intersector_link_max": 1,
+    },
+    "graveyard": {
+        "node_count": (1, 3),
+        "kind_caps": {"station": 0, "relay": 1, "waystation": 0, "ship": 2, "derelict": 2},
+        "forbidden_kinds": {"station", "waystation"},
+        "intersector_link_max": 1,
+    },
+}
+
 
 def _parse_sector_id(sector_id: str) -> tuple[int, int, int]:
     sx, sy, sz = sector_id[1:].split("_")
@@ -106,13 +139,12 @@ def _assert_region_templates() -> None:
 def _assert_archetype_catalog() -> None:
     archetypes = load_worldgen_archetypes()
     assert set(archetypes) >= _ALL_ARCHETYPES
-    assert archetypes["empty"]["node_count_min"] == 0
-    assert archetypes["empty"]["node_count_max"] == 1
-    assert archetypes["empty"]["intersector_link_max"] == 0
-    assert archetypes["empty"]["kind_caps"]["station"] == 0
-    assert archetypes["relay_corridor"]["kind_caps"]["station"] == 0
-    assert archetypes["isolated_station"]["kind_caps"]["relay"] == 0
-    assert archetypes["graveyard"]["kind_caps"]["station"] == 0
+    for archetype, expected in _EXPECTED_ARCHETYPE_RULES.items():
+        config = archetypes[archetype]
+        assert (config["node_count_min"], config["node_count_max"]) == expected["node_count"]
+        assert config["kind_caps"] == expected["kind_caps"]
+        assert set(config["forbidden_kinds"]) == expected["forbidden_kinds"]
+        assert config["intersector_link_max"] == expected["intersector_link_max"]
 
 
 def _assert_determinism() -> None:
@@ -176,7 +208,6 @@ def _assert_sparse_topology_and_caps() -> None:
 
     node_counts = [len(sector_state.node_ids) for sector_state in sample_states]
     assert max(node_counts) <= 3, f"Sparse worldgen exceeded node cap: {max(node_counts)}"
-    assert sum(count <= 3 for count in node_counts) == len(node_counts)
     assert sum(node_counts) / len(node_counts) < 2.1, "Expected sparse mean node density"
 
     inter_counts = [int(sector_state.intersector_link_count) for sector_state in sample_states]
@@ -186,44 +217,62 @@ def _assert_sparse_topology_and_caps() -> None:
     )
     assert any(count == 0 for count in inter_counts), "Expected local dead ends in sparse topology"
 
+    archetypes = load_worldgen_archetypes()
     for sector_state in sample_states:
         kinds = _node_kinds_for_sector(state, sector_state.sector_id)
+        config = archetypes[sector_state.archetype]
+        min_nodes = int(config["node_count_min"])
+        max_nodes = int(config["node_count_max"])
+        assert min_nodes <= len(kinds) <= max_nodes, (
+            sector_state.sector_id,
+            sector_state.archetype,
+            kinds,
+            (min_nodes, max_nodes),
+        )
+
+        forbidden = set(config.get("forbidden_kinds", []))
+        assert forbidden.isdisjoint(kinds), (sector_state.sector_id, sector_state.archetype, kinds, forbidden)
+
+        caps = config.get("kind_caps", {})
+        for kind, cap in caps.items():
+            assert kinds.count(kind) <= int(cap), (
+                sector_state.sector_id,
+                sector_state.archetype,
+                kind,
+                kinds.count(kind),
+                int(cap),
+            )
+
+        allowed_kinds = set(config.get("kind_weights", {})) | set(config.get("playable_hub_kind_weights", {}))
+        assert set(kinds) <= allowed_kinds, (
+            sector_state.sector_id,
+            sector_state.archetype,
+            kinds,
+            allowed_kinds,
+        )
+        assert int(sector_state.intersector_link_count) <= int(config["intersector_link_max"])
+
         if sector_state.playable_hub_node_id:
             playable = state.world.space.nodes[sector_state.playable_hub_node_id]
             assert playable.is_hub is True
-        if sector_state.topology_hub_node_id:
+            assert playable.kind in set(config.get("playable_hub_kind_weights", {}))
+
+        if kinds:
+            assert sector_state.topology_hub_node_id is not None
             topology = state.world.space.nodes[sector_state.topology_hub_node_id]
             assert topology.is_topology_hub is True
+            for node_id in sector_state.node_ids:
+                if node_id == topology.node_id:
+                    continue
+                node = state.world.space.nodes[node_id]
+                assert topology.node_id in node.links, (sector_state.sector_id, node_id, topology.node_id)
+                assert node_id in topology.links, (sector_state.sector_id, topology.node_id, node_id)
+        else:
+            assert sector_state.topology_hub_node_id is None
 
         if sector_state.archetype == "empty":
-            assert not set(kinds) & {"station", "relay", "waystation"}
             assert sector_state.playable_hub_node_id is None
             assert int(sector_state.intersector_link_count) == 0
-        elif sector_state.archetype == "ruin_field":
-            assert kinds.count("station") <= 1
-            assert kinds.count("relay") <= 1
-            assert kinds.count("ship") <= 2
-            assert kinds.count("derelict") <= 2
-            assert int(sector_state.intersector_link_count) <= 1
-        elif sector_state.archetype == "relay_corridor":
-            assert "station" not in kinds
-            assert kinds.count("relay") <= 1
-            assert kinds.count("ship") <= 1
-            assert kinds.count("derelict") <= 1
-            assert int(sector_state.intersector_link_count) <= 2
-        elif sector_state.archetype == "isolated_station":
-            assert "relay" not in kinds
-            assert kinds.count("station") <= 1
-            assert kinds.count("ship") <= 1
-            assert kinds.count("derelict") <= 1
-            assert int(sector_state.intersector_link_count) <= 1
-        elif sector_state.archetype == "graveyard":
-            assert "station" not in kinds
-            assert "waystation" not in kinds
-            assert kinds.count("relay") <= 1
-            assert kinds.count("ship") <= 2
-            assert kinds.count("derelict") <= 2
-            assert int(sector_state.intersector_link_count) <= 1
 
 
 def _assert_vertical_distribution_centered() -> None:
