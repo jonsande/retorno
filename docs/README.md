@@ -20,8 +20,10 @@ Spanish version: [README.es.md](README.es.md)
 
 | Document | Purpose | Status |
 | --- | --- | --- |
-| [Physical universe and procedural generation](systems/world-generation.md) | Canonical reference for the spatial model, regions, sectors, worldgen, topology, authored content, and determinism. | **Verified** against code, active data, and tests at commit `3658577`. It records known gaps and the sector diagnostic's materializing effect; it does not fully cover navigation, lore, or failsafes. |
+| [Physical universe and procedural generation](systems/world-generation.md) | Canonical reference for the spatial model, regions, sectors, worldgen, topology, authored content, and determinism. | **Verified** against production code at `3658577`, active data, and later Phase 3A.1 tests. It records known gaps and the sector diagnostic's materializing effect; it does not fully cover navigation, lore, or failsafes. |
 | [Universo físico y generación procedural](systems/world-generation.es.md) | Spanish counterpart of the universe and worldgen reference. | **Verified**; maintained as a language pair with the English document. |
+| [Discovery, navigation, and intel](systems/discovery-navigation-intel.md) | Canonical reference for player knowledge, scan, route solve, uplink, intel import, travel, narrative protection, and failsafes. | **Verified** against production code and focused tests. It distinguishes implemented behavior, one failing fixture expectation, and pending decisions; no arcs are currently active. |
+| [Descubrimiento, navegación e intel](systems/discovery-navigation-intel.es.md) | Spanish counterpart of the discovery and navigation reference. | **Verified**; maintained as a language pair with the English document. |
 | [Content loading contract](content-loading.md) | Defines which content paths the current loaders read directly, non-recursively, or recursively; also inventories inactive arc and location templates. | **Verified** against `src/retorno/runtime/data_loader.py`, `src/retorno/bootstrap.py`, `src/retorno/runtime/startup.py`, and the data tree at commit `2ffb1ab`. |
 | [Contrato de carga de contenido](content-loading.es.md) | Spanish counterpart of the content loading contract. | **Verified**; maintained as a language pair with the English document. |
 
@@ -48,8 +50,7 @@ Spanish version: [README.es.md](README.es.md)
 
 ## Planned documentation work
 
-Later phases should document navigation and discovery on top of the established
-physical model, revise the arc/lore guides from the unified scheduler
-implementation, document failsafes, and add a verification matrix linking
-behavior to tests. Proposals should live separately from documents that
-describe implemented behavior.
+Later phases should revise the arc/lore guides from the unified scheduler
+implementation, deepen failsafe documentation, and add a global verification
+matrix linking behavior to tests. Proposals should live separately from
+documents that describe implemented behavior.

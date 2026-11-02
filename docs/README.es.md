@@ -20,8 +20,10 @@ Versión inglesa: [README.md](README.md)
 
 | Documento | Finalidad | Estado |
 | --- | --- | --- |
-| [Universo físico y generación procedural](systems/world-generation.es.md) | Referencia canónica del modelo espacial, regiones, sectores, worldgen, topología, contenido authored y determinismo. | **Verificado** contra código, datos activos y pruebas en el commit `3658577`. Documenta las lagunas conocidas y el efecto materializador del diagnóstico de sector; no cubre en profundidad navegación, lore o failsafes. |
+| [Universo físico y generación procedural](systems/world-generation.es.md) | Referencia canónica del modelo espacial, regiones, sectores, worldgen, topología, contenido authored y determinismo. | **Verificado** contra código productivo en `3658577`, datos activos y pruebas posteriores de la Fase 3A.1. Documenta las lagunas conocidas y el efecto materializador del diagnóstico de sector; no cubre en profundidad navegación, lore o failsafes. |
 | [Physical universe and procedural generation](systems/world-generation.md) | Pareja inglesa de la referencia de universo y worldgen. | **Verificado**; se mantiene como pareja lingüística del documento español. |
+| [Descubrimiento, navegación e intel](systems/discovery-navigation-intel.es.md) | Referencia canónica del conocimiento del jugador, scan, route solve, uplink, importación de intel, viaje, protección narrativa y failsafes. | **Verificado** contra código productivo y pruebas específicas. Distingue comportamiento implementado, una expectativa de fixture fallida y decisiones pendientes; actualmente no hay arcos activos. |
+| [Discovery, navigation, and intel](systems/discovery-navigation-intel.md) | Pareja inglesa de la referencia de descubrimiento y navegación. | **Verificado**; se mantiene como pareja lingüística del documento español. |
 | [Contrato de carga de contenido](content-loading.es.md) | Define qué rutas leen los loaders actuales de forma directa, no recursiva o recursiva; también inventaría las plantillas inactivas de arcos y localizaciones. | **Verificado** contra `src/retorno/runtime/data_loader.py`, `src/retorno/bootstrap.py`, `src/retorno/runtime/startup.py` y el árbol de datos en el commit `2ffb1ab`. |
 | [Content loading contract](content-loading.md) | Pareja inglesa del contrato de carga. | **Verificado**; se mantiene como pareja lingüística del documento español. |
 
@@ -49,8 +51,8 @@ Versión inglesa: [README.md](README.md)
 
 ## Trabajo documental previsto
 
-Las fases posteriores deberán documentar navegación y descubrimiento sobre el
-modelo físico ya establecido, revisar las guías de arcos y lore desde la
-implementación unificada del scheduler, documentar failsafes y añadir una matriz
-de verificación que relacione comportamiento y pruebas. Las propuestas deberán
-mantenerse separadas de los documentos sobre comportamiento implementado.
+Las fases posteriores deberán revisar las guías de arcos y lore desde la
+implementación unificada del scheduler, profundizar en los failsafes y añadir
+una matriz de verificación global que relacione comportamiento y pruebas. Las
+propuestas deberán mantenerse separadas de los documentos sobre comportamiento
+implementado.
