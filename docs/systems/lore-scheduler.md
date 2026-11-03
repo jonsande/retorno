@@ -378,10 +378,10 @@ mobility mechanisms, but their responsibilities differ:
 - `pending_push_piece_ids` affects whether a node is considered clean and may
   therefore interact indirectly with recovery.
 
-`forced_hidden_ad_hoc_smoke.py` expects `HARBOR_12` to have a sandbox pool, but
-that node is not known, forced-hidden, or an anchor. The fixture expectation is
-outdated; changing production to pool every authored node would alter the
-hiding contract. Neither test nor code was changed.
+The historical `forced_hidden_ad_hoc_smoke.py` fixture no longer depends on
+`HARBOR_12`: it uses a synthetic known, unvisited host with an eligible pool.
+This characterizes the breadcrumb without making unknown authored nodes initial
+contacts or changing production code.
 
 ## 13. Observed invariants
 
@@ -415,16 +415,18 @@ persistence check. No real save was opened or modified.
 | `mail_metadata_and_log_header_smoke.py` | PASSED | Mail metadata and fixture log header. |
 | `drone_salvage_survey_smoke.py` | PASSED | Pools, mounting, counts, and repeat salvage in isolated state. |
 | `uplink_once_per_node_smoke.py` | PASSED | Frozen uplink pool and one-time consumption. |
-| Internal `hard` and `hard strict/no-relax` cases | PASSED separately | Ad hoc node, constraints, and no relaxation with synthetic arcs. |
-| Complete `lore_secondary_count_weights_hard_smoke.py` | FAILED | Its first fixture only has visited/closed pools, obtains zero assignments, and never reaches later cases. This does not disprove `count` logic. |
-| `debug_lore_arcs_smoke.py` | FAILED | Requires `primary:` although `load_arcs()` returns zero and `debug arcs` prints `(none)`. Historical fixture. |
-| `forced_hidden_ad_hoc_smoke.py` | FAILED | Requires a pool for unknown authored `HARBOR_12`. Fixture conflicts with pool seeding. |
+| `lore_secondary_count_weights_hard_smoke.py` | PASSED | Independent `count=1`, weight 0/1, hard, constraint, and no-relax cases with synthetic receivers/arcs. |
+| `debug_lore_arcs_smoke.py` | PASSED | Zero real active arcs plus synthetic-loader primary/status/canonical-key formatting with restoration. |
+| `forced_hidden_ad_hoc_smoke.py` | PASSED | Known/unvisited synthetic host, hidden node, and breadcrumb only in the eligible pool. |
 
 Isolated checks with active data confirmed `load_arcs() == []`, all five singles,
 and their eligibility against a compatible known/unvisited pool. An isolated
 stress run with general probability `1.0` and interval `0` assigned all five
 real singles and produced their expected bindings and salvage file. This proves
 data compatibility, **not** normal frequency or an end-to-end player flow.
+
+The three historical fixtures were repaired in Phase 4A without activating
+templates, revealing authored nodes, or changing production code.
 
 ### 14.2 Historical discrepancy matrix
 
@@ -448,21 +450,21 @@ data compatibility, **not** normal frequency or an end-to-end player flow.
 1. Decide whether `force=true` plus `force_policy=none` is invalid or should have
    useful semantics.
 2. Decide whether `LORE_SCHEDULER_ENABLED` should also control forced pieces.
-3. Define whether a piece may be marked delivered when `uplink_only` applies no
-   intel or its definition/asset is missing.
-4. Unify primary unlock semantics for new, pre-existing, cap-blocked, and
-   file-delivered LINKs.
+3. Implement the approved `uplink_only` decision: only a valid effect may mark
+   the piece delivered; malformed, missing-endpoint, or over-cap LINKs must
+   remain pending and retryable.
+4. Technically unify primary unlock semantics for valid new and pre-existing
+   LINKs, without treating cap-blocked cases or mere file delivery without an
+   effect as success.
 5. Decide whether annual evaluation plus visit closure causes too many lost
    opportunities and whether reservations or recalculation are needed.
-6. Define migrations for persisted assignments when ids, channels, or assets
-   change.
+6. Preserve assignment integrity within the current version and reject
+   incompatible saves; pre-alpha does not require historical migrations.
 7. Clarify whether push-channel paths should honor `path_template`.
 8. Prevalidate references, primary kinds, and mountable paths.
 9. Specify the “near” threshold, `max_events`, and conditional counters as a
    stable contract.
-10. Update the three outdated fixtures without revealing authored nodes or
-    accidentally activating arcs.
-11. Add an end-to-end active-single test covering contact discovery, evaluation,
+10. Add an end-to-end active-single test covering contact discovery, evaluation,
     visit, trigger, reading, import, and persistence.
 
 ## 15. Implementation references

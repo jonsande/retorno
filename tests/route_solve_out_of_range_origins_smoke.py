@@ -5,6 +5,7 @@ from contextlib import redirect_stdout
 
 from retorno.bootstrap import create_initial_state_prologue
 from retorno.cli import repl
+from retorno.config.balance import Balance
 from retorno.core.actions import RouteSolve
 from retorno.core.engine import Engine
 from retorno.model.events import EventType
@@ -73,8 +74,41 @@ def test_route_solve_out_of_range_origins() -> None:
     assert f"- {reachable_id} (reachable, route solve possible, {reachable_dist:.2f}ly)" in text, text
     assert f"- {remote_id} (no known path from current, route already known, {remote_dist:.2f}ly)" in text, text
 
-    print("ROUTE SOLVE OUT OF RANGE ORIGINS SMOKE PASSED")
+def test_route_solve_exact_undiscovered_physical_id() -> None:
+    state = create_initial_state_prologue()
+    engine = Engine()
+
+    sensors = state.ship.systems["sensors"]
+    sensors.state = SystemState.NOMINAL
+    assert sensors.service is not None
+    sensors.service.is_running = True
+
+    origin_id = "EXACT_ID_ORIGIN"
+    target_id = "EXACT_ID_UNDISCOVERED"
+    state.world.space.nodes[origin_id] = _make_node(origin_id, 0.0)
+    state.world.space.nodes[target_id] = _make_node(target_id, 1.0)
+    state.world.current_node_id = origin_id
+    state.ship.current_node_id = origin_id
+    state.world.known_nodes = {origin_id}
+    state.world.known_contacts = {origin_id}
+    state.world.known_links = {origin_id: set()}
+
+    assert target_id not in state.world.known_nodes
+    assert target_id not in state.world.space.nodes[origin_id].links
+
+    queued = engine.apply_action(state, RouteSolve(node_id=target_id))
+    assert any(e.type == EventType.JOB_QUEUED for e in queued), queued
+    engine.tick(state, float(Balance.ROUTE_SOLVE_MAX_S) + 1.0)
+
+    assert target_id in state.world.known_nodes, "Exact physical ID should become known after route solve"
+    assert target_id in state.world.known_links.get(origin_id, set()), "Route solve should publish the route"
+    assert origin_id in state.world.known_links.get(target_id, set()), "Published route should be bidirectional"
+    assert target_id not in state.world.space.nodes[origin_id].links, (
+        "A route-solve route is not required to mutate the physical topology graph"
+    )
 
 
 if __name__ == "__main__":
     test_route_solve_out_of_range_origins()
+    test_route_solve_exact_undiscovered_physical_id()
+    print("ROUTE SOLVE OUT OF RANGE ORIGINS SMOKE PASSED")

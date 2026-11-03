@@ -1,14 +1,42 @@
 from __future__ import annotations
 
+import retorno.core.lore as lore_mod
 from retorno.bootstrap import create_initial_state_sandbox
 from retorno.config.balance import Balance
-from retorno.core.lore import run_lore_scheduler_tick
-import retorno.core.lore as lore_mod
-from retorno.model.world import region_for_pos
+from retorno.core.lore import run_lore_scheduler_tick, sync_node_pools_for_known_nodes
+from retorno.model.world import SpaceNode, region_for_pos
+
+
+def _add_open_receiver(state, receiver_id: str) -> None:
+    current = state.world.space.nodes[state.world.current_node_id]
+    state.world.space.nodes[receiver_id] = SpaceNode(
+        node_id=receiver_id,
+        name=f"Synthetic Receiver {receiver_id}",
+        kind="station",
+        radiation_rad_per_s=0.001,
+        region=current.region,
+        x_ly=current.x_ly + 0.25,
+        y_ly=current.y_ly,
+        z_ly=current.z_ly,
+    )
+    state.world.known_nodes.add(receiver_id)
+    state.world.known_contacts.add(receiver_id)
+    state.world.visited_nodes.discard(receiver_id)
+    sync_node_pools_for_known_nodes(state)
+    for node_id, pool in state.world.node_pools.items():
+        pool.node_cleaned = node_id != receiver_id
+        pool.window_open = node_id == receiver_id
+    receiver_pool = state.world.node_pools.get(receiver_id)
+    assert receiver_pool is not None
+    assert receiver_id not in state.world.visited_nodes
+    assert receiver_pool.window_open and not receiver_pool.node_cleaned
 
 
 def _run_secondary_count_case() -> None:
     state = create_initial_state_sandbox()
+    receiver_id = "SECONDARY_COUNT_RECEIVER"
+    _add_open_receiver(state, receiver_id)
+
     arcs = [
         {
             "arc_id": "smoke_secondary_count",
@@ -56,10 +84,14 @@ def _run_secondary_count_case() -> None:
         if key.startswith("arc:smoke_secondary_count:")
     ]
     assert len(assigned) == 1, f"Expected exactly one secondary assignment due to count=1, got {assigned}"
+    assert state.world.lore_placements.piece_to_node[assigned[0]] == receiver_id, (
+        "The count fixture must place on its explicit eligible receiver"
+    )
 
 
 def _run_single_weight_case() -> None:
     state = create_initial_state_sandbox()
+    _add_open_receiver(state, "SINGLE_WEIGHT_RECEIVER")
     lore_mod.load_arcs = lambda: []
     lore_mod.load_singles = lambda: [
         {
@@ -219,10 +251,19 @@ def main() -> None:
         Balance.LORE_SCHEDULER_ENABLED = True
         Balance.LORE_NON_FORCED_INJECT_P = 1.0
         Balance.LORE_NON_FORCED_INTERVAL_YEARS = 0.0
-        _run_secondary_count_case()
-        _run_single_weight_case()
-        _run_hard_force_case()
-        _run_hard_force_constraints_and_no_relax_case()
+        failures: list[str] = []
+        cases = [
+            ("secondary_count", _run_secondary_count_case),
+            ("single_weights", _run_single_weight_case),
+            ("hard_force", _run_hard_force_case),
+            ("hard_force_constraints_and_no_relax", _run_hard_force_constraints_and_no_relax_case),
+        ]
+        for name, case in cases:
+            try:
+                case()
+            except Exception as exc:
+                failures.append(f"{name}: {type(exc).__name__}: {exc}")
+        assert not failures, "Independent lore fixture failures:\n- " + "\n- ".join(failures)
     finally:
         lore_mod.load_arcs = original_arcs_loader
         lore_mod.load_singles = original_singles_loader

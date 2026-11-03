@@ -2,8 +2,7 @@
 
 This file defines the operational rules for agents working in this repository.
 It keeps the essential project rules versioned with the code so they also apply
-to collaborators and future checkouts. A parent-directory `AGENTS.md` may add
-checkout-specific instructions; do not contradict it.
+to collaborators and future checkouts.
 
 The goal is to prioritize robustness, reuse of existing infrastructure, and
 long-term maintainability.
@@ -88,3 +87,27 @@ truth. Validate internal paths and links.
 For diegetic manuals, follow `docs/manuals_style_guide.md`.
 
 If a behavior change needs no documentation update, state why in the handoff.
+
+## Localization — Mandatory project rule
+
+RETORNO is a bilingual project. All player-facing text must be available in
+English and Spanish (EN/ES).
+
+- This applies to CLI/REPL and Textual UI output, menus, events, errors,
+  warnings, notifications, help, system and service messages, narrative text,
+  and diegetic documentation.
+- Every new or modified document must have a corresponding EN/ES version and
+  maintain semantic parity with it.
+- Use the existing localization infrastructure. Do not introduce parallel
+  localization mechanisms or hardcode new player-visible strings in only one
+  language.
+- Keep internal identifiers, command syntax, localization keys, and technical
+  names stable unless a task explicitly authorizes changing them. Localize
+  their player-visible descriptions, not the identifiers themselves.
+- Internal code comments do not require artificial EN/ES duplication.
+- Any change affecting text must validate translation references,
+  completeness, and EN/ES consistency. Automate these checks when practical.
+- If the existing localization system cannot support required text, report the
+  limitation instead of silently leaving it untranslated.
+- A change that introduces player-facing text or documentation is incomplete
+  until both supported languages have been updated and validated.

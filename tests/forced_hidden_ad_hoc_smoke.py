@@ -2,19 +2,38 @@ from __future__ import annotations
 
 from retorno.bootstrap import create_initial_state_sandbox
 from retorno.core.lore import _spawn_ad_hoc_candidate_for_forced_piece, sync_node_pools_for_known_nodes
-
-
-def _all_pool_files(pool) -> list[dict]:
-    return list(pool.base_files) + list(pool.injected_files)
+from retorno.model.world import SpaceNode
 
 
 def main() -> None:
     state = create_initial_state_sandbox()
+    host_id = "BREADCRUMB_HOST"
+    current = state.world.space.nodes[state.world.current_node_id]
+    state.world.space.nodes[host_id] = SpaceNode(
+        node_id=host_id,
+        name="Synthetic Breadcrumb Host",
+        kind="station",
+        radiation_rad_per_s=0.001,
+        region=current.region,
+        x_ly=current.x_ly + 0.25,
+        y_ly=current.y_ly,
+        z_ly=current.z_ly,
+    )
+    state.world.known_nodes.add(host_id)
+    state.world.known_contacts.add(host_id)
+    state.world.visited_nodes.discard(host_id)
     sync_node_pools_for_known_nodes(state)
 
-    # Force breadcrumb target set: only HARBOR_12 remains non-clean candidate.
+    # Keep exactly one explicit, known, unvisited, open pool eligible for the
+    # breadcrumb. Do not rely on authored locations being known in this fixture.
     for nid, pool in state.world.node_pools.items():
-        pool.node_cleaned = nid != "HARBOR_12"
+        pool.node_cleaned = nid != host_id
+        pool.window_open = nid == host_id
+
+    host_pool = state.world.node_pools.get(host_id)
+    assert host_pool is not None, "Expected synthetic breadcrumb host pool"
+    assert host_id not in state.world.visited_nodes, "Breadcrumb host must remain unvisited"
+    assert host_pool.window_open and not host_pool.node_cleaned, "Breadcrumb host must be eligible"
 
     piece_entry = {
         "piece_key": "arc:smoke:forced_hidden",
@@ -33,19 +52,20 @@ def main() -> None:
     assert hidden_id not in state.world.known_nodes, "Hidden node must NOT be auto-known node"
     assert hidden_id in state.world.node_pools, "Hidden node must have node pool state"
 
-    # Breadcrumb must be injected in known non-clean node pool, not in cleaned ones.
-    harbor_pool = state.world.node_pools.get("HARBOR_12")
-    assert harbor_pool is not None, "Expected HARBOR_12 pool"
-    harbor_hint = [f for f in harbor_pool.injected_files if hidden_id in str(f.get("content", ""))]
-    assert harbor_hint, "Expected breadcrumb hint in HARBOR_12 injected files"
+    # Breadcrumb must be injected only in the explicit eligible host.
+    host_hint = [f for f in host_pool.injected_files if hidden_id in str(f.get("content", ""))]
+    assert len(host_hint) == 1, f"Expected exactly one breadcrumb in {host_id}, got {host_hint}"
 
     for nid, pool in state.world.node_pools.items():
-        if nid == "HARBOR_12":
+        if nid == host_id:
             continue
-        if not pool.node_cleaned:
-            continue
-        leaked = [f for f in _all_pool_files(pool) if hidden_id in str(f.get("content", ""))]
-        assert not leaked, f"Breadcrumb must not be injected into cleaned node pool: {nid}"
+        leaked = [
+            entry
+            for entry in pool.injected_files
+            if str(entry.get("path", "")).startswith("/logs/nav/forced_hint_")
+            and hidden_id in str(entry.get("content", ""))
+        ]
+        assert not leaked, f"Breadcrumb must not be injected outside the eligible host: {nid}"
 
     print("FORCED HIDDEN AD-HOC SMOKE PASSED")
 

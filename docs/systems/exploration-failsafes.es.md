@@ -394,37 +394,41 @@ directorios temporales. No se abrió ni modificó ninguna partida real.
 | `drone_salvage_survey_smoke.py` | PASSED | Survey y salvage de datos aislados |
 | `save_load_smoke.py` | PASSED | Serialización temporal general y guardrail sparse; no estados específicos de failsafe |
 | Sonda deadnode en memoria | PASSED | Tracking, umbral `dead`, reutilización de puente, ausencia de enlaces físicos y bypass de cooldown en `t=0` |
-| `forced_hidden_ad_hoc_smoke.py` | FAILED | Primer fallo: espera pool de `HARBOR_12`, que no es conocido, oculto ni ancla en el sandbox actual |
-| `lore_secondary_count_weights_hard_smoke.py` | FAILED | Primer caso obtiene cero asignaciones porque sus pools están visitados/cerrados; no llega a los casos hard-force |
-| `debug_lore_arcs_smoke.py` | FAILED | Espera `primary:` aunque no hay arcos activos y debug muestra `(none)` |
+| `forced_hidden_ad_hoc_smoke.py` | PASSED | Host sintético conocido/no visitado, nodo oculto y breadcrumb sólo en el pool elegible |
+| `lore_secondary_count_weights_hard_smoke.py` | PASSED | Receptores sintéticos y casos independientes de count, pesos y hard-force |
+| `debug_lore_arcs_smoke.py` | PASSED | Cero arcos activos reales y contrato de formato sobre arco sintético |
 
-Las tres últimas son las fixtures desalineadas ya identificadas en la Fase 3C;
-esta fase no las modificó. No hay test dedicado de deadnodes, de importación de
+Las tres fixtures desalineadas se repararon posteriormente en Fase 4A sin
+cambios productivos. No hay test dedicado de deadnodes, de importación de
 una pista deadnode válida e inválida, de persistencia específica de ambos
 estados, de ad hoc sin breadcrumb ni de interferencia con objetivos protegidos.
 
-## 14. Cuestiones pendientes de diseño
+## 14. Decisiones cerradas y cuestiones técnicas pendientes
 
-- Decidir si los umbrales `stuck` deben gobernar una fase real o desaparecer del
-  contrato y del diagnóstico.
-- Definir si el puente deadnode debe garantizar una ruta bajo cap desde un
-  origen alcanzable y si debe integrarse en la topología/pools.
-- Decidir cómo tratar identificadores inexistentes antes de que una ruta
-  fantasma cierre deadnodes o bloquee la recuperación global.
-- Confirmar si la entrega del “dock hint” en llegada es intencional o si su
-  nombre/test deben reflejar otro contrato.
-- Definir protección común para receptores narrativos ad hoc frente a
-  reutilización como gateway y revelación por deadnodes.
-- Decidir si una pieza forzada puede considerarse colocada cuando no se pudo
-  sembrar breadcrumb, y qué hacer con pools cerrados.
+- Los umbrales `stuck` y la utilidad de uplink siguen pendientes de estudio de
+  balance; no forman parte de las decisiones cerradas.
+- Implementar la cadena completa aprobada: cada salto bajo cap desde un origen
+  alcanzable, revelación progresiva e integración coherente con topología y
+  pools.
+- Rechazar identificadores inexistentes como rutas operativas antes de que una
+  ruta fantasma cierre deadnodes o bloquee la recuperación global.
+- La recepción de un broadcast al llegar a cobertura está aprobada para el
+  futuro `comms` + `radiod`; no debe adelantar triggers de lore que exigen dock.
+  Nombre, evento y tests deberán expresar esa distinción.
+- Aplicar protección común a primaries frente a automatismos de recuperación,
+  conservando las excepciones deliberadas de `scan` y `route solve` manual.
+- Una oportunidad forzosa sin breadcrumb o cadena válida debe permanecer
+  pendiente y reintentable; falta diseñar su commit técnico e idempotencia.
 - Aclarar la semántica de “uplink útil” para los años/umbrales deadnode y si los
   intentos consumidos sin contenido deben contar.
-- Decidir si `MOBILITY_FAILSAFE_MAX_DIST_LY` es legado eliminable o una regla que
-  falta aplicar.
+- Determinar si `MOBILITY_FAILSAFE_MAX_DIST_LY` es legado eliminable o una regla
+  que falta aplicar, sin cambiar balance en esta fase.
 - Añadir cobertura sin cambiar antes el balance: deadnodes completo,
   persistencia, generación tardía, rutas sobre cap y ausencia de breadcrumb.
 
-Estas cuestiones no son decisiones aprobadas ni propuestas implementadas.
+Las decisiones aprobadas proceden del
+[contrato de navegación y recuperación](../design/navigation-recovery-contract.es.md);
+ninguna de ellas está implementada por esta actualización documental.
 
 ## 15. Referencias al código
 

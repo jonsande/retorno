@@ -484,7 +484,7 @@ construyen estados en memoria; no se abrió ni modificó ningún save real.
 | --- | --- | --- |
 | `scan_job_smoke.py` | PASSED | Trabajo scan, duración, detección y salida. |
 | `route_hop_cap_smoke.py` | PASSED | Rechazo de viaje por cap y enlaces físicos worldgen. |
-| `route_solve_out_of_range_origins_smoke.py` | PASSED | Bloqueo fuera de rango y pistas de otros orígenes conocidos. |
+| `route_solve_out_of_range_origins_smoke.py` | PASSED | Bloqueo fuera de rango, pistas de otros orígenes y resolución por id físico no descubierto sin mutar `SpaceNode.links`. |
 | `contacts_smoke.py` | PASSED | Contacto actual, visita y flag de ruta. |
 | `contacts_sector_smoke.py` | PASSED | Alias, agrupación por sector y ocultación de `UNKNOWN`. |
 | `drone_completion_context_smoke.py` | PASSED | Sugerencias distintas para route solve y viaje. |
@@ -493,11 +493,11 @@ construyen estados en memoria; no se abrió ni modificó ningún save real.
 | `exploration_recovery_smoke.py` | PASSED | Cadena breadcrumb → route solve → viaje → dock → gateway. |
 | `lore_channel_preference_and_unlock_smoke.py` | PASSED | Canal `uplink_only` y desbloqueo primary con ruta preexistente. |
 | `energy_policy_smoke.py` | PASSED | Gates energéticos y fallos de scan/route por sistemas durante trabajos. |
-| `forced_hidden_ad_hoc_smoke.py` | FAILED | Espera un pool de `HARBOR_12`, pero el sandbox actual no lo incluye entre nodos conocidos, ocultos o anclas que inicializan pools. |
+| `forced_hidden_ad_hoc_smoke.py` | PASSED | Host sintético conocido/no visitado y breadcrumb únicamente en su pool elegible. |
 
-La prueba fallida expone una expectativa de fixture desalineada; no demuestra
-que `register_hidden_anchored_node` deba revelar `HARBOR_12`. No se modificó el
-test ni el código en esta fase.
+La fixture desalineada se reparó posteriormente sin revelar `HARBOR_12` ni
+cambiar producto. La caracterización deliberada de `route solve` también se
+añadió durante la Fase 4A.
 
 Lagunas de cobertura:
 
@@ -505,8 +505,7 @@ Lagunas de cobertura:
   dangling, deduplicación y bloques `[INTEL]` multilínea;
 - no hay prueba que demuestre el alcance exacto —y los bypasses— de
   `locked_primary_targets` con un arco cargado de forma aislada;
-- no se cubre route solve por id físico aún desconocido ni el cambio de origen
-  durante el trabajo;
+- no se cubre el cambio de origen durante un trabajo route solve;
 - no se comprueba la limpieza completa de referencias del waypoint temporal;
 - no hay contrato probado de convergencia entre `known_nodes` y
   `known_contacts`;
@@ -547,8 +546,8 @@ Lagunas de cobertura:
 6. Unificar los dos parsers de importación y precisar el contrato de bloques
    `[INTEL]` e intel corrupta.
 7. Definir y probar la limpieza total del waypoint temporal.
-8. Resolver la expectativa desalineada de `forced_hidden_ad_hoc_smoke.py` sin
-   convertir accidentalmente nodos authored desconocidos en contactos iniciales.
+8. Mantener la fixture sintética reparada de `forced_hidden_ad_hoc_smoke.py` sin
+   convertir nodos authored desconocidos en contactos iniciales.
 9. Definir el factor de detección de sensores `UPGRADED` y corregir o renombrar
    la semántica de “latest” en el listado limitado de intel.
 

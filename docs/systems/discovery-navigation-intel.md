@@ -470,7 +470,7 @@ all build in-memory states; no real save was opened or modified.
 | --- | --- | --- |
 | `scan_job_smoke.py` | PASSED | Scan job, duration, detection, and output. |
 | `route_hop_cap_smoke.py` | PASSED | Travel cap rejection and physical worldgen links. |
-| `route_solve_out_of_range_origins_smoke.py` | PASSED | Out-of-range block and hints from other known origins. |
+| `route_solve_out_of_range_origins_smoke.py` | PASSED | Out-of-range block, alternative-origin hints, and exact undiscovered physical-id solve without mutating `SpaceNode.links`. |
 | `contacts_smoke.py` | PASSED | Current contact, visit, and route flag. |
 | `contacts_sector_smoke.py` | PASSED | Aliases, sector grouping, and hidden `UNKNOWN`. |
 | `drone_completion_context_smoke.py` | PASSED | Different suggestions for route solve and travel. |
@@ -479,11 +479,11 @@ all build in-memory states; no real save was opened or modified.
 | `exploration_recovery_smoke.py` | PASSED | Breadcrumb → route solve → travel → dock → gateway chain. |
 | `lore_channel_preference_and_unlock_smoke.py` | PASSED | `uplink_only` and primary unlock with preexisting route. |
 | `energy_policy_smoke.py` | PASSED | Energy gates and system-driven scan/route job failures. |
-| `forced_hidden_ad_hoc_smoke.py` | FAILED | Expects a `HARBOR_12` pool, but current sandbox does not include it among known, hidden, or anchor nodes that initialize pools. |
+| `forced_hidden_ad_hoc_smoke.py` | PASSED | Known/unvisited synthetic host with breadcrumb only in its eligible pool. |
 
-The failed test exposes a misaligned fixture expectation; it does not establish
-that `register_hidden_anchored_node` should reveal `HARBOR_12`. Neither test nor
-product code was changed in this phase.
+The stale fixture was later repaired without revealing `HARBOR_12` or changing
+product code. The deliberate `route solve` characterization was also added in
+Phase 4A.
 
 Coverage gaps:
 
@@ -491,8 +491,7 @@ Coverage gaps:
   deduplication, and multiline `[INTEL]` blocks;
 - no test demonstrates the exact scope and bypasses of
   `locked_primary_targets` with an isolated loaded arc;
-- unknown-physical-id route solve and origin changes during the job are not
-  covered;
+- origin changes during a route-solve job are not covered;
 - complete cleanup of temporary-waypoint references is not checked;
 - no tested contract enforces convergence of `known_nodes` and
   `known_contacts`;
@@ -532,7 +531,7 @@ Coverage gaps:
 6. Unify the two import parsers and define the `[INTEL]` and corrupt-intel
    contract precisely.
 7. Define and test complete temporary-waypoint cleanup.
-8. Resolve the stale `forced_hidden_ad_hoc_smoke.py` expectation without
+8. Keep the repaired synthetic `forced_hidden_ad_hoc_smoke.py` fixture from
    accidentally making unknown authored nodes initial contacts.
 9. Define the `UPGRADED` sensor detection factor and fix or rename “latest”
    semantics for the limited intel listing.

@@ -385,37 +385,40 @@ states or temporary directories. No real save was opened or modified.
 | `drone_salvage_survey_smoke.py` | PASSED | Isolated survey and data salvage |
 | `save_load_smoke.py` | PASSED | General temporary serialization and sparse guardrail; no failsafe-specific state assertions |
 | In-memory deadnode probe | PASSED | Tracking, `dead` threshold, bridge reuse, missing physical links, and `t=0` cooldown bypass |
-| `forced_hidden_ad_hoc_smoke.py` | FAILED | First failure: expects a `HARBOR_12` pool although it is neither known, hidden, nor an anchor in the current sandbox |
-| `lore_secondary_count_weights_hard_smoke.py` | FAILED | First case gets zero assignments because its pools are visited/closed; hard-force cases are not reached |
-| `debug_lore_arcs_smoke.py` | FAILED | Expects `primary:` although no arcs are active and debug prints `(none)` |
+| `forced_hidden_ad_hoc_smoke.py` | PASSED | Known/unvisited synthetic host, hidden node, and breadcrumb only in the eligible pool |
+| `lore_secondary_count_weights_hard_smoke.py` | PASSED | Synthetic receivers and independent count, weight, and hard-force cases |
+| `debug_lore_arcs_smoke.py` | PASSED | Zero real active arcs and synthetic-arc formatting contract |
 
-The last three are the stale fixtures already identified in Phase 3C; this
-phase did not modify them. There is no dedicated test for deadnodes, valid and
+The three stale fixtures were later repaired in Phase 4A without production
+changes. There is no dedicated test for deadnodes, valid and
 invalid deadnode hint import, persistence of both recovery state types, ad hoc
 creation without a breadcrumb, or protected-target interference.
 
-## 14. Pending design questions
+## 14. Closed decisions and pending technical questions
 
-- Decide whether `stuck` thresholds should govern a real phase or be removed
-  from the contract and diagnostics.
-- Define whether a deadnode bridge must guarantee a route under the cap from a
-  reachable origin and whether it should join topology/pools.
-- Decide how to reject nonexistent identifiers before a phantom route closes
-  deadnodes or blocks global recovery.
-- Confirm whether delivering the “dock hint” on arrival is intentional or
-  whether its name/test should express a different contract.
-- Define shared protection for ad hoc narrative receivers against gateway reuse
-  and deadnode revelation.
-- Decide whether a forced piece may count as placed when no breadcrumb could be
-  seeded and how closed pools should behave.
+- The `stuck` thresholds and useful-uplink semantics remain separate balance
+  studies; they are not part of the closed decisions.
+- Implement the approved complete chain: every hop under the cap from a
+  reachable origin, progressive reveal, and coherent topology/pool integration.
+- Reject nonexistent identifiers as operational routes before a phantom route
+  closes deadnodes or blocks global recovery.
+- Receiving a broadcast on entering coverage is approved for future
+  `comms` + `radiod`; it must not advance lore triggers that require dock. Its
+  name, event, and tests must express that distinction.
+- Apply shared primary protection against recovery automation while preserving
+  the deliberate natural `scan` and manual `route solve` exceptions.
+- A forced opportunity without a breadcrumb or valid chain must remain pending
+  and retryable; its technical commit and idempotency still need design.
 - Clarify useful-uplink semantics for deadnode thresholds and whether consumed
   no-content attempts should count.
-- Decide whether `MOBILITY_FAILSAFE_MAX_DIST_LY` is removable legacy or an
-  unapplied rule.
+- Determine whether `MOBILITY_FAILSAFE_MAX_DIST_LY` is removable legacy or an
+  unapplied rule, without changing balance in this phase.
 - Add coverage before changing balance: complete deadnodes, persistence, late
   insertion, over-cap routes, and missing breadcrumbs.
 
-These are neither approved decisions nor implemented proposals.
+The approved decisions come from the
+[navigation and recovery contract](../design/navigation-recovery-contract.md);
+none of them is implemented by this documentation update.
 
 ## 15. Code references
 

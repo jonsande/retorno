@@ -385,10 +385,10 @@ mecanismos de movilidad, pero sus responsabilidades son distintas:
 - `pending_push_piece_ids` participa en la evaluación de si un nodo está limpio,
   lo que puede influir indirectamente en recuperación.
 
-`forced_hidden_ad_hoc_smoke.py` espera que `HARBOR_12` tenga pool en el sandbox,
-pero ese nodo no es conocido, oculto ni ancla. La expectativa de fixture está
-desactualizada; cambiar el producto para crear pools para todo authored
-alteraría el contrato de ocultación. No se modificó test ni código.
+La fixture histórica `forced_hidden_ad_hoc_smoke.py` ya no depende de
+`HARBOR_12`: usa un host sintético conocido, no visitado y con pool elegible.
+Así caracteriza el breadcrumb sin convertir nodos authored desconocidos en
+contactos iniciales ni cambiar código productivo.
 
 ## 13. Invariantes observadas
 
@@ -423,10 +423,9 @@ para persistencia. No se abrió ni modificó ninguna partida real.
 | `mail_metadata_and_log_header_smoke.py` | PASSED | Metadatos de mail y cabecera de log en fixtures. |
 | `drone_salvage_survey_smoke.py` | PASSED | Pools, montaje, recuentos y repetición de salvage en estado aislado. |
 | `uplink_once_per_node_smoke.py` | PASSED | Pool uplink congelado y consumo único. |
-| Casos internos `hard` y `hard strict/no-relax` | PASSED por separado | Nodo ad hoc, constraints y no relajación con arcos sintéticos. |
-| `lore_secondary_count_weights_hard_smoke.py` completo | FAILED | La primera fixture sólo tiene pools visitados/cerrados; obtiene cero asignaciones y no alcanza los casos posteriores. No refuta la lógica de `count`. |
-| `debug_lore_arcs_smoke.py` | FAILED | Exige texto `primary:` aunque `load_arcs()` devuelve cero y `debug arcs` muestra `(none)`. Fixture histórica. |
-| `forced_hidden_ad_hoc_smoke.py` | FAILED | Exige pool para el authored desconocido `HARBOR_12`. Fixture desalineada con el contrato de seed de pools. |
+| `lore_secondary_count_weights_hard_smoke.py` | PASSED | Casos independientes de `count=1`, pesos 0/1, hard, constraints y no-relax con receptores/arcos sintéticos. |
+| `debug_lore_arcs_smoke.py` | PASSED | Cero arcos activos reales y formato primary/estado/clave canónica con loader sintético restaurado. |
+| `forced_hidden_ad_hoc_smoke.py` | PASSED | Host sintético conocido/no visitado; nodo oculto y breadcrumb sólo en el pool elegible. |
 
 Comprobaciones aisladas con datos activos confirmaron `load_arcs() == []`, los
 cinco singles y su elegibilidad sobre un pool conocido/no visitado compatible.
@@ -434,6 +433,9 @@ Un stress aislado con probabilidad general `1.0` e intervalo `0` asignó los cin
 singles reales y produjo los bindings y el archivo salvage esperados. Esta
 prueba confirma compatibilidad de datos, **no** frecuencia normal ni un flujo de
 jugador extremo a extremo.
+
+Las tres fixtures históricas se repararon en Fase 4A sin activar templates,
+revelar nodos authored ni modificar código productivo.
 
 ### 14.2 Matriz de discrepancias históricas
 
@@ -457,22 +459,22 @@ jugador extremo a extremo.
 1. Definir si `force=true` + `force_policy=none` debe ser inválido o tener una
    semántica útil.
 2. Decidir si `LORE_SCHEDULER_ENABLED` debe controlar también piezas forzadas.
-3. Precisar si una pieza puede marcarse entregada cuando `uplink_only` no aplica
-   intel o cuando falta su definición/recurso.
-4. Unificar el desbloqueo primary para LINK nuevo, preexistente, bloqueado por
-   cap y entregado mediante archivo.
+3. Implementar la decisión aprobada para `uplink_only`: sólo un efecto válido
+   puede marcar la pieza entregada; un LINK malformado, inexistente o sobre cap
+   debe quedar pendiente y reintentable.
+4. Unificar técnicamente el desbloqueo primary para LINK válido nuevo o
+   preexistente, sin tratar como éxito los casos bloqueados por cap ni la mera
+   entrega de un archivo sin efecto.
 5. Decidir si el intervalo anual y el cierre al visitar pueden dejar demasiado
    contenido sin oportunidad, y si debe existir reserva o recálculo.
-6. Definir migraciones para asignaciones persistidas cuando cambian ids, canales
-   o recursos de contenido.
+6. Mantener integridad de asignaciones dentro de la versión vigente y rechazar
+   saves incompatibles; la prealfa no exige migraciones históricas.
 7. Aclarar si rutas secuenciales de canales push deben respetar
    `path_template`.
 8. Validar de antemano referencias, tipos de primary y rutas mountables.
 9. Fijar por contrato el significado del umbral “near”, de `max_events` y de los
    contadores condicionales.
-10. Actualizar las tres fixtures obsoletas sin revelar nodos authored ni activar
-    arcos por accidente.
-11. Añadir una prueba extremo a extremo con singles activos: descubrimiento de
+10. Añadir una prueba extremo a extremo con singles activos: descubrimiento de
     contacto, evaluación, visita, trigger, lectura, importación y persistencia.
 
 ## 15. Referencias de implementación
