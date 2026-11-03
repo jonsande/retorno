@@ -3992,10 +3992,25 @@ def _handle_uplink(state) -> None:
     current_node_id = state.world.current_node_id
     pool = state.world.node_pools.get(current_node_id)
     if pool and pool.uplink_data_consumed:
-        msg = {
-            "en": "uplink_complete :: node data already exhausted",
-            "es": "uplink_complete :: datos del nodo ya agotados",
-        }
+        lore_ctx = build_lore_context(state, current_node_id)
+        lore_result = maybe_deliver_lore(
+            state,
+            "uplink",
+            lore_ctx,
+            count_trigger=False,
+            allowed_channels={"uplink_only"},
+        )
+        _render_and_store_events(state, lore_result.events)
+        if lore_result.applied:
+            msg = {
+                "en": "uplink_complete :: node data exhausted; pending narrative delivery applied",
+                "es": "uplink_complete :: datos del nodo agotados; entrega narrativa pendiente aplicada",
+            }
+        else:
+            msg = {
+                "en": "uplink_complete :: node data already exhausted",
+                "es": "uplink_complete :: datos del nodo ya agotados",
+            }
         print(msg.get(locale, msg["en"]))
         events_out: list[tuple[str, Event]] = []
         _emit_runtime_event(
@@ -4081,7 +4096,7 @@ def _handle_uplink(state) -> None:
         if recovery_events:
             state.world.mobility_no_new_uplink_count = 0
     _render_and_store_events(state, recovery_events)
-    if added or lore_result.files or lore_result.events or recovery_events:
+    if added or lore_result.applied or lore_result.files or lore_result.events or recovery_events:
         counters = state.world.lore.counters
         counters["uplink_count"] = counters.get("uplink_count", 0) + 1
     if pool:

@@ -253,7 +253,7 @@ hub.
 | `ExplorationRecoveryState.generation` | Makes generations and salvage paths unique | Increments only after entry and gateway are both created |
 | `ExplorationRecoveryState` IDs/flags | Prevent duplicate broadcast and describe the current chain | A new activation replaces active IDs; old nodes are not removed |
 | `DeadNodeState` | Thresholds, start points, attempts, cooldown, and bridge | Deleted as soon as the target stops being a candidate |
-| `LoreSchedulerState.counters.uplink_count` | Useful-uplink clock for deadnodes | Increments only when uplink added route, lore/events, or recovery, and after deadnode evaluation |
+| `LoreSchedulerState.counters.uplink_count` | Useful-uplink clock for deadnodes | On the first uplink, increments only when it added a route, applied lore, produced lore events/files, or recovery; it increments after deadnode evaluation and never on exhausted-pool retries |
 | `sparse_guardrail_done` | Prevents another initial promotion | Persists for the run |
 
 All of this state belongs to `WorldState` and is serialized with the save. The

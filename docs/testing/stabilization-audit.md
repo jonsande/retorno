@@ -13,7 +13,7 @@ mechanics, tests, balance, or content.
 > reception, narrative protection, and save policy. These audit matrices are
 > retained as a diagnosis of the behavior that was observed.
 
-## 0. Phase 4B planning closure
+## 0. Phase 4B closure and 4C-1 update
 
 Open decisions in this audit are closed or reassigned as follows:
 
@@ -33,7 +33,7 @@ The current executive matrix, with full criteria in the contract, is:
 
 | ID | Priority | Test before correction | Phase |
 | --- | --- | --- | --- |
-| F-LORE-01 — no-effect `uplink_only` | **P0 high** | malformed, missing endpoint, over-cap, valid new/preexisting | **4C-1** |
+| F-LORE-01 — no-effect `uplink_only` | **Fixed** | `uplink_only_delivery_retry_smoke.py` | **4C-1 complete** |
 | F-SENS-01 — `UPGRADED` factor | P1 medium | deterministic matrix of all states | 4C-2a |
 | F-WGEN-02 — malformed `SECTOR` | P1 medium | valid/invalid formats without mutation | 4C-2b |
 | F-INTEL-01 — old `intel N` | P2 low | controlled timestamps and limits 1/2/unlimited | 4C-2c |
@@ -41,8 +41,8 @@ The current executive matrix, with full criteria in the contract, is:
 | F-WGEN-01 — `modules_pool` filters | P1 medium | metadata plus per-region seeds | 4C-3 |
 
 This ordering supersedes historical priorities in sections 4, 7, and 8 where
-they conflict. The remaining matrices still describe observed defects, not
-corrected mechanics.
+they conflict. F-LORE-01 was subsequently fixed in 4C-1; the remaining matrices
+still describe observed defects, not corrected mechanics.
 
 ## 1. Executive summary
 
@@ -58,9 +58,9 @@ validity criterion. The highest-priority problems are:
    and publishes a hint from the current node without validating 45 ly. In the
    probe, the bridge was 99.38 ly away, had no physical links or pool, and route
    import rejected it.
-3. An invalid or over-cap `uplink_only` piece is marked `delivered` despite
-   producing no route, event, file, or unlock. No arcs are active now, but this
-   defect would compromise primaries once content using that path is activated.
+3. F-LORE-01 reproduced an invalid or over-cap `uplink_only` piece being marked
+   `delivered` without route, event, file, or unlock. 4C-1 now requires a valid
+   effect and preserves retryable pending state.
 
 Smaller confirmed defects are: `UPGRADED` sensors use the `CRITICAL` factor;
 `intel N` shows the N oldest records; bulge/halo recover no modules because of
@@ -87,7 +87,7 @@ telemetry or play sample, not that the case is unlikely.
 | F-ROUTE-01 | Nonexistent or over-cap known routes count as frontier/route for recovery and deadnodes, but travel rejects them. | Intel, `WorldState`, travel, recovery, deadnodes, save | Implementation + in-memory probe | Import `LINK` with missing endpoint, load stale state, or retain invalid edge | Phantom frontier; rescue stays off and target is excluded from deadnodes | High | Unknown; dangling import is player-accessible | No cleanup command; unrelated valid routes may still work | `route_hop_cap_smoke` covers travel rejection only | Dangling/over-cap import → frontier → deadnodes → travel, before/after sanitation | Rejection and save-migration policy | 1 |
 | F-NAV-01 | `_clear_tmp_node` removes the waypoint and its own entry but leaves reverse references at both endpoints. | Aborted travel, routes, recovery, persistence | Implementation + probe | `nav abort` followed by leaving the waypoint | Phantom route created by normal play; may trigger F-ROUTE-01 | High | Unknown | None automatic | No focused coverage | Abort → resume → arrival → temporary id absent everywhere, including after save/load | Cleanup itself needs no design; migration of existing states does | 1 |
 | F-DEAD-01 | Deadnode bridge is created near the target and its hint starts at current node without cap validation; it also has no physical link or pool. | Deadnodes, intel, navigation, worldgen, pools | Implementation + probe: 99.38 ly and dropped route | Distant inaccessible target reaches `dead` threshold | Both indirect attempts may be unusable; direct attempt can remain over-cap | High | Unknown | Repeats every 5 years, then direct hint, with no usefulness guarantee | No dedicated test | Reachable origin → threshold → under-cap bridge → import → travel; far/generated/un generated sectors | Bridge origin, topology, pool, persistence contract | 2 |
-| F-LORE-01 | `uplink_only` is marked delivered when LINK is invalid/over-cap and has no effect. | Scheduler, primaries, intel, persistence | Implementation + synthetic probe | Piece bound to `uplink_only` with unparsable line or invalid hop | One-shot content consumed and primary remains locked | High | Zero with current active data; certain under precondition | None: `delivered` prevents retry | Positive unlock test with preexisting route | Negative malformed, missing-node, over-cap; positive new/preexisting route | Valid success and retry approved; implementation remains | 3 |
+| F-LORE-01 — fixed in 4C-1 | `uplink_only` was marked delivered when LINK was invalid/over-cap and had no effect. | Scheduler, primaries, intel, persistence | Implementation + synthetic regression | Piece bound to `uplink_only` with unparsable line or invalid hop | One-shot content consumed and primary remains locked | High before fix | Zero with current active data | Failures retain assignment/pending state; public retry does not repeat the pool | `uplink_only_delivery_retry_smoke.py` | Covered: malformed, missing, over-cap, new/preexisting, retry, and save/load | Implemented | Closed |
 | F-SENS-01 | `UPGRADED` passes the gate but is absent from detection map and falls back to `CRITICAL` (0.35). | Scan, systems, balance | Implementation + isolated-factor probe | Sensors are `UPGRADED` | Upgrade detects less than nominal | Medium | Unknown | Repeat scan; recovery entry has guaranteed exception | No factor coverage | Deterministic matrix for every `SystemState` | Choose factor, normally nominal or higher | 1 |
 | F-WGEN-01 | List `modules_pool: ["tech", "rare"]` is interpreted as module ids; those ids do not exist and selection is empty. | Templates, modules, worldgen, salvage | Active data + implementation + probe | Bulge salvage node; halo when rolled count is 1 | Configured modules are systematically lost; guaranteed in bulge (`min=1`) | Medium | Every applicable bulge profile; halo depends on roll | No recovery for omitted loot | Worldgen does not assert module pools | Per-region seeds: counts and category membership | Categories as filters approved; actual metadata mapping remains | 4 |
 | F-WGEN-02 | `_parse_sector_id` maps malformed ids to `(0,0,0)`; `SECTOR:` may materialize origin and record invalid id. | Intel, worldgen, sector state | Implementation + probe | Import `SECTOR: <malformed>` or equivalent internal call | Unexpected origin mutation and incoherent intel | Medium | Unknown | World remains playable; invalid record has no cleanup | No negative test | Strict public-boundary parser and rejection without mutation | Accepted format and save compatibility | 1 |
@@ -238,7 +238,8 @@ Algorithm fixtures should not depend on authored narrative names.
    explicitly marked non-navigable, and how existing saves are sanitized.
 2. Choose deadnode bridge physical contract: reachable origin, link, pool,
    sector, and strategy when target is more than one hop away.
-3. Define success/retry for `uplink_only` and a forced piece with no breadcrumb.
+3. `uplink_only` success/retry is now defined and implemented; policy for a
+   forced piece without a breadcrumb remains open.
 4. Determine which mechanisms may reveal a protected primary. The deliberate
    `route solve` decision does not answer for scan, deadnodes, or gateways.
 5. Confirm arrival versus dock for gateway hint.
@@ -257,8 +258,8 @@ Algorithm fixtures should not depend on authored narrative names.
 3. Fix/sanitize phantom routes and waypoint; then revalidate recovery and known
    components.
 4. Agree bridge contract and complete IT-04 + IT-07 before changing deadnodes.
-5. Agree delivery result, breadcrumb, and protection; implement IT-05 and
-   negative `uplink_only` cases.
+5. Keep the closed F-LORE-01 regression; still agree breadcrumb and protection
+   and complete the forced-arc IT-05 before extending those paths.
 6. Fix `UPGRADED`, intel listing, and sector id as bounded changes.
 7. Resolve `modules_pool`/`radiation_base` with IT-10 and review existing data.
 8. Run multi-seed opportunity simulation and decide pools, windows, singles,

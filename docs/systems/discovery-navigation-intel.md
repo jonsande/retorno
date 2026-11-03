@@ -220,10 +220,14 @@ sets `uplink_data_consumed`.
 
 The dedicated `mobility_no_new_uplink_count` does record an attempt without new
 routes. By contrast, `lore.counters["uplink_count"]` only increases when there
-was a route, file, narrative event, or recovery event.
+was a route, file, narrative event, directly applied lore effect, or recovery
+event.
 
-Later attempts at the same node end as exhausted data: they add no routes, write
-no additional log, and do not increment the uplink counter.
+Later attempts at the same node keep the route pool exhausted: they add none of
+its routes, write no additional log, and increment no counters. They do
+reevaluate only an already assigned `uplink_only` piece that remains pending.
+The localized completion message distinguishes a successful pending narrative
+delivery from an exhausted pool with no applied effect.
 
 ### 4.4 `cat`, `intel import`, and formats
 
@@ -275,7 +279,8 @@ node intel with confidence 0.4.
   world destination.
 - The lore scheduler may write mail/log/salvage files for later player import.
 - Narrative channel `uplink_only` applies a `LINK` directly, records intel, and
-  unlocks its primary when the route passes the cap.
+  unlocks its primary only when both physical endpoints exist and the route
+  passes the cap.
 - `drone salvage data` mounts files under `/remote/<node>/`; acquiring a file
   does not import its intel until `cat` or `intel import`.
 - Exploration recovery and deadnodes create or deliver breadcrumbs as files.
@@ -289,7 +294,7 @@ node intel with confidence 0.4.
 | --- | --- | --- | --- |
 | `scan` | Valid power, sensors ≥ `LIMITED`, `sensord`; unlock at a `transit` node. | `SCAN`, 8 s. | Fails if sensors/service stop serving or current node changes; cancellable. |
 | `route solve <id>` | Power/Core OS, sensors ≥ `LIMITED`, `sensord`, both physical nodes, sensor range and cap. | `ROUTE_SOLVE`, 100–6800 s. | Fails if sensors/service stop serving; cancellable; origin not revalidated. |
-| `uplink` | Dock, compatible hub, power, `data_core` ≥ `LIMITED`, `datad`, unconsumed pool. | Immediate in REPL; not a `Job`. | No interruptible phase; pool is consumed after a valid attempt. |
+| `uplink` | Dock, compatible hub, power, `data_core` ≥ `LIMITED`, `datad`; the first attempt uses the unconsumed pool. | Immediate in REPL; not a `Job`. | No interruptible phase; the route pool is consumed once and later attempts only reevaluate pending `uplink_only`. |
 | `intel import` | Existing file and sufficient access; Core OS/terminal permits command. | Immediate. | May materialize the world and mutate knowledge while parsing. |
 | `nav <id>` | Not already in transit or docked; physical known destination; direct known route; cap and power/Core OS. | Transit state until `arrival_t`; not a `Job`. | `nav abort` creates a waypoint; arrival occurs in `Engine.tick`. |
 
@@ -347,11 +352,12 @@ destinations, but state may retain those stale references.
 | Completed `scan` | Sensors/service/range and stable job. | Materializes sectors; adds detections to both known sets; may set fine range. | `IntelItem(node)` only for new contacts; no route. |
 | Completed `route solve <id>` | Physical target in range and sensors available. | Adds bidirectional `known_links` and knows destination. | Usable route; no `IntelItem`. |
 | First node `uplink` | Dock, compatible hub, `data_core`/`datad`, unconsumed pool. | Adds accepted routes/contacts, log, conditional counters, and consumes pool. | `IntelItem(link)` per new route; possible lore/failsafe delivery. |
+| Later `uplink` | Same gates; consumed route pool and pending `uplink_only`. | Does not repeat pool/log/counters; retries only that narrative channel. | `IntelItem(link)` only if the pending LINK has become valid. |
 | `NODE:` | Accessible file. | Adds id to known sets and `known_intel`. | `IntelItem(node)`; may be dangling. |
 | `LINK:` | Accessible file; cap when distance is known. | Adds known endpoints and, if accepted, `known_links`. | `IntelItem(link)` only for a new route. |
 | `SECTOR:` | Accessible file. | Materializes sector and marks `known_intel`. | `IntelItem(sector)`; nodes remain hidden. |
 | `COORD:` | Three valid numbers. | Creates/knows `NAV_<hash>`. | `IntelItem(coord)`; no route. |
-| Lore `uplink_only` | Eligible piece, channel, and cap. | Adds route/contacts and marks primary unlocked. | Direct `IntelItem(link)`. |
+| Lore `uplink_only` | Eligible piece, both physical endpoints, and cap. | Adds route/contacts and marks primary unlocked; on failure keeps assignment and pending state. | Direct `IntelItem(link)` only after success. |
 | Lore/failsafe breadcrumb | Eligible trigger. | Writes local/remote file; may create hidden nodes. | No route change until file import. |
 | `nav <id>` | Known node, direct route, cap, and gates. | Starts transit; arrival updates node/position/visit. | Discovers no new routes. |
 | `nav abort` | In transit and CLI confirmation. | Creates temporary waypoint and routes to endpoints. | Return/resume access, not a normal contact. |
@@ -456,9 +462,10 @@ operating narrative protection or activated content.
   `known_links`.
 - `locked_primary_targets` only recognizes `link` and `node` primaries; other
   types produce no locked target.
-- If an `uplink_only` primary exceeds the cap, it neither adds the route nor
-  runs the unlock inside that branch. The later delivery lifecycle needs review
-  before this is treated as a narrative guarantee.
+- If an `uplink_only` primary is malformed, lacks a physical endpoint, or
+  exceeds the cap, it adds no route, intel, or unlock and remains pending. An
+  unmaterialized procedural id may succeed after it becomes physical; 4C-1 does
+  not define a new protocol for materializing it by id.
 
 ## 12. Existing tests and gaps
 
@@ -475,6 +482,7 @@ all build in-memory states; no real save was opened or modified.
 | `contacts_sector_smoke.py` | PASSED | Aliases, sector grouping, and hidden `UNKNOWN`. |
 | `drone_completion_context_smoke.py` | PASSED | Different suggestions for route solve and travel. |
 | `uplink_once_per_node_smoke.py` | PASSED | Frozen pool, one-time consumption, and no second log. |
+| `uplink_only_delivery_retry_smoke.py` | PASSED | Non-destructive failures, useful-uplink counting, localized public retry feedback separated from the one-shot pool, and duplicate-free save/load. |
 | `uplink_authored_and_failsafe_smoke.py` | PASSED | Synthetic authored candidates, current anchor, and recovery after empty uplink. |
 | `exploration_recovery_smoke.py` | PASSED | Breadcrumb → route solve → travel → dock → gateway chain. |
 | `lore_channel_preference_and_unlock_smoke.py` | PASSED | `uplink_only` and primary unlock with preexisting route. |

@@ -305,15 +305,16 @@ creating a second localization infrastructure now.
 | Frozen, single-use uplink pool | `uplink_once_per_node_smoke.py` |
 | Current global-recovery chain and progressive import | `exploration_recovery_smoke.py` and `uplink_authored_and_failsafe_smoke.py` |
 | Channel preference and primary unlock through valid preexisting `uplink_only` | `lore_channel_preference_and_unlock_smoke.py` |
+| `uplink_only` integrity, public retry, and persistence | `uplink_only_delivery_retry_smoke.py` |
 | General world/job/worldgen persistence | `save_load_smoke.py` |
 | Ad hoc breadcrumb with an explicit known, unvisited host | `forced_hidden_ad_hoc_smoke.py` |
 | `secondary.count`, weights, and hard force on synthetic content | `lore_secondary_count_weights_hard_smoke.py` |
 | Debug with zero active arcs and with a synthetic arc | `debug_lore_arcs_smoke.py` |
 
-The last three fixtures are synthetic and do not activate template arcs. The
+The synthetic lore fixtures do not activate template arcs. The
 weight case forces probability 1 and interval 0 inside `try/finally`; it is not
-a representation of real balance. All ten coverage rows passed on the
-consolidated Phase 4A/4B worktree on 2026-11-03.
+a representation of real balance. All eleven coverage rows passed on the Phase
+4C-1 worktree on 2026-11-03.
 
 ### 4.2 Prepared cases for defects not yet corrected
 
@@ -330,17 +331,14 @@ These are future acceptance criteria, not green tests of current behavior:
   hop is valid and the complete chain terminates at the target. With the
   receiver off, no chain, or a protected target, attempts/cooldown do not
   advance.
-- **IT-05:** malformed, dangling, or over-cap `uplink_only` remains pending; a
-  new or preexisting valid LINK has an effect and is only then marked
-  delivered/unlocked.
 - **Protection:** a synthetic arc with a primary protected from gateway,
   deadnodes, and automatic breadcrumb; natural scan and manual route solve keep
   their approved exceptions.
 - **Reception:** each channel with requirements on, off, later restored, a
   save/load between attempts, and no duplicates.
 
-No test is added now that claims these fixes already exist, nor is a current
-defect frozen as the desired contract.
+These remain future corrections; IT-05 is now implemented and covered without
+freezing any former defect as desired behavior.
 
 ### 4.3 Items to measure
 
@@ -354,7 +352,7 @@ existing receivers/stages that the planner can reuse without creating nodes.
 
 | Defect | Priority | Regression before correction | Acceptance criterion | Proposed phase |
 | --- | --- | --- | --- | --- |
-| `uplink_only` consumes a primary without a valid effect | **P0 — high** | Synthetic malformed, missing-endpoint, over-cap, valid-new-LINK, and valid-preexisting-LINK cases | Only valid new/preexisting links set `delivered` and unlock; failures remain pending and retryable | **4C-1** |
+| `uplink_only` consumes a primary without a valid effect | **Fixed** | Synthetic malformed, missing-endpoint, over-cap, valid-new-LINK, and valid-preexisting-LINK cases | Only valid new/preexisting links set `delivered` and unlock; failures remain pending and retryable | **4C-1 complete** |
 | `UPGRADED` sensors fall back to the `CRITICAL` factor | P1 — medium | Deterministic factor/detection matrix for every `SystemState` | `UPGRADED` uses the approved factor, never lower than `NOMINAL`; other states unchanged | 4C-2a |
 | Malformed `SECTOR` materializes origin | P1 — medium | Import valid and invalid formats; compare `generated_sectors`, `sector_states`, and intel | Localized rejection without mutation; canonical formats still materialize | 4C-2b |
 | `intel N` returns the oldest records | P2 — low | Three or more controlled timestamps/ids; limits 1, 2, and unlimited | Shows the N newest in stable order and preserves `intel show/export` | 4C-2c |
@@ -371,7 +369,7 @@ The order prevents recovery or lore from inventing parallel validators again.
 
 | Intervention | Change and supporting decision | Modules to review | Risks | Tests and save/load | Possible additional decisions |
 | --- | --- | --- | --- | --- | --- |
-| 0. `uplink_only` integrity | Do not consume one-shot primary content without an effect; distinguish success, failure, and retry. | `core/lore.py`, delivery state, LINK parser/validator. | Double unlock, duplicate retries, or accidental changes to singles. | 4C-1 matrix; current-version save/load with pending and delivered pieces. | None required to start: the success contract is approved. |
+| 0. `uplink_only` integrity — implemented | Do not consume one-shot primary content without an effect; distinguish success, failure, and retry. | `core/lore.py`, `cli/repl.py`, and delivery state. | Double unlock, duplicate retries, or accidental changes to singles. | 4C-1 matrix; current-version save/load with pending and delivered pieces. | Closed: narrative retry is separate from the one-shot route pool. |
 | 1. Route and intel integrity | Separate clue/contact/operational route; exclude dangling and over-cap edges; clean waypoint references. | `model/world.py`, `core/engine.py`, `cli/repl.py`, `known_links` consumers. | Erasing historical knowledge, invalidating lazy procedural references, or changing UI. | IT-01, IT-06, IT-09, cap and route solve; invalid current state → stable sanitation → save/load. | Visible representation of an unverifiable clue and protocol for materializing procedural ids. |
 | 2. Current-save integrity | Version/reject incompatible formats explicitly and preserve invariants within a version, without pre-alpha historical migrations. | `io/save_load.py`, model/versioning, shared validators. | Accepting corruption or deleting/replacing user data. | Current save/load, backup/checksum, incompatible-version rejection, and proof the file is not deleted. | Review policy before public alpha/beta. |
 | 3. Chain planner | Calculate every hop before publication; prefer existing unvisited nodes and create only what is needed. | `core/deadnodes.py`, `core/exploration_recovery.py`, worldgen/topology model, and pools. | Revealing content, late islands, using visited nodes, or changing determinism. | IT-04/07 with near/far targets, lazy sectors, no solution, and protection; save/load mid-chain. | New-node topology/pool and stage limit, without changing thresholds yet. |
@@ -380,23 +378,22 @@ The order prevents recovery or lore from inventing parallel validators again.
 | 6. Narrative protection and receivers | Exclude protected primaries from automation without blocking scan/manual route solve; distinguish mandatory procedural receivers. | `core/lore.py`, recovery, deadnodes, locks/placements. | Impossible primary or accidental bypass. | Synthetic arcs by channel, protected target, forced ad hoc with/without host; persisted lock/unlock. | Canonical protection marker/query and policy when no host is eligible. |
 | 7. Integration, notices, and localization | Exercise the full journey, dynamic service notices, and every observable string in EN/ES. | Tests, docs, manuals, help, and modules touched in 0–6. | A green suite missing player decisions; CLI/Textual divergence or incomplete translation. | IT-01–IT-10, full suite, EN/ES locales, links, manuals, and saves at each boundary. | Success metrics, acceptable frequency, and any later rebalancing. |
 
-### Proposed first corrective intervention: Phase 4C-1
+### Completed first corrective intervention: Phase 4C-1
 
-Limit the change to `uplink_only` result semantics. Before editing production,
-add one synthetic fixture with five independent cases: malformed line, missing
-endpoint, hop over 45 ly, valid new LINK, and valid preexisting LINK. Only the
-last two may set `delivered` and unlock the primary; the three failures retain
-their placement/channel and remain retryable, including across current-version
-save/load. Do not activate templates or change singles, general routes, UI, or
-balance. After correction, run the new fixture,
-`lore_channel_preference_and_unlock_smoke.py`, `lore_smoke.py`, save/load, and
-applicable EN/ES checks.
+`LoreDelivery.applied` distinguishes an attempt from an effect. A malformed,
+missing-physical-endpoint, or over-cap LINK keeps its assignment, channel, and
+pending state; a valid new or preexisting LINK records and unlocks exactly once.
+After the route pool is consumed, another `uplink` command reevaluates only
+pending `uplink_only`: it does not repeat routes, logs, rewards, recovery, or
+counters. The fixture covers all five cases, repeated failure, later condition
+change, save/load before and after success, and absence of duplicates. No
+templates, singles, UI, or balance were changed.
 
 ## 6. Current risks and boundaries
 
-- `is_hop_within_cap` currently returns true when an endpoint is missing; it
-  cannot serve as a complete existence test without a corrected contract or a
-  canonical wrapper.
+- `is_hop_within_cap` currently returns true when an endpoint is missing. 4C-1
+  checks both nodes before calling it for `uplink_only`; other importers still
+  need the future shared route contract.
 - Procedural validation cannot be limited to looking up the id in
   `space.nodes`. The project must first define which formats are materializable
   references and which are malformed ids.
@@ -414,7 +411,7 @@ applicable EN/ES checks.
 
 ## 7. Result of this phase
 
-The contract now includes Phase 4B decisions, future communication architecture,
-the pre-alpha save policy, recovery coherence without resource rescue, and a
-bounded first 4C intervention. Production defects remain unchanged, with tests
-and exit criteria defined.
+The contract incorporates the Phase 4B decisions and records 4C-1 as the first
+completed production correction. `uplink_only` no longer consumes pieces
+without an effect and has a public retry compatible with the one-shot pool.
+Other interventions, communications work, and defects remain pending.

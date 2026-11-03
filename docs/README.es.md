@@ -59,8 +59,8 @@ Versión inglesa: [README.md](README.md)
 
 ## Trabajo documental previsto
 
-La auditoría transversal y el contrato fijan la secuencia de estabilización. La
-primera corrección propuesta para Fase 4C es impedir que `uplink_only` consuma un
-primary sin producir un efecto válido. Las fases posteriores deberán mantener
-la matriz, la paridad EN/ES y la separación entre comportamiento implementado y
-propuestas.
+La auditoría transversal y el contrato fijan la secuencia de estabilización.
+Fase 4C-1 ya impide que `uplink_only` consuma un primary sin producir un efecto
+válido y conserva reintentos sin reabrir el pool de rutas. Las fases posteriores
+deberán mantener la matriz, la paridad EN/ES y la separación entre comportamiento
+implementado y propuestas.

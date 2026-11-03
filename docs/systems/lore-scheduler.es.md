@@ -63,7 +63,7 @@ texto sin intel válida no garantiza progresión.
 | `load_arcs()` | Lee sólo `data/arcs/*.json`, sin recorrer subdirectorios. |
 | `load_singles()` | Lee la lista de `data/lore/singles/index.json`. |
 | `run_lore_scheduler_tick()` | Sincroniza pools, cierra ventanas visitadas, evalúa piezas forzadas y ejecuta ciclos periódicos no forzados. |
-| `maybe_deliver_lore()` | Cuenta ciertos triggers y entrega piezas ya asignadas compatibles con el trigger. No selecciona piezas nuevas. |
+| `maybe_deliver_lore()` | Cuenta ciertos triggers y entrega piezas ya asignadas compatibles con el trigger. Devuelve si hubo aplicación efectiva y admite filtrar canales para reintentos acotados; no selecciona piezas nuevas. |
 | `LorePlacementState` | Persiste `piece_to_node`, `piece_channel_bindings`, próximo ciclo no forzado y `eval_seq`. |
 | `LoreSchedulerState` | Persiste piezas entregadas, contadores, instante de última entrega y un log parcial de entregas. |
 | `arc_placements` | Estado condicional por arco: colocación primary/secundaria, `discovered` y `primary.unlocked`. |
@@ -79,8 +79,8 @@ falta. Retirar o renombrar una definición ya asignada puede dejar una referenci
 persistida que el índice actual no sepa entregar.
 
 `delivery_log` sólo recibe entradas de mail, señal y broadcast. No es un ledger
-completo de salvage ni `uplink_only`. `last_delivery_t` se actualiza al consumir
-una pieza asignada, incluso si un canal directo no produjo el efecto esperado.
+completo de salvage ni `uplink_only`. `last_delivery_t` sólo se actualiza cuando
+una pieza asignada se entrega con un efecto válido.
 
 ## 4. Arcos y singles
 
@@ -164,8 +164,8 @@ origen galáctico ni necesariamente desde la posición actual.
    `pending_push_piece_ids`.
 6. **Disponibilidad:** el archivo salvage ya puede ser detectado y recuperado;
    una pieza push espera su trigger.
-7. **Entrega:** `dock`, `uplink` o `salvage_data` consumen las piezas asignadas
-   cuyo canal acepta el trigger.
+7. **Entrega:** `dock`, `uplink` o `salvage_data` intentan las piezas asignadas
+   cuyo canal acepta el trigger; sólo un resultado aplicado las consume.
 8. **Consumo:** el jugador usa `cat`, `mail read` o `intel import`. `uplink_only`
    no requiere lectura porque intenta aplicar el LINK directamente.
 9. **Progresión:** importar el LINK primary exacto puede marcar el arco
@@ -181,7 +181,7 @@ origen galáctico ni necesariamente desde la posición actual.
 | Colocación → disponibilidad | Sí para el estado asignado; un recurso ausente puede producir contenido vacío. |
 | Disponibilidad → entrega | Depende de que el jugador ejecute el trigger compatible. |
 | Entrega → lectura/importación | Depende del jugador, salvo `uplink_only`. |
-| Importación → desbloqueo | Sólo si el formato, dirección, cap y estado del enlace satisfacen la ruta concreta de código. |
+| Importación → desbloqueo | Sólo si el formato, dirección, extremos físicos y cap satisfacen la ruta concreta de código. |
 
 ## 6. Canales y triggers
 
@@ -192,7 +192,7 @@ elegir según el trigger que ocurra después.
 | --- | --- | --- | --- | --- |
 | `salvage_data` | cualquiera con pool | `salvage_data` | Inserta el archivo en el pool desde la colocación; el trabajo de salvage lo monta bajo `/remote/<nodo>/...`. | `cat` o `intel import`; requiere recuperar datos con dron. |
 | `station_broadcast` | relay, station o waystation | `dock` | Escribe `/logs/broadcasts/...` y emite `BROADCAST_RECEIVED`. | `cat`; el evento indica la ruta. |
-| `uplink_only` | relay, station o waystation | `uplink` | Interpreta únicamente un `piece.line` con `LINK`, comprueba cap e intenta publicar ruta e intel. No crea archivo ni evento narrativo. | Ninguna lectura; el efecto es directo si es válido. |
+| `uplink_only` | relay, station o waystation | `uplink` | Interpreta únicamente un `piece.line` con `LINK`, exige ambos extremos físicos y comprueba cap antes de publicar ruta e intel. No crea archivo ni evento narrativo. | Ninguna lectura; el efecto es directo si es válido. |
 | `ship_os_mail` | cualquiera | `dock`, `uplink` o `salvage_data` | Escribe `/mail/inbox/<seq>.<lang>.txt`, registra el mail y emite `MAIL_RECEIVED`. | `mail read` o `cat`, que también autoimportan intel. |
 | `captured_signal` | cualquiera | `dock`, `uplink` o `salvage_data` | Escribe `/logs/signals/<seq>.<lang>.txt`, incrementa `signal_count` y emite `SIGNAL_CAPTURED`. | `cat`; el evento indica la ruta. |
 
@@ -222,8 +222,10 @@ Los deadlines admiten `max_year`, `max_events`, `max_docks`, `max_uplinks` y
 `max_salvage_data`. `max_events` suma todos los contadores, incluido
 `signal_count`; no es un contador independiente. Dock incrementa al completar
 el trigger. Uplink y salvage incrementan sólo cuando la integración considera
-que hubo rutas, datos, lore o recuperación útil, por lo que no equivalen a todo
-comando intentado.
+que hubo rutas, datos, lore aplicado o recuperación útil, por lo que no
+equivalen a todo comando intentado. Un efecto directo `uplink_only` válido cuenta
+por tanto en el primer uplink aunque no produzca ruta del pool, archivo ni evento
+narrativo.
 
 Las piezas forzadas se evalúan incluso si `LORE_SCHEDULER_ENABLED` es falso;
 ese flag sólo corta el tramo periódico no forzado.
@@ -299,8 +301,11 @@ Los flags se recalculan así:
 - `node_cleaned`: los tres anteriores son ciertos.
 
 Montar un archivo no borra su entrada del pool. Se considera consumido porque
-la ruta destino ya existe en el filesystem. `uplink_data_consumed` es distinto
-de entregar lore por uplink.
+la ruta destino ya existe en el filesystem. `uplink_data_consumed` sólo agota el
+pool congelado de rutas: un `uplink_only` pendiente puede reevaluarse mediante
+otro `uplink` sin regenerar rutas, logs, recompensas ni contadores. Un mensaje
+localizado de finalización indica si ese reintento aplicó la entrega narrativa
+pendiente o sólo encontró el pool ya agotado.
 
 La deduplicación se apoya en cuatro niveles: una `piece_key` sólo puede aparecer
 en `piece_to_node`; el pool registra `delivered_piece_ids`; el scheduler global
@@ -322,13 +327,13 @@ delega en `cat`; `intel import` lo hace explícitamente.
 
 El parser marca el arco descubierto cuando añade por primera vez el enlace
 exacto y en la misma dirección. Si la ruta ya existía, esa vía no actualiza el
-flag. `uplink_only` es la excepción: si el LINK pasa el cap, marca el primary
-desbloqueado incluso cuando la ruta ya era conocida.
+flag. `uplink_only` es la excepción: si ambos extremos existen y el LINK pasa el
+cap, marca el primary desbloqueado incluso cuando la ruta ya era conocida.
 
-Si un `uplink_only` no contiene un LINK parseable o excede el cap, no desbloquea
-ni produce archivo/evento. Aun así, el ciclo exterior marca actualmente la
-pieza como entregada. Por ello, “delivered” no demuestra por sí solo progreso
-narrativo exitoso.
+Si un `uplink_only` no contiene un LINK parseable, falta un extremo físico o
+excede el cap, no desbloquea ni produce archivo/evento y permanece pendiente con
+su asignación y canal. Sólo el éxito actualiza `delivered`, el pool y
+`last_delivery_t`.
 
 ## 10. Casos límite
 
@@ -353,6 +358,9 @@ narrativo exitoso.
 - Los saltos grandes de reloj pueden ejecutar varios ciclos acumulados con el
   tiempo actual, no reconstruyendo el contexto histórico de cada aniversario.
 - Desactivar el scheduler no desactiva la rama forzada.
+- Un extremo procedural aún no materializado no se publica como ruta: la pieza
+  permanece pendiente y podrá tener éxito si ese id aparece físicamente antes
+  de un `uplink` posterior. Esta fase no define ni añade materialización por id.
 
 ## 11. Interacción con worldgen y navegación
 
@@ -423,6 +431,7 @@ para persistencia. No se abrió ni modificó ninguna partida real.
 | `mail_metadata_and_log_header_smoke.py` | PASSED | Metadatos de mail y cabecera de log en fixtures. |
 | `drone_salvage_survey_smoke.py` | PASSED | Pools, montaje, recuentos y repetición de salvage en estado aislado. |
 | `uplink_once_per_node_smoke.py` | PASSED | Pool uplink congelado y consumo único. |
+| `uplink_only_delivery_retry_smoke.py` | PASSED | Malformed, extremo ausente, sobre-cap, LINK nuevo/preexistente, recuento de uplink útil, reintento público localizado y persistencia pendiente/entregada sin duplicados. |
 | `lore_secondary_count_weights_hard_smoke.py` | PASSED | Casos independientes de `count=1`, pesos 0/1, hard, constraints y no-relax con receptores/arcos sintéticos. |
 | `debug_lore_arcs_smoke.py` | PASSED | Cero arcos activos reales y formato primary/estado/clave canónica con loader sintético restaurado. |
 | `forced_hidden_ad_hoc_smoke.py` | PASSED | Host sintético conocido/no visitado; nodo oculto y breadcrumb sólo en el pool elegible. |
@@ -459,22 +468,16 @@ revelar nodos authored ni modificar código productivo.
 1. Definir si `force=true` + `force_policy=none` debe ser inválido o tener una
    semántica útil.
 2. Decidir si `LORE_SCHEDULER_ENABLED` debe controlar también piezas forzadas.
-3. Implementar la decisión aprobada para `uplink_only`: sólo un efecto válido
-   puede marcar la pieza entregada; un LINK malformado, inexistente o sobre cap
-   debe quedar pendiente y reintentable.
-4. Unificar técnicamente el desbloqueo primary para LINK válido nuevo o
-   preexistente, sin tratar como éxito los casos bloqueados por cap ni la mera
-   entrega de un archivo sin efecto.
-5. Decidir si el intervalo anual y el cierre al visitar pueden dejar demasiado
+3. Decidir si el intervalo anual y el cierre al visitar pueden dejar demasiado
    contenido sin oportunidad, y si debe existir reserva o recálculo.
-6. Mantener integridad de asignaciones dentro de la versión vigente y rechazar
+4. Mantener integridad de asignaciones dentro de la versión vigente y rechazar
    saves incompatibles; la prealfa no exige migraciones históricas.
-7. Aclarar si rutas secuenciales de canales push deben respetar
+5. Aclarar si rutas secuenciales de canales push deben respetar
    `path_template`.
-8. Validar de antemano referencias, tipos de primary y rutas mountables.
-9. Fijar por contrato el significado del umbral “near”, de `max_events` y de los
+6. Validar de antemano referencias, tipos de primary y rutas mountables.
+7. Fijar por contrato el significado del umbral “near”, de `max_events` y de los
    contadores condicionales.
-10. Añadir una prueba extremo a extremo con singles activos: descubrimiento de
+8. Añadir una prueba extremo a extremo con singles activos: descubrimiento de
     contacto, evaluación, visita, trigger, lectura, importación y persistencia.
 
 ## 15. Referencias de implementación

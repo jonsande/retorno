@@ -42,6 +42,7 @@ class LoreContext:
 class LoreDelivery:
     files: list[dict]
     events: list[Event]
+    applied: bool = False
 
 
 def _stable_seed64(*parts: object) -> int:
@@ -304,13 +305,16 @@ def _location_fs_files(node_id: str) -> list[dict]:
 
 def _primary_link_pair(primary: dict) -> tuple[str, str] | None:
     line = str(primary.get("line", "")).strip()
-    if "->" not in line:
+    if ":" not in line:
         return None
     try:
-        left, right = [p.strip() for p in line.split(":", 1)[1].split("->", 1)]
+        head, payload = line.split(":", 1)
+        if head.strip().upper() != "LINK" or "->" not in payload:
+            return None
+        left, right = [p.strip() for p in payload.split("->", 1)]
     except Exception:
         return None
-    if not left or not right:
+    if not left or not right or left == right:
         return None
     return left, right
 
@@ -1670,33 +1674,34 @@ def _deliver_piece(
     lang = state.os.locale.value
 
     if channel == "uplink_only":
-        line = str(piece.get("line", "") or "")
-        if "->" in line:
-            try:
-                left, right = [p.strip() for p in line.split(":", 1)[1].split("->", 1)]
-            except Exception:
-                left = right = ""
-            if left and right:
-                if is_hop_within_cap(state.world, left, right, float(Balance.MAX_ROUTE_HOP_LY)):
-                    add_known_link(state.world, left, right, bidirectional=True)
-                    state.world.known_nodes.add(left)
-                    state.world.known_nodes.add(right)
-                    state.world.known_contacts.add(left)
-                    state.world.known_contacts.add(right)
-                    record_intel(
-                        state.world,
-                        t=state.clock.t,
-                        kind="link",
-                        from_id=left,
-                        to_id=right,
-                        confidence=float(piece.get("confidence", 0.6)),
-                        source_kind="uplink_only",
-                        source_ref=ctx.node_id,
-                    )
-                    if is_primary:
-                        # Unlock primary even when LINK was already known beforehand.
-                        _mark_primary_unlocked(state, arc_id, piece)
-        return LoreDelivery(delivered_files, events)
+        pair = _primary_link_pair(piece)
+        if pair is None:
+            return LoreDelivery(delivered_files, events, applied=False)
+        left, right = pair
+        if left not in state.world.space.nodes or right not in state.world.space.nodes:
+            return LoreDelivery(delivered_files, events, applied=False)
+        if not is_hop_within_cap(state.world, left, right, float(Balance.MAX_ROUTE_HOP_LY)):
+            return LoreDelivery(delivered_files, events, applied=False)
+
+        add_known_link(state.world, left, right, bidirectional=True)
+        state.world.known_nodes.add(left)
+        state.world.known_nodes.add(right)
+        state.world.known_contacts.add(left)
+        state.world.known_contacts.add(right)
+        record_intel(
+            state.world,
+            t=state.clock.t,
+            kind="link",
+            from_id=left,
+            to_id=right,
+            confidence=float(piece.get("confidence", 0.6)),
+            source_kind="uplink_only",
+            source_ref=ctx.node_id,
+        )
+        if is_primary:
+            # Unlock primary even when LINK was already known beforehand.
+            _mark_primary_unlocked(state, arc_id, piece)
+        return LoreDelivery(delivered_files, events, applied=True)
 
     content_ref = _content_ref_for_piece(piece, lang)
 
@@ -1727,7 +1732,7 @@ def _deliver_piece(
             )
         )
         state.events.next_event_seq += 1
-        return LoreDelivery(delivered_files, events)
+        return LoreDelivery(delivered_files, events, applied=True)
 
     if channel == "captured_signal":
         path = deliver_captured_signal(state, content_ref or "", lang)
@@ -1749,7 +1754,7 @@ def _deliver_piece(
             )
         )
         state.events.next_event_seq += 1
-        return LoreDelivery(delivered_files, events)
+        return LoreDelivery(delivered_files, events, applied=True)
 
     if channel == "station_broadcast":
         path = deliver_station_broadcast(state, ctx.node_id, content_ref or "", lang)
@@ -1770,20 +1775,27 @@ def _deliver_piece(
             )
         )
         state.events.next_event_seq += 1
-        return LoreDelivery(delivered_files, events)
+        return LoreDelivery(delivered_files, events, applied=True)
 
     if channel == "salvage_data":
         entry = _file_for_salvage_piece({"piece_key": piece_id, "piece": piece}, lang)
         if entry:
             delivered_files.append(entry)
-        return LoreDelivery(delivered_files, events)
+        return LoreDelivery(delivered_files, events, applied=bool(entry))
 
-    return LoreDelivery(delivered_files, events)
+    return LoreDelivery(delivered_files, events, applied=False)
 
 
-def _deliver_assigned_for_trigger(state, trigger: str, ctx: LoreContext) -> LoreDelivery:
+def _deliver_assigned_for_trigger(
+    state,
+    trigger: str,
+    ctx: LoreContext,
+    *,
+    allowed_channels: set[str] | None = None,
+) -> LoreDelivery:
     delivered_files: list[dict] = []
     events: list[Event] = []
+    applied = False
     node_id = ctx.node_id
     piece_by_key = _piece_index()
     pool = state.world.node_pools.get(node_id)
@@ -1793,6 +1805,8 @@ def _deliver_assigned_for_trigger(state, trigger: str, ctx: LoreContext) -> Lore
             continue
         channel = state.world.lore_placements.piece_channel_bindings.get(piece_key, "")
         if not _trigger_matches_channel(trigger, channel):
+            continue
+        if allowed_channels is not None and channel not in allowed_channels:
             continue
         if piece_key in state.world.lore.delivered:
             continue
@@ -1817,6 +1831,10 @@ def _deliver_assigned_for_trigger(state, trigger: str, ctx: LoreContext) -> Lore
             )
             delivered_files.extend(result.files)
             events.extend(result.events)
+            if not result.applied:
+                continue
+
+        applied = True
 
         state.world.lore.delivered.add(piece_key)
         state.world.lore.last_delivery_t = state.clock.t
@@ -1826,7 +1844,7 @@ def _deliver_assigned_for_trigger(state, trigger: str, ctx: LoreContext) -> Lore
 
     if pool:
         recompute_node_completion(state, node_id)
-    return LoreDelivery(delivered_files, events)
+    return LoreDelivery(delivered_files, events, applied=applied)
 
 
 def _evaluate_forced_pieces(state, piece_entries: list[dict]) -> None:
@@ -1953,7 +1971,14 @@ def run_lore_scheduler_tick(state) -> None:
     recompute_all_node_completion(state)
 
 
-def maybe_deliver_lore(state, trigger: str, ctx: LoreContext, *, count_trigger: bool = True) -> LoreDelivery:
+def maybe_deliver_lore(
+    state,
+    trigger: str,
+    ctx: LoreContext,
+    *,
+    count_trigger: bool = True,
+    allowed_channels: set[str] | None = None,
+) -> LoreDelivery:
     counters = state.world.lore.counters
     if trigger == "uplink" and count_trigger:
         counters["uplink_count"] = counters.get("uplink_count", 0) + 1
@@ -1963,6 +1988,11 @@ def maybe_deliver_lore(state, trigger: str, ctx: LoreContext, *, count_trigger: 
         counters["salvage_data_count"] = counters.get("salvage_data_count", 0) + 1
 
     sync_node_pools_for_known_nodes(state)
-    result = _deliver_assigned_for_trigger(state, trigger, ctx)
+    result = _deliver_assigned_for_trigger(
+        state,
+        trigger,
+        ctx,
+        allowed_channels=allowed_channels,
+    )
     recompute_all_node_completion(state)
     return result

@@ -59,6 +59,7 @@ Spanish version: [README.es.md](README.es.md)
 ## Planned documentation work
 
 The cross-system audit and design contract define the stabilization sequence.
-The proposed first Phase 4C correction prevents `uplink_only` from consuming a
-primary without a valid effect. Later phases must keep the matrix and EN/ES
-parity current while separating implemented behavior from proposals.
+Phase 4C-1 now prevents `uplink_only` from consuming a primary without a valid
+effect and preserves retries without reopening the route pool. Later phases
+must keep the matrix and EN/ES parity current while separating implemented
+behavior from proposals.

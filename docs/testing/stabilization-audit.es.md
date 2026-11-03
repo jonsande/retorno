@@ -13,7 +13,7 @@ tests, balance ni contenido.
 > diferida, protección narrativa y política de partidas. Las matrices de esta
 > auditoría se conservan como diagnóstico del comportamiento observado.
 
-## 0. Cierre de planificación de Fase 4B
+## 0. Cierre de Fase 4B y actualización 4C-1
 
 Las decisiones abiertas de esta auditoría se cierran o reasignan así:
 
@@ -33,7 +33,7 @@ La matriz ejecutiva vigente, con criterios completos en el contrato, es:
 
 | ID | Prioridad | Prueba previa | Fase |
 | --- | --- | --- | --- |
-| F-LORE-01 — `uplink_only` sin efecto | **P0 alta** | malformed, extremo ausente, sobre-cap, válido nuevo/preexistente | **4C-1** |
+| F-LORE-01 — `uplink_only` sin efecto | **Corregido** | `uplink_only_delivery_retry_smoke.py` | **4C-1 completada** |
 | F-SENS-01 — factor `UPGRADED` | P1 media | matriz determinista de todos los estados | 4C-2a |
 | F-WGEN-02 — `SECTOR` malformado | P1 media | formatos válidos/inválidos sin mutación | 4C-2b |
 | F-INTEL-01 — `intel N` antiguo | P2 baja | timestamps controlados y límites 1/2/sin límite | 4C-2c |
@@ -41,8 +41,9 @@ La matriz ejecutiva vigente, con criterios completos en el contrato, es:
 | F-WGEN-01 — filtros `modules_pool` | P1 media | metadatos + seeds por región | 4C-3 |
 
 El orden anterior sustituye las prioridades históricas de las secciones 4, 7 y
-8 cuando entren en conflicto. Las demás matrices siguen describiendo los
-defectos observados, no mecánicas corregidas.
+8 cuando entren en conflicto. F-LORE-01 quedó corregido posteriormente en 4C-1;
+las demás matrices siguen describiendo los defectos observados, no mecánicas
+corregidas.
 
 ## 1. Resumen ejecutivo
 
@@ -58,9 +59,9 @@ criterio de validez. Los problemas de mayor prioridad son:
    publica una pista desde el nodo actual sin validar 45 ly. En la sonda, el
    puente quedó a 99,38 ly, sin enlaces físicos ni pool, y la importación rechazó
    la ruta.
-3. Una pieza `uplink_only` inválida o sobre el cap se marca `delivered` aunque no
-   produzca ruta, evento, archivo ni unlock. No hay arcos activos ahora, pero el
-   defecto comprometería primaries al activar contenido que use esa vía.
+3. F-LORE-01 reproducía que una pieza `uplink_only` inválida o sobre cap se
+   marcaba `delivered` sin ruta, evento, archivo ni unlock. 4C-1 ya exige un
+   efecto válido y conserva pendientes reintentables.
 
 También están confirmados defectos más acotados: sensores `UPGRADED` usan el
 factor de `CRITICAL`, `intel N` muestra los N registros más antiguos, bulge/halo
@@ -88,7 +89,7 @@ telemetría ni muestra de partidas, no que el caso sea improbable.
 | F-ROUTE-01 | Rutas conocidas inexistentes o sobre-cap cuentan como frontera/ruta para recuperación y deadnodes, pero viaje las rechaza. | Intel, `WorldState`, viaje, recuperación, deadnodes, save | Implementación + sonda en memoria | Importar `LINK` con extremo inexistente, cargar estado obsoleto o conservar arista inválida | Frontera fantasma; no se activa rescate y el destino no entra en deadnodes | Alta | Desconocida; el import dangling está disponible al jugador | No hay comando de limpieza; otras rutas independientes pueden seguir funcionando | `route_hop_cap_smoke` sólo cubre rechazo de viaje | Import dangling/sobre-cap → frontera → deadnodes → viaje, antes/después de sanear | Política de rechazo/migración para saves | 1 |
 | F-NAV-01 | `_clear_tmp_node` elimina el waypoint y su entrada, pero deja referencias inversas en los extremos. | Viaje abortado, rutas, recuperación, persistencia | Implementación + sonda | `nav abort` y posterior salida del waypoint | Ruta fantasma producida por juego normal; puede activar F-ROUTE-01 | Alta | Desconocida | Ninguna automática | Sin cobertura específica | Abort → reanudar → llegada → ausencia total del id temporal, también tras save/load | Ninguna para la limpieza; definir migración de estados existentes | 1 |
 | F-DEAD-01 | El puente deadnode se crea junto al objetivo y la pista parte del nodo actual sin validar cap; además no tiene enlace físico ni pool. | Deadnodes, intel, navegación, worldgen, pools | Implementación + sonda: 99,38 ly y ruta descartada | Objetivo inaccesible lejano alcanza umbral `dead` | Dos intentos indirectos pueden ser inutilizables; el directo puede seguir sobre-cap | Alta | Desconocida | Repetición cada 5 años y pista directa, sin garantía de utilidad | No hay test dedicado | Origen alcanzable → umbral → puente bajo cap → import → viaje; casos lejano, sector generado/no generado | Contrato del puente: origen, topología, pool y persistencia | 2 |
-| F-LORE-01 | `uplink_only` se marca entregado aunque el LINK sea inválido/sobre-cap y no haya efecto. | Scheduler, primaries, intel, persistencia | Implementación + sonda sintética | Pieza asignada a `uplink_only` con línea no parseable o salto inválido | Contenido irrepetible consumido y primary no desbloqueado | Alta | Cero con los datos activos actuales; cierta al darse la precondición | Ninguna: `delivered` impide reintento | Test positivo de unlock con ruta preexistente | Negativos: malformed, nodo ausente, sobre-cap y éxito preexistente/nuevo | Éxito válido y reintento ya aprobados; falta implementación | 3 |
+| F-LORE-01 — corregido 4C-1 | `uplink_only` se marcaba entregado aunque el LINK fuera inválido/sobre-cap y no hubiera efecto. | Scheduler, primaries, intel, persistencia | Implementación + regresión sintética | Pieza asignada a `uplink_only` con línea no parseable o salto inválido | Contenido irrepetible consumido y primary no desbloqueado | Alta antes de corregir | Cero con los datos activos actuales | Fallos conservan asignación/pendiente; reintento público no repite el pool | `uplink_only_delivery_retry_smoke.py` | Cubierto: malformed, ausente, sobre-cap, nuevo/preexistente, retry y save/load | Implementado | Cerrado |
 | F-SENS-01 | `UPGRADED` supera el gate pero falta en el mapa de detección y cae a `CRITICAL` (0,35). | Scan, sistemas, balance | Implementación + sonda con fallback aislado | Sensores en estado `UPGRADED` | Una mejora reduce la detección frente a nominal | Media | Desconocida | Repetir scan; entrada de recuperación tiene excepción garantizada | Sin cobertura del factor | Matriz determinista por cada `SystemState` | Elegir factor; normalmente nominal o superior | 1 |
 | F-WGEN-01 | Lista `modules_pool: ["tech", "rare"]` se interpreta como ids; no existen esos ids y la selección queda vacía. | Templates, módulos, worldgen, salvage | Datos activos + implementación + sonda | Nodo salvage en bulge; en halo cuando el conteo sorteado es 1 | Pérdida sistemática de módulos configurados, segura en bulge (`min=1`) | Media | En cada perfil bulge aplicable; halo depende del sorteo | No existe recuperación del loot omitido | Worldgen no afirma pools de módulos | Semillas por región: conteos y pertenencia a categorías | Categorías como filtros aprobadas; falta mapear metadatos reales | 4 |
 | F-WGEN-02 | `_parse_sector_id` convierte cualquier id malformado a `(0,0,0)`; `SECTOR:` puede materializar el origen y registrar el id inválido. | Intel, worldgen, estado sectorial | Implementación + sonda | Importar `SECTOR: <malformado>` o llamada interna equivalente | Mutación inesperada del origen e intel incoherente | Media | Desconocida | El mundo sigue jugable; no hay limpieza del registro inválido | Sin test negativo | Parser estricto en frontera pública y rechazo sin mutación | Formato aceptado y compatibilidad con saves | 1 |
@@ -242,8 +243,8 @@ Las fixtures de algoritmos no deben depender de nombres narrativos authored.
    o se marca explícitamente como no navegable; y cómo sanear saves existentes.
 2. Elegir el contrato físico del puente deadnode: origen alcanzable, enlace,
    pool, sector y estrategia cuando el objetivo está a más de un salto.
-3. Definir éxito/reintento para `uplink_only` y para una pieza forzada sin
-   breadcrumb.
+3. `uplink_only` ya tiene éxito/reintento definido e implementado; sigue abierta
+   la política de una pieza forzada sin breadcrumb.
 4. Determinar qué mecanismos pueden revelar un primary protegido. La decisión
    deliberada sobre `route solve` no responde por scan, deadnodes o gateways.
 5. Confirmar llegada frente a dock para la pista del gateway.
@@ -262,8 +263,8 @@ Las fixtures de algoritmos no deben depender de nombres narrativos authored.
 3. Corregir/sanear rutas fantasma y waypoint; después revalidar recuperación y
    componentes conocidos.
 4. Acordar el puente y completar IT-04 + IT-07 antes de tocar deadnodes.
-5. Acordar resultado de entrega, breadcrumb y protección; implementar IT-05 y
-   negativos de `uplink_only`.
+5. Mantener cerrada la regresión F-LORE-01; acordar todavía breadcrumb y
+   protección y completar el IT-05 de arco forzado antes de ampliar esas rutas.
 6. Corregir `UPGRADED`, listado intel e id sectorial como cambios acotados.
 7. Resolver `modules_pool`/`radiation_base` con IT-10 y revisar datos existentes.
 8. Ejecutar simulación multi-seed de oportunidades y decidir pools, ventanas,

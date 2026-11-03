@@ -304,15 +304,16 @@ separada, sin crear ahora otra infraestructura de localización.
 | Pool uplink congelado y de un solo uso | `uplink_once_per_node_smoke.py` |
 | Cadena actual de recuperación global e importación progresiva | `exploration_recovery_smoke.py` y `uplink_authored_and_failsafe_smoke.py` |
 | Preferencia de canal y unlock primary por `uplink_only` válido preexistente | `lore_channel_preference_and_unlock_smoke.py` |
+| Integridad, reintento público y persistencia de `uplink_only` | `uplink_only_delivery_retry_smoke.py` |
 | Persistencia general de mundo/jobs/worldgen | `save_load_smoke.py` |
 | Breadcrumb ad hoc con host explícito conocido y no visitado | `forced_hidden_ad_hoc_smoke.py` |
 | `secondary.count`, pesos y hard-force sobre contenido sintético | `lore_secondary_count_weights_hard_smoke.py` |
 | Debug con cero arcos activos y con arco sintético | `debug_lore_arcs_smoke.py` |
 
-Las tres últimas fixtures son sintéticas y no activan arcos template. El caso de
+Las fixtures de lore sintéticas no activan arcos template. El caso de
 pesos fuerza probabilidad 1 e intervalo 0 dentro de `try/finally`; no representa
-el balance real. Las diez coberturas de la tabla pasaron en el árbol de trabajo
-consolidado de Fases 4A/4B el 2026-11-03.
+el balance real. Las once coberturas de la tabla pasaron en el árbol de trabajo
+de Fase 4C-1 el 2026-11-03.
 
 ### 4.2 Casos preparados para defectos aún no corregidos
 
@@ -327,17 +328,14 @@ Estos casos son criterios futuros, no pruebas verdes del comportamiento actual:
 - **IT-04/IT-07:** alcanzar deadnode lejano; cada pista sólo se confirma si hay
   un salto válido y la cadena completa termina en el objetivo. Con receptor
   apagado, sin cadena o con target protegido, no avanzan intentos/cooldown.
-- **IT-05:** `uplink_only` malformed, dangling y sobre-cap permanece pendiente;
-  un LINK válido nuevo o preexistente produce efecto y sólo entonces se marca
-  entregado/desbloqueado.
 - **Protección:** arco sintético con primary protegido frente a gateway,
   deadnodes y breadcrumb automático; scan natural y route solve manual conservan
   las excepciones aprobadas.
 - **Recepción:** cada canal se prueba con requisitos activos, apagados, reintento
   tras recuperación, save/load entre ambos y ausencia de duplicados.
 
-No se añade ahora una prueba que afirme que estas correcciones ya existen, ni se
-congela el defecto actual como contrato deseado.
+Estas siguen siendo correcciones futuras; IT-05 ya está implementado y cubierto
+sin congelar como deseable ningún defecto anterior.
 
 ### 4.3 Aspectos por medir
 
@@ -352,7 +350,7 @@ planificador sin crear nodos nuevos.
 
 | Defecto | Prioridad | Regresión previa a la corrección | Criterio de aceptación | Fase propuesta |
 | --- | --- | --- | --- | --- |
-| `uplink_only` consume primary sin efecto válido | **P0 — alta** | Casos sintéticos malformed, extremo ausente, sobre-cap, LINK nuevo válido y LINK válido preexistente | Sólo nuevo/preexistente válido marca `delivered` y desbloquea; los fallos quedan pendientes y reintentables | **4C-1** |
+| `uplink_only` consume primary sin efecto válido | **Corregido** | Casos sintéticos malformed, extremo ausente, sobre-cap, LINK nuevo válido y LINK válido preexistente | Sólo nuevo/preexistente válido marca `delivered` y desbloquea; los fallos quedan pendientes y reintentables | **4C-1 completada** |
 | Sensores `UPGRADED` caen al factor `CRITICAL` | P1 — media | Matriz determinista de factor/detección para cada `SystemState` | `UPGRADED` usa el factor aprobado, nunca uno inferior a `NOMINAL`; sin cambiar otros estados | 4C-2a |
 | `SECTOR` malformado materializa origen | P1 — media | Importar formatos válidos e inválidos y comparar `generated_sectors`, `sector_states` e intel | Rechazo localizado sin mutación; formatos canónicos siguen materializando | 4C-2b |
 | `intel N` devuelve los más antiguos | P2 — baja | Tres o más registros con timestamps/ids controlados; límites 1, 2 y sin límite | Muestra los N más recientes en orden estable y conserva `intel show/export` | 4C-2c |
@@ -369,7 +367,7 @@ orden evita que recuperación o lore vuelvan a inventar validadores paralelos.
 
 | Intervención | Cambio y decisión que lo justifica | Módulos a revisar | Riesgos | Pruebas y save/load | Decisiones adicionales posibles |
 | --- | --- | --- | --- | --- | --- |
-| 0. Integridad `uplink_only` | No consumir un primary irrepetible sin efecto; distinguir éxito, fallo y retry. | `core/lore.py`, estado de entrega, parser/validador de LINK. | Doble unlock, reintentos duplicados o cambio accidental de singles. | Matriz 4C-1; save/load con pieza pendiente y entregada dentro de la versión vigente. | Ninguna para empezar: el contrato de éxito ya está aprobado. |
+| 0. Integridad `uplink_only` — implementada | No consumir un primary irrepetible sin efecto; distinguir éxito, fallo y retry. | `core/lore.py`, `cli/repl.py` y estado de entrega. | Doble unlock, reintentos duplicados o cambio accidental de singles. | Matriz 4C-1; save/load con pieza pendiente y entregada dentro de la versión vigente. | Cerrada: reintento narrativo separado del pool de rutas one-shot. |
 | 1. Integridad de rutas e intel | Separar pista/contacto/ruta operativa; excluir dangling y sobre-cap; limpiar referencias de waypoint. | `model/world.py`, `core/engine.py`, `cli/repl.py`, consumidores de `known_links`. | Borrar conocimiento histórico, invalidar referencias procedurales lazy o cambiar UI. | IT-01, IT-06, IT-09, cap y route solve; estado vigente inválido → saneado estable → save/load. | Representación visible de una pista no verificable y protocolo para materializar ids procedurales. |
 | 2. Integridad de saves vigentes | Versionar/rechazar explícitamente formatos incompatibles y preservar invariantes dentro de la versión, sin migraciones históricas prealfa. | `io/save_load.py`, modelo/versionado y validadores compartidos. | Aceptar corrupción o borrar/reemplazar datos del usuario. | Save/load vigente, backup/checksum, rechazo de versión incompatible y confirmación de que no se borra el archivo. | Revisar la política antes de alfa/beta pública. |
 | 3. Planificador de cadenas | Calcular todos los saltos antes de publicar; preferir nodos existentes no visitados y crear sólo los necesarios. | `core/deadnodes.py`, `core/exploration_recovery.py`, worldgen/modelo de topología y pools. | Revelar contenido, crear islas tardías, usar nodos visitados o alterar determinismo. | IT-04/07 con objetivos cercanos/lejanos, sectores lazy, sin solución y protección; save/load a mitad de cadena. | Topología/pool de nodos nuevos y límite de etapas, sin tocar aún umbrales. |
@@ -378,23 +376,22 @@ orden evita que recuperación o lore vuelvan a inventar validadores paralelos.
 | 6. Protección narrativa y receptores | Excluir primaries protegidos de automatismos, sin bloquear scan/route solve manual; distinguir receptor procedural obligatorio. | `core/lore.py`, recovery, deadnodes y locks/placements. | Primary imposible o bypass accidental. | Arcos sintéticos por canal, protected target, ad hoc forzado con/sin host; persistir lock y unlock. | Etiqueta o consulta canónica de protección; política sin host elegible. |
 | 7. Integración, avisos y localización | Probar recorrido completo, avisos dinámicos de servicios y todo texto observable en EN/ES. | Tests, docs, manuales, ayuda y módulos tocados en 0–6. | Suite verde sin decisiones del jugador; divergencia CLI/Textual o traducciones incompletas. | IT-01–IT-10, suite completa, locales EN/ES, enlaces, manuales y saves en cada frontera. | Métricas de éxito, frecuencia aceptable y cualquier rebalanceo posterior. |
 
-### Primera intervención correctiva propuesta: Fase 4C-1
+### Primera intervención correctiva completada: Fase 4C-1
 
-Acotar el cambio a la semántica de resultado de `uplink_only`. Antes de editar
-producción, añadir una fixture sintética que ejecute cinco casos independientes:
-línea malformed, extremo ausente, salto sobre 45 ly, LINK válido nuevo y LINK
-válido ya conocido. Sólo los dos últimos podrán marcar `delivered` y desbloquear
-el primary; los tres fallidos conservarán asignación/canal y serán reintentables,
-también tras save/load vigente. No se activarán templates ni se cambiarán
-singles, rutas generales, UI o balance. Tras corregir, se ejecutarán la fixture,
-`lore_channel_preference_and_unlock_smoke.py`, `lore_smoke.py`, save/load y las
-validaciones EN/ES pertinentes.
+`LoreDelivery.applied` distingue intento y efecto. Un LINK malformado, con un
+extremo físico ausente o sobre cap conserva asignación, canal y pendiente; uno
+nuevo o preexistente válido se registra y desbloquea una sola vez. Tras consumir
+el pool de rutas, otro comando `uplink` sólo reevalúa `uplink_only` pendiente:
+no repite rutas, logs, recompensas, recovery ni contadores. La fixture cubre los
+cinco casos, fallo reiterado, cambio posterior de condiciones, save/load antes y
+después del éxito y ausencia de duplicados. No se activaron templates ni se
+cambiaron singles, UI o balance.
 
 ## 6. Riesgos y límites vigentes
 
-- `is_hop_within_cap` devuelve actualmente verdadero si falta un extremo; no
-  debe reutilizarse como prueba completa de existencia sin corregir su contrato
-  o envolverlo en una validación canónica.
+- `is_hop_within_cap` devuelve actualmente verdadero si falta un extremo. 4C-1
+  comprueba ambos nodos antes de llamarlo para `uplink_only`; los demás
+  importadores siguen necesitando el futuro contrato común de rutas.
 - La validación procedural no puede limitarse a buscar el id en `space.nodes`.
   Primero debe definirse qué formatos constituyen referencias materializables y
   cuáles son ids malformados.
@@ -412,7 +409,7 @@ validaciones EN/ES pertinentes.
 
 ## 7. Resultado de esta fase
 
-El contrato incorpora las decisiones de Fase 4B, la arquitectura futura de
-comunicaciones, la política prealfa de saves, la regla de coherencia sin rescate
-de recursos y una primera intervención 4C acotada. Los defectos permanecen sin
-cambios en producción, con pruebas y criterios de salida definidos.
+El contrato incorpora las decisiones de Fase 4B y registra 4C-1 como primera
+corrección productiva completada. `uplink_only` ya no consume piezas sin efecto
+y dispone de reintento público compatible con el pool one-shot. Las demás
+intervenciones, comunicaciones y defectos permanecen pendientes.

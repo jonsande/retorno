@@ -61,7 +61,7 @@ will be read; reading text without valid intel does not guarantee progression.
 | `load_arcs()` | Reads only `data/arcs/*.json`; it does not recurse. |
 | `load_singles()` | Reads the list in `data/lore/singles/index.json`. |
 | `run_lore_scheduler_tick()` | Synchronizes pools, closes visited windows, evaluates forced pieces, and runs periodic non-forced cycles. |
-| `maybe_deliver_lore()` | Counts selected triggers and delivers already assigned pieces compatible with that trigger. It does not choose new pieces. |
+| `maybe_deliver_lore()` | Counts selected triggers and delivers already assigned pieces compatible with that trigger. It reports whether an effect was applied and accepts a channel filter for bounded retries; it does not choose new pieces. |
 | `LorePlacementState` | Persists `piece_to_node`, `piece_channel_bindings`, the next non-forced cycle, and `eval_seq`. |
 | `LoreSchedulerState` | Persists delivered pieces, counters, last delivery time, and a partial delivery log. |
 | `arc_placements` | Conditional per-arc placement, delivery, `discovered`, and `primary.unlocked` state. |
@@ -77,9 +77,8 @@ already assigned definition may leave persisted state that the current index
 cannot deliver.
 
 `delivery_log` only records mail, signal, and broadcast entries. It is not a
-complete ledger for salvage or `uplink_only`. `last_delivery_t` is updated when
-an assigned piece is consumed even when a direct channel did not achieve its
-intended effect.
+complete ledger for salvage or `uplink_only`. `last_delivery_t` is updated only
+when an assigned piece is delivered with a valid effect.
 
 ## 4. Arcs and singles
 
@@ -161,8 +160,8 @@ galactic origin and not necessarily from the current position.
    `injected_files`; other channels add the key to `pending_push_piece_ids`.
 6. **Availability:** the salvage file can now be detected/recovered; a push
    piece waits for its trigger.
-7. **Delivery:** `dock`, `uplink`, or `salvage_data` consumes assigned pieces
-   whose binding accepts that trigger.
+7. **Delivery:** `dock`, `uplink`, or `salvage_data` attempts assigned pieces
+   whose binding accepts that trigger; only an applied result consumes them.
 8. **Consumption:** the player uses `cat`, `mail read`, or `intel import`.
    `uplink_only` needs no reading because it applies the LINK directly.
 9. **Progression:** importing the exact primary LINK may mark the arc discovered;
@@ -178,7 +177,7 @@ galactic origin and not necessarily from the current position.
 | Placement → availability | Yes as assigned state; a missing asset may still yield empty content. |
 | Availability → delivery | Requires the player to perform a compatible trigger. |
 | Delivery → reading/import | Requires player action except for `uplink_only`. |
-| Import → unlock | Only when format, direction, cap, and link state match the specific code path. |
+| Import → unlock | Only when format, direction, physical endpoints, cap, and link state match the specific code path. |
 
 ## 6. Channels and triggers
 
@@ -189,7 +188,7 @@ again for whichever trigger happens later.
 | --- | --- | --- | --- | --- |
 | `salvage_data` | any node with a pool | `salvage_data` | Injects a file into the pool at placement; the salvage job mounts it below `/remote/<node>/...`. | `cat` or `intel import`, after drone data salvage. |
 | `station_broadcast` | relay, station, or waystation | `dock` | Writes `/logs/broadcasts/...` and emits `BROADCAST_RECEIVED`. | `cat`; the event reports the path. |
-| `uplink_only` | relay, station, or waystation | `uplink` | Interprets only a `piece.line` containing `LINK`, checks the cap, and attempts to publish route/intel. It creates no narrative file or event. | No reading; a valid effect is direct. |
+| `uplink_only` | relay, station, or waystation | `uplink` | Interprets only a `piece.line` containing `LINK`, requires both physical endpoints, and checks the cap before publishing route/intel. It creates no narrative file or event. | No reading; a valid effect is direct. |
 | `ship_os_mail` | any | `dock`, `uplink`, or `salvage_data` | Writes `/mail/inbox/<seq>.<lang>.txt`, registers mail, and emits `MAIL_RECEIVED`. | `mail read` or `cat`, both of which auto-import intel. |
 | `captured_signal` | any | `dock`, `uplink`, or `salvage_data` | Writes `/logs/signals/<seq>.<lang>.txt`, increments `signal_count`, and emits `SIGNAL_CAPTURED`. | `cat`; the event reports the path. |
 
@@ -219,7 +218,9 @@ Deadlines support `max_year`, `max_events`, `max_docks`, `max_uplinks`, and
 `max_salvage_data`. `max_events` is the sum of every counter, including
 `signal_count`; it is not independent. Dock increments at completed delivery
 trigger. Uplink and salvage increment only when their integration considers
-routes, data, lore, or recovery useful, so they do not count every command.
+routes, data, applied lore, or recovery useful, so they do not count every
+command. A direct valid `uplink_only` effect therefore counts on the first
+uplink even when no pool route, file, or narrative event was produced.
 
 Forced pieces are evaluated even when `LORE_SCHEDULER_ENABLED` is false; that
 flag only stops the periodic non-forced branch.
@@ -295,8 +296,11 @@ Completion flags are recomputed as follows:
 - `node_cleaned`: all three are true.
 
 Mounting does not remove the pool entry. It counts as consumed because the
-destination path now exists in the filesystem. `uplink_data_consumed` is
-distinct from lore delivery through uplink.
+destination path now exists in the filesystem. `uplink_data_consumed` only
+exhausts the frozen route pool: a pending `uplink_only` piece can be reevaluated
+by another `uplink` without regenerating routes, logs, rewards, or counters. A
+localized completion message reports whether that retry applied the pending
+narrative delivery or found only an already exhausted pool.
 
 Deduplication has four layers: one `piece_key` in `piece_to_node`; per-pool
 `delivered_piece_ids`; global `delivered`; and mount path projection. A base and
@@ -318,13 +322,14 @@ to `cat`; `intel import` is explicit.
 
 The parser marks an arc discovered when it adds the exact link for the first
 time in the same direction. If that route already exists, this path does not
-update the flag. `uplink_only` is the exception: if the LINK passes the cap, it
-unlocks the primary even when the route was already known.
+update the flag. `uplink_only` is the exception: if both endpoints exist and the
+LINK passes the cap, it unlocks the primary even when the route was already
+known.
 
-If `uplink_only` has no parseable LINK or exceeds the cap, it unlocks nothing
-and creates no file/event. The outer loop nevertheless currently marks the
-piece delivered. Therefore, `delivered` alone does not prove successful
-narrative progression.
+If `uplink_only` has no parseable LINK, lacks a physical endpoint, or exceeds
+the cap, it unlocks nothing, creates no file/event, and remains pending with its
+assignment and channel. Only success updates `delivered`, the pool, and
+`last_delivery_t`.
 
 ## 10. Edge cases
 
@@ -347,6 +352,9 @@ narrative progression.
 - Large clock jumps can run accumulated cycles with the current time rather
   than reconstructing historical context for each anniversary.
 - Disabling the scheduler does not disable its forced branch.
+- An unmaterialized procedural endpoint is not published as a route: the piece
+  remains pending and may succeed if that id becomes physical before a later
+  `uplink`. This phase neither defines nor adds id-based materialization.
 
 ## 11. Interaction with world generation and navigation
 
@@ -415,6 +423,7 @@ persistence check. No real save was opened or modified.
 | `mail_metadata_and_log_header_smoke.py` | PASSED | Mail metadata and fixture log header. |
 | `drone_salvage_survey_smoke.py` | PASSED | Pools, mounting, counts, and repeat salvage in isolated state. |
 | `uplink_once_per_node_smoke.py` | PASSED | Frozen uplink pool and one-time consumption. |
+| `uplink_only_delivery_retry_smoke.py` | PASSED | Malformed, missing endpoint, over-cap, new/preexisting valid LINK, useful-uplink counting, localized public retry, and pending/delivered persistence without duplicates. |
 | `lore_secondary_count_weights_hard_smoke.py` | PASSED | Independent `count=1`, weight 0/1, hard, constraint, and no-relax cases with synthetic receivers/arcs. |
 | `debug_lore_arcs_smoke.py` | PASSED | Zero real active arcs plus synthetic-loader primary/status/canonical-key formatting with restoration. |
 | `forced_hidden_ad_hoc_smoke.py` | PASSED | Known/unvisited synthetic host, hidden node, and breadcrumb only in the eligible pool. |
@@ -450,21 +459,15 @@ templates, revealing authored nodes, or changing production code.
 1. Decide whether `force=true` plus `force_policy=none` is invalid or should have
    useful semantics.
 2. Decide whether `LORE_SCHEDULER_ENABLED` should also control forced pieces.
-3. Implement the approved `uplink_only` decision: only a valid effect may mark
-   the piece delivered; malformed, missing-endpoint, or over-cap LINKs must
-   remain pending and retryable.
-4. Technically unify primary unlock semantics for valid new and pre-existing
-   LINKs, without treating cap-blocked cases or mere file delivery without an
-   effect as success.
-5. Decide whether annual evaluation plus visit closure causes too many lost
+3. Decide whether annual evaluation plus visit closure causes too many lost
    opportunities and whether reservations or recalculation are needed.
-6. Preserve assignment integrity within the current version and reject
+4. Preserve assignment integrity within the current version and reject
    incompatible saves; pre-alpha does not require historical migrations.
-7. Clarify whether push-channel paths should honor `path_template`.
-8. Prevalidate references, primary kinds, and mountable paths.
-9. Specify the “near” threshold, `max_events`, and conditional counters as a
+5. Clarify whether push-channel paths should honor `path_template`.
+6. Prevalidate references, primary kinds, and mountable paths.
+7. Specify the “near” threshold, `max_events`, and conditional counters as a
    stable contract.
-10. Add an end-to-end active-single test covering contact discovery, evaluation,
+8. Add an end-to-end active-single test covering contact discovery, evaluation,
     visit, trigger, reading, import, and persistence.
 
 ## 15. Implementation references

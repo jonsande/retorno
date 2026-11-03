@@ -258,7 +258,7 @@ primarios bloqueados al elegir un hub.
 | `ExplorationRecoveryState.generation` | Hace únicas las generaciones y paths salvage | Sólo incrementa tras crear entrada y gateway con éxito |
 | IDs y flags de `ExplorationRecoveryState` | Evitan repetir broadcast y describen la cadena vigente | Una nueva activación sustituye los IDs anteriores; los nodos previos no se retiran |
 | `DeadNodeState` | Umbrales, origen temporal, intentos, cooldown y puente | Se elimina en cuanto el objetivo deja de ser candidato |
-| `LoreSchedulerState.counters.uplink_count` | Reloj de uplinks útiles para deadnodes | Sólo sube si el uplink añadió ruta, lore/eventos o recuperación; se incrementa después de evaluar deadnodes |
+| `LoreSchedulerState.counters.uplink_count` | Reloj de uplinks útiles para deadnodes | En el primer uplink sólo sube si añadió ruta, aplicó lore, produjo archivos/eventos de lore o recuperación; se incrementa tras evaluar deadnodes y nunca en reintentos con el pool agotado |
 | `sparse_guardrail_done` | Evita repetir la promoción inicial | Persiste durante la partida |
 
 Todo este estado pertenece a `WorldState` y se serializa con la partida. La
