@@ -3794,6 +3794,7 @@ class Engine:
 
         system = state.ship.systems.get("sensors")
         state_p = {
+            SystemState.UPGRADED: Balance.SENSORS_DETECT_P_NOMINAL,
             SystemState.NOMINAL: Balance.SENSORS_DETECT_P_NOMINAL,
             SystemState.LIMITED: Balance.SENSORS_DETECT_P_LIMITED,
             SystemState.DAMAGED: Balance.SENSORS_DETECT_P_DAMAGED,

@@ -148,6 +148,13 @@ On completion it:
    new detection.
 6. May set `fine_ranges_km` for selected kinds inside local radius.
 
+The effective detection factors are `UPGRADED=1.00`, `NOMINAL=1.00`,
+`LIMITED=0.85`, `DAMAGED=0.60`, and `CRITICAL=0.35`; `OFFLINE` uses the 0.35
+fallback internally. The public gate rejects `DAMAGED`, `CRITICAL`, and
+`OFFLINE` before scan execution. `UPGRADED` deliberately reuses the nominal
+factor as the conservative 4C-2a correction: any additional upgrade bonus
+remains a future balance study. The final probability is clamped to `[0, 1]`.
+
 The active exploration-recovery entry is an exception: detection is guaranteed
 once it exists. `scan` does not publish `known_links`, inspect
 `SpaceNode.links`, or filter `locked_primary_targets`.
@@ -450,8 +457,9 @@ operating narrative protection or activated content.
   routes are discarded by cap.
 - Multiline `[INTEL]` blocks may combine a corrupt-recovery attempt with later
   parsing of valid lines.
-- `UPGRADED` passes the scan gate but is absent from the detection-factor table,
-  so it falls back to the `CRITICAL` factor (0.35).
+- `UPGRADED` now uses the nominal detection factor (1.00). This corrects its
+  former fallback to `CRITICAL` without changing range, energy, or job duration;
+  a distinct upgrade bonus remains undecided balance work.
 - Route solve does not require prior knowledge or check that the ship remains
   at the origin; automatic sensor shutdown on entering `CRUISE` will usually
   interrupt it on the next tick.
@@ -476,6 +484,7 @@ all build in-memory states; no real save was opened or modified.
 | Test | Result | Relevant coverage |
 | --- | --- | --- |
 | `scan_job_smoke.py` | PASSED | Scan job, duration, detection, and output. |
+| `sensor_detection_factor_smoke.py` | PASSED | Deterministic state-factor matrix, distance/base probability, clamps, operational gates, and guaranteed recovery-entry detection. |
 | `route_hop_cap_smoke.py` | PASSED | Travel cap rejection and physical worldgen links. |
 | `route_solve_out_of_range_origins_smoke.py` | PASSED | Out-of-range block, alternative-origin hints, and exact undiscovered physical-id solve without mutating `SpaceNode.links`. |
 | `contacts_smoke.py` | PASSED | Current contact, visit, and route flag. |
@@ -541,8 +550,9 @@ Coverage gaps:
 7. Define and test complete temporary-waypoint cleanup.
 8. Keep the repaired synthetic `forced_hidden_ad_hoc_smoke.py` fixture from
    accidentally making unknown authored nodes initial contacts.
-9. Define the `UPGRADED` sensor detection factor and fix or rename “latest”
-   semantics for the limited intel listing.
+9. Measure whether `UPGRADED` should later receive a bonus above its implemented
+   nominal factor, and fix or rename “latest” semantics for the limited intel
+   listing.
 
 These are pending decisions; this document does not recommend activating them
 or changing balance in this phase.

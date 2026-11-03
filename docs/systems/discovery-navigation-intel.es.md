@@ -149,6 +149,14 @@ Al completarse:
    confidence=0.6)`.
 6. Para ciertos tipos dentro del radio local puede fijar `fine_ranges_km`.
 
+Los factores efectivos de detección son `UPGRADED=1.00`, `NOMINAL=1.00`,
+`LIMITED=0.85`, `DAMAGED=0.60` y `CRITICAL=0.35`; internamente `OFFLINE` usa el
+fallback 0.35. El gate público rechaza `DAMAGED`, `CRITICAL` y `OFFLINE` antes
+de ejecutar el scan. `UPGRADED` reutiliza deliberadamente el factor nominal como
+corrección conservadora de 4C-2a: cualquier bonificación adicional de la mejora
+queda para un estudio futuro de balance. La probabilidad final se limita a
+`[0, 1]`.
+
 La entrada activa de recuperación de exploración es una excepción: se detecta
 con garantía una vez que existe. `scan` no publica `known_links`, no consulta
 `SpaceNode.links` y no filtra `locked_primary_targets`.
@@ -464,8 +472,9 @@ una protección narrativa operativa ni contenido activado.
   todas sus rutas sean descartadas por cap.
 - Los bloques `[INTEL]` multilínea pueden combinar una tentativa de recuperación
   corrupta con el parseo posterior de líneas válidas.
-- El estado `UPGRADED` supera el gate de scan, pero falta en la tabla de factores
-  de detección y cae al factor fallback de `CRITICAL` (0.35).
+- `UPGRADED` usa ahora el factor nominal de detección (1.00). Esto corrige su
+  antiguo fallback a `CRITICAL` sin cambiar alcance, energía ni duración del
+  trabajo; una bonificación propia de la mejora sigue pendiente de balance.
 - Route solve no exige conocimiento previo y no comprueba que la nave permanezca
   en el origen; el apagado automático de sensores al entrar en `CRUISE` sí suele
   interrumpirlo en el tick siguiente.
@@ -490,6 +499,7 @@ construyen estados en memoria; no se abrió ni modificó ningún save real.
 | Prueba | Resultado | Cobertura relevante |
 | --- | --- | --- |
 | `scan_job_smoke.py` | PASSED | Trabajo scan, duración, detección y salida. |
+| `sensor_detection_factor_smoke.py` | PASSED | Matriz determinista de factores por estado, distancia/probabilidad base, límites, gates operativos y detección garantizada de la entrada de recuperación. |
 | `route_hop_cap_smoke.py` | PASSED | Rechazo de viaje por cap y enlaces físicos worldgen. |
 | `route_solve_out_of_range_origins_smoke.py` | PASSED | Bloqueo fuera de rango, pistas de otros orígenes y resolución por id físico no descubierto sin mutar `SpaceNode.links`. |
 | `contacts_smoke.py` | PASSED | Contacto actual, visita y flag de ruta. |
@@ -556,8 +566,9 @@ Lagunas de cobertura:
 7. Definir y probar la limpieza total del waypoint temporal.
 8. Mantener la fixture sintética reparada de `forced_hidden_ad_hoc_smoke.py` sin
    convertir nodos authored desconocidos en contactos iniciales.
-9. Definir el factor de detección de sensores `UPGRADED` y corregir o renombrar
-   la semántica de “latest” en el listado limitado de intel.
+9. Medir si `UPGRADED` debe recibir más adelante una bonificación sobre el factor
+   nominal implementado y corregir o renombrar la semántica de “latest” en el
+   listado limitado de intel.
 
 Estas son decisiones pendientes; el documento no recomienda activarlas ni
 cambiar balance en esta fase.

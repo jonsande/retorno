@@ -300,6 +300,7 @@ creating a second localization infrastructure now.
 | Decision/behavior | Coverage |
 | --- | --- |
 | Scan materializes and discovers a contact | `scan_job_smoke.py` |
+| Sensor-state detection factors and guaranteed recovery-entry detection | `sensor_detection_factor_smoke.py` |
 | `route solve` accepts an undiscovered exact physical id within sensors/cap and does not mutate `SpaceNode.links` | `route_solve_out_of_range_origins_smoke.py` |
 | Rejection above 45 ly and worldgen links under the cap | `route_hop_cap_smoke.py` |
 | Frozen, single-use uplink pool | `uplink_once_per_node_smoke.py` |
@@ -311,10 +312,11 @@ creating a second localization infrastructure now.
 | `secondary.count`, weights, and hard force on synthetic content | `lore_secondary_count_weights_hard_smoke.py` |
 | Debug with zero active arcs and with a synthetic arc | `debug_lore_arcs_smoke.py` |
 
-The synthetic lore fixtures do not activate template arcs. The
-weight case forces probability 1 and interval 0 inside `try/finally`; it is not
-a representation of real balance. All eleven coverage rows passed on the Phase
-4C-1 worktree on 2026-11-03.
+The synthetic lore fixtures do not activate template arcs. The weight case
+forces probability 1 and interval 0 inside `try/finally`; it is not a
+representation of real balance. The eleven preexisting rows passed on the Phase
+4C-1 worktree on 2026-11-03; the sensor-factor row passed on the Phase 4C-2a
+worktree on the same date.
 
 ### 4.2 Prepared cases for defects not yet corrected
 
@@ -353,7 +355,7 @@ existing receivers/stages that the planner can reuse without creating nodes.
 | Defect | Priority | Regression before correction | Acceptance criterion | Proposed phase |
 | --- | --- | --- | --- | --- |
 | `uplink_only` consumes a primary without a valid effect | **Fixed** | Synthetic malformed, missing-endpoint, over-cap, valid-new-LINK, and valid-preexisting-LINK cases | Only valid new/preexisting links set `delivered` and unlock; failures remain pending and retryable | **4C-1 complete** |
-| `UPGRADED` sensors fall back to the `CRITICAL` factor | P1 — medium | Deterministic factor/detection matrix for every `SystemState` | `UPGRADED` uses the approved factor, never lower than `NOMINAL`; other states unchanged | 4C-2a |
+| `UPGRADED` sensors fell back to the `CRITICAL` factor | **Fixed** | `sensor_detection_factor_smoke.py`: deterministic factor/detection matrix for every `SystemState` | `UPGRADED` uses the nominal factor; other states, range, energy, and duration are unchanged | **4C-2a complete** |
 | Malformed `SECTOR` materializes origin | P1 — medium | Import valid and invalid formats; compare `generated_sectors`, `sector_states`, and intel | Localized rejection without mutation; canonical formats still materialize | 4C-2b |
 | `intel N` returns the oldest records | P2 — low | Three or more controlled timestamps/ids; limits 1, 2, and unlimited | Shows the N newest in stable order and preserves `intel show/export` | 4C-2c |
 | Deadnode cooldown is skipped at `t=0` | P2 — low | Force initial action at zero, immediate reevaluation, and post-cooldown reevaluation | Zero is a valid timestamp; no second action before cooldown | 4C-2d |
@@ -361,6 +363,11 @@ existing receivers/stages that the planner can reuse without creating nodes.
 
 Single frequency, uplink snapshots, `radiation_base`, generation-order
 dependence, and general balance remain independent studies.
+
+No separate `UPGRADED` detection multiplier was configured or approved. Phase
+4C-2a therefore uses `SENSORS_DETECT_P_NOMINAL` (1.00) conservatively; deciding
+whether an upgrade deserves a larger bonus remains balance work, not part of
+the defect correction.
 
 ## 5. Later implementation plan
 

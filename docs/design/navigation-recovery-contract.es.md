@@ -299,6 +299,7 @@ separada, sin crear ahora otra infraestructura de localización.
 | Decisión/comportamiento | Cobertura |
 | --- | --- |
 | Scan materializa y descubre un contacto | `scan_job_smoke.py` |
+| Factores de detección por estado de sensores y detección garantizada de la entrada de recuperación | `sensor_detection_factor_smoke.py` |
 | `route solve` acepta un id físico exacto no descubierto dentro de sensores/cap y no muta `SpaceNode.links` | `route_solve_out_of_range_origins_smoke.py` |
 | Rechazo de salto sobre 45 ly y links worldgen bajo cap | `route_hop_cap_smoke.py` |
 | Pool uplink congelado y de un solo uso | `uplink_once_per_node_smoke.py` |
@@ -310,10 +311,11 @@ separada, sin crear ahora otra infraestructura de localización.
 | `secondary.count`, pesos y hard-force sobre contenido sintético | `lore_secondary_count_weights_hard_smoke.py` |
 | Debug con cero arcos activos y con arco sintético | `debug_lore_arcs_smoke.py` |
 
-Las fixtures de lore sintéticas no activan arcos template. El caso de
-pesos fuerza probabilidad 1 e intervalo 0 dentro de `try/finally`; no representa
-el balance real. Las once coberturas de la tabla pasaron en el árbol de trabajo
-de Fase 4C-1 el 2026-11-03.
+Las fixtures de lore sintéticas no activan arcos template. El caso de pesos
+fuerza probabilidad 1 e intervalo 0 dentro de `try/finally`; no representa el
+balance real. Las once filas preexistentes pasaron en el árbol de trabajo de
+Fase 4C-1 el 2026-11-03; la fila de factores de sensores pasó en el árbol de
+trabajo de Fase 4C-2a en la misma fecha.
 
 ### 4.2 Casos preparados para defectos aún no corregidos
 
@@ -351,7 +353,7 @@ planificador sin crear nodos nuevos.
 | Defecto | Prioridad | Regresión previa a la corrección | Criterio de aceptación | Fase propuesta |
 | --- | --- | --- | --- | --- |
 | `uplink_only` consume primary sin efecto válido | **Corregido** | Casos sintéticos malformed, extremo ausente, sobre-cap, LINK nuevo válido y LINK válido preexistente | Sólo nuevo/preexistente válido marca `delivered` y desbloquea; los fallos quedan pendientes y reintentables | **4C-1 completada** |
-| Sensores `UPGRADED` caen al factor `CRITICAL` | P1 — media | Matriz determinista de factor/detección para cada `SystemState` | `UPGRADED` usa el factor aprobado, nunca uno inferior a `NOMINAL`; sin cambiar otros estados | 4C-2a |
+| Sensores `UPGRADED` caían al factor `CRITICAL` | **Corregido** | `sensor_detection_factor_smoke.py`: matriz determinista de factor/detección para cada `SystemState` | `UPGRADED` usa el factor nominal; los demás estados, alcance, energía y duración no cambian | **4C-2a completada** |
 | `SECTOR` malformado materializa origen | P1 — media | Importar formatos válidos e inválidos y comparar `generated_sectors`, `sector_states` e intel | Rechazo localizado sin mutación; formatos canónicos siguen materializando | 4C-2b |
 | `intel N` devuelve los más antiguos | P2 — baja | Tres o más registros con timestamps/ids controlados; límites 1, 2 y sin límite | Muestra los N más recientes en orden estable y conserva `intel show/export` | 4C-2c |
 | Cooldown deadnode se omite en `t=0` | P2 — baja | Forzar acción inicial en cero, reevaluación inmediata y tras cooldown | Cero es un instante válido; no hay segunda acción hasta cumplir cooldown | 4C-2d |
@@ -359,6 +361,11 @@ planificador sin crear nodos nuevos.
 
 Frecuencia de singles, snapshots uplink, `radiation_base`, dependencia del orden
 de worldgen y balance general permanecen en estudios independientes.
+
+No había un multiplicador de detección `UPGRADED` separado, configurado ni
+aprobado. La Fase 4C-2a usa por tanto de forma conservadora
+`SENSORS_DETECT_P_NOMINAL` (1.00); decidir si la mejora merece una bonificación
+mayor sigue siendo trabajo de balance y no parte de esta corrección.
 
 ## 5. Plan de implementación posterior
 
