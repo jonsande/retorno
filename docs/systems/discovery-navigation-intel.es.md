@@ -107,6 +107,14 @@ reconstruyen el inventario desde `known_links` o `known_intel`. En consecuencia,
 una ruta creada por route solve no aparece en el export salvo que otra vía haya
 registrado además su `IntelItem`.
 
+La presentación del listado es de sólo lectura. `intel` muestra los 20 registros
+más recientes, `intel N` los N más recientes disponibles e `intel all` el
+historial completo. Los tres ordenan por timestamp descendente; a igualdad de
+timestamp usan orden de inserción inverso, de modo que aparece primero el
+registro añadido después. La lista almacenada no se reordena, y `intel show` e
+`intel export` conservan respectivamente su búsqueda por id y el orden de export
+almacenado.
+
 ### Sectores y coordenadas conocidas
 
 La implementación representa tres hechos distintos:
@@ -489,9 +497,6 @@ una protección narrativa operativa ni contenido activado.
 - Route solve no exige conocimiento previo y no comprueba que la nave permanezca
   en el origen; el apagado automático de sensores al entrar en `CRUISE` sí suele
   interrumpirlo en el tick siguiente.
-- `intel` ordena el registro por tiempo ascendente y aplica `items[:limit]`, por
-  lo que el límite muestra actualmente las entradas más antiguas aunque la ayuda
-  pública lo describe como “latest”.
 - Abortar viaje puede dejar referencias inversas a un waypoint ya eliminado en
   `known_links`.
 - La protección `locked_primary_targets` sólo reconoce primaries `link` y
@@ -524,6 +529,7 @@ construyen estados en memoria; no se abrió ni modificó ningún save real.
 | `energy_policy_smoke.py` | PASSED | Gates energéticos y fallos de scan/route por sistemas durante trabajos. |
 | `forced_hidden_ad_hoc_smoke.py` | PASSED | Host sintético conocido/no visitado y breadcrumb únicamente en su pool elegible. |
 | `sector_intel_validation_smoke.py` | PASSED | Sectores canónicos existentes y lazy, índices con signo amplios, formatos inválidos sin mutar estado serializable, bloques `[INTEL]` sólo de sector sin recovery corrupta/uso de RNG, feedback EN/ES y continuación de líneas válidas. |
+| `intel_recent_order_smoke.py` | PASSED | Historiales vacío/único, límite 20 por defecto, límites N/all, timestamps descendentes, desempate por inserción inversa, EN/ES, adaptador Textual, estado de sólo lectura y show/export sin cambios. |
 
 La fixture desalineada se reparó posteriormente sin revelar `HARBOR_12` ni
 cambiar producto. La caracterización deliberada de `route solve` también se
@@ -580,8 +586,7 @@ Lagunas de cobertura:
 8. Mantener la fixture sintética reparada de `forced_hidden_ad_hoc_smoke.py` sin
    convertir nodos authored desconocidos en contactos iniciales.
 9. Medir si `UPGRADED` debe recibir más adelante una bonificación sobre el factor
-   nominal implementado y corregir o renombrar la semántica de “latest” en el
-   listado limitado de intel.
+   nominal implementado.
 
 Estas son decisiones pendientes; el documento no recomienda activarlas ni
 cambiar balance en esta fase.

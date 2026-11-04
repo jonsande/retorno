@@ -4,6 +4,10 @@ Purpose
 - Manage navigation intelligence records (inspect, import, export).
 
 Usage: intel | intel <amount> | intel all
+- `intel` shows the 20 most recent records.
+- `intel <amount>` shows that many most recent records, or all available when fewer exist.
+- `intel all` shows the complete history.
+- Lists are ordered newest first. For equal timestamps, the record inserted later appears first.
 - Columns:
   ID: intel item identifier.
   kind: intel type (node/link/sector/coord).
@@ -13,7 +17,7 @@ Usage: intel | intel <amount> | intel all
   age: time since recorded.
 - Intel kinds:
   node: a specific known node/contact (e.g., HARBOR_12).
-  sector: a known sector identifier (e.g., S+0001_-0002_+0000).
+  sector: a known sector identifier (e.g., S+001_-002_+000).
   link: a known route between two nodes (A -> B).
   coord: exact coordinates (x,y,z) that point to a nav point.
 

@@ -4,6 +4,10 @@ Propósito
 - Gestionar registros de inteligencia de navegación (inspección, importación y exportación).
 
 Uso: intel | intel <amount> | intel all
+- `intel` muestra los 20 registros más recientes.
+- `intel <amount>` muestra esa cantidad de registros más recientes, o todos los disponibles si hay menos.
+- `intel all` muestra el historial completo.
+- Los listados se ordenan del más reciente al más antiguo. Con timestamps iguales, aparece primero el registro insertado después.
 - Columnas:
   ID: identificador del item de intel.
   kind: tipo de intel (node/link/sector/coord).
@@ -13,7 +17,7 @@ Uso: intel | intel <amount> | intel all
   age: tiempo desde que se registró.
 - Tipos de intel:
   node: nodo/contacto conocido específico (p. ej., HARBOR_12).
-  sector: identificador de sector conocido (p. ej., S+0001_-0002_+0000).
+  sector: identificador de sector conocido (p. ej., S+001_-002_+000).
   link: ruta conocida entre dos nodos (A -> B).
   coord: coordenadas exactas (x,y,z) que señalan un punto de navegación.
 

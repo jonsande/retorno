@@ -107,6 +107,13 @@ do not rebuild inventory from `known_links` or `known_intel`. Consequently, a
 route created by route solve does not appear in export unless another path also
 recorded its `IntelItem`.
 
+List presentation is read-only. `intel` shows the 20 most recent records,
+`intel N` the N most recent available, and `intel all` the complete history.
+All three order by descending timestamp; equal timestamps use reverse insertion
+order, so the later-appended record appears first. The stored list is not
+reordered, and `intel show` and `intel export` retain their id lookup and stored
+export order respectively.
+
 ### Known sectors and coordinates
 
 The implementation represents three different facts:
@@ -472,9 +479,6 @@ operating narrative protection or activated content.
 - Route solve does not require prior knowledge or check that the ship remains
   at the origin; automatic sensor shutdown on entering `CRUISE` will usually
   interrupt it on the next tick.
-- `intel` sorts the record by ascending time and applies `items[:limit]`, so its
-  limited view currently shows the oldest entries even though public help calls
-  them the “latest”.
 - Aborting travel may leave reverse references to a removed waypoint in
   `known_links`.
 - `locked_primary_targets` only recognizes `link` and `node` primaries; other
@@ -507,6 +511,7 @@ all build in-memory states; no real save was opened or modified.
 | `energy_policy_smoke.py` | PASSED | Energy gates and system-driven scan/route job failures. |
 | `forced_hidden_ad_hoc_smoke.py` | PASSED | Known/unvisited synthetic host with breadcrumb only in its eligible pool. |
 | `sector_intel_validation_smoke.py` | PASSED | Existing and lazy canonical sectors, wide signed indices, invalid formats without serializable-state mutation, sector-only `[INTEL]` blocks without corrupt recovery/RNG use, EN/ES feedback, and continued valid-line processing. |
+| `intel_recent_order_smoke.py` | PASSED | Empty/single histories, default 20, N/all limits, descending timestamps, reverse-insertion ties, EN/ES, Textual adapter, read-only state, and unchanged show/export. |
 
 The stale fixture was later repaired without revealing `HARBOR_12` or changing
 product code. The deliberate `route solve` characterization was also added in
@@ -562,8 +567,7 @@ Coverage gaps:
 8. Keep the repaired synthetic `forced_hidden_ad_hoc_smoke.py` fixture from
    accidentally making unknown authored nodes initial contacts.
 9. Measure whether `UPGRADED` should later receive a bonus above its implemented
-   nominal factor, and fix or rename “latest” semantics for the limited intel
-   listing.
+   nominal factor.
 
 These are pending decisions; this document does not recommend activating them
 or changing balance in this phase.

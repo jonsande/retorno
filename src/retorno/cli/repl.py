@@ -5674,8 +5674,8 @@ def _handle_log_copy(state, amount: int | None) -> None:
 
 def render_intel_list(state, limit: int | None = 20) -> None:
     print("\n=== INTEL ===")
-    items = list(state.world.intel)
-    if not items:
+    indexed_items = list(enumerate(state.world.intel))
+    if not indexed_items:
         print("(no intel)")
         locale = state.os.locale.value
         hint = {
@@ -5684,7 +5684,8 @@ def render_intel_list(state, limit: int | None = 20) -> None:
         }
         print(hint.get(locale, hint["en"]))
         return
-    items.sort(key=lambda i: i.t)
+    indexed_items.sort(key=lambda entry: (entry[1].t, entry[0]), reverse=True)
+    items = [item for _, item in indexed_items]
     if limit is not None:
         items = items[:limit]
     id_w = max(2, max((len(item.intel_id) for item in items), default=2))
