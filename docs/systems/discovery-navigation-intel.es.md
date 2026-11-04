@@ -119,6 +119,10 @@ La implementación representa tres hechos distintos:
 
 Ninguno implica automáticamente los otros dos. En particular, `SECTOR:` llama
 a `ensure_sector_generated`, pero no revela todos los nodos creados allí.
+El id admitido tiene la forma canónica de worldgen: `S` mayúscula y tres
+índices decimales con signo separados por guiones bajos, cada uno formateado
+como `{value:+04d}`. La anchura es mínima, por lo que los índices mayores siguen
+siendo válidos.
 
 ## 4. Vías de descubrimiento e importación
 
@@ -256,7 +260,7 @@ y manuales importados explícitamente usan normalmente 0.8.
 | `NODE: <id>` | Añade el texto literalmente a `known_nodes`, `known_contacts` y `known_intel`, y registra intel de nodo. Sólo materializa un sector si el id tiene forma procedural `S...:...`; un id arbitrario puede quedar sin nodo físico. |
 | `LINK: <from> -> <to>` | Intenta añadir ruta bidireccional conocida. Si la distancia física conocida supera el cap, conserva ambos extremos como contactos pero no la ruta. |
 | `LINK: <to>` | Igual, tomando el nodo actual como origen. |
-| `SECTOR: <sector_id>` | Llama a worldgen, registra intel de sector y `known_intel`; no revela los nodos del sector. |
+| `SECTOR: <sector_id>` | Para un id canónico, llama a worldgen, registra intel de sector y `known_intel`, pero no revela los nodos del sector. Un id no canónico se rechaza con feedback localizado antes de mutar mundo o intel; las líneas válidas posteriores del archivo siguen procesándose. |
 | `COORD: x, y, z` | Crea un `NAV_<hash>` físico si falta, lo marca conocido y registra intel de coordenada; no publica ruta. |
 
 Una ruta `LINK` cuyos extremos no existen puede entrar en `known_links`: la
@@ -268,6 +272,9 @@ seguirá bloqueado porque exige que el nodo destino exista físicamente.
 Cada bloque se procesa primero como una unidad:
 
 - si contiene una línea `LINK:`, se procesa el primer enlace encontrado;
+- si todas las líneas no vacías son `SECTOR:` explícitos, se omite el
+  procesamiento unitario y el parser canónico de líneas trata cada una sin
+  activar recuperación corrupta;
 - en caso contrario, el contenido completo debe coincidir exactamente con el
   id, nombre o sector de una localización authored activa para descubrirla;
 - si no coincide, entra en el flujo de intel corrupta.
@@ -276,7 +283,10 @@ Después, las líneas explícitas `LINK:`, `NODE:`, `SECTOR:` y `COORD:` del mis
 archivo se procesan también por el parser de líneas. Por ello un bloque
 multilínea sin `LINK` puede intentar recuperación corrupta antes de importar
 sus líneas válidas. La descripción antigua de los bloques como contenedor
-general flexible es más amplia que el comportamiento real.
+general flexible es más amplia que el comportamiento real. Un bloque que mezcla
+`SECTOR:` con texto narrativo desconocido conserva el comportamiento general de
+bloques y aún puede entrar en recuperación corrupta antes del parser de líneas;
+4C-2b no define una semántica nueva para esa forma mixta.
 
 La intel corrupta tiene actualmente un 50 % de fallo. Si se recupera, muestrea
 sectores alrededor del nodo actual, puede materializarlos y revela el primer hub
@@ -371,7 +381,7 @@ ausentes, pero el estado puede conservar esas referencias obsoletas.
 | `uplink` posterior | Mismos gates; pool de rutas consumido y `uplink_only` pendiente. | No repite pool/log/contadores; sólo reintenta ese canal narrativo. | `IntelItem(link)` únicamente si el LINK pendiente pasa a ser válido. |
 | `NODE:` | Archivo accesible. | Añade id a conocidos y a `known_intel`. | `IntelItem(node)`; puede ser dangling. |
 | `LINK:` | Archivo accesible; cap si se conoce distancia. | Añade extremos conocidos y, si acepta, `known_links`. | `IntelItem(link)` sólo si la ruta era nueva. |
-| `SECTOR:` | Archivo accesible. | Materializa sector y marca `known_intel`. | `IntelItem(sector)`; nodos siguen ocultos. |
+| `SECTOR:` | Archivo accesible e id de sector canónico. | Materializa sector y marca `known_intel`; un id inválido no tiene efecto. | `IntelItem(sector)`; nodos siguen ocultos. |
 | `COORD:` | Tres números válidos. | Crea/conoce `NAV_<hash>`. | `IntelItem(coord)`; sin ruta. |
 | Lore `uplink_only` | Pieza elegible, ambos extremos físicos y cap. | Añade ruta/contactos y marca primary desbloqueado; si falla, conserva asignación y pendiente. | `IntelItem(link)` directo sólo tras éxito. |
 | Breadcrumb de lore/failsafe | Trigger elegible. | Escribe archivo local/remoto; puede crear nodos ocultos. | Ningún cambio de rutas hasta importar el archivo. |
@@ -463,8 +473,9 @@ una protección narrativa operativa ni contenido activado.
   porque la distancia es incalculable y se acepta; el viaje la bloquea.
 - Un contacto `COORD:` es físico y conocido, pero queda inaccesible hasta obtener
   o resolver una ruta.
-- Los ids de sector malformados llegan a worldgen sin validación estricta; esta
-  laguna ya está registrada en la documentación de worldgen.
+- Los ids de sector malformados se rechazan antes de mutar worldgen o intel.
+  Esto corrige el antiguo fallback a coordenadas de origen; el rechazo no
+  impide procesar otras líneas de intel válidas del mismo archivo.
 - El lock narrativo puede eludirse mediante scan, id conocido de antemano o
   importación explícita.
 - Un pool uplink creado antes de materializar o desbloquear un destino no lo
@@ -512,6 +523,7 @@ construyen estados en memoria; no se abrió ni modificó ningún save real.
 | `lore_channel_preference_and_unlock_smoke.py` | PASSED | Canal `uplink_only` y desbloqueo primary con ruta preexistente. |
 | `energy_policy_smoke.py` | PASSED | Gates energéticos y fallos de scan/route por sistemas durante trabajos. |
 | `forced_hidden_ad_hoc_smoke.py` | PASSED | Host sintético conocido/no visitado y breadcrumb únicamente en su pool elegible. |
+| `sector_intel_validation_smoke.py` | PASSED | Sectores canónicos existentes y lazy, índices con signo amplios, formatos inválidos sin mutar estado serializable, bloques `[INTEL]` sólo de sector sin recovery corrupta/uso de RNG, feedback EN/ES y continuación de líneas válidas. |
 
 La fixture desalineada se reparó posteriormente sin revelar `HARBOR_12` ni
 cambiar producto. La caracterización deliberada de `route solve` también se
@@ -519,8 +531,9 @@ añadió durante la Fase 4A.
 
 Lagunas de cobertura:
 
-- no hay pruebas dedicadas para los cuatro formatos de importación, referencias
-  dangling, deduplicación y bloques `[INTEL]` multilínea;
+- no hay una prueba dedicada al comportamiento combinado de los cuatro formatos
+  de importación, referencias dangling, deduplicación y bloques `[INTEL]`
+  multilínea; la validación estricta de `SECTOR` sí tiene cobertura aislada;
 - no hay prueba que demuestre el alcance exacto —y los bypasses— de
   `locked_primary_targets` con un arco cargado de forma aislada;
 - no se cubre el cambio de origen durante un trabajo route solve;

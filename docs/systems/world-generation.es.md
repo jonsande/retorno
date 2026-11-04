@@ -79,6 +79,14 @@ sectores son cubos lógicos de **10 ly por eje** (`SECTOR_SIZE_LY = 10.0`). El i
 se calcula con `floor(coordenada / 10)` en los tres ejes y se formatea como, por
 ejemplo, `S+000_+000_+000`.
 
+El formato canónico es una `S` mayúscula seguida de tres índices decimales con
+signo separados por guiones bajos. Cada índice usa el resultado de
+`{value:+04d}`: el signo es obligatorio, la anchura mínima es de cuatro
+caracteres incluido el signo y los valores mayores se amplían sin un límite
+numérico arbitrario. Por ello `S+012_-013_+014` y
+`S+12345_-12346_+000` son válidos, mientras que un signo ausente, padding no
+canónico, `-000`, otro prefijo o caracteres adicionales no lo son.
+
 El uso de `floor` importa para coordenadas negativas: `x=-0.1` pertenece al
 sector `-1`, no al sector `0`.
 
@@ -364,9 +372,11 @@ por lo que puede producir un mundo con sectores creados bajo semillas distintas.
 
 ## 12. Casos límite y condiciones de fallo
 
-- `_parse_sector_id` convierte silenciosamente un id malformado en coordenadas
-  `(0,0,0)`. Algunas entradas de UI validan antes, pero el helper interno no
-  rechaza el valor; falta cobertura para intel de sector malformada.
+- Desde la Fase 4C-2b, `_parse_sector_id` rechaza ids no canónicos con
+  `ValueError`, y `ensure_sector_generated` valida antes de cualquier mutación
+  del mundo. Las importaciones `SECTOR:` convierten ese error en feedback
+  localizado y no registran intel de sector; las demás líneas válidas del mismo
+  archivo siguen procesándose.
 - Un sector vacío se marca como generado e `internal_links_built`; nodos añadidos
   después no provocan una reconstrucción automática de la topología interna.
 - `intersector_link_pairs` impide reintentar una pareja fallida aunque cambie el
@@ -399,9 +409,11 @@ por lo que puede producir un mundo con sectores creados bajo semillas distintas.
 
 ## 14. Pruebas y estado de verificación
 
-El código productivo se revisó en el commit `3658577`; las pruebas se ejecutaron
-posteriormente, después de actualizar `worldgen_sparse_archetypes_smoke.py`,
-sobre el árbol de trabajo de la Fase 3A.1:
+El código productivo se revisó originalmente en el commit `3658577`; las
+pruebas originales se ejecutaron después, tras actualizar
+`worldgen_sparse_archetypes_smoke.py`, sobre el árbol de trabajo de la Fase
+3A.1. La Fase 4C-2b añadió posteriormente la regresión estricta de ids de sector
+y volvió a ejecutar las pruebas pertinentes:
 
 | Prueba | Resultado | Cobertura relevante |
 | --- | --- | --- |
@@ -413,11 +425,11 @@ sobre el árbol de trabajo de la Fase 3A.1:
 | `save_load_smoke.py` | PASSED | Persistencia de `SectorGenState`, guardrail y flags de hub. |
 | `scan_job_smoke.py` | PASSED | Scan, materialización indirecta y descubrimiento. |
 | `worldgen_sparse_archetypes_smoke.py` | PASSED | Catálogo y caps activos, tipos prohibidos/permitidos, conteos por arquetipo, enlaces internos al topology hub, dispersión, determinismo con el mismo orden, guardrail y no revelación de vecinos. |
+| `sector_intel_validation_smoke.py` | PASSED | Ids canónicos con signo de anchura mínima/ampliada, sectores existentes/lazy, rechazo sin mutar estado serializable, bloques `[INTEL]` sólo de sector sin recovery corrupta/uso de RNG, feedback público localizado y procesamiento posterior de otras líneas válidas. |
 
 Lagunas de verificación:
 
 - no hay una prueba que fije o rechace la dependencia del orden de generación;
-- no se prueban ids de sector malformados;
 - no se comprueba que Z permanezca dentro del sector;
 - no se prueban duplicados authored ni sectores que ya excedan caps;
 - no hay una prueba de frontera física de la galaxia;

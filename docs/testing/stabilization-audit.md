@@ -35,15 +35,15 @@ The current executive matrix, with full criteria in the contract, is:
 | --- | --- | --- | --- |
 | F-LORE-01 — no-effect `uplink_only` | **Fixed** | `uplink_only_delivery_retry_smoke.py` | **4C-1 complete** |
 | F-SENS-01 — `UPGRADED` factor | **Fixed** | `sensor_detection_factor_smoke.py` | **4C-2a complete** |
-| F-WGEN-02 — malformed `SECTOR` | P1 medium | valid/invalid formats without mutation | 4C-2b |
+| F-WGEN-02 — malformed `SECTOR` | **Fixed** | `sector_intel_validation_smoke.py` | **4C-2b complete** |
 | F-INTEL-01 — old `intel N` | P2 low | controlled timestamps and limits 1/2/unlimited | 4C-2c |
 | F-DEAD-02 — cooldown at `t=0` | P2 low | zero, immediate reevaluation, and post-cooldown | 4C-2d |
 | F-WGEN-01 — `modules_pool` filters | P1 medium | metadata plus per-region seeds | 4C-3 |
 
 This ordering supersedes historical priorities in sections 4, 7, and 8 where
-they conflict. F-LORE-01 was subsequently fixed in 4C-1 and F-SENS-01 in 4C-2a;
-the remaining matrices still describe observed defects, not corrected
-mechanics.
+they conflict. F-LORE-01 was subsequently fixed in 4C-1, F-SENS-01 in 4C-2a,
+and F-WGEN-02 in 4C-2b; historical matrix text describes the pre-fix evidence
+where explicitly identified.
 
 ## 1. Executive summary
 
@@ -64,11 +64,11 @@ validity criterion. The highest-priority problems are:
    effect and preserves retryable pending state.
 
 F-SENS-01 was subsequently corrected in 4C-2a: `UPGRADED` sensors now use the
-nominal factor, with any larger bonus left to balance study. Remaining smaller
-confirmed defects are: `intel N` shows the N oldest records; bulge/halo recover
-no modules because of `modules_pool` interpretation; malformed sector ids
-materialize the origin cluster; and the deadnode cooldown can be bypassed
-exactly at `t = 0`.
+nominal factor, with any larger bonus left to balance study. F-WGEN-02 was then
+corrected in 4C-2b: malformed sector ids are rejected without world or intel
+mutation. Remaining smaller confirmed defects are: `intel N` shows the N oldest
+records; bulge/halo recover no modules because of `modules_pool`
+interpretation; and the deadnode cooldown can be bypassed exactly at `t = 0`.
 
 Two undecided policies are not classified as bugs. Allowing `route solve` for
 an undiscovered physical node inside sensors/cap is deliberate. Frozen uplink
@@ -93,7 +93,7 @@ telemetry or play sample, not that the case is unlikely.
 | F-LORE-01 — fixed in 4C-1 | `uplink_only` was marked delivered when LINK was invalid/over-cap and had no effect. | Scheduler, primaries, intel, persistence | Implementation + synthetic regression | Piece bound to `uplink_only` with unparsable line or invalid hop | One-shot content consumed and primary remains locked | High before fix | Zero with current active data | Failures retain assignment/pending state; public retry does not repeat the pool | `uplink_only_delivery_retry_smoke.py` | Covered: malformed, missing, over-cap, new/preexisting, retry, and save/load | Implemented | Closed |
 | F-SENS-01 — fixed in 4C-2a | `UPGRADED` passed the gate but was absent from the detection map and fell back to `CRITICAL` (0.35). | Scan, systems, balance | Implementation + deterministic regression | Sensors are `UPGRADED` | Upgrade detected less than nominal | Medium before fix | Unknown | Nominal factor; recovery-entry guarantee unchanged | `sensor_detection_factor_smoke.py` | Covered: factors, thresholds, clamps, gates, and recovery exception | Nominal 1.00 implemented; larger bonus remains balance work | Closed |
 | F-WGEN-01 | List `modules_pool: ["tech", "rare"]` is interpreted as module ids; those ids do not exist and selection is empty. | Templates, modules, worldgen, salvage | Active data + implementation + probe | Bulge salvage node; halo when rolled count is 1 | Configured modules are systematically lost; guaranteed in bulge (`min=1`) | Medium | Every applicable bulge profile; halo depends on roll | No recovery for omitted loot | Worldgen does not assert module pools | Per-region seeds: counts and category membership | Categories as filters approved; actual metadata mapping remains | 4 |
-| F-WGEN-02 | `_parse_sector_id` maps malformed ids to `(0,0,0)`; `SECTOR:` may materialize origin and record invalid id. | Intel, worldgen, sector state | Implementation + probe | Import `SECTOR: <malformed>` or equivalent internal call | Unexpected origin mutation and incoherent intel | Medium | Unknown | World remains playable; invalid record has no cleanup | No negative test | Strict public-boundary parser and rejection without mutation | Accepted format and save compatibility | 1 |
+| F-WGEN-02 — fixed in 4C-2b | `_parse_sector_id` mapped malformed ids to `(0,0,0)`; `SECTOR:` could materialize origin and record the invalid id. Sector-only `[INTEL]` blocks also entered corrupt recovery first. | Intel, worldgen, sector state | Implementation + probe + public regression | Import `SECTOR: <malformed>` directly or inside a sector-only block | Unexpected origin mutation, incoherent intel, or unrelated RNG/recovery effects | Medium before fix | Unknown | Canonical validation precedes generation; explicit sector-only blocks bypass corrupt recovery; invalid public input receives localized feedback without mutation | `sector_intel_validation_smoke.py` | Covered: existing/lazy/wide canonical ids, invalid forms, serialized state, sector-only blocks via import/cat, EN/ES, RNG, and continued valid lines | Canonical `{value:+04d}` components and narrow block dispatch implemented | Closed |
 | F-INTEL-01 | `intel N` sorts ascending and slices from start despite advertising “latest”. | CLI/UI, intel history | Implementation + probe | More than N records | Requested recent records are hidden | Low | Common once history exceeds limit | `intel show` if id is known; full export | No coverage | Three timestamps, limits 1/2/unlimited | Choose stable display order | 1 |
 | F-DEAD-02 | Cooldown applies only when `last_action_t > 0`; actions at `t=0` can repeat immediately. | Deadnodes, clock | Implementation + earlier probe | Threshold reached at `t=0` through fixture/debug/migrated state | Two indirect and one direct hint without waiting | Low | Very low/unknown in normal play | State progresses, but with spam | No test | `t=0` and positive case after 5 years | Represent absence as `None` or explicit condition | 4 |
 
@@ -161,7 +161,7 @@ flowchart LR
 | P1 — Route integrity | Published route is travelable or explicitly marked/not published | Shared validator, importers, waypoint cleanup, save normalization | No dangling/over-cap edge counts as frontier or deadnode resolution |
 | P2 — Recovery | Deadnodes/recovery offer only consumable opportunities | Reachable bridge origin, cap, topology/pool, cooldown, `stuck`; confirm arrival/dock | Deadnode E2E and save/load green |
 | P3 — Narrative integrity | Do not consume pieces without effect or assign without access policy | Delivery outcome, retry, breadcrumb, unlock, protection | Synthetic primaries cover success, failure, and preexisting route |
-| P4 — Bounded data/UI defects | Independent low-risk repairs | `UPGRADED`, intel order, sector ids, `modules_pool`, radiation field after decision | State/region matrices and clear public errors |
+| P4 — Bounded data/UI defects | Independent low-risk repairs | `UPGRADED` and sector ids fixed; intel order, `modules_pool`, and radiation field remain after their decisions | State/region matrices and clear public errors |
 | P5 — Opportunity policy | Decide from evidence, not intuition | Frozen pools, windows, annual cycle, singles, request-order determinism | Reproducible simulation and approved product threshold |
 | P6 — Persistence/migration | Preserve invariants while loading older state | Route sanitation, temporary ids, recovery/lore versioning | Before/after temporary tests and documented compatibility strategy |
 
@@ -190,7 +190,9 @@ literal seeds, `create_initial_state_sandbox/prologue`, `Engine`, and
 
 The in-memory audit probe confirmed F-ROUTE-01, F-NAV-01, F-DEAD-01,
 F-LORE-01, F-SENS-01, F-WGEN-01, F-WGEN-02, and F-INTEL-01, plus the
-R-LORE-01 setup. A second temporary probe placed real active single
+R-LORE-01 setup. F-WGEN-02 was later reproduced by
+`sector_intel_validation_smoke.py` before the 4C-2b correction and passes after
+it. A second temporary probe placed real active single
 `sig_echo_fragment_01`, delivered it through `captured_signal`, read/imported
 its text with no intel effect—the correct result for that asset—and confirmed
 persistence. A third temporary-slot probe confirmed that global recovery and

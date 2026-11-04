@@ -36,11 +36,24 @@ def _weighted_choice(rng: random.Random, weights: dict[str, float]) -> str | Non
 
 
 def _parse_sector_id(sector_id: str) -> tuple[int, int, int]:
-    try:
-        sx, sy, sz = sector_id[1:].split("_")
-        return int(sx), int(sy), int(sz)
-    except Exception:
-        return 0, 0, 0
+    if not isinstance(sector_id, str) or not sector_id.startswith("S"):
+        raise ValueError(f"Invalid sector id: {sector_id!r}")
+
+    parts = sector_id[1:].split("_")
+    if len(parts) != 3:
+        raise ValueError(f"Invalid sector id: {sector_id!r}")
+
+    coordinates: list[int] = []
+    for part in parts:
+        try:
+            coordinate = int(part)
+        except ValueError:
+            raise ValueError(f"Invalid sector id: {sector_id!r}") from None
+        if part != f"{coordinate:+04d}":
+            raise ValueError(f"Invalid sector id: {sector_id!r}")
+        coordinates.append(coordinate)
+
+    return coordinates[0], coordinates[1], coordinates[2]
 
 
 def _neighbor_sector_ids_2d(sector_id: str, radius: int = 1, include_self: bool = True) -> list[str]:
@@ -650,6 +663,7 @@ def _ensure_sector_cluster_generated(state: GameState, sector_ids: list[str]) ->
 
 
 def ensure_sector_generated(state: GameState, sector_id: str) -> None:
+    _parse_sector_id(sector_id)
     _ensure_sector_cluster_generated(state, [sector_id])
 
 

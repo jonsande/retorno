@@ -306,6 +306,7 @@ separada, sin crear ahora otra infraestructura de localización.
 | Cadena actual de recuperación global e importación progresiva | `exploration_recovery_smoke.py` y `uplink_authored_and_failsafe_smoke.py` |
 | Preferencia de canal y unlock primary por `uplink_only` válido preexistente | `lore_channel_preference_and_unlock_smoke.py` |
 | Integridad, reintento público y persistencia de `uplink_only` | `uplink_only_delivery_retry_smoke.py` |
+| Ids `SECTOR` canónicos estrictos, materialización lazy y rechazo localizado sin mutación | `sector_intel_validation_smoke.py` |
 | Persistencia general de mundo/jobs/worldgen | `save_load_smoke.py` |
 | Breadcrumb ad hoc con host explícito conocido y no visitado | `forced_hidden_ad_hoc_smoke.py` |
 | `secondary.count`, pesos y hard-force sobre contenido sintético | `lore_secondary_count_weights_hard_smoke.py` |
@@ -354,7 +355,7 @@ planificador sin crear nodos nuevos.
 | --- | --- | --- | --- | --- |
 | `uplink_only` consume primary sin efecto válido | **Corregido** | Casos sintéticos malformed, extremo ausente, sobre-cap, LINK nuevo válido y LINK válido preexistente | Sólo nuevo/preexistente válido marca `delivered` y desbloquea; los fallos quedan pendientes y reintentables | **4C-1 completada** |
 | Sensores `UPGRADED` caían al factor `CRITICAL` | **Corregido** | `sensor_detection_factor_smoke.py`: matriz determinista de factor/detección para cada `SystemState` | `UPGRADED` usa el factor nominal; los demás estados, alcance, energía y duración no cambian | **4C-2a completada** |
-| `SECTOR` malformado materializa origen | P1 — media | Importar formatos válidos e inválidos y comparar `generated_sectors`, `sector_states` e intel | Rechazo localizado sin mutación; formatos canónicos siguen materializando | 4C-2b |
+| `SECTOR` malformado materializa origen | **Corregido** | `sector_intel_validation_smoke.py`: ids canónicos existentes/lazy/amplios y formatos inválidos mediante importaciones públicas | Rechazo localizado sin mutación; formatos canónicos siguen materializando | **4C-2b completada** |
 | `intel N` devuelve los más antiguos | P2 — baja | Tres o más registros con timestamps/ids controlados; límites 1, 2 y sin límite | Muestra los N más recientes en orden estable y conserva `intel show/export` | 4C-2c |
 | Cooldown deadnode se omite en `t=0` | P2 — baja | Forzar acción inicial en cero, reevaluación inmediata y tras cooldown | Cero es un instante válido; no hay segunda acción hasta cumplir cooldown | 4C-2d |
 | `modules_pool` regional trata categorías como ids | P1 — media | Inventariar metadatos reales y generar seeds por disk/bulge/halo con conteos no nulos | Las categorías actúan como filtros sobre módulos reales; conteos, pertenencia y determinismo respetan configuración | 4C-3 |
@@ -394,14 +395,32 @@ cinco casos, fallo reiterado, cambio posterior de condiciones, save/load antes y
 después del éxito y ausencia de duplicados. No se activaron templates ni se
 cambiaron singles, UI o balance.
 
+### Corrección estricta de ids de sector completada: Fase 4C-2b
+
+El parser anterior descartaba el primer carácter, pasaba los tres componentes
+restantes a `int()` y devolvía `(0, 0, 0)` ante cualquier error. Por ello, una
+línea pública `SECTOR:` inválida podía generar el clúster del origen y registrar
+después el literal inválido como intel de sector. El parser canónico exige ahora
+una `S` mayúscula y tres componentes decimales con signo separados por guiones
+bajos, cada uno igual a su representación `{value:+04d}`. La anchura puede
+ampliarse más allá de cuatro caracteres. `ensure_sector_generated` valida antes
+de mutar; ambas vías públicas de importación comparten el rechazo localizado y
+continúan con las demás líneas válidas. Las importaciones válidas conservan
+generación lazy, determinismo y contactos del sector ocultos. Un bloque que sólo
+contiene líneas `SECTOR:` explícitas se delega directamente a ese parser de
+líneas, por lo que no consume RNG ni entra en recuperación corrupta. Los bloques
+que mezclan directivas explícitas con texto narrativo desconocido conservan su
+semántica general anterior.
+
 ## 6. Riesgos y límites vigentes
 
 - `is_hop_within_cap` devuelve actualmente verdadero si falta un extremo. 4C-1
   comprueba ambos nodos antes de llamarlo para `uplink_only`; los demás
   importadores siguen necesitando el futuro contrato común de rutas.
-- La validación procedural no puede limitarse a buscar el id en `space.nodes`.
-  Primero debe definirse qué formatos constituyen referencias materializables y
-  cuáles son ids malformados.
+- `SECTOR` ya tiene un formato canónico estricto y rechaza referencias
+  malformadas. El contrato más amplio de rutas/nodos aún no puede validar
+  referencias procedurales sólo buscándolas en `space.nodes`; sigue siendo
+  trabajo independiente.
 - Preparar pistas antes de una visita exige una operación coherente entre
   planificador, pool y persistencia; escribir primero y completar después puede
   dejar etapas parcialmente visibles.

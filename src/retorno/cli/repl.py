@@ -84,7 +84,12 @@ from retorno.model.world import (
     sector_id_for_pos,
 )
 from retorno.model.world import SpaceNode, region_for_pos
-from retorno.worldgen.generator import ensure_sector_generated, procedural_radiation_for_node, sync_sector_state_for_node
+from retorno.worldgen.generator import (
+    _parse_sector_id,
+    ensure_sector_generated,
+    procedural_radiation_for_node,
+    sync_sector_state_for_node,
+)
 from retorno.util.timefmt import format_elapsed_long, format_elapsed_short
 
 
@@ -4263,9 +4268,27 @@ def _spawn_corrupt_intel_contact(state, source_path: str) -> str | None:
     return node_id
 
 
+def _ensure_sector_for_procedural_node_id(state, node_id: str) -> None:
+    if not (node_id.startswith("S") and ":" in node_id):
+        return
+    sector_id = node_id.split(":", 1)[0]
+    try:
+        _parse_sector_id(sector_id)
+    except ValueError:
+        # NODE/LINK retain their existing literal-id semantics; only the
+        # malformed sector prefix is prevented from materializing the origin.
+        return
+    ensure_sector_generated(state, sector_id)
+
+
 def _process_intel_token(state, token: str, source_path: str, messages: list[str]) -> None:
     token = token.strip()
     if not token:
+        return
+    token_lines = [line.strip() for line in token.splitlines() if line.strip()]
+    if token_lines and all(line.upper().startswith("SECTOR:") for line in token_lines):
+        # Explicit SECTOR lines are validated by the line parser below. They
+        # are not unknown narrative tokens and must not trigger corrupt intel.
         return
     # LINK inside token
     for raw in token.splitlines():
@@ -4276,9 +4299,7 @@ def _process_intel_token(state, token: str, source_path: str, messages: list[str
                 left, right = [p.strip() for p in payload.split("->", 1)]
                 if left and right:
                     for nid in (left, right):
-                        if nid.startswith("S") and ":" in nid:
-                            sector_id = nid.split(":", 1)[0]
-                            ensure_sector_generated(state, sector_id)
+                        _ensure_sector_for_procedural_node_id(state, nid)
                     added_link, blocked_by_cap, dist_ly = _try_add_known_link_with_cap(
                         state, left, right, bidirectional=True
                     )
@@ -4360,6 +4381,46 @@ def _process_intel_token(state, token: str, source_path: str, messages: list[str
         }
         print(msg.get(locale, msg["en"]))
 
+
+def _import_sector_intel(
+    state,
+    sector_id: str,
+    source_path: str,
+    source_kind: str,
+    source_ref: str,
+    confidence: float,
+    added_msgs: list[str],
+) -> None:
+    try:
+        _parse_sector_id(sector_id)
+    except ValueError:
+        locale = state.os.locale.value
+        visible_id = sector_id or ("<vacío>" if locale == "es" else "<empty>")
+        msg = {
+            "en": f"(intel) invalid sector id: {visible_id}",
+            "es": f"(intel) identificador de sector no válido: {visible_id}",
+        }
+        added_msgs.append(msg.get(locale, msg["en"]))
+        return
+
+    ensure_sector_generated(state, sector_id)
+
+    prev = state.world.known_intel.get(sector_id, {}).get("sector")
+    if prev:
+        return
+    state.world.known_intel[sector_id] = {"source": source_path, "sector": True}
+    record_intel(
+        state.world,
+        t=state.clock.t,
+        kind="sector",
+        sector_id=sector_id,
+        confidence=confidence,
+        source_kind=source_kind,
+        source_ref=source_ref,
+    )
+    added_msgs.append(f"(intel) sector known: {sector_id}")
+
+
 def _handle_intel_import(state, path: str) -> None:
     try:
         content = read_file(state.os.fs, path, state.os.auth_levels)
@@ -4392,9 +4453,7 @@ def _handle_intel_import(state, path: str) -> None:
             node_id = line.split(":", 1)[1].strip()
             if not node_id:
                 continue
-            if node_id.startswith("S") and ":" in node_id:
-                sector_id = node_id.split(":", 1)[0]
-                ensure_sector_generated(state, sector_id)
+            _ensure_sector_for_procedural_node_id(state, node_id)
             if node_id not in state.world.known_nodes:
                 state.world.known_intel[node_id] = {"source": path}
                 state.world.known_nodes.add(node_id)
@@ -4411,31 +4470,22 @@ def _handle_intel_import(state, path: str) -> None:
                 added_msgs.append(f"(intel) node known: {node_id}")
         if line.upper().startswith("SECTOR:"):
             sector_id = line.split(":", 1)[1].strip()
-            if not sector_id:
-                continue
-            ensure_sector_generated(state, sector_id)
-            prev = state.world.known_intel.get(sector_id, {}).get("sector")
-            if not prev:
-                state.world.known_intel[sector_id] = {"source": path, "sector": True}
-                record_intel(
-                    state.world,
-                    t=state.clock.t,
-                    kind="sector",
-                    sector_id=sector_id,
-                    confidence=confidence,
-                    source_kind=source_kind,
-                    source_ref=source_ref,
-                )
-                added_msgs.append(f"(intel) sector known: {sector_id}")
+            _import_sector_intel(
+                state,
+                sector_id,
+                path,
+                source_kind,
+                source_ref,
+                confidence,
+                added_msgs,
+            )
         if line.upper().startswith("LINK:"):
             payload = line.split(":", 1)[1].strip()
             if "->" in payload:
                 left, right = [p.strip() for p in payload.split("->", 1)]
                 if left and right:
                     for nid in (left, right):
-                        if nid.startswith("S") and ":" in nid:
-                            sector_id = nid.split(":", 1)[0]
-                            ensure_sector_generated(state, sector_id)
+                        _ensure_sector_for_procedural_node_id(state, nid)
                     added_link, blocked_by_cap, _ = _try_add_known_link_with_cap(
                         state, left, right, bidirectional=True
                     )
@@ -4467,9 +4517,7 @@ def _handle_intel_import(state, path: str) -> None:
                 to_id = payload
                 if to_id:
                     from_id = state.world.current_node_id
-                    if to_id.startswith("S") and ":" in to_id:
-                        sector_id = to_id.split(":", 1)[0]
-                        ensure_sector_generated(state, sector_id)
+                    _ensure_sector_for_procedural_node_id(state, to_id)
                     added_link, blocked_by_cap, _ = _try_add_known_link_with_cap(
                         state, from_id, to_id, bidirectional=True
                     )
@@ -4585,30 +4633,22 @@ def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str
                     added_msgs.append(f"(intel) node known: {node_id}")
         if line.upper().startswith("SECTOR:"):
             sector_id = line.split(":", 1)[1].strip()
-            if sector_id:
-                ensure_sector_generated(state, sector_id)
-                prev = state.world.known_intel.get(sector_id, {}).get("sector")
-                if not prev:
-                    state.world.known_intel[sector_id] = {"source": source_path, "sector": True}
-                    record_intel(
-                        state.world,
-                        t=state.clock.t,
-                        kind="sector",
-                        sector_id=sector_id,
-                        confidence=confidence,
-                        source_kind=source_kind,
-                        source_ref=source_ref,
-                    )
-                    added_msgs.append(f"(intel) sector known: {sector_id}")
+            _import_sector_intel(
+                state,
+                sector_id,
+                source_path,
+                source_kind,
+                source_ref,
+                confidence,
+                added_msgs,
+            )
         if line.upper().startswith("LINK:"):
             payload = line.split(":", 1)[1].strip()
             if "->" in payload:
                 left, right = [p.strip() for p in payload.split("->", 1)]
                 if left and right:
                     for nid in (left, right):
-                        if nid.startswith("S") and ":" in nid:
-                            sector_id = nid.split(":", 1)[0]
-                            ensure_sector_generated(state, sector_id)
+                        _ensure_sector_for_procedural_node_id(state, nid)
                     added_link, blocked_by_cap, _ = _try_add_known_link_with_cap(
                         state, left, right, bidirectional=True
                     )
@@ -4640,9 +4680,7 @@ def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str
                 to_id = payload
                 if to_id:
                     from_id = state.world.current_node_id
-                    if to_id.startswith("S") and ":" in to_id:
-                        sector_id = to_id.split(":", 1)[0]
-                        ensure_sector_generated(state, sector_id)
+                    _ensure_sector_for_procedural_node_id(state, to_id)
                     added_link, blocked_by_cap, _ = _try_add_known_link_with_cap(
                         state, from_id, to_id, bidirectional=True
                     )
@@ -5024,14 +5062,8 @@ def render_map_path(state, target_id: str) -> None:
 
 
 def _sector_coords_from_id(sector_id: str) -> tuple[int, int, int] | None:
-    if not sector_id.startswith("S"):
-        return None
-    body = sector_id[1:]
-    parts = body.split("_")
-    if len(parts) != 3:
-        return None
     try:
-        return int(parts[0]), int(parts[1]), int(parts[2])
+        return _parse_sector_id(sector_id)
     except ValueError:
         return None
 

@@ -77,6 +77,13 @@ cubes of **10 ly per axis** (`SECTOR_SIZE_LY = 10.0`). Their id applies
 `floor(coordinate / 10)` on all three axes and formats the result as, for
 example, `S+000_+000_+000`.
 
+The canonical format is capital `S` followed by three signed decimal indices
+separated by underscores. Each index uses the result of `{value:+04d}`: the
+sign is mandatory, the minimum width is four characters including the sign,
+and larger values expand without an arbitrary numeric limit. Thus
+`S+012_-013_+014` and `S+12345_-12346_+000` are valid, while a missing sign,
+noncanonical padding, `-000`, a different prefix, or extra characters are not.
+
 Using `floor` matters for negative positions: `x=-0.1` belongs to sector `-1`,
 not sector `0`.
 
@@ -354,9 +361,10 @@ world can contain sectors produced under different seeds.
 
 ## 12. Edge cases and failure conditions
 
-- `_parse_sector_id` silently maps a malformed id to coordinates `(0,0,0)`.
-  Some UI entry points validate first, but the internal helper does not reject
-  it; malformed sector intel lacks coverage.
+- Since Phase 4C-2b, `_parse_sector_id` rejects noncanonical ids with
+  `ValueError`, and `ensure_sector_generated` validates before any world
+  mutation. `SECTOR:` imports turn that error into localized feedback and do
+  not register sector intel; other valid lines in the same file still run.
 - An empty sector is marked generated and `internal_links_built`; nodes added
   later do not automatically rebuild its internal topology.
 - `intersector_link_pairs` prevents retrying a failed pair after physical state
@@ -389,9 +397,10 @@ world can contain sectors produced under different seeds.
 
 ## 14. Tests and verification status
 
-The production code was reviewed at commit `3658577`; the tests were run later,
-after updating `worldgen_sparse_archetypes_smoke.py`, on the Phase 3A.1 working
-tree:
+The production code was originally reviewed at commit `3658577`; the original
+tests were run later, after updating `worldgen_sparse_archetypes_smoke.py`, on
+the Phase 3A.1 working tree. Phase 4C-2b later added the strict sector-id
+regression and reran the relevant tests:
 
 | Test | Result | Relevant coverage |
 | --- | --- | --- |
@@ -403,11 +412,11 @@ tree:
 | `save_load_smoke.py` | PASSED | Persistence of `SectorGenState`, guardrail, and hub flags. |
 | `scan_job_smoke.py` | PASSED | Scan, indirect materialization, and discovery. |
 | `worldgen_sparse_archetypes_smoke.py` | PASSED | Active catalog and caps, allowed/forbidden kinds, per-archetype counts, internal links to the topology hub, sparse distribution, same-order determinism, guardrail, and no neighbor revelation. |
+| `sector_intel_validation_smoke.py` | PASSED | Canonical minimum/wide signed ids, existing/lazy sectors, rejection without serializable-state mutation, sector-only `[INTEL]` blocks without corrupt recovery/RNG use, localized public feedback, and continued processing of other valid lines. |
 
 Verification gaps:
 
 - no test accepts or rejects generation-order dependence;
-- malformed sector ids are untested;
 - no test asserts Z remains within its requested sector;
 - authored duplicates and already-over-cap sectors are untested;
 - there is no physical galaxy-boundary test;

@@ -118,6 +118,9 @@ The implementation represents three different facts:
 
 None automatically implies the other two. In particular, `SECTOR:` calls
 `ensure_sector_generated` but does not reveal every node created there.
+The accepted id is the canonical worldgen form: capital `S` plus three
+underscore-separated signed decimal indices, each formatted as `{value:+04d}`.
+The width is a minimum, so larger indices remain valid.
 
 ## 4. Discovery and import paths
 
@@ -252,7 +255,7 @@ explicitly imported manuals normally use 0.8.
 | `NODE: <id>` | Adds the literal text to `known_nodes`, `known_contacts`, and `known_intel`, then records node intel. It only materializes a sector when the id has procedural `S...:...` form; an arbitrary id may have no physical node. |
 | `LINK: <from> -> <to>` | Attempts to add a bidirectional known route. If known physical distance exceeds the cap, it keeps both endpoints as contacts but not the route. |
 | `LINK: <to>` | Same, with the current node as origin. |
-| `SECTOR: <sector_id>` | Calls worldgen, records sector intel and `known_intel`; it does not reveal sector nodes. |
+| `SECTOR: <sector_id>` | For a canonical id, calls worldgen, records sector intel and `known_intel`, but does not reveal sector nodes. A noncanonical id is rejected with localized feedback before world or intel mutation; later valid lines in the file still run. |
 | `COORD: x, y, z` | Creates a physical `NAV_<hash>` if absent, marks it known, and records coordinate intel; it publishes no route. |
 
 A `LINK` whose endpoints do not exist may enter `known_links`: the cap helper
@@ -264,6 +267,9 @@ requires the physical destination node.
 Each block is first processed as a unit:
 
 - if it contains a `LINK:` line, the first link is processed;
+- if every nonempty line is an explicit `SECTOR:`, unit processing is skipped
+  and the canonical line parser handles each line without invoking corrupt
+  recovery;
 - otherwise, the complete content must exactly match an active authored
   location id, name, or sector to discover it;
 - if it does not match, it enters corrupt-intel handling.
@@ -272,7 +278,9 @@ Explicit `LINK:`, `NODE:`, `SECTOR:`, and `COORD:` lines in the same file are
 then also handled by the line parser. A multiline block without `LINK` can
 therefore attempt corrupt recovery before its valid lines are imported. The old
 description of blocks as a general flexible container is broader than actual
-behavior.
+behavior. A block mixing `SECTOR:` with unknown narrative text retains the
+general block behavior and may still enter corrupt recovery before line parsing;
+4C-2b does not define new semantics for that mixed form.
 
 Corrupt intel currently has a 50% failure chance. On recovery it samples
 sectors around the current node, may materialize them, and reveals the first
@@ -362,7 +370,7 @@ destinations, but state may retain those stale references.
 | Later `uplink` | Same gates; consumed route pool and pending `uplink_only`. | Does not repeat pool/log/counters; retries only that narrative channel. | `IntelItem(link)` only if the pending LINK has become valid. |
 | `NODE:` | Accessible file. | Adds id to known sets and `known_intel`. | `IntelItem(node)`; may be dangling. |
 | `LINK:` | Accessible file; cap when distance is known. | Adds known endpoints and, if accepted, `known_links`. | `IntelItem(link)` only for a new route. |
-| `SECTOR:` | Accessible file. | Materializes sector and marks `known_intel`. | `IntelItem(sector)`; nodes remain hidden. |
+| `SECTOR:` | Accessible file and canonical sector id. | Materializes sector and marks `known_intel`; an invalid id has no effect. | `IntelItem(sector)`; nodes remain hidden. |
 | `COORD:` | Three valid numbers. | Creates/knows `NAV_<hash>`. | `IntelItem(coord)`; no route. |
 | Lore `uplink_only` | Eligible piece, both physical endpoints, and cap. | Adds route/contacts and marks primary unlocked; on failure keeps assignment and pending state. | Direct `IntelItem(link)` only after success. |
 | Lore/failsafe breadcrumb | Eligible trigger. | Writes local/remote file; may create hidden nodes. | No route change until file import. |
@@ -448,8 +456,9 @@ operating narrative protection or activated content.
   distance is unavailable and accepted; travel blocks it.
 - A `COORD:` contact is physical and known but inaccessible until a route is
   acquired or solved.
-- Malformed sector ids reach worldgen without strict validation; this gap is
-  already recorded in the worldgen documentation.
+- Malformed sector ids are rejected before worldgen or intel mutation. This
+  fixes the former fallback to origin coordinates; rejection does not stop
+  other valid intel lines in the same file.
 - Narrative locks can be bypassed through scan, a pre-known id, or explicit
   import.
 - An uplink pool created before a destination is materialized or unlocked will
@@ -497,6 +506,7 @@ all build in-memory states; no real save was opened or modified.
 | `lore_channel_preference_and_unlock_smoke.py` | PASSED | `uplink_only` and primary unlock with preexisting route. |
 | `energy_policy_smoke.py` | PASSED | Energy gates and system-driven scan/route job failures. |
 | `forced_hidden_ad_hoc_smoke.py` | PASSED | Known/unvisited synthetic host with breadcrumb only in its eligible pool. |
+| `sector_intel_validation_smoke.py` | PASSED | Existing and lazy canonical sectors, wide signed indices, invalid formats without serializable-state mutation, sector-only `[INTEL]` blocks without corrupt recovery/RNG use, EN/ES feedback, and continued valid-line processing. |
 
 The stale fixture was later repaired without revealing `HARBOR_12` or changing
 product code. The deliberate `route solve` characterization was also added in
@@ -504,8 +514,9 @@ Phase 4A.
 
 Coverage gaps:
 
-- no dedicated tests cover all four import formats, dangling references,
-  deduplication, and multiline `[INTEL]` blocks;
+- no dedicated test covers the combined behavior of all four import formats,
+  dangling references, deduplication, and multiline `[INTEL]` blocks; strict
+  `SECTOR` validation is covered independently;
 - no test demonstrates the exact scope and bypasses of
   `locked_primary_targets` with an isolated loaded arc;
 - origin changes during a route-solve job are not covered;
