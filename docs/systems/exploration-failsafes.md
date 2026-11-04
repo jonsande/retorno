@@ -252,19 +252,21 @@ hub.
 | `mobility_hints` | Short history of entry/gateway/channel | Accumulates; debug shows the last five |
 | `ExplorationRecoveryState.generation` | Makes generations and salvage paths unique | Increments only after entry and gateway are both created |
 | `ExplorationRecoveryState` IDs/flags | Prevent duplicate broadcast and describe the current chain | A new activation replaces active IDs; old nodes are not removed |
-| `DeadNodeState` | Thresholds, start points, attempts, cooldown, and bridge | Deleted as soon as the target stops being a candidate |
+| `DeadNodeState` | Thresholds, start points, attempts, cooldown, and bridge; `attempts > 0` is the persisted indicator that an earlier action exists | Deleted as soon as the target stops being a candidate |
 | `LoreSchedulerState.counters.uplink_count` | Useful-uplink clock for deadnodes | On the first uplink, increments only when it added a route, applied lore, produced lore events/files, or recovery; it increments after deadnode evaluation and never on exhausted-pool retries |
 | `sparse_guardrail_done` | Prevents another initial promotion | Persists for the run |
 
 All of this state belongs to `WorldState` and is serialized with the save. The
-generic save/load smoke proves world persistence and the sparse flag, but has
-no assertions specific to `DeadNodeState` or `ExplorationRecoveryState`.
+generic save/load smoke proves world persistence and the sparse flag, while
+`deadnode_cooldown_zero_smoke.py` specifically proves persistence of the
+deadnode action counter, timestamp, bridge, hint, and cooldown.
 
-The deadnode cooldown is five years and applies only when `last_action_t > 0`.
-An action recorded exactly at `t = 0` leaves `last_action_t == 0`, so consecutive
-evaluations can bypass the cooldown. This audit's isolated probe confirmed two
-indirect hints and one direct hint at the same timestamp after artificially
-preparing the `dead` uplink count.
+The deadnode cooldown remains five years. `attempts == 0` means that no action
+has occurred; once `attempts > 0`, `last_action_t` is a real timestamp, including
+exactly `t = 0`. Cooldown checks use that persisted action counter rather than
+treating zero as an absence sentinel. A blocked evaluation changes neither the
+counter, timestamp, bridge, event sequence, hint files, routes, nor intel, and
+save/load preserves the same boundary behavior.
 
 ## 9. Mechanism interactions
 
@@ -383,16 +385,17 @@ states or temporary directories. No real save was opened or modified.
 | `scan_job_smoke.py` | PASSED | Job-based scan and current-entry special case |
 | `uplink_once_per_node_smoke.py` | PASSED | One-shot uplink pool |
 | `drone_salvage_survey_smoke.py` | PASSED | Isolated survey and data salvage |
-| `save_load_smoke.py` | PASSED | General temporary serialization and sparse guardrail; no failsafe-specific state assertions |
-| In-memory deadnode probe | PASSED | Tracking, `dead` threshold, bridge reuse, missing physical links, and `t=0` cooldown bypass |
+| `save_load_smoke.py` | PASSED | General temporary serialization and sparse guardrail |
+| `deadnode_cooldown_zero_smoke.py` | PASSED | Pre-fix reproduction plus zero/positive timestamps, immediate and pre-limit blocking, exact expiry, independent candidates, observable effects, and focused save/load persistence |
 | `forced_hidden_ad_hoc_smoke.py` | PASSED | Known/unvisited synthetic host, hidden node, and breadcrumb only in the eligible pool |
 | `lore_secondary_count_weights_hard_smoke.py` | PASSED | Synthetic receivers and independent count, weight, and hard-force cases |
 | `debug_lore_arcs_smoke.py` | PASSED | Zero real active arcs and synthetic-arc formatting contract |
 
 The three stale fixtures were later repaired in Phase 4A without production
-changes. There is no dedicated test for deadnodes, valid and
-invalid deadnode hint import, persistence of both recovery state types, ad hoc
-creation without a breadcrumb, or protected-target interference.
+changes. The focused deadnode regression covers cooldown state and persistence,
+but there is still no end-to-end test for valid and invalid deadnode hint import,
+both recovery state types together, ad hoc creation without a breadcrumb, or
+protected-target interference.
 
 ## 14. Closed decisions and pending technical questions
 

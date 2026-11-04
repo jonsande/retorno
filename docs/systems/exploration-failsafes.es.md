@@ -257,20 +257,21 @@ primarios bloqueados al elegir un hub.
 | `mobility_hints` | Historial resumido de entrada/gateway/canal | Se acumula; debug muestra los cinco últimos |
 | `ExplorationRecoveryState.generation` | Hace únicas las generaciones y paths salvage | Sólo incrementa tras crear entrada y gateway con éxito |
 | IDs y flags de `ExplorationRecoveryState` | Evitan repetir broadcast y describen la cadena vigente | Una nueva activación sustituye los IDs anteriores; los nodos previos no se retiran |
-| `DeadNodeState` | Umbrales, origen temporal, intentos, cooldown y puente | Se elimina en cuanto el objetivo deja de ser candidato |
+| `DeadNodeState` | Umbrales, origen temporal, intentos, cooldown y puente; `attempts > 0` es el indicador persistente de que existe una acción anterior | Se elimina en cuanto el objetivo deja de ser candidato |
 | `LoreSchedulerState.counters.uplink_count` | Reloj de uplinks útiles para deadnodes | En el primer uplink sólo sube si añadió ruta, aplicó lore, produjo archivos/eventos de lore o recuperación; se incrementa tras evaluar deadnodes y nunca en reintentos con el pool agotado |
 | `sparse_guardrail_done` | Evita repetir la promoción inicial | Persiste durante la partida |
 
 Todo este estado pertenece a `WorldState` y se serializa con la partida. La
-prueba genérica de save/load confirma persistencia del mundo y del flag sparse,
-pero no contiene aserciones específicas para `DeadNodeState` ni
-`ExplorationRecoveryState`.
+prueba genérica de save/load confirma persistencia del mundo y del flag sparse;
+`deadnode_cooldown_zero_smoke.py` demuestra específicamente la persistencia del
+contador de acciones deadnode, timestamp, puente, pista y cooldown.
 
-El cooldown deadnode es de cinco años y sólo se aplica si `last_action_t > 0`.
-Una acción registrada exactamente en `t = 0` deja `last_action_t == 0`, por lo
-que evaluaciones consecutivas pueden saltarse el cooldown. La sonda aislada de
-esta auditoría confirmó dos pistas indirectas y una directa en el mismo instante
-al preparar artificialmente el contador `dead`.
+El cooldown deadnode sigue siendo de cinco años. `attempts == 0` significa que
+no ha ocurrido ninguna acción; desde `attempts > 0`, `last_action_t` es un
+timestamp real, incluido exactamente `t = 0`. El cooldown usa ese contador
+persistente en vez de interpretar cero como centinela de ausencia. Una
+evaluación bloqueada no cambia contador, timestamp, puente, secuencia de eventos,
+archivos de pista, rutas ni intel, y save/load conserva los mismos límites.
 
 ## 9. Interacciones entre mecanismos
 
@@ -392,16 +393,17 @@ directorios temporales. No se abrió ni modificó ninguna partida real.
 | `scan_job_smoke.py` | PASSED | Scan por job y tratamiento especial de la entrada vigente |
 | `uplink_once_per_node_smoke.py` | PASSED | Consumo único del pool de uplink |
 | `drone_salvage_survey_smoke.py` | PASSED | Survey y salvage de datos aislados |
-| `save_load_smoke.py` | PASSED | Serialización temporal general y guardrail sparse; no estados específicos de failsafe |
-| Sonda deadnode en memoria | PASSED | Tracking, umbral `dead`, reutilización de puente, ausencia de enlaces físicos y bypass de cooldown en `t=0` |
+| `save_load_smoke.py` | PASSED | Serialización temporal general y guardrail sparse |
+| `deadnode_cooldown_zero_smoke.py` | PASSED | Reproducción previa al fix, timestamps cero/positivos, bloqueo inmediato y anterior al límite, expiración exacta, candidatos independientes, efectos observables y persistencia save/load específica |
 | `forced_hidden_ad_hoc_smoke.py` | PASSED | Host sintético conocido/no visitado, nodo oculto y breadcrumb sólo en el pool elegible |
 | `lore_secondary_count_weights_hard_smoke.py` | PASSED | Receptores sintéticos y casos independientes de count, pesos y hard-force |
 | `debug_lore_arcs_smoke.py` | PASSED | Cero arcos activos reales y contrato de formato sobre arco sintético |
 
 Las tres fixtures desalineadas se repararon posteriormente en Fase 4A sin
-cambios productivos. No hay test dedicado de deadnodes, de importación de
-una pista deadnode válida e inválida, de persistencia específica de ambos
-estados, de ad hoc sin breadcrumb ni de interferencia con objetivos protegidos.
+cambios productivos. La regresión deadnode focalizada cubre estado y persistencia
+del cooldown, pero aún no hay prueba extremo a extremo de importación de pistas
+deadnode válidas e inválidas, de ambos estados de recuperación juntos, de ad hoc
+sin breadcrumb ni de interferencia con objetivos protegidos.
 
 ## 14. Decisiones cerradas y cuestiones técnicas pendientes
 

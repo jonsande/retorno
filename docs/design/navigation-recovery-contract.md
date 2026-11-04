@@ -309,6 +309,7 @@ creating a second localization infrastructure now.
 | `uplink_only` integrity, public retry, and persistence | `uplink_only_delivery_retry_smoke.py` |
 | Strict canonical `SECTOR` ids, lazy materialization, and localized non-mutating rejection | `sector_intel_validation_smoke.py` |
 | Newest-first intel listing, limits, stable timestamp ties, and unchanged show/export | `intel_recent_order_smoke.py` |
+| Deadnode cooldown at zero/positive timestamps, exact expiry, candidate independence, and save/load | `deadnode_cooldown_zero_smoke.py` |
 | General world/job/worldgen persistence | `save_load_smoke.py` |
 | Ad hoc breadcrumb with an explicit known, unvisited host | `forced_hidden_ad_hoc_smoke.py` |
 | `secondary.count`, weights, and hard force on synthetic content | `lore_secondary_count_weights_hard_smoke.py` |
@@ -334,7 +335,8 @@ These are future acceptance criteria, not green tests of current behavior:
 - **IT-04/IT-07:** reach a remote deadnode; each clue is confirmed only if its
   hop is valid and the complete chain terminates at the target. With the
   receiver off, no chain, or a protected target, attempts/cooldown do not
-  advance.
+  advance. The focused zero-timestamp regression now covers cooldown persistence,
+  but not this route/receiver contract.
 - **Protection:** a synthetic arc with a primary protected from gateway,
   deadnodes, and automatic breadcrumb; natural scan and manual route solve keep
   their approved exceptions.
@@ -360,7 +362,7 @@ existing receivers/stages that the planner can reuse without creating nodes.
 | `UPGRADED` sensors fell back to the `CRITICAL` factor | **Fixed** | `sensor_detection_factor_smoke.py`: deterministic factor/detection matrix for every `SystemState` | `UPGRADED` uses the nominal factor; other states, range, energy, and duration are unchanged | **4C-2a complete** |
 | Malformed `SECTOR` materializes origin | **Fixed** | `sector_intel_validation_smoke.py`: canonical existing/lazy/wide ids and invalid formats through public imports | Localized rejection without mutation; canonical formats still materialize | **4C-2b complete** |
 | `intel N` returns the oldest records | **Fixed** | `intel_recent_order_smoke.py`: empty/single/large histories, limits, timestamp ties, EN/ES, CLI/Textual, show/export, and read-only state | Shows the N newest in stable order and preserves `intel show/export` | **4C-2c complete** |
-| Deadnode cooldown is skipped at `t=0` | P2 — low | Force initial action at zero, immediate reevaluation, and post-cooldown reevaluation | Zero is a valid timestamp; no second action before cooldown | 4C-2d |
+| Deadnode cooldown is skipped at `t=0` | **Fixed** | `deadnode_cooldown_zero_smoke.py`: zero/positive timestamps, immediate/pre-limit/exact-limit evaluations, independent candidates, and save/load | `attempts > 0` identifies a prior action; zero remains a valid persisted timestamp and blocked evaluations do not mutate effects | **4C-2d complete** |
 | Regional `modules_pool` treats categories as ids | P1 — medium | Inventory actual metadata and generate per-region seeds with nonzero counts | Categories filter real modules; counts, membership, and determinism respect configuration | 4C-3 |
 
 Single frequency, uplink snapshots, `radiation_base`, generation-order
@@ -424,6 +426,18 @@ applying the default 20 or explicit N limit. Thus `intel`, `intel N`, and
 ties without using textual ids as chronology. The stored history is untouched;
 `intel show` and `intel export` retain their previous lookup and export order,
 and Textual inherits the same renderer.
+
+### Completed zero-time deadnode cooldown correction: Phase 4C-2d
+
+`last_action_t == 0` formerly meant both “no previous action” and “the previous
+action happened at time zero,” so the latter bypassed the five-year cooldown.
+`attempts` already records every successfully written deadnode hint and has no
+other writer, so `attempts > 0` is now the prior-action indicator without a
+schema change. `last_action_t` therefore remains an ordinary persisted timestamp,
+including zero. The focused regression proves no mutation before expiry, a new
+action exactly at the boundary, independence between candidates, unchanged
+positive-time behavior, and the same semantics after save/load. It does not
+resolve deadnode route validity or bridge topology (F-DEAD-01).
 
 ## 6. Current risks and boundaries
 

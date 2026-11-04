@@ -156,7 +156,7 @@ def evaluate_dead_nodes(state, trigger: str, debug: bool = False) -> list[Event]
             continue
 
         years_since_action = (state.clock.t - st.last_action_t) / Balance.YEAR_S if Balance.YEAR_S else 0.0
-        if st.last_action_t > 0 and years_since_action < Balance.DEADNODE_ACTION_COOLDOWN_YEARS:
+        if st.attempts > 0 and years_since_action < Balance.DEADNODE_ACTION_COOLDOWN_YEARS:
             continue
 
         # Indirect strategy: create a bridge node near the dead node, then deliver link to it.

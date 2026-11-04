@@ -37,13 +37,14 @@ La matriz ejecutiva vigente, con criterios completos en el contrato, es:
 | F-SENS-01 — factor `UPGRADED` | **Corregido** | `sensor_detection_factor_smoke.py` | **4C-2a completada** |
 | F-WGEN-02 — `SECTOR` malformado | **Corregido** | `sector_intel_validation_smoke.py` | **4C-2b completada** |
 | F-INTEL-01 — `intel N` antiguo | **Corregido** | `intel_recent_order_smoke.py` | **4C-2c completada** |
-| F-DEAD-02 — cooldown en `t=0` | P2 baja | cero, reevaluación inmediata y tras cooldown | 4C-2d |
+| F-DEAD-02 — cooldown en `t=0` | **Corregido** | `deadnode_cooldown_zero_smoke.py` | **4C-2d completada** |
 | F-WGEN-01 — filtros `modules_pool` | P1 media | metadatos + seeds por región | 4C-3 |
 
 El orden anterior sustituye las prioridades históricas de las secciones 4, 7 y
 8 cuando entren en conflicto. F-LORE-01 quedó corregido posteriormente en 4C-1,
-F-SENS-01 en 4C-2a, F-WGEN-02 en 4C-2b y F-INTEL-01 en 4C-2c; el texto histórico
-de las matrices describe la evidencia previa cuando se identifica expresamente.
+F-SENS-01 en 4C-2a, F-WGEN-02 en 4C-2b, F-INTEL-01 en 4C-2c y F-DEAD-02 en
+4C-2d; el texto histórico de las matrices describe la evidencia previa cuando
+se identifica expresamente.
 
 ## 1. Resumen ejecutivo
 
@@ -68,9 +69,11 @@ ahora el factor nominal y cualquier bonificación mayor queda para estudio de
 balance. F-WGEN-02 quedó corregido después en 4C-2b: los ids de sector
 malformados se rechazan sin mutar mundo ni intel. F-INTEL-01 quedó corregido en
 4C-2c: todos los listados muestran primero los registros más recientes y
-desempatan de forma determinista por inserción. Siguen confirmados otros
-defectos acotados: bulge/halo no recuperan módulos por la interpretación de
-`modules_pool` y el cooldown deadnode puede saltarse exactamente en `t = 0`.
+desempatan de forma determinista por inserción. F-DEAD-02 quedó corregido en
+4C-2d: una acción en `t = 0` inicia el mismo cooldown de cinco años que un
+timestamp positivo y sigue aplicándose tras save/load. El defecto acotado que
+queda es que bulge/halo no recuperan módulos por la interpretación de
+`modules_pool`.
 
 No se clasifican como bugs dos políticas sin decisión: `route solve` hacia un
 nodo físico no descubierto dentro de sensores/cap es deliberado; y los pools de
@@ -97,7 +100,7 @@ telemetría ni muestra de partidas, no que el caso sea improbable.
 | F-WGEN-01 | Lista `modules_pool: ["tech", "rare"]` se interpreta como ids; no existen esos ids y la selección queda vacía. | Templates, módulos, worldgen, salvage | Datos activos + implementación + sonda | Nodo salvage en bulge; en halo cuando el conteo sorteado es 1 | Pérdida sistemática de módulos configurados, segura en bulge (`min=1`) | Media | En cada perfil bulge aplicable; halo depende del sorteo | No existe recuperación del loot omitido | Worldgen no afirma pools de módulos | Semillas por región: conteos y pertenencia a categorías | Categorías como filtros aprobadas; falta mapear metadatos reales | 4 |
 | F-WGEN-02 — corregido 4C-2b | `_parse_sector_id` convertía ids malformados a `(0,0,0)`; `SECTOR:` podía materializar el origen y registrar el id inválido. Los bloques `[INTEL]` sólo de sector entraban además primero en recuperación corrupta. | Intel, worldgen, estado sectorial | Implementación + sonda + regresión pública | Importar `SECTOR: <malformado>` directamente o dentro de un bloque sólo de sector | Mutación inesperada del origen, intel incoherente o efectos ajenos de RNG/recuperación | Media antes de corregir | Desconocida | La validación canónica precede a generación; los bloques explícitos sólo de sector omiten recovery corrupta; la entrada pública inválida recibe feedback localizado sin mutación | `sector_intel_validation_smoke.py` | Cubierto: ids canónicos existentes/lazy/amplios, formatos inválidos, estado serializable, bloques sólo de sector vía import/cat, EN/ES, RNG y continuación de líneas válidas | Componentes canónicos `{value:+04d}` y dispatch acotado de bloques implementados | Cerrado |
 | F-INTEL-01 — corregido 4C-2c | `intel N` ordenaba ascendente y cortaba al inicio pese a anunciar “latest”. | CLI/Textual, historial intel | Implementación + regresión pública determinista | Más de N registros o timestamps iguales | Ocultaba los registros recientes solicitados o dejaba el desempate sin contrato | Baja antes de corregir | Frecuente cuando el historial supera el límite | Vista temporal reciente primero; show/export sin cambios | `intel_recent_order_smoke.py` | Cubierto: historiales vacío/único/de 25 items, límites 1/2/amplio/all/default, empates, EN/ES, Textual, show/export y ausencia de mutación | `(timestamp, índice_de_inserción)` descendente implementado | Cerrado |
-| F-DEAD-02 | El cooldown sólo se aplica si `last_action_t > 0`; acciones en `t=0` pueden repetirse inmediatamente. | Deadnodes, reloj | Implementación + sonda previa | Umbral alcanzado en `t=0` por fixture/debug/estado migrado | Dos indirectas y una directa sin esperar | Baja | Muy baja/desconocida en juego normal | El estado termina avanzando, pero con spam | Sin test | Caso `t=0` y caso positivo tras 5 años | Representar ausencia con `None` o condición explícita | 4 |
+| F-DEAD-02 — corregido 4C-2d | El cooldown sólo se aplicaba si `last_action_t > 0`; las acciones en `t=0` podían repetirse inmediatamente. | Deadnodes, reloj, persistencia | Implementación + regresión focalizada determinista | Umbral alcanzado en `t=0` por fixture/debug/estado migrado | Podían emitirse varias pistas sin esperar | Baja antes de corregir | Muy baja/desconocida en juego normal | `attempts > 0` distingue una acción previa y cero sigue siendo timestamp válido | `deadnode_cooldown_zero_smoke.py` | Cubierto: primera acción, evaluaciones inmediata/anterior al límite/en el límite, tiempo positivo, candidatos nuevos/independientes, efectos observables y save/load | Se reutiliza el contador persistente existente; sin cambio de esquema ni balance | Cerrado |
 
 ### 2.2 Riesgos potenciales que necesitan reproducirse o medirse
 
@@ -183,10 +186,10 @@ literales, `create_initial_state_sandbox/prologue`, `Engine` y
 | IT-01 | Seed fija: generar sector, scan, descubrir objetivo físico cercano, `route solve`, completar job, viajar y completar llegada | Generar no revela; scan sí; solve publica bajo cap; viaje exige ruta; llegada actualiza visita/pool | Reusar Engine, worldgen y helpers de ETA de smokes; fixture local de dos nodos |
 | IT-02 | Inicializar pool uplink, materializar hub posterior, ejecutar uplink y después otro canal de descubrimiento | Snapshot no cambia hoy; consumo es único; el hub tardío conserva una vía alternativa o el test documenta la pérdida | Extender `uplink_once_per_node_smoke`; sin helper nuevo |
 | IT-03 | Estado sin frontera → recuperación global → importar entrada → solve/viaje → llegada → importar gateway → viaje | Una sola generación, distancias bajo cap, broadcast en el evento acordado, rutas viajables | Extender `exploration_recovery_smoke`; seed fija |
-| IT-04 | Contacto lejano sin ruta → avanzar contador/tiempo → deadnode → importar pista → viajar al puente → resolver objetivo | Cada pista publicada pasa validador; puente tiene integración decidida; cooldown y attempts persisten | Nueva fixture deadnode sintética; no existe equivalente |
+| IT-04 | Contacto lejano sin ruta → avanzar contador/tiempo → deadnode → importar pista → viajar al puente → resolver objetivo | Cada pista publicada pasa validador; puente tiene integración decidida; cooldown y attempts persisten | Extender la fixture focalizada de cooldown en una prueba E2E de rutas separada; F-DEAD-01 sigue abierto |
 | IT-05 | Arco sintético hard sin candidato → ad hoc → breadcrumb en host conocido → importar la ruta → viaje → trigger → entrega/unlock | Nodo oculto, breadcrumb recuperable, ruta bajo cap, pieza no `delivered` antes de efecto | Reparar fixture forced-hidden y añadir test E2E separado |
 | IT-06 | Importar LINK inexistente y sobre-cap; cargar arista obsoleta; ejecutar frontera, deadnodes y viaje | Rechazo/no publicación; ningún falso frontier; contacto conserva semántica decidida; migración idempotente | Nueva fixture de rutas inválidas; reutilizar parser y Engine |
-| IT-07 | Guardar antes y después de activar recuperación global/deadnode; cargar dos veces | IDs, paths, pools, thresholds, attempts y bridge persisten; no se duplica generación/pista | Extender `save_load_smoke` o test específico con `TemporaryDirectory` |
+| IT-07 | Guardar antes y después de activar recuperación global/deadnode; cargar dos veces | IDs, paths, pools, thresholds, attempts y bridge persisten; no se duplica generación/pista | El cooldown deadnode en tiempo cero está cubierto con `TemporaryDirectory`; queda la persistencia de la cadena global/deadnode completa |
 | IT-08 | Filtrar un single real activo, probabilidad/intervalo controlados, receptor conocido abierto, trigger, lectura/import, save/load | Binding correcto, un solo delivery, contenido real legible, efecto intel esperado (ninguno si el archivo no contiene intel), persistencia | Loader real + filtro local; no copiar el contenido al test |
 | IT-09 | Viaje → abort → save/load opcional → reanudar a cada extremo | Waypoint desaparece de nodos, rutas, conocidos, intel/fine ranges aplicables y componentes | Nueva prueba local sobre `TravelAbort`/`_clear_tmp_node` |
 | IT-10 | Generar bulge/halo/disk con seeds conocidas y nodo salvage aplicable | Conteo respeta min/max y cada módulo pertenece a la semántica aprobada; determinismo | Reusar loader y descriptor de worldgen; tabla de seeds explícita |
@@ -195,7 +198,9 @@ La sonda de auditoría en memoria confirmó F-ROUTE-01, F-NAV-01, F-DEAD-01,
 F-LORE-01, F-SENS-01, F-WGEN-01, F-WGEN-02 y F-INTEL-01, además del escenario
 R-LORE-01. `sector_intel_validation_smoke.py` reprodujo después F-WGEN-02 antes
 de la corrección 4C-2b y pasa tras ella. `intel_recent_order_smoke.py` reprodujo
-también F-INTEL-01 antes de 4C-2c y pasa tras la corrección del renderer. Una sonda temporal adicional colocó el single real
+también F-INTEL-01 antes de 4C-2c y pasa tras la corrección del renderer.
+`deadnode_cooldown_zero_smoke.py` reprodujo F-DEAD-02 antes de 4C-2d y ahora
+pasa en el límite exacto del cooldown y tras save/load. Una sonda temporal adicional colocó el single real
 `sig_echo_fragment_01`, lo entregó por `captured_signal`, leyó/importó su texto
 sin producir intel —resultado correcto para ese asset— y confirmó persistencia.
 Otra sonda con slots temporales confirmó que recuperación global y deadnodes

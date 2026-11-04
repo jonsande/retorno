@@ -308,6 +308,7 @@ separada, sin crear ahora otra infraestructura de localización.
 | Integridad, reintento público y persistencia de `uplink_only` | `uplink_only_delivery_retry_smoke.py` |
 | Ids `SECTOR` canónicos estrictos, materialización lazy y rechazo localizado sin mutación | `sector_intel_validation_smoke.py` |
 | Listado de intel reciente primero, límites, desempate estable y show/export sin cambios | `intel_recent_order_smoke.py` |
+| Cooldown deadnode con timestamps cero/positivos, expiración exacta, independencia de candidatos y save/load | `deadnode_cooldown_zero_smoke.py` |
 | Persistencia general de mundo/jobs/worldgen | `save_load_smoke.py` |
 | Breadcrumb ad hoc con host explícito conocido y no visitado | `forced_hidden_ad_hoc_smoke.py` |
 | `secondary.count`, pesos y hard-force sobre contenido sintético | `lore_secondary_count_weights_hard_smoke.py` |
@@ -331,7 +332,9 @@ Estos casos son criterios futuros, no pruebas verdes del comportamiento actual:
   quedar ninguna referencia al id, tampoco tras save/load.
 - **IT-04/IT-07:** alcanzar deadnode lejano; cada pista sólo se confirma si hay
   un salto válido y la cadena completa termina en el objetivo. Con receptor
-  apagado, sin cadena o con target protegido, no avanzan intentos/cooldown.
+  apagado, sin cadena o con target protegido, no avanzan intentos/cooldown. La
+  regresión focalizada de timestamp cero ya cubre la persistencia del cooldown,
+  pero no este contrato de rutas/receptores.
 - **Protección:** arco sintético con primary protegido frente a gateway,
   deadnodes y breadcrumb automático; scan natural y route solve manual conservan
   las excepciones aprobadas.
@@ -358,7 +361,7 @@ planificador sin crear nodos nuevos.
 | Sensores `UPGRADED` caían al factor `CRITICAL` | **Corregido** | `sensor_detection_factor_smoke.py`: matriz determinista de factor/detección para cada `SystemState` | `UPGRADED` usa el factor nominal; los demás estados, alcance, energía y duración no cambian | **4C-2a completada** |
 | `SECTOR` malformado materializa origen | **Corregido** | `sector_intel_validation_smoke.py`: ids canónicos existentes/lazy/amplios y formatos inválidos mediante importaciones públicas | Rechazo localizado sin mutación; formatos canónicos siguen materializando | **4C-2b completada** |
 | `intel N` devuelve los más antiguos | **Corregido** | `intel_recent_order_smoke.py`: historiales vacío/único/amplio, límites, empates de timestamp, EN/ES, CLI/Textual, show/export y estado de sólo lectura | Muestra los N más recientes en orden estable y conserva `intel show/export` | **4C-2c completada** |
-| Cooldown deadnode se omite en `t=0` | P2 — baja | Forzar acción inicial en cero, reevaluación inmediata y tras cooldown | Cero es un instante válido; no hay segunda acción hasta cumplir cooldown | 4C-2d |
+| Cooldown deadnode se omite en `t=0` | **Corregido** | `deadnode_cooldown_zero_smoke.py`: timestamps cero/positivos, evaluaciones inmediata/anterior al límite/en el límite, candidatos independientes y save/load | `attempts > 0` identifica una acción previa; cero sigue siendo timestamp persistente válido y las evaluaciones bloqueadas no mutan efectos | **4C-2d completada** |
 | `modules_pool` regional trata categorías como ids | P1 — media | Inventariar metadatos reales y generar seeds por disk/bulge/halo con conteos no nulos | Las categorías actúan como filtros sobre módulos reales; conteos, pertenencia y determinismo respetan configuración | 4C-3 |
 
 Frecuencia de singles, snapshots uplink, `radiation_base`, dependencia del orden
@@ -424,6 +427,18 @@ de timestamp gana el registro añadido después sin usar ids textuales como
 cronología. El historial almacenado no cambia; `intel show` e `intel export`
 conservan su búsqueda y orden de exportación anteriores, y Textual hereda el
 mismo renderer.
+
+### Corrección del cooldown deadnode en tiempo cero completada: Fase 4C-2d
+
+`last_action_t == 0` significaba antes tanto «sin acción previa» como «la acción
+previa ocurrió en tiempo cero», por lo que el segundo caso eludía el cooldown de
+cinco años. `attempts` ya registra cada pista deadnode escrita con éxito y no
+tiene otro escritor, así que `attempts > 0` identifica ahora la acción previa sin
+cambiar el esquema. `last_action_t` queda como timestamp persistente ordinario,
+incluido cero. La regresión focalizada demuestra ausencia de mutación antes de
+vencer, nueva acción exactamente en el límite, independencia entre candidatos,
+comportamiento positivo sin cambios y la misma semántica tras save/load. No
+resuelve la validez de rutas deadnode ni la topología del puente (F-DEAD-01).
 
 ## 6. Riesgos y límites vigentes
 
