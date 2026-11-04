@@ -467,3 +467,38 @@ CLI/Textual EN/ES, ticks posteriores y tres ciclos temporales save/load sin
 duplicados ni cambios de ids/secuencias terminales. También pasan compilación
 Python y `git diff --check`. Se conservan los 16 archivos pendientes originales;
 esta revisión sólo cambia engine, regresión y esta auditoría EN/ES.
+
+### Fase 4D-3b: núcleo de propuestas deadnode de sólo lectura
+
+`main` inicial limpio, HEAD y `origin/main` remoto verificado: `b7bb68b`.
+El [diseño del núcleo](../design/deadnode-chain-planner.es.md) documenta API
+tipada independiente, inventario de capacidades, orígenes dirigidos, consultas
+canónicas de cupos/tipos, progresión informativa y dependencias de materialización
+y recepción pendientes. Sólo calcula propuestas. `evaluate_dead_nodes`, worldgen,
+navegación, persistencia de planes activos, umbrales, intentos y cooldowns no
+cambian. **F-DEAD-01 sigue abierto.**
+
+`deadnode_chain_planner_smoke.py` supera los 28 grupos de aserciones de la matriz
+4D-3b: cap inclusivo, 70/100 ly, cadena existente 35+35+30 ly y mixta,
+tipos/capacidades, cupos regionales, fuentes no disponibles, escalas visitadas
+sin información nueva, orígenes dirigidos, protección, colocación lazy/tardía,
+ids estables/sin colisión, doce saltos, inmutabilidad completa de estado/RNG y
+tres ciclos save/load. Dos subprocesos con `PYTHONHASHSEED=1/97` producen
+propuestas idénticas. La exclusión de interfaces de datos en `waystation` se
+comprueba además mediante la acción real de Engine. Nunca se modifican sectores
+generados ni pendientes de generar.
+
+Con seed `271828`, A=(0,25,1), 45 ly no exige intermediarios, 70 ly exige uno
+y 100 ly admite dos (`relay`, `station`) en cupos canónicos respaldados.
+Estas propuestas con señal de recuperación están condicionadas. La falta de
+cupos en y=1 devuelve un testigo geométrico incompleto, sin inventar capacidad.
+Una pista válida legible ya almacenada puede usar mecánicas existentes; incluso
+esa propuesta no publica nada ni constituye una recuperación confirmada.
+
+Validación: pasan la regresión nueva y los 31 controles anteriores (32/32,
+incluidos los nueve smokes de referencia de 4D-3a). Pasan compilación Python,
+`git diff --check`, enlaces locales y paridad técnica EN/ES. Una aserción inicial
+usaba igualdad exacta de floats para tercios; se ajustó a tolerancia numérica
+sin cambiar geometría productiva ni cap. No se instalaron dependencias.
+Ningún comando del jugador cambia, por lo que no procede modificar manuales/help.
+Sin commit, push, staging, materialización ni integración posterior.

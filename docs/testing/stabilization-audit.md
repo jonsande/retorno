@@ -457,3 +457,37 @@ terminal history, EN/ES CLI/Textual rendering, later ticks and three temporary
 save/load cycles without duplicates or changes to terminal ids/sequences.
 Python compilation and `git diff --check` also pass. The original 16 pending
 files remain; this review only changes engine, regression and this EN/ES audit.
+
+### Phase 4D-3b: read-only deadnode proposal kernel
+
+Initial clean `main`, HEAD and verified remote `origin/main`: `b7bb68b`.
+The [kernel design](../design/deadnode-chain-planner.md) documents the independent
+typed API, capability inventory, directed origins, canonical slot/type queries,
+information progression and unresolved materialization/reception dependencies.
+Only proposals are computed. `evaluate_dead_nodes`, worldgen, navigation,
+active-plan persistence, thresholds, attempts and cooldowns remain unchanged.
+**F-DEAD-01 remains open.**
+
+`deadnode_chain_planner_smoke.py` passes all 28 assertion groups covering the
+4D-3b matrix: inclusive cap, 70/100 ly, existing 35+35+30 ly and mixed chains,
+types/capabilities, regional slots, unavailable sources, visited navigation-only
+stops, directed origins, protection, lazy/late placement, stable/collision-safe
+ids, twelve-hop chains, complete state/RNG immutability and three save/load
+cycles. Two subprocesses with `PYTHONHASHSEED=1/97` produce identical proposals.
+The `waystation` data-interface exclusion is also checked through the actual
+Engine action. Generated or ungenerated sectors are never modified.
+
+At seed `271828`, A=(0,25,1), 45 ly needs no intermediary, 70 ly needs one,
+and 100 ly admits two (`relay`, `station`) in supported canonical slots.
+These recovery-signal proposals are conditional. Missing procedural slots at
+y=1 produce an incomplete geometric witness, not invented capacity. A stored,
+readable valid clue can instead use existing mechanics; even that proposal
+publishes nothing and is not a confirmed recovery.
+
+Validation: the new regression plus all 31 prior checks pass (32/32 controls,
+including the nine baseline smokes from 4D-3a). Python compilation,
+`git diff --check`, local links and technical EN/ES parity pass. One initial
+assertion used exact float equality for thirds; it was corrected to a numeric
+tolerance without changing production geometry or the cap. No dependencies
+were installed. No player command changed, so manuals/help need no update.
+No commit, push, staging, materialization or later integration was performed.

@@ -92,6 +92,11 @@ first link from the current node without validating the whole hop. It does not
 construct a chain or guarantee usable topology/pool state, and it counts the
 attempt when the clue is written. The audit reproduced a bridge 99.38 ly away.
 
+**Phase 4D-3b:** the independent [proposal kernel](deadnode-chain-planner.md)
+now calculates immutable, non-mutating chains with explicit information and
+materialization dependencies. Production deadnodes does not call it; F-DEAD-01
+remains open, including confirmation, active-plan persistence and delivery.
+
 This contract does not change thresholds, probabilities, or balance limits.
 Those require a separate evaluation.
 

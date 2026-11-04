@@ -93,6 +93,11 @@ enlace desde el nodo actual sin validar el salto completo. No crea una cadena,
 no garantiza topología/pool utilizable y contabiliza el intento al escribir la
 pista. La auditoría reprodujo un puente a 99,38 ly.
 
+**Fase 4D-3b:** el [núcleo independiente de propuestas](deadnode-chain-planner.es.md)
+calcula cadenas inmutables y no mutantes con dependencias informativas y de
+materialización explícitas. Deadnodes productivo no lo invoca; F-DEAD-01 sigue
+abierto, incluidas confirmación, persistencia de planes activos y entrega.
+
 Los umbrales, probabilidades y límites de balance no se cambian por este
 contrato. Su ajuste requiere una evaluación separada.
 
