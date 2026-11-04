@@ -502,3 +502,60 @@ usaba igualdad exacta de floats para tercios; se ajustó a tolerancia numérica
 sin cambiar geometría productiva ni cap. No se instalaron dependencias.
 Ningún comando del jugador cambia, por lo que no procede modificar manuales/help.
 Sin commit, push, staging, materialización ni integración posterior.
+
+### Fase 4D-3c: rodeos regionales puros y comprobación de materialización
+
+`main` inicialmente limpia; HEAD local, referencia de seguimiento y remoto
+`refs/heads/main` verificados en `c48ee001ad976c9a3cc0b5ae578b19240c3e771d`.
+4D-3b estaba confirmada y publicada. No había cambios pendientes ni staging.
+
+**Aprobado:** buscar alternativas regionalmente coherentes y rodeos antes de
+desistir; sin garantía de salida ni excepciones a las reglas del universo. El
+[diseño del núcleo](../design/deadnode-chain-planner.es.md) recoge soporte previo
+de rodeos existentes, límite de cupos rectos, búsqueda espacial ampliada finita,
+presupuestos técnicos, autoridad canónica de tipos/capacidad, evidencia de
+materialización y escrituras atómicas futuras. Deadnodes productivo, worldgen,
+balance, motor, guardados de planes activos, comunicaciones y UI no cambian.
+**F-DEAD-01 sigue abierto.**
+
+Con seed `271828`, el anterior testigo sin tipos en y=1 pasa a proponer escalas
+nuevas condicionadas en (25,-5,5) y (65,-5,5), con saltos 26,0192 / 40 / 35,7351 ly.
+La propuesta directa válida de y=25 conserva saltos de unos 33,3333 ly. Se cubren
+rodeos existentes de 36,0555 / 30 / 36,0555 ly, alternativas mixtas con un nodo
+nuevo, frontera real disk/halo, caminos largos informativos, atajos protegidos,
+etapas dirigidas sólo de navegación y receptores consumidos/visitados.
+
+Validación del 2026-11-04: pasan **49/49 grupos del planificador** (28 originales
+y 21 del complemento) y **31/31 controles previos**: **33/33 scripts de smoke/
+control**. El diseño relaciona los 35 casos pedidos con comprobaciones ejecutables.
+Estado completo serializado y RNG global permanecen idénticos; llamadas repetidas,
+diccionarios reordenados, subprocesos con seeds hash y tres ciclos temporales
+save/load de entrada reproducen propuestas. No se abren partidas reales. Se
+prohíben explícitamente escritores/generadores. Pasan compilación Python, rutas
+locales documentales, paridad técnica EN/ES del diseño nuevo/secciones modificadas
+del contrato y `git diff --check`. Ruff no está instalado; no se añadieron
+dependencias.
+
+El benchmark reproducible de 16 celdas usa tres llamadas por celda y fondos de
+0/300/1200/3000 nodos, incluido un origen denso consumido. Con 3000 nodos de fondo,
+las medianas existentes/directos/rodeo/agotado fueron
+37,86 / 54,18 / 68,13 / 107,76 ms. El mayor máximo observado entre celdas fue
+153,79 ms; son mediciones, no garantías de latencia. Los presupuestos acotan
+búsqueda; una futura invocación Textual deberá usar instantánea inmutable en un
+worker. Agotar presupuesto informa de búsqueda incompleta, nunca imposibilidad
+universal ni rescate confirmado.
+
+Las posiciones nuevas siguen condicionadas a política de coordenadas/cupos,
+reservas lazy, topología tardía, preparación de pools/fuentes y confirmación
+atómica. Sectores generados y visitados tienen dependencias explícitas pendientes
+de aparición/inserción; metadatos incoherentes requieren conciliación. Los ids
+también protegen referencias pendientes en conocimiento/pools/topología. No se
+inventó política de aparición retroactiva, datos obligatorios en receptores
+visitados ni reapertura de pools consumidos. El desarrollador aún debe decidir
+aparición, topología tardía, reserva de pistas uplink congeladas, esquema del
+plan activo/recepción y límite preciso para contar intentos/cooldown.
+
+Sólo cambian planificador, regresiones original/complementaria y tres pares
+documentales EN/ES. Manuales/help no requieren cambios porque ningún comando
+del jugador cambia. No se hicieron commit, push, staging, materialización viva
+ni Fase 4D-3d.

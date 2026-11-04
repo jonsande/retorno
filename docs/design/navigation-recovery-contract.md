@@ -82,6 +82,11 @@ when needed. If no valid chain exists, the target remains pending: no impossible
 route is published and no attempt, cooldown, or other state is consumed as if a
 rescue had occurred.
 
+**Approved in 4D-3c:** when the direct chain is infeasible, search regionally
+coherent alternatives and detours before giving up. Prefer suitable physical
+locations; do not guarantee escape or invent exceptions to procedural rules.
+A longer usable journey can take precedence over a shorter unusable one.
+
 **Partially implemented:** global recovery creates an entry within range,
 reuses a suitable existing gateway or creates one under the cap, and prepares a
 later clue in the entry pool. It neither grants the routes directly nor forces
@@ -96,6 +101,13 @@ attempt when the clue is written. The audit reproduced a bridge 99.38 ly away.
 now calculates immutable, non-mutating chains with explicit information and
 materialization dependencies. Production deadnodes does not call it; F-DEAD-01
 remains open, including confirmation, active-plan persistence and delivery.
+
+**Phase 4D-3c:** the pure kernel adds deterministic sampled 3D detours,
+technical search budgets and explicit per-node materialization checks. Budget
+exhaustion reports incomplete search, never universal impossibility. New nodes
+in generated/explored sectors remain conditional on an approved appearance and
+insertion policy; no such policy or production activation is introduced here.
+See the kernel design for the domain, measurements and future atomic write set.
 
 This contract does not change thresholds, probabilities, or balance limits.
 Those require a separate evaluation.

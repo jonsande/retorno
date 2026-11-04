@@ -83,6 +83,11 @@ crearán nuevas cuando sea necesario. Si no existe una cadena válida, el
 objetivo queda pendiente: no se publica una ruta imposible ni se consumen
 intentos, cooldowns u otros estados como si hubiese habido rescate.
 
+**Aprobado en 4D-3c:** si la cadena directa es inviable, buscar alternativas
+regionalmente coherentes y rodeos antes de desistir. Preferir localizaciones
+físicas adecuadas; no garantizar salida ni inventar excepciones procedurales.
+Un viaje utilizable más largo puede prevalecer sobre otro corto inutilizable.
+
 **Implementado parcialmente:** la recuperación global crea una entrada dentro
 del alcance, reutiliza un gateway existente apropiado o crea uno bajo el cap, y
 prepara una pista posterior en el pool de la entrada. No concede por sí sola
@@ -97,6 +102,13 @@ pista. La auditoría reprodujo un puente a 99,38 ly.
 calcula cadenas inmutables y no mutantes con dependencias informativas y de
 materialización explícitas. Deadnodes productivo no lo invoca; F-DEAD-01 sigue
 abierto, incluidas confirmación, persistencia de planes activos y entrega.
+
+**Fase 4D-3c:** el núcleo puro añade rodeos 3D muestreados deterministas,
+presupuestos técnicos y comprobaciones explícitas de materialización por nodo.
+Agotar presupuesto informa de búsqueda incompleta, nunca imposibilidad universal.
+Los nodos nuevos en sectores generados/explorados quedan condicionados a política
+aprobada de aparición e inserción; aquí no se establece ni se activa producción.
+El diseño del núcleo detalla dominio, mediciones y escrituras atómicas futuras.
 
 Los umbrales, probabilidades y límites de balance no se cambian por este
 contrato. Su ajuste requiere una evaluación separada.

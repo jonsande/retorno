@@ -9,8 +9,9 @@ from dataclasses import dataclass
 from enum import Enum
 import hashlib
 import heapq
-from itertools import count
+from itertools import count, product
 import math
+from types import SimpleNamespace
 
 from retorno.config.balance import Balance
 from retorno.core.gamestate import GameState
@@ -68,9 +69,43 @@ class Dependency:
 
 
 @dataclass(frozen=True, slots=True)
+class SearchBudget:
+    """Technical work bounds per search pass, never a gameplay stage limit."""
+    expansions: int = 512
+    edges: int = 1024
+    sector_samples: int = 256
+    connector_nodes: int = 256
+    labels: int = 512
+
+    def __post_init__(self):
+        if any(type(value) is not int or value <= 0
+               for value in (self.expansions, self.edges, self.sector_samples,
+                             self.connector_nodes, self.labels)):
+            raise ValueError("Search budgets must be positive integers")
+
+
+@dataclass(frozen=True, slots=True)
+class SearchReport:
+    expansions: int = 0
+    edges: int = 0
+    sector_queries: int = 0
+    candidate_sectors: tuple[str, ...] = ()
+    exhausted: tuple[str, ...] = ()
+    domain: str = "existing_graph_then_straight_and_3d_corridor_samples"
+
+
+@dataclass(frozen=True, slots=True)
+class MaterializationCheck:
+    """Read-only evidence; passed checks do not grant insertion permission."""
+    code: str
+    status: str  # checked, conditional, inadmissible
+
+
+@dataclass(frozen=True, slots=True)
 class PlanningContext:
     key: str = "deadnode"
     allow_new_nodes: bool = True
+    budget: SearchBudget = SearchBudget()
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +122,7 @@ class ProposedNode:
     selection_reasons: tuple[str, ...]
     dependencies: tuple[Dependency, ...] = ()
     slot_index: int | None = None
+    checks: tuple[MaterializationCheck, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,6 +167,7 @@ class RecoveryProposal:
     reasons: tuple[str, ...]
     limitations: tuple[str, ...]
     origin_access_path: tuple[str, ...] = ()
+    search: SearchReport = SearchReport()
 
     @property
     def new_nodes(self) -> tuple[ProposedNode, ...]:
@@ -197,10 +234,11 @@ def _existing(node: SpaceNode, state: GameState) -> ProposedNode:
                         Materialization.EXISTING, ("existing_physical_node",))
 
 
-def _intel_ref(state: GameState, left: str, right: str) -> str | None:
+def _intel_sources(state: GameState) -> dict[tuple[str, str], str]:
+    sources = {}
     for item in state.world.intel:
-        if item.kind == "link" and item.from_id == left and item.to_id == right:
-            return item.intel_id
+        if item.kind == "link":
+            sources.setdefault((item.from_id, item.to_id), item.intel_id)
     # Only already stored ship files, never unopened pools, authorize this path.
     for path, file in sorted(state.os.fs.items()):
         if file.is_corrupted:
@@ -212,22 +250,23 @@ def _intel_ref(state: GameState, left: str, right: str) -> str | None:
         for line in content.splitlines():
             if line.strip().upper().startswith("LINK:"):
                 parts = line.split(":", 1)[1].strip().split("->")
-                if len(parts) == 2 and tuple(p.strip() for p in parts) == (left, right):
-                    return path
-    return None
+                if len(parts) == 2:
+                    sources.setdefault(tuple(p.strip() for p in parts), path)
+    return sources
 
 
-def _hint(state: GameState, left: ProposedNode, right: ProposedNode, first: bool) -> Hint:
+def _hint(state: GameState, left: ProposedNode, right: ProposedNode, first: bool,
+          sources: dict[tuple[str, str], str], routes: dict[str, set[str]], known: set[str]) -> Hint:
     a, b = left.node_id, right.node_id
     travel_known = b in state.world.known_nodes or b in state.world.known_intel
-    recorded_route = left.existing and right.existing and b in reachable_from(state.world, a)
+    recorded_route = left.existing and right.existing and b in routes.get(a, ())
     if recorded_route and travel_known:
         return Hint(Mechanism.KNOWN_ROUTE, a, b)
-    ref = _intel_ref(state, a, b)
+    ref = sources.get((a, b))
     if ref:
         return Hint(Mechanism.EXISTING_INTEL, a, b, ref,
                     dependencies=(Dependency("read_import_intel", True, True),))
-    if right.existing and b in _known(state) and not (recorded_route and not travel_known) and _distance(left, right) <= state.ship.sensors_range_ly:
+    if right.existing and b in known and not (recorded_route and not travel_known) and _distance(left, right) <= state.ship.sensors_range_ly:
         sensors = state.ship.systems.get("sensors")
         usable = bool(sensors and sensors.state in {SystemState.LIMITED, SystemState.NOMINAL, SystemState.UPGRADED})
         service = bool(sensors and sensors.service and sensors.service.is_running)
@@ -267,8 +306,41 @@ def _hint(state: GameState, left: ProposedNode, right: ProposedNode, first: bool
 class _Planner:
     """Call-local queries, caches and reservations; writes no persistent state."""
 
-    def __init__(self, state: GameState, opportunity_id: str):
+    def __init__(self, state: GameState, opportunity_id: str, budget: SearchBudget):
         self.state = state
+        self.sources = _intel_sources(state)
+        self.routes = {nid: reachable_from(state.world, nid) for nid in sorted(state.world.known_links)}
+        self.known = _known(state)
+        self.budget = budget
+        self.expansions = self.edges = 0
+        self.exhausted: set[str] = set()
+        self.candidate_sectors: list[str] = []
+        world = state.world
+        self.claimed_ids = (set(world.space.nodes) | world.known_nodes | world.known_contacts
+                            | set(world.known_intel) | world.forced_hidden_nodes | world.visited_nodes
+                            | set(world.node_pools) | set(world.dead_nodes)
+                            | set(world.lore_placements.piece_to_node.values()))
+        for adjacency in (world.known_links, world.space.edges):
+            self.claimed_ids.update(adjacency)
+            for destinations in adjacency.values():
+                self.claimed_ids.update(destinations)
+        for node in world.space.nodes.values():
+            self.claimed_ids.update(node.links)
+        for sector in world.sector_states.values():
+            self.claimed_ids.update(sector.node_ids)
+            self.claimed_ids.update(n for n in (sector.playable_hub_node_id, sector.topology_hub_node_id) if n)
+        for item in world.intel:
+            self.claimed_ids.update(n for n in (item.from_id, item.to_id) if n)
+        for pair in self.sources:
+            self.claimed_ids.update(pair)
+        for tracked in world.dead_nodes.values():
+            if tracked.bridge_node_id:
+                self.claimed_ids.add(tracked.bridge_node_id)
+        self.occupied = {_position(n) for n in world.space.nodes.values()}
+        self.by_sector: dict[str, dict[str, SpaceNode]] = {}
+        for nid, node in sorted(state.world.space.nodes.items()):
+            if all(math.isfinite(v) for v in _position(node)):
+                self.by_sector.setdefault(sector_id_for_pos(*_position(node)), {})[nid] = node
         self.opportunity_id = opportunity_id
         self.templates = load_worldgen_templates()
         self.archetypes = load_worldgen_archetypes()
@@ -279,7 +351,7 @@ class _Planner:
                     pos: tuple[float, float, float], reserved_ids: set[str]) -> str:
         for nonce in count():
             node_id = f"{prefix}_{_digest(self.opportunity_id, edge_key, index, pos, nonce)}"
-            if node_id not in self.state.world.space.nodes and node_id not in reserved_ids:
+            if node_id not in self.claimed_ids and node_id not in reserved_ids:
                 return node_id
 
     def sector_slots(self, sid: str) -> tuple[str, str, tuple[str, ...]]:
@@ -292,11 +364,19 @@ class _Planner:
             allowed = self.templates.get(region, {}).get("archetype_weights", {})
             kinds: tuple[str, ...] = ()
             if cfg and float(allowed.get(archetype, 0)) > 0:
-                planned, _ = _plan_sector_kinds(self.state, sid, archetype, region,
+                # The canonical query only reads meta.seed and this sector's
+                # physical nodes. A detached indexed view avoids O(world) per slot.
+                view = SimpleNamespace(meta=self.state.meta, world=SimpleNamespace(
+                    space=SimpleNamespace(nodes=self.by_sector.get(sid, {}))))
+                planned, _ = _plan_sector_kinds(view, sid, archetype, region,
                                                self.templates[region], cfg)
                 kinds = tuple(planned)
             self.slots[sid] = region, archetype, kinds
         return self.slots[sid]
+
+    def report(self) -> SearchReport:
+        return SearchReport(self.expansions, self.edges, len(self.slots),
+                            tuple(self.candidate_sectors), tuple(sorted(self.exhausted)))
 
     def new_node(self, pos: tuple[float, float, float], edge_key: tuple[str, str], index: int,
                  used: tuple[tuple[str, int], ...], occupied: set[tuple[float, float, float]],
@@ -308,13 +388,19 @@ class _Planner:
                    and kind not in cfg.get("forbidden_kinds", [])
                    and kind in {"relay", "station", "waystation", "derelict", "ship"}]
         reasons = [f"canonical_sector_archetype:{archetype}", "canonical_slot_order"]
+        actual_region = region_for_pos(*pos)
+        if float(self.templates.get(actual_region, {}).get("archetype_weights", {}).get(archetype, 0)) <= 0:
+            choices = []
+            reasons.append("archetype_not_admitted_at_position")
         if pos in occupied:
             choices = []
             reasons.append("position_already_occupied")
         if not choices:
             return ProposedNode(self.proposed_id("UNRESOLVED", edge_key, index, pos, reserved_ids),
                                 None, pos, region_for_pos(*pos), sid, archetype, False, False,
-                                Materialization.UNAVAILABLE, tuple(reasons + ["no_admissible_procedural_slot"]))
+                                Materialization.UNAVAILABLE, tuple(reasons + ["no_admissible_procedural_slot"]),
+                                checks=(MaterializationCheck("coordinates_unique", "inadmissible" if pos in occupied else "checked"),
+                                        MaterializationCheck("canonical_capacity", "inadmissible")))
         slot, kind = choices[0]
         node_id = self.proposed_id("WRECK" if kind == "ship" else kind.upper(),
                                    edge_key, index, pos, reserved_ids)
@@ -326,10 +412,25 @@ class _Planner:
                         Dependency("pool_preparation_before_revelation", False)]
         if not self.state.world.sparse_guardrail_done:
             dependencies.append(Dependency("pending_initial_guardrail_context", False))
+        if sid in self.state.world.generated_sectors or sector:
+            dependencies.append(Dependency("generated_sector_insertion_policy", False))
+        sector_nodes = self.by_sector.get(sid, {})
+        if sector and ((sector.region and sector.region != region)
+                       or (sector.sector_id and sector.sector_id != sid)
+                       or set(sector.node_ids) != set(sector_nodes)):
+            dependencies.append(Dependency("sector_metadata_reconciliation", False))
+        if set(sector_nodes) & self.state.world.visited_nodes:
+            dependencies.append(Dependency("explored_sector_appearance_policy", False))
+        if region_for_pos(*pos) != region:
+            dependencies.append(Dependency("sector_boundary_region_policy", False))
+        checks = tuple(MaterializationCheck(code, "checked") for code in (
+            "identity_unique", "coordinates_unique", "sector_membership", "regional_archetype",
+            "canonical_kind_capacity", "proposal_slot_reserved")) + tuple(
+                MaterializationCheck(d.code, "conditional") for d in dependencies)
         reasons += [f"canonical_slot:{slot}", f"information_capabilities:{','.join(m.value for m in information_capabilities(kind))}"]
         return ProposedNode(node_id, kind, pos, region_for_pos(*pos), sid, archetype,
                             False, True, Materialization.CONDITIONAL, tuple(reasons),
-                            tuple(dependencies), slot)
+                            tuple(dependencies), slot, checks)
 
     def connector(self, left: ProposedNode, right: ProposedNode, first: bool,
                   used: tuple[tuple[str, int], ...], path: tuple[ProposedNode, ...],
@@ -338,13 +439,15 @@ class _Planner:
         if distance <= 0 or not math.isfinite(distance):
             return None
         segments = max(1, math.ceil(distance / float(Balance.MAX_ROUTE_HOP_LY)))
+        if segments - 1 > self.budget.connector_nodes:
+            self.exhausted.add("connector_nodes")
+            return None
         if segments > 1 and not allow_new:
             return None
         nodes = []
         reservations = list(used)
-        occupied = {_position(n) for n in self.state.world.space.nodes.values()}
-        occupied.update(n.position_ly for n in path)
-        ids = {n.node_id for n in path}
+        occupied = self.occupied | {n.position_ly for n in path} if segments > 1 else set()
+        ids = {n.node_id for n in path} if segments > 1 else set()
         for index in range(1, segments):
             pos = tuple(a + (b - a) * (index / segments)
                         for a, b in zip(left.position_ly, right.position_ly))
@@ -369,11 +472,11 @@ class _Planner:
                 x, y, z = endpoint.position_ly
                 view.space.nodes[endpoint.node_id] = SpaceNode(endpoint.node_id, endpoint.node_id,
                                                                endpoint.kind or "", x_ly=x, y_ly=y, z_ly=z)
-            if not is_hop_within_cap(view, previous.node_id, node.node_id):
+            if dist <= 0 or not is_hop_within_cap(view, previous.node_id, node.node_id):
                 return None
             hint_key = previous, node, first and index == 0
             if hint_key not in self.hints:
-                self.hints[hint_key] = _hint(self.state, *hint_key)
+                self.hints[hint_key] = _hint(self.state, *hint_key, self.sources, self.routes, self.known)
             hint = self.hints[hint_key]
             if hint.mechanism == Mechanism.UNAVAILABLE and not geometry_only:
                 return None
@@ -381,37 +484,187 @@ class _Planner:
             previous = node
         return tuple(nodes), tuple(hops), tuple(sorted(reservations))
 
+    def corridor_candidates(self, nodes: dict[str, ProposedNode], origins: tuple[str, ...],
+                            target: str) -> dict[str, ProposedNode]:
+        """Finite sampled corridors, not a new procedural placement distribution.
+
+        Sector centers are geometric probes only. Their insertion remains conditional.
+        Round-robin origins and widths prevent one long line starving every detour.
+        """
+        def corridor(origin: str, width: float):
+            left, right = nodes[origin], nodes[target]
+            delta = tuple(b-a for a, b in zip(left.position_ly, right.position_ly))
+            length = math.hypot(*delta)
+            if not math.isfinite(length) or length <= 0:
+                return
+            direction = tuple(v / length for v in delta)
+            axis = min(range(3), key=lambda i: (abs(direction[i]), i))
+            unit = tuple(float(i == axis) for i in range(3))
+            cross = (direction[1]*unit[2]-direction[2]*unit[1],
+                     direction[2]*unit[0]-direction[0]*unit[2],
+                     direction[0]*unit[1]-direction[1]*unit[0])
+            norm = math.hypot(*cross)
+            u = tuple(v/norm for v in cross)
+            v = (direction[1]*u[2]-direction[2]*u[1],
+                 direction[2]*u[0]-direction[0]*u[2],
+                 direction[0]*u[1]-direction[1]*u[0])
+            steps = max(2, math.ceil(length / (Balance.MAX_ROUTE_HOP_LY / 2)))
+            for step in range(1, steps):
+                base = tuple(a + d*step/steps for a, d in zip(left.position_ly, delta))
+                for a, b in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1),
+                             (1, 1), (-1, 1), (1, -1), (-1, -1)):
+                    yield sector_id_for_pos(*(base[i]+width*(a*u[i]+b*v[i]) for i in range(3)))
+        streams = [iter(corridor(origin, width)) for width in (10.0, 20.0, 40.0)
+                   for origin in origins]
+        result: dict[str, ProposedNode] = {}
+        seen: set[str] = set()
+        # Bound raw samples too: overlapping corridors must not cause unbounded work.
+        samples = 0
+        while streams:
+            pending = []
+            for stream in streams:
+                if samples >= self.budget.sector_samples:
+                    self.exhausted.add("sector_samples")
+                    return result
+                try:
+                    sid = next(stream)
+                except StopIteration:
+                    continue
+                samples += 1
+                pending.append(stream)
+                if sid in seen:
+                    continue
+                seen.add(sid)
+                self.candidate_sectors.append(sid)
+                pos = _sector_center(sid)
+                node = self.new_node(pos, ("corridor", sid), 0, (), self.occupied, set())
+                if node.procedural_eligible:
+                    result[node.node_id] = node
+            streams = pending
+        return result
+
+    @staticmethod
+    def cell(pos: tuple[float, float, float]) -> tuple[int, int, int]:
+        return tuple(math.floor(v / Balance.MAX_ROUTE_HOP_LY) for v in pos)
+
     def search(self, nodes: dict[str, ProposedNode], origins: tuple[str, ...], target: str,
                allow_new: bool, geometry_only: bool = False):
+        graph = dict(nodes)
+        if allow_new and not geometry_only:
+            graph.update(self.corridor_candidates(nodes, origins, target))
+        index: dict[tuple[int, int, int], list[str]] = {}
+        for nid, node in sorted(graph.items()):
+            index.setdefault(self.cell(node.position_ly), []).append(nid)
+        # Reverse physical component gives an admissible lower bound on new
+        # intermediaries: outside one hop, at least one new stop is needed.
+        # Do not use ceil(gap/cap)-1: another existing component can carry the
+        # ship much closer at no new-node cost. Ignore information only here.
+        component = {target}
+        todo = [target]
+        for nid in todo:
+            if len(component) > self.budget.expansions:
+                component = set(nodes)  # conservative bound when prepass is large
+                break
+            cell = self.cell(nodes[nid].position_ly)
+            for offset in product(range(-1, 2), repeat=3):
+                for other in index.get(tuple(a+b for a, b in zip(cell, offset)), ()):
+                    if other in nodes and other not in component and _distance(nodes[nid], nodes[other]) <= Balance.MAX_ROUTE_HOP_LY:
+                        component.add(other)
+                        todo.append(other)
+        lower_bounds = {}
+        def priority(cost, node):
+            if node.node_id not in lower_bounds:
+                gap = min(_distance(node, nodes[n]) for n in component)
+                direct = _distance(node, nodes[target])
+                lower_bounds[node.node_id] = (
+                    int(gap > Balance.MAX_ROUTE_HOP_LY) if math.isfinite(gap) else 0,
+                    math.ceil(direct / Balance.MAX_ROUTE_HOP_LY) if math.isfinite(direct) else 0, direct)
+            extra, hop_bound, distance_bound = lower_bounds[node.node_id]
+            return (cost[0]+extra, cost[1]+hop_bound, cost[2]+distance_bound, cost[3])
         queue = []
         serial = count()
         best = {}
+        endpoint_best = {}
         for origin in origins:
             cost = (0, 0, 0.0, (origin,))
-            heapq.heappush(queue, (cost, next(serial), origin, (), (nodes[origin],), ()))
+            heapq.heappush(queue, (priority(cost, nodes[origin]), next(serial), cost, origin, (), (nodes[origin],), ()))
             best[origin, ()] = cost
+            endpoint_best.setdefault(origin, {})[()] = cost
+        expansions = edges = 0
+        incumbent = None
+        incumbent_cost = None
         while queue:
-            cost, _, current, used, path, hops = heapq.heappop(queue)
+            _, _, cost, current, used, path, hops = heapq.heappop(queue)
             if cost != best.get((current, used)):
                 continue
             if current == target:
                 return path, hops
-            for dest, node in sorted(nodes.items()):
-                if dest == current:
+            if expansions >= self.budget.expansions:
+                self.exhausted.add("expansions")
+                return incumbent
+            expansions += 1
+            self.expansions += 1
+            left = path[-1]
+            cell = self.cell(left.position_ly)
+            nearby = {nid for offset in product(range(-1, 2), repeat=3)
+                      for nid in index.get(tuple(a+b for a, b in zip(cell, offset)), ())
+                      if 0 < math.dist(left.position_ly, graph[nid].position_ly) <= Balance.MAX_ROUTE_HOP_LY}
+            destinations = set(nearby)
+            if allow_new and left.existing:
+                # Straight connectors to the target and nearest existing endpoints
+                # in a two-hop neighborhood. This is a sampled search domain,
+                # not a maximum chain length or a universe connectivity guarantee.
+                local = {nid for offset in product(range(-2, 3), repeat=3)
+                         for nid in index.get(tuple(a+b for a, b in zip(cell, offset)), ())
+                         if graph[nid].existing and nid != current}
+                nearest = sorted(local, key=lambda n: (_distance(left, graph[n]), n))[:16]
+                destinations.update(nearest)
+                destinations.add(target)
+            path_ids = {n.node_id for n in path}
+            path_positions = {n.position_ly for n in path}
+            for dest in sorted(destinations):
+                if dest in path_ids:
                     continue
-                edge = self.connector(nodes[current], node, not hops, used, path,
-                                      allow_new, geometry_only)
+                if edges >= self.budget.edges:
+                    self.exhausted.add("edges")
+                    return incumbent
+                edges += 1
+                self.edges += 1
+                node = graph[dest]
+                if not node.existing:
+                    if node.position_ly in path_positions:
+                        continue
+                    node = self.new_node(node.position_ly, ("corridor", node.sector_id), 0,
+                                         used, self.occupied, path_ids)
+                    if not node.procedural_eligible:
+                        continue
+                edge = self.connector(left, node, not hops, used, path,
+                                      allow_new and left.existing and node.existing, geometry_only)
                 if edge is None:
                     continue
                 added_nodes, added_hops, reservations = edge
-                new_cost = (cost[0] + len(added_nodes) - 1, cost[1] + len(added_hops),
+                if not node.existing:
+                    reservations = tuple(sorted((*reservations, (node.sector_id, node.slot_index))))
+                new_cost = (cost[0] + sum(not n.existing for n in added_nodes),
+                            cost[1] + len(added_hops),
                             cost[2] + sum(h.distance_ly for h in added_hops),
                             cost[3] + tuple(n.node_id for n in added_nodes))
+                if dest == target and (incumbent_cost is None or new_cost < incumbent_cost):
+                    incumbent = path + added_nodes, hops + added_hops
+                    incumbent_cost = new_cost
                 key = dest, reservations
-                if key not in best or new_cost < best[key]:
-                    best[key] = new_cost
-                    heapq.heappush(queue, (new_cost, next(serial), dest, reservations,
-                                           path + added_nodes, hops + added_hops))
+                # Subset reservations dominate supersets at the same endpoint:
+                # lower cost with more free slots cannot reduce continuation options.
+                if any(set(slots).issubset(reservations) and old <= new_cost
+                       for slots, old in endpoint_best.get(dest, {}).items()):
+                    continue
+                if len(best) >= self.budget.labels and key not in best:
+                    self.exhausted.add("labels")
+                    return incumbent
+                best[key] = new_cost
+                endpoint_best.setdefault(dest, {})[reservations] = new_cost
+                heapq.heappush(queue, (priority(new_cost, node), next(serial), new_cost, dest, reservations,
+                                       path + added_nodes, hops + added_hops))
         return None
 
 
@@ -474,14 +727,16 @@ def propose_deadnode_chain(state: GameState, target_id: str,
     origins = tuple(nid for nid in origins if nid in nodes)
     if not origins:
         return reject("no_eligible_origin")
-    planner = _Planner(state, identity)
+    planner = _Planner(state, identity, context.budget)
+    planner.claimed_ids.update(protected)
     result = planner.search(nodes, origins, target_id, False)
     if result is None and context.allow_new_nodes:
         result = planner.search(nodes, origins, target_id, True)
     if result is None:
         # Preserve a geometric witness without mislabelling missing information
         # or undefined procedural placement as an operational opportunity.
-        result = planner.search(nodes, origins, target_id, False, True)
+        if not planner.exhausted:
+            result = planner.search(nodes, origins, target_id, False, True)
         if result is None and context.allow_new_nodes:
             origin = min(origins, key=lambda nid: (math.dist(nodes[nid].position_ly, _position(target)), nid))
             edge = planner.connector(nodes[origin], nodes[target_id], True, (), (nodes[origin],), True, True)
@@ -490,7 +745,8 @@ def propose_deadnode_chain(state: GameState, target_id: str,
     if result is None:
         return RecoveryProposal(identity, target_id, None, (), (), False, False,
                                 InformationStatus.UNAVAILABLE, Materialization.UNAVAILABLE,
-                                Viability.INCOMPLETE, ("no_chain_in_search_family",), limitations)
+                                Viability.INCOMPLETE, ("no_chain_in_sampled_domain",) + (("search_budget_exhausted",) if planner.exhausted else ()),
+                                limitations, search=planner.report())
     path, hops = result
     physical = all(n.procedural_eligible for n in path)
     unavailable = any(h.hint.mechanism == Mechanism.UNAVAILABLE for h in hops)
@@ -509,8 +765,9 @@ def propose_deadnode_chain(state: GameState, target_id: str,
                    for index, node in enumerate(path))
     reasons = tuple(sorted({"information_source_unavailable" for h in hops if h.hint.mechanism == Mechanism.UNAVAILABLE}
                            | {reason for n in path if not n.procedural_eligible for reason in n.selection_reasons}
+                           | ({"search_budget_exhausted"} if planner.exhausted else set())
                            | ({"future_reception_required"} if future else set())
                            | ({"materialization_not_guaranteed"} if materialization != Materialization.EXISTING else set())))
     return RecoveryProposal(identity, target_id, path[0].node_id, stages, hops, True, physical,
                             information, materialization, viability, reasons, limitations,
-                            origin_paths[path[0].node_id])
+                            origin_paths[path[0].node_id], planner.report())

@@ -1,142 +1,300 @@
-# Núcleo de propuestas de cadenas deadnode — Fase 4D-3b
+# Núcleo de propuestas de cadenas deadnode — Fases 4D-3b/3c
 
 Versión inglesa: [deadnode-chain-planner.md](deadnode-chain-planner.md).
 
 API implementada: `propose_deadnode_chain(state, target_id, PlanningContext())`
 en [`core/deadnode_planner.py`](../../src/retorno/core/deadnode_planner.py).
-Calcula una propuesta inmutable y sin confirmar. `evaluate_dead_nodes` no la
-invoca, no corrige F-DEAD-01 y no cambia estado vivo ni esquema de guardado.
-El [contrato de navegación/recuperación](navigation-recovery-contract.es.md)
-sigue siendo vinculante.
+Calcula un valor inmutable sin confirmar. `evaluate_dead_nodes` no la invoca;
+no activa nodos, enlaces, archivos, planes ni recepción.
+**F-DEAD-01 permanece abierto.** El [contrato de navegación/recuperación](navigation-recovery-contract.es.md)
+es vinculante; worldgen sigue regido por [su referencia canónica](../systems/world-generation.es.md).
 
-## Representación y viabilidad
+## Decisión aprobada y limitaciones anteriores
+
+**Buscar alternativas regionalmente coherentes y rodeos antes de desistir; no
+garantizar salida ni crear excepciones a las reglas del universo.** Un viaje
+más largo por otra región puede ser apropiado. Una rama sin recuperación también
+puede ser una situación jugable válida. No se conceden recursos, drones, energía
+ni reparaciones.
+
+4D-3b ya buscaba rodeos arbitrarios por nodos existentes y conectores mixtos a
+través de extremos existentes. No exigía alineación. Sus intermediarios nuevos
+eran sólo subdivisiones equidistantes de conectores rectos; no movía posiciones
+sin cupo. Las etiquetas conservaban reservas, pero la expansión ilimitada entre
+todos los pares podía crecer combinatoriamente. `conditional` significaba tipo
+y capacidad respaldados con inserción, pools y topología pendientes, nunca
+permiso para crear un nodo.
+
+Sondas aisladas previas con seed `271828` confirmaron:
+
+- A=(0,25,1), B=(20,55,1), C=(50,55,1), D=(70,25,1) ya daban un rodeo existente:
+  36,0555 + 30 + 36,0555 ly.
+- A=(0,1,1), D=(100,1,1) daban dos intermediarios rectos sin tipo y un testigo
+  incompleto: los sectores rectos correspondientes no tienen cupos.
+- Sondas desconectadas sólo con existentes y 0/100/1000 nodos de fondo tardaron
+  unos 1,25/1,75/8,60 ms; eran sondas dispersas, no cotas de peor caso.
+
+## Representación independiente
 
 Las dataclasses congeladas `RecoveryProposal`, `Stage`, `ProposedNode`, `Hop`,
-`Hint`, `Dependency` y `PlanningContext` sólo contienen valores independientes
-y tuplas. Describen identidades de oportunidad/extremos, nodos y saltos ordenados,
-posiciones/distancias exactas, región física, sector/arquetipo/cupo, fuentes de
-información, funciones, restricciones, preparación y dependencias de capacidad.
-`origin_access_path` recoge el camino dirigido ya conocido hasta el origen
-elegido; elegirlo no desplaza la nave.
-
-El resultado distingue estas preguntas independientes:
+`Hint`, `Dependency`, `MaterializationCheck`, `SearchReport`, `SearchBudget` y
+`PlanningContext` sólo contienen valores/tuplas independientes. `origin_access_path`
+registra el viaje dirigido conocido hasta el origen elegido; no mueve la nave.
 
 | Campo | Significado |
 | --- | --- |
-| `geometry_valid` | Un testigo geométrico completo tiene segmentos dentro del cap inclusivo de 45 ly. |
-| `physical_chain_valid` | Los extremos existen o tienen tipos propuestos respaldados por cupos procedurales canónicos. No garantiza materialización. |
-| `information_status` | `verified` usa mecánicas existentes; `future_required` incluye recepción sin implementar; `unavailable` carece de fuente indispensable elegible. |
-| `materialization` | `existing`, `conditional` para inserción propuesta o `unavailable` para colocación/tipo sin resolver. |
-| `viability` | `verified`, `conditional`, `incomplete` o `rejected`. Una propuesta verificada sigue sin confirmar. |
+| `geometry_valid` | Testigo completo con segmentos mayores que cero y de hasta 45 ly. |
+| `physical_chain_valid` | Extremos existentes o tipos/cupos canónicos propuestos; la inserción sigue condicionada. |
+| `information_status` | Mecánicas `verified`, recepción `future_required` o fuente indispensable `unavailable`. |
+| `materialization` | `existing`, `conditional` o `unavailable`. |
+| `viability` | `verified`, `conditional`, `incomplete` o candidato `rejected`; nunca rescate confirmado. |
+| `checks` | Evidencia por nodo marcada `checked`, `conditional` o `inadmissible`. |
+| `search` | Contadores deterministas, sectores muestreados, dominio y presupuestos agotados; sin tiempos reales. |
 
-`ready_with_existing_mechanics` sólo valora la propuesta. No publica rutas ni
-confirma recuperación. Un LINK válido legible ya almacenado puede valorarse sin
-inventar otra señal; una primera señal de recuperación nueva siempre depende
-de futuros `comms`, `radiod` y captura/importación progresiva.
+`ready_with_existing_mechanics` sólo valora la propuesta. Un LINK legible ya
+almacenado puede evitar recepción nueva; una primera señal nueva sigue
+necesitando futuros `comms`, `radiod` y captura/importación progresiva. No se
+añaden campos de guardado de planes activos.
 
-## Orígenes, búsqueda e información
+## Dominio de búsqueda, orden y límites técnicos
 
-El llamador gestiona umbrales y cooldown. Los filtros conservan las condiciones
-vigentes de contacto/forced-hidden, pool limpio y alcance base de sensores;
-no cambian silenciosamente la detección al alcance efectivo de la nave.
-Un viaje activo no es origen de planificación; un waypoint detenido sí.
-Los orígenes salen de `reachable_known_nodes`, refinado con `reachable_from`
-y conocimiento normal de destinos para que aristas obsoletas/inversas o pasos
-por nodos desconocidos no habiliten un origen.
+Los orígenes conservan gates de candidato por contacto/forced-hidden, pool limpio
+y alcance base de sensores. `reachable_known_nodes` más `reachable_from` dirigido
+y conocimiento normal de viaje rechazan aristas inversas/obsoletas y orígenes a
+través de desconocidos. Un waypoint detenido es elegible; un viaje activo se
+rechaza. El llamador sigue siendo responsable de los umbrales temporales.
 
-Primero se busca una cadena de nodos existentes. La segunda pasada admite
-subdivisiones rectas equidistantes entre extremos existentes. Cada conector
-usa el mínimo geométrico de segmentos para el cap; no hay máximo arbitrario
-de etapas. La búsqueda ordena por nodos nuevos, saltos, distancia e ids completos
-ordenados. Las etiquetas conservan reservas de cupos para que dos conectores
-no asignen el mismo cupo previsto. Reservas y cachés son locales a la llamada.
-Cada segmento se comprueba con `is_hop_within_cap` sobre extremos independientes.
+1. Primero se busca en el grafo físico existente. Un índice espacial con celdas
+   de 45 ly enumera extremos vecinos, incluidas localizaciones fuera de línea y
+   en otras regiones; se comprueba la viabilidad informativa antes de guardar
+   cada arista.
+2. Si hace falta, se busca en un grafo ampliado. Se conservan subdivisiones
+   rectas hacia el objetivo y los 16 extremos existentes más cercanos en el cubo
+   circundante de cinco celdas. Se añaden sondas sectoriales condicionadas desde
+   corredores alrededor de cada segmento origen-objetivo. La preferencia de
+   reutilización ordena por nodos nuevos, saltos, distancia total e ids completos
+   ordenados. Si funciona sólo con existentes, ni se generan sondas candidatas.
+   Las cadenas mixtas con menos nodos nuevos ganan a las totalmente nuevas aun
+   siendo más largas. Con igual cantidad se aplican los demás criterios.
+3. Las sondas usan separación longitudinal máxima de 22,5 ly y bases ortogonales
+   reproducibles en 3D (eje menos alineado, empates estables). Anchuras 10/20/40 ly
+   muestrean el centro y ocho desplazamientos. Los flujos se intercalan por
+   origen y anchura y se eliminan sectores duplicados. Los centros sectoriales
+   son **sondas geométricas**, no coordenadas procedurales aprobadas. Un cupo
+   previsto positivo habilita un candidato condicionado, nunca inserción confirmada.
+4. A* usa cotas inferiores admisibles por distancia y componente física existente
+   del objetivo, ignorando información sólo en la heurística. Cada arista exige
+   el mecanismo informativo real y `is_hop_within_cap` compartido. Las etiquetas
+   conservan cupos reservados; etiquetas más baratas con un subconjunto dominan
+   otras más caras en el mismo extremo. Se excluyen ciclos y posiciones repetidas.
+   Las cachés de pistas, intel, cupos y heurísticas son locales a la llamada.
 
-Cada arista necesita un mecanismo informativo. Se consideran, por orden: ruta
-dirigida conocida, intel de enlace legítima almacenada/archivo legible no
-corrupto de la nave, route solve normal hacia destino conocido dentro del
-alcance efectivo, primera señal de recuperación y fuente local disponible.
-Estas alternativas no mutan conocimiento. Rutas existentes, intel almacenada
-y resolución normal permiten usar un nodo visitado como escala de navegación
-sin archivo retroactivo.
+`SearchBudget` predeterminado: 512 expansiones, 1024 aristas evaluadas y 512
+etiquetas por pasada; 256 muestras brutas de corredor y 256 intermediarios por
+conector recto. Son cotas técnicas configurables, **no un máximo jugable de
+etapas**. La regresión de doce saltos sigue siendo válida. Contar muestras brutas
+también acota corredores superpuestos. El precálculo acotado de componente
+inversa usa una cota conservadora cuando la componente es grande.
 
-La primera señal se captura en la nave aunque el salto parta de otro nodo
-alcanzable. Una fuente local posterior obligatoria exige nodo no visitado,
-ventana abierta y pool no limpio. Salvage data no reutiliza una fuente de datos
-completada; uplink no reutiliza un uplink consumido. Los canales son distintos.
-Reservar una pista uplink indispensable nueva es una dependencia explícita de
-política futura; no se supone permiso para reescribir un pool de rutas congelado.
-Las fuentes nuevas exigen preparación antes de revelar/visitar. Las escalas
-de navegación no necesitan fuente ni archivo nuevo. Los gates normales de
-hardware/operador siguen como dependencias explícitas; no se concede dron,
-energía ni reparación.
+Un presupuesto agotado aparece en `search.exhausted` y
+`search_budget_exhausted`. Una cadena completa ya encontrada puede devolverse
+con esa advertencia; su selección no está demostrada óptima. En otro caso se
+devuelve `incomplete`, posiblemente con testigo geométrico diagnóstico cuyas
+fuentes/cupos no disponibles se explicitan. Se omite el diagnóstico geométrico
+opcional sólo con existentes tras agotar presupuesto. Ningún resultado demuestra
+imposibilidad espacial universal. Los corredores finitos, extremos muestreados
+y la política canónica de primer cupo libre tampoco constituyen búsqueda
+exhaustiva aunque no se agote el presupuesto. No se afirma optimalidad sobre
+posiciones arbitrarias, todos los órdenes de cupos ni todos los rodeos regionales.
 
-## Tipos y contexto procedural
+El mundo se indexa y la intel legible se analiza una vez por llamada.
+`_plan_sector_kinds` canónico se ejecuta sobre una vista independiente indexada
+por sector, con la misma seed y nodos físicos, evitando recorrer el mundo por
+cada previsión. Esta función y `_select_archetype` siguen siendo dueñas de pesos,
+caps, conteos y aleatoriedad. Hace falta la vista porque la consulta pura vigente
+recibe un estado, no una colección de nodos sectoriales; worldgen no cambia.
 
-El gate real de interfaces de datos del Engine es más restrictivo que el
-predicado genérico de canales de lore. El núcleo registra esta diferencia:
+## Información y narrativa
 
-| Tipo | Mecanismos informativos locales posibles |
+Cada salto dirigido considera: ruta operativa conocida, intel de enlace o
+archivo legible no corrupto de la nave, route solve normal hacia destino conocido
+dentro del alcance efectivo, primera señal de recuperación y fuente local fresca.
+Estas comprobaciones no publican `known_links`. Etapas con rutas/intel/resolución
+existentes pueden ser sólo de navegación; no hace falta archivo obligatorio nuevo
+en cada escala. Un camino corto con receptor inutilizable pierde ante otro más
+largo que sí permite progresar.
+
+La primera señal nueva se captura en la nave, incluso si el origen elegido es
+otro nodo alcanzable. Las fuentes posteriores obligatorias exigen nodo no
+visitado, ventana abierta y pool no limpio. Datos de salvage completados y uplink
+consumido siguen siendo fuentes distintas no disponibles; no se reabre ningún
+pool. Se prepararán fuentes antes de revelar/visitar. Reservar una pista uplink
+sigue siendo política pendiente, no autoridad para reescribir un pool congelado.
+Los gates normales de hardware, docking, drones y operador siguen explícitos.
+
+| Tipo | Capacidad informativa local real |
 | --- | --- |
 | `relay` | `salvage_data`, `uplink` |
 | `station` | `salvage_data`, `uplink` |
-| `waystation` | `uplink`; Engine rechaza `SalvageData` aquí |
+| `waystation` | `uplink`; Engine rechaza `SalvageData` |
 | `derelict` | `salvage_data` |
 | `ship` | `salvage_data` |
 
-Los tipos nuevos proceden de las consultas puras existentes `_select_archetype`
-y `_plan_sector_kinds`, usando plantillas/pesos regionales y de arquetipo,
-caps por tipo, prohibiciones, conteos físicos actuales y orden determinista de
-cupos. No se introducen pesos de aparición, tirada de hub adicional ni reparto
-estético de tipos. Los nodos existentes adecuados se reutilizan con independencia
-del tipo elegido para un cupo nuevo. Una política regional desconocida o falta
-de cupo produce un testigo incompleto con `kind=None`, no un tipo válido inventado.
+No se convierte ningún tipo existente. Los tipos desconocidos/prohibidos y la
+capacidad canónica no disponible nunca se sustituyen por infraestructura
+conveniente. La protección reutiliza `_locked_primary_targets` para primaries
+NODE/LINK finales e intermedios. Se excluye el atajo protegido y se continúa
+buscando alternativas. Los formatos bloqueados no soportados fallan de forma
+conservadora con `primary_protection_query_incomplete`. Un host en
+`forced_hidden_nodes` no está prohibido por sí solo. Scan natural y route solve
+manual conservan sus excepciones aprobadas.
 
-Con seed `271828`, `A=(0,25,1)` y `D=(100,25,1)`, los cupos en
-`S+003_+002_+000` / `S+006_+002_+000` admiten una cadena `relay` / `station`
-de tres saltos de unos 33,33 ly. Un destino a 70 ly necesita un intermediario;
-40 y exactamente 45 ly no necesitan ninguno. Otras fixtures de la misma seed
-seleccionan `ship` y `derelict`. En `y=1`, los sectores de la subdivisión de
-100 ly carecen de cupos: se informa de incompletitud sin cambiar worldgen.
+## Comprobación de materialización e inserción tardía
 
-## Límites y decisiones pendientes
+Cada nodo nuevo describe identidad, coordenadas, región real, sector/arquetipo,
+tipo y primer cupo canónico libre. Comprueba colisiones de identidad reales y
+locales, colisiones exactas de coordenadas, elegibilidad regional, capacidad y
+reservas compartidas de propuesta. Las colisiones de ids se resuelven con nonces
+locales deterministas sin asignar ids del juego. La elegibilidad de cupo no
+valida coordenadas muestreadas. También se consideran ocupados ids pendientes
+en conocimiento, pools, topología, índices sectoriales e intel histórica.
 
-Las coordenadas equidistantes propuestas no se anuncian como las coordenadas
-muestreadas por worldgen. Prever tipo/cupo establece un contexto respaldado,
-no permiso para sobrescribir generación. Cada nodo nuevo registra por tanto
-inserción de coordenadas, registro atómico/idempotente, preparación de pool y
-reserva lazy de cupo o topología de sector cerrado todavía sin resolver.
-Un guardrail inicial sin ejecutar añade otra dependencia explícita de contexto.
-No se genera ni reconstruye ningún sector, gasta presupuesto, ni añade enlace
-físico o ruta conocida.
+Las dependencias condicionadas incluyen `atomic_idempotent_materialization`,
+`coordinate_slot_insertion_policy`, `pool_preparation_before_revelation` y
+`lazy_sector_slot_reservation` o `late_sector_topology`. Sectores generados/con
+estado añaden `generated_sector_insertion_policy`; un sector con nodo físico
+visitado añade `explored_sector_appearance_policy`. La diferencia entre región
+del centro/posición añade `sector_boundary_region_policy` y sigue exigiendo un
+arquetipo admitido en la posición real. Metadatos sectoriales incoherentes añaden
+`sector_metadata_reconciliation`; no se reparan implícitamente. Un guardrail inicial pendiente queda
+explícito. El `Hint` de la etapa y sus restricciones también describen el trabajo
+de pool/fuente.
 
-Los ids propuestos usan un digest estable de seed, contexto de oportunidad y
-del nodo; resolver colisiones localmente no asigna ids del juego. Esto no hace
-idempotente una confirmación futura. Confirmar deberá revalidar el estado,
-reservar cupos/identidades, preparar fuentes atómicamente y después confirmar
-y entregar por etapas. Intentos/cooldowns, persistencia de planes activos,
-comunicaciones y colas de recepción quedan fuera de esta fase.
+`sync_sector_state_for_node` puede actualizar índices existentes, pero no
+reconstruye topología interna cerrada; no se reintentan pares intersectoriales
+evaluados. La generación lazy cuenta nodos físicos y puede cambiar la previsión
+restante. El registrador anclado actual crea estado vivo, enlaces y pools, puede
+invocar generación adicional y no es idempotente; el escritor de pistas también
+produce archivos/eventos nuevos al repetirse. Ninguno es una transacción ni se
+invoca aquí.
 
-La protección reutiliza `_locked_primary_targets` para primaries NODE/LINK y
-excluye objetivos finales e intermediarios. Los formatos bloqueados sin resolver
-fallan de forma conservadora con `primary_protection_query_incomplete`; no se
-introduce progresión narrativa nueva. Un host narrativo forced-hidden no está
-protegido automáticamente. Scan natural y resolución manual no cambian.
+Escalas físicas, rutas dirigidas y fuentes utilizables existentes no necesitan
+política de aparición. Una escala nueva propuesta en sector generado/visitado
+sigue condicionada. Para el jugador: **¿puede una zona ya explorada contener más
+tarde una localización de recuperación antes desconocida, y cómo se enteraría?**
+Esta fase no decide esa política. Un centro sectorial, capacidad libre o pool
+abierto no bastan para responderla.
 
-La búsqueda sólo es completa dentro de su familia de conectores/cupos, no sobre
-coordenadas arbitrarias, desvíos regionales o toda asignación procedural posible.
-Agotar la búsqueda devuelve `incomplete`, sin afirmar que el universo carezca
-de solución.
+## Confirmación atómica futura — sólo diseño
 
-## Verificación
+Una implementación posterior debería preparar una transacción independiente
+con clave de oportunidad y huella de instantánea. Primero debe resolver todas
+las políticas de inserción pendientes. Revalidar protección, orígenes, saltos,
+receptores, conteos físicos e identidades/coordenadas/reservas propuestas contra
+el estado más reciente. Preparar la cadena completa, nunca sólo el primer puente.
 
-[`deadnode_chain_planner_smoke.py`](../../tests/deadnode_chain_planner_smoke.py)
-cubre 40/cap/70/100 ly, reutilización 35+35+30 ly, cadenas mixtas, orígenes
-alternativos dirigidos, aristas obsoletas, tipos canónicos diversos y rechazo
-por capacidad, receptores consumidos, escalas visitadas sin información nueva,
-intel legible, protección NODE/LINK, formatos de protección no soportados,
-contextos lazy/cerrados, colisiones, doce saltos, waypoints detenidos y negativos.
-Cada fixture compara el estado completo serializado y RNG global antes/después
-de llamadas repetidas. Reordenar contenedores y tres ciclos temporales save/load
-reproducen las propuestas. No se invoca escritor, registrador ni generador
-productivo.
+El conjunto de escrituras debe incluir nodos físicos e identidades, coordenadas
+y cupos, índices/hubs sectoriales, enlaces físicos permitidos y sus presupuestos/
+pares, pools inicializados y archivos/reservas exactos de fuentes, identidad de
+plan activo, estado de etapas y dependencias de recepción pendiente. Validar que
+ninguna fuente visitada/consumida reciba contenido obligatorio y que se respeten
+los caps topológicos. No reconstruir topología ni añadir conocimiento implícito.
+
+Construir y validar esas escrituras sobre una instantánea independiente; publicar
+el estado coherente de mundo/plan en un único punto de confirmación propiedad del
+motor, sin entrega visible antes. Una preparación fallida/obsoleta descarta el
+resultado independiente, no consume intento ni inicia cooldown. Confirmar de
+nuevo la misma identidad debe devolver el mismo plan activo, no volver a llamar
+registradores que asignan ids. La publicación durable usará el límite de guardado
+existente sólo cuando el estado sea coherente; esquema/versión del plan activo
+y detalles del punto atómico pertenecen a esa fase posterior.
+
+Recepción, captura e importación seguirán como transiciones persistidas distintas
+con claves de idempotencia. Un receptor pendiente no equivale a rescate exitoso.
+El momento exacto de inicio de intento/cooldown respecto a preparación/captura
+aún necesita decisión explícita de integración; ningún contador actual cambia.
+Nada de esta transacción, comunicaciones o persistencia se implementa en 4D-3c.
+
+## Mediciones y verificación
+
+Reproducir con el Python canónico:
+`tests/deadnode_chain_detours_smoke.py --benchmark`. Usa seed `271828`, tres
+llamadas por celda, estados sintéticos aislados, excluye construir fixtures y
+registra mediana/máximo en milisegundos y contadores deterministas. Los fondos de
+0/300/1200/3000 nodos físicos ocupan 300×300×60 ly lejos del recorrido; el caso
+agotado los concentra cerca del origen, marca sus datos consumidos y usa objetivo
+a 2000 ly. Las densidades/resultados son sintéticos, no frecuencias jugables.
+
+Mediana / máximo, ms:
+
+| Nodos de fondo | Sólo existentes | Nuevos rectos | Rodeo | Presupuesto agotado |
+| --- | --- | --- | --- | --- |
+| 0 | 3.51 / 4.93 | 16.39 / 16.78 | 30.22 / 31.28 | 131.64 / 153.79 |
+| 300 | 6.55 / 6.57 | 20.20 / 21.33 | 46.33 / 49.59 | 87.70 / 101.72 |
+| 1200 | 15.81 / 16.37 | 32.83 / 39.09 | 47.67 / 48.75 | 80.20 / 89.52 |
+| 3000 | 37.86 / 48.93 | 54.18 / 54.23 | 68.13 / 68.53 | 107.76 / 110.47 |
+
+Indexar escala con el mundo físico y la intel almacenada. El trabajo de búsqueda
+se acota con presupuestos técnicos, no combinaciones ilimitadas de reservas;
+vecindarios densos y copias siguen siendo más caros. Las mediciones no garantizan
+latencia máxima. La integración futura en Textual **deberá usar una instantánea
+inmutable en un worker**, validar obsolescencia antes de confirmar y podrá ajustar
+presupuestos técnicos/cachés. Aquí no se añade worker ni integración de UI.
+
+Con seed `271828`, la fixture recta válida de 100 ly conserva dos nodos en y=25
+y tres saltos de unos 33,3333 ly. En y=1, el rodeo nuevo propone (25,-5,5) y
+(65,-5,5): unos 26,0192 + 40 + 35,7351 ly. Ambos tienen cupos canónicos; inserción
+y primera recepción siguen condicionadas. Un nodo existente en (65,1,1) reduce
+la propuesta a un intermediario nuevo. La fixture de frontera real disk/halo
+cruza regiones sin cambiar balance ni definiciones regionales.
+
+La [regresión original de 28 grupos](../../tests/deadnode_chain_planner_smoke.py)
+y el [complemento 4D-3c](../../tests/deadnode_chain_detours_smoke.py) cubren juntos
+la matriz solicitada (números de la solicitud 4D-3c):
+
+| Casos | Cobertura ejecutable |
+| --- | --- |
+| 1 | `test_direct_viable_is_retained`, originales directo/45/70/100 |
+| 2, 4 | `test_reference_seed_empty_straight_slots_find_offline_nodes` |
+| 3 | `test_existing_detour_preferred_over_shorter_all_new` |
+| 5 | `test_mixed_detour_minimizes_new_nodes` |
+| 6 | `test_real_regional_boundary_with_existing_detour` |
+| 7, 21 | `test_short_unusable_receiver_loses_to_longer_information_path` |
+| 8 | `test_equal_alternatives_have_stable_tie_breaks` |
+| 9, 18 | `test_regional_kind_restrictions_not_overridden` |
+| 10 | `test_no_procedural_context_is_not_a_permission` |
+| 11–15, 30–31 | `_checked`/`_plan` original comparan estado completo serializado/RNG global y cap positivo exacto mediante `_assert_hops`; originales de cap inclusivo |
+| 16, 20 | `test_navigation_only_exhausted_stop_and_direction_preserved`, originales de orígenes dirigidos |
+| 17 | Pruebas originales de tipos canónicos y capacidad waystation mediante Engine real |
+| 19 | `test_shared_slot_reservations_and_coordinate_collision`; cada propuesta también exige reservas únicas |
+| 22–23 | `test_protected_shortcut_excluded_alternative_retained`, originales NODE/LINK/primary no soportado |
+| 24–25 | `test_sources_and_first_reception_remain_pending` |
+| 26–27, 29 | `test_generated_explored_and_lazy_insertion_are_distinct` |
+| 28 | `test_collision_safe_detour_identities`, colisión original de id y `test_pending_identity_references_are_not_reused` |
+| 32–33 | `test_detour_save_load_hash_seeds_and_all_state_purity`, originales orden/guardado/hash |
+| 34 | `test_budget_exhaustion_is_incomplete_not_universal_impossibility` |
+| 35 | `test_populated_world_has_bounded_search_and_preserves_state`, benchmark |
+
+Comparar el estado entero cubre mundo, topología sectorial, conocimiento/intel,
+pools, filesystem, contadores/cooldown, RNG/secuencias, eventos, nave/recursos,
+recuperación y tiempo. Tres ciclos temporales save/load y subprocesos con seeds
+hash conservan propuestas. La previsión indexada se compara con la consulta canónica sobre el mundo completo
+en `test_indexed_forecasts_match_the_canonical_full_world_query`. No se abren partidas reales. Pruebas específicas
+prohíben llamar escritores/generadores. Manuales/help no necesitan cambios:
+no cambia ningún comando del jugador.
+
+## Decisiones de producto aún necesarias
+
+- Si el jugador puede descubrir localizaciones nuevas de recuperación en áreas
+  generadas/exploradas y cómo; qué sectores deben excluirse en su lugar.
+- Cómo conviven coordenadas/cupos condicionados con muestreo lazy normal,
+  guardrails iniciales y regiones en fronteras sin aumentar densidad.
+- Cómo respetan enlaces/hubs físicos tardíos topología cerrada y presupuestos
+  intersectoriales.
+- Cómo reservar datos uplink indispensables sin reabrir pools congelados/
+  consumidos y qué preparación de fuentes puede confirmarse atómicamente.
+- Cuándo preparación/captura hace contar el rescate para intentos/cooldown,
+  esquema del plan activo/recepción y semántica de invalidación/reintento.
+
+La regla de rodeos aprobada no requiere otra aprobación. No se propone tipo,
+peso, probabilidad, límite jugable de saltos ni garantía de supervivencia universal.

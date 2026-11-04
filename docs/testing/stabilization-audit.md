@@ -491,3 +491,55 @@ assertion used exact float equality for thirds; it was corrected to a numeric
 tolerance without changing production geometry or the cap. No dependencies
 were installed. No player command changed, so manuals/help need no update.
 No commit, push, staging, materialization or later integration was performed.
+
+### Phase 4D-3c: pure regional detours and materialization preflight
+
+Initial clean `main`; local HEAD, tracking ref and remote `refs/heads/main`
+all verified at `c48ee001ad976c9a3cc0b5ae578b19240c3e771d`. Phase 4D-3b was committed
+and published. No pending changes or staged files were present.
+
+**Approved:** search regionally coherent alternatives and detours before giving
+up; no guaranteed escape or exceptions to universe rules. The
+[kernel design](../design/deadnode-chain-planner.md) records the old search's
+existing-detour support, straight-slot limitation, finite augmented spatial
+search, work budgets, canonical type/capacity ownership, materialization evidence
+and future atomic write set. Production deadnodes, worldgen, balance, engine,
+active-plan saves, communications and UI remain unchanged. **F-DEAD-01 is open.**
+
+At seed `271828`, the former untyped witness at y=1 now has conditional new
+stops at (25,-5,5) and (65,-5,5), with hops 26.0192 / 40 / 35.7351 ly. The valid
+y=25 direct proposal remains at approximately 33.3333 ly per hop. Existing
+36.0555 / 30 / 36.0555 ly detours, mixed one-new-node alternatives, the actual
+disk/halo boundary, longer informative paths, protected shortcuts, directional
+navigation-only stages and consumed/visited receivers are covered.
+
+Validation on 2026-11-04: **49/49 planner assertion groups** (28 original and
+21 companion) and **31/31 prior controls** pass: **33/33 smoke/control scripts**.
+The design maps all 35 requested cases to executable checks. Full serialized
+state and global RNG remain identical; repeated calls, reordered dictionaries,
+hash-seed subprocesses and three temporary input save/load cycles reproduce
+proposals. No real saves are opened. Forbidden writer/generator calls are
+checked explicitly. Python compilation, local documentation paths, EN/ES
+technical parity for the new design/changed contract sections and
+`git diff --check` pass. Ruff is absent; no dependencies were installed.
+
+The reproducible 16-cell benchmark uses three calls per cell and backgrounds of
+0/300/1200/3000 nodes, including a dense consumed-origin case. With 3000 background
+nodes, median existing/direct/detour/exhausted times were
+37.86 / 54.18 / 68.13 / 107.76 ms. The largest observed maximum across cells was
+153.79 ms; these are measurements, not latency guarantees. Budgets bound search;
+future Textual invocation must use an immutable snapshot in a worker. Exhaustion
+reports incomplete search and never universal impossibility or a confirmed rescue.
+
+New positions remain conditional on coordinate/slot policy, lazy reservations,
+late topology, pool/source preparation and atomic confirmation. Generated and
+visited sectors have explicit unresolved appearance/insertion dependencies;
+metadata inconsistencies require reconciliation. Id checks also protect pending
+knowledge/pool/topology references. No policy allowing retroactive appearance,
+mandatory data at visited receivers or reopening consumed pools was invented.
+The developer still must decide appearance, late topology, frozen uplink hint
+reservation, active-plan/reception schema and the precise attempt/cooldown boundary.
+
+Only the planner, its original/companion regressions and three EN/ES document
+pairs change. Manuals/help require no update because no player command changes.
+No commit, push, staging, live materialization or Phase 4D-3d was performed.

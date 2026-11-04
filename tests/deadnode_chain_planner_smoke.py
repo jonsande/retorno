@@ -361,12 +361,11 @@ def test_generated_and_lazy_sectors_are_explicit_dependencies():
 
 
 def test_no_policy_or_procedural_slot_is_not_fabricated():
-    # At y=1 the real seed selects empty sectors with zero canonical slots.
+    # The straight slots at y=1 are empty; 4D-3c may now find a real detour.
     result = _plan(_state(y=1))
-    assert result.geometry_valid and not result.physical_chain_valid
-    assert result.materialization == Materialization.UNAVAILABLE
-    assert result.viability == Viability.INCOMPLETE
-    assert all(n.kind is None for n in result.new_nodes)
+    assert result.geometry_valid and result.physical_chain_valid
+    assert result.materialization == Materialization.CONDITIONAL
+    assert any(n.position_ly[1:] != (1, 1.0) for n in result.new_nodes)
     state = _state()
     with patch("retorno.core.deadnode_planner.load_worldgen_templates", return_value={}):
         result = _plan(state)
