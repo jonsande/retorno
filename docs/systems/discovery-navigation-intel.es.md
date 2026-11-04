@@ -154,11 +154,11 @@ contactos ni podan historial.
 | Bootstrap, `route solve`, `nav abort` | Publican mediante `add_known_link`; los trabajos solve completados revalidan extremos/cap. Las rutas válidas de waypoint siguen admitidas. |
 | Importación explícita, autoimportación `cat`/mail, tokens LINK de `[INTEL]` | Comparten `_import_link_intel`; intentan primero la materialización lazy existente, conservan contactos e historial de enlaces deduplicado y sólo publican saltos válidos. |
 | Uplink y lore `uplink_only` | Publican con el mismo criterio de dominio; no cambian ciclo de pools, pesos, entrega narrativa ni probabilidades. La exclusión de candidatos del pool usa rutas operativas. |
-| Viaje | Exige una arista directa registrada y el criterio físico compartido, además de los gates vigentes de conocimiento, waypoint y nave. |
+| Viaje | Exige una arista directa registrada y el criterio físico compartido, además de los gates vigentes de conocimiento y nave. |
 | Grafo/caminos/componentes de navegación, listado de rutas, sugerencias de origen, contactos, survey y compleción CLI/Textual | Usan la proyección operativa para conexiones y flags de ruta; el inventario de contactos sigue siendo independiente. Ambas interfaces comparten renderers/helpers. |
 | Recuperación global y deadnodes | Comparten `reachable_known_nodes`; las aristas inválidas no crean frontera, no hacen accesibles payloads remotos mediante un componente inválido ni excluyen un objetivo como conectado. |
 | Listado/show/export de intel y diagnósticos debug crudos | Historial/inspección, no autorización. Las pistas inválidas registradas siguen visibles/exportables; los conteos debug de grafo/cap pueden mostrar registros obsoletos crudos. |
-| Save/load y limpieza de nodos temporales | La persistencia conserva el estado crudo. La limpieza `_clear_tmp_node` no cambia (F-NAV-01); las referencias inversas restantes quedan operativamente inertes. |
+| Save/load y limpieza de nodos temporales | La persistencia conserva el estado crudo. Desde 4D-2, `_clear_tmp_node` elimina las referencias vivas del waypoint abandonado/reemplazado; conserva el historial. |
 
 No hace falta normalización destructiva al cargar: la proyección idempotente
 filtra registros inválidos inmediatamente, antes y después de save/load.
@@ -186,8 +186,11 @@ Sintaxis pública: `scan`.
 
 **Requisitos iniciales y durante el trabajo:** terminal operativo, estado de
 potencia no crítico, calidad de energía por encima del umbral de bloqueo,
-sensores al menos `LIMITED` y servicio `sensord` en ejecución. En un nodo de
-tipo `transit` también se requiere el unlock de módulo `scan_in_transit`.
+sensores al menos `LIMITED` y servicio `sensord` en ejecución. Un waypoint detenido (`kind="transit"`, `ship.in_transit=False`) usa estos
+gates normales y no necesita el unlock `scan_in_transit`. El gate público sigue
+rechazando scan durante un viaje activo; los trabajos encolados conservan la
+comprobación de `scan_in_transit` cuando `ship.in_transit=True`. No se amplía
+el escaneo durante viajes activos.
 
 El comando encola un trabajo `SCAN` de `Balance.SCAN_TIME_S` (actualmente 8 s)
 y guarda el nodo de origen. El trabajo falla si los sensores o `sensord` dejan
@@ -393,8 +396,8 @@ Sintaxis de viaje:
 
 El motor valida, en este orden lógico, que la nave no esté en tránsito ni
 acoplada, que el destino exista, sea conocido, sea distinto del actual, figure
-en `known_links[current]` y no supere 45 ly. En un waypoint temporal sólo se
-permiten los extremos originales.
+en `known_links[current]` y no supere 45 ly. Un waypoint temporal detenido usa las mismas reglas de ruta operativa;
+sus destinos no se limitan a los extremos anteriores.
 
 `SpaceNode.links` no participa en esta autorización. Por tanto:
 
@@ -416,17 +419,48 @@ corresponde.
 
 ### Aborto y nodo temporal
 
-`nav abort`, tras confirmación de la CLI, interpola la posición actual y crea un
-`NAV_PT_<hex>` físico de tipo `transit`. Lo convierte en nodo actual y añade
-rutas conocidas bidireccionales hacia origen y destino. No lo añade a
-`known_nodes` ni `known_contacts`. Desde él sólo se puede reanudar hacia uno de
-los extremos.
+`nav abort`, tras confirmación de la CLI, detiene la nave en la posición
+interpolada exacta y crea un `NAV_PT_<hex>` físico de tipo `transit`.
+`ship.in_transit` pasa a falso; el aborto no avanza tiempo ni produce llegada
+o desplazamiento gratuito. Registra rutas conocidas bidireccionales dentro del
+cap hacia origen y destino supervivientes. El waypoint es inicialmente la
+posición actual, no un contacto descubierto; un scan posterior puede conocerlo.
 
-Al abandonar el waypoint, `_clear_tmp_node` elimina el nodo y su entrada propia
-de `known_links`, pero no elimina explícitamente las referencias inversas al id
-temporal almacenadas en los extremos. La proyección operativa excluye
-esas referencias ausentes de rutas y componentes, pero el estado puede
-conservarlas: la limpieza específica F-NAV-01 sigue pendiente.
+El jugador puede permanecer allí, utilizar sistemas, guardar/cargar y ejecutar
+`scan` con los requisitos normales de sensores, `sensord` y energía. Las
+distancias de detección se calculan desde T. `route solve C` puede publicar una
+ruta hacia un tercer destino físico elegible dentro de sensores y 45 ly,
+aplicando el criterio F-ROUTE-01. Viajar a C exige esa ruta operativa y todos
+los gates normales de la nave. No obliga a volver a A ni pasar por B, ni permite
+navegar a coordenadas arbitrarias. CLI y Textual comparten
+`_travel_targets_for_completion`; mapas y autocompletado usan `reachable_from`.
+
+El waypoint de salida sigue existiendo mientras el viaje lo necesita para
+interpolar. Al llegar a otro nodo, o al reemplazarlo por otro aborto,
+`_clear_tmp_node` elimina exclusivamente ese id temporal. Un aborto repetido
+calcula posición y radiación ambiental antes de eliminar T1; T2 conserva rutas
+sólo a extremos supervivientes. El origen eliminado no queda en
+`active_tmp_from`. Desde T2 siguen disponibles exploración y route solve; los
+destinos históricos necesitan una nueva ruta normal.
+
+#### Inventario de referencias temporales (4D-2)
+
+| Estado / consumidor | Vida útil y limpieza |
+| --- | --- |
+| `space.nodes`, `SpaceNode.links`, `space.edges`, `known_links` | Elimina T, su entrada saliente y todas las referencias entrantes a T; conserva las demás aristas y direcciones. Sin saneado global. |
+| `known_nodes`, `known_contacts`, `known_intel`, `forced_hidden_nodes`, `visited_nodes`, `salvage_tip_nodes`, `fine_ranges_km` | Elimina sólo entradas con clave T, incluido su autodescubrimiento por scan. Conserva contactos legítimos e intel de destinos. |
+| `node_pools`, `dead_nodes`, `uplink_route_pool` de los pools | Elimina pool/tracker vivo de T y T como candidato de ruta pendiente en otros pools; conserva contenidos ajenos. |
+| `sector_states` | Los waypoints no son miembros generados de sectores; elimina sólo T si aparece en índices de nodos/hubs. Conserva ids de sector, registros de generación, pares intersectoriales y contadores de enlaces permanentes. |
+| Jobs SCAN / ROUTE_SOLVE | Cancela jobs activos cuyo objetivo/origen sea T eliminado mediante el finalizador y evento localizado existentes. Conserva jobs terminales como historial. |
+| `active_tmp_*`, origen de tránsito de la nave | Restablece metadatos temporales activos; vacía un extremo eliminado tras la llegada y conserva el origen histórico en su evento. El reemplazo registra sólo extremos supervivientes. |
+| `intel`, eventos, logs deadnode | Los registros históricos pueden conservar T como fuente/id; no son aristas operativas ni se borran. |
+| Placements lore/arcos, anclas recovery, pistas del filesystem | Auditado: creación/scan normal del waypoint no convierte T en host narrativo authored/procedural elegible ni en ancla recovery. Sin edición general de esos sistemas. |
+| Save/load | La serialización existente conserva cada fase sin normalización, cambios de esquema ni migración. Los ciclos repetidos y la limpieza son idempotentes. |
+
+Regresión: `tests/nav_abort_waypoint_cleanup_smoke.py`, seed `314159`, acciones
+reales de Engine y slots temporales. Cubre `(0,0,0) -> (8,4,2)` abortado al 25%
+= `(2,1,0.5)`, detección de C desde T, T→C/A/B, abortos repetidos, jobs
+pendientes, gates negativos y cinco fases de persistencia.
 
 ## 7. Tabla de transiciones
 
@@ -444,7 +478,7 @@ conservarlas: la limpieza específica F-NAV-01 sigue pendiente.
 | Lore `uplink_only` | Pieza elegible, ambos extremos físicos y cap. | Añade ruta/contactos y marca primary desbloqueado; si falla, conserva asignación y pendiente. | `IntelItem(link)` directo sólo tras éxito. |
 | Breadcrumb de lore/failsafe | Trigger elegible. | Escribe archivo local/remoto; puede crear nodos ocultos. | Ningún cambio de rutas hasta importar el archivo. |
 | `nav <id>` | Nodo conocido, ruta directa, cap y gates. | Inicia tránsito; al llegar actualiza nodo/posición/visita. | No descubre nuevas rutas. |
-| `nav abort` | Nave en tránsito y confirmación CLI. | Crea waypoint temporal y rutas a los extremos. | Acceso de retorno/reanudación, no contacto normal. |
+| `nav abort` | Nave en tránsito y confirmación CLI. | Crea waypoint temporal y rutas a los extremos. | Posición detenida para scan, solve y viaje real a destinos válidos. |
 
 ## 8. Protección narrativa y excepciones
 
@@ -547,8 +581,8 @@ una protección narrativa operativa ni contenido activado.
 - Route solve no exige conocimiento previo y no comprueba que la nave permanezca
   en el origen; el apagado automático de sensores al entrar en `CRUISE` sí suele
   interrumpirlo en el tick siguiente.
-- Abortar viaje puede dejar referencias inversas a un waypoint ya eliminado en
-  `known_links`.
+- Desde 4D-2, eliminar un waypoint limpia sus referencias vivas y cancela
+  sus jobs de navegación pendientes; conserva las fuentes históricas de scan/intel.
 - La protección `locked_primary_targets` sólo reconoce primaries `link` y
   `node`; otros tipos no producen un target bloqueado.
 - Si una pieza primaria `uplink_only` es malformada, carece de un extremo físico
@@ -581,6 +615,7 @@ construyen estados en memoria; no se abrió ni modificó ningún save real.
 | `sector_intel_validation_smoke.py` | PASSED | Sectores canónicos existentes y lazy, índices con signo amplios, formatos inválidos sin mutar estado serializable, bloques `[INTEL]` sólo de sector sin recovery corrupta/uso de RNG, feedback EN/ES y continuación de líneas válidas. |
 | `intel_recent_order_smoke.py` | PASSED | Historiales vacío/único, límite 20 por defecto, límites N/all, timestamps descendentes, desempate por inserción inversa, EN/ES, adaptador Textual, estado de sólo lectura y show/export sin cambios. |
 | `known_routes_integrity_smoke.py` | PASSED | Seed 271828; extremos/cap inclusivo, historial e importación EN/ES, componentes mixtos, frontera real sin fantasmas, candidatos deadnode, sectores lazy, waypoint inerte, jobs y save/load idempotente sin pérdida de pistas. |
+| `nav_abort_waypoint_cleanup_smoke.py` | PASSED | Seed 314159; aborto interpolado, scan/solve/viaje C, retorno A/B, CLI/Textual, limpieza dirigida, jobs pendientes, abortos repetidos, gates negativos, EN/ES y cinco fases save/load. |
 
 La fixture desalineada se reparó posteriormente sin revelar `HARBOR_12` ni
 cambiar producto. La caracterización deliberada de `route solve` también se
@@ -594,7 +629,7 @@ Lagunas de cobertura:
 - no hay prueba que demuestre el alcance exacto —y los bypasses— de
   `locked_primary_targets` con un arco cargado de forma aislada;
 - no se cubre el cambio de origen durante un trabajo route solve;
-- no se comprueba la limpieza completa de referencias del waypoint temporal;
+- operación y limpieza de waypoints cubiertas por la regresión 4D-2;
 - no hay contrato probado de convergencia entre `known_nodes` y
   `known_contacts`;
 - no se prueba qué ocurre al desbloquear un target después de congelar el pool
@@ -633,7 +668,7 @@ Lagunas de cobertura:
 5. Decidir cuándo se recalculan pools uplink ante worldgen o desbloqueos tardíos.
 6. Unificar los dos parsers de importación y precisar el contrato de bloques
    `[INTEL]` e intel corrupta.
-7. Definir y probar la limpieza total del waypoint temporal.
+7. Mantener la regresión de waypoint detenido y limpieza completa añadida en 4D-2.
 8. Mantener la fixture sintética reparada de `forced_hidden_ad_hoc_smoke.py` sin
    convertir nodos authored desconocidos en contactos iniciales.
 9. Medir si `UPGRADED` debe recibir más adelante una bonificación sobre el factor

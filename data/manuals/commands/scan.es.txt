@@ -9,6 +9,8 @@ Requisitos (gating)
 
 Comportamiento operativo
 - Encola un job de scan con un barrido activo temporizado.
+- Tras `nav abort`, un waypoint detenido es un origen normal de scan: el alcance se mide desde esa posición y no exige módulo de escaneo en tránsito.
+- El viaje activo conserva sus restricciones de scan; esto no autoriza escanear durante un viaje.
 - Al completarse, actualiza conciencia local de contactos y puede revelar eventos de detección.
 - Si descubre contactos nuevos, dispara el evento `signal_detected` y su cue asociado.
 - Si cambia el contexto operativo antes de completar, el job puede interrumpirse.

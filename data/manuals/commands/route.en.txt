@@ -1,7 +1,7 @@
 route solve <node_id>
 - Attempts to resolve/add a known route from your current node to `<node_id>`.
 Purpose
-- Compute and store missing navigable links from current position to a known target node.
+- Compute and store missing navigable links from current position to a physical target node.
 
 Behavior
 - If the route is already known from your current node, no job is queued:
@@ -14,7 +14,7 @@ Behavior
 Requirements (gating)
 - `sensors` state `>= limited`.
 - `sensord` service running.
-- Target must be known and exist.
+- Target must physically exist; use an available exact node id.
 - Target must be within sensor range.
 - Ship must not be in transit.
 - Sufficient power:
@@ -25,12 +25,14 @@ Common block reasons
 - `sensors` degraded/offline.
 - `sensord` not running.
 - Target out of range.
-- Unknown or missing target node.
+- Missing target node.
 - Insufficient power quality.
 
 Notes
 - `route solve` does not start travel; use `nav <node_id>` to travel.
 - Known route status is relative to your current node.
+- A stopped waypoint after `nav abort` is a valid origin for solving a route to a third destination; normal sensors, power, sensor range and the 45 ly hop cap apply. You do not need to return to the previous origin.
+- A physical node whose exact id is available can be solved even before scan discovery; a missing node cannot.
 
 Related commands
 - `nav map routes`, `nav map path <node_id>`, `nav <node_id>`, `scan`

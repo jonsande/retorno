@@ -398,7 +398,7 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ("nav map contacts", "list known contacts", "lista contactos conocidos"),
                 ("nav <node_id>", "start transit to node", "inicia tránsito al nodo"),
                 ("nav --no-cruise <node_id>", "start transit without cruise profile", "inicia tránsito sin perfil cruise"),
-                ("nav abort", "abort active transit", "aborta tránsito activo"),
+                ("nav abort", "stop at current position; explore or solve another route", "detente en la posición actual; explora o resuelve otra ruta"),
                 ("dock <node_id>", "dock at current node", "acopla en nodo actual"),
                 ("undock", "undock from current node", "desacopla del nodo actual"),
                 ("uplink", "pull route intel from docked hub", "extrae intel de rutas desde hub acoplado"),
@@ -998,8 +998,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "es": "Acción bloqueada: sensord no está en ejecución. Prueba: boot sensord",
         },
         "scan_locked_in_transit": {
-            "en": "Action blocked: scan unavailable while adrift",
-            "es": "Acción bloqueada: scan no disponible en tránsito",
+            "en": "Action blocked: scan unavailable during transit",
+            "es": "Acción bloqueada: scan no disponible durante el tránsito",
         },
         "out_of_range": {
             "en": "Action blocked: target out of sensor range ({node_id})",
@@ -1204,8 +1204,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "es": "Scan interrumpido: sensord detenido para {node_id}",
         },
         "job_failed_scan_locked_in_transit": {
-            "en": "Scan interrupted: scan unavailable while adrift",
-            "es": "Scan interrumpido: scan no disponible en tránsito",
+            "en": "Scan interrupted: scan unavailable during transit",
+            "es": "Scan interrumpido: scan no disponible durante el tránsito",
         },
         "job_failed_scan_context_changed": {
             "en": "Scan interrupted: location changed during scan ({node_id})",
@@ -1978,21 +1978,19 @@ def render_status(state) -> None:
         status_label = _orbit_status_label(state, current_loc)
         print(f"location: {current_loc} ({node_name}) [{status_label}]")
         if state.world.active_tmp_node_id == current_loc:
-            tmp_from = state.world.active_tmp_from or "?"
-            tmp_to = state.world.active_tmp_to or "?"
             progress = state.world.active_tmp_progress
             locale = state.os.locale.value
             if isinstance(progress, (int, float)):
                 pct = int(progress * 100)
                 msg = {
-                    "en": f"transit: between {tmp_from} and {tmp_to} (aborted, {pct}%)",
-                    "es": f"transit: entre {tmp_from} y {tmp_to} (abortado, {pct}%)",
+                    "en": f"waypoint: stopped (travel aborted at {pct}%)",
+                    "es": f"waypoint: detenido (viaje abortado al {pct}%)",
                 }
                 print(msg.get(locale, msg["en"]))
             else:
                 msg = {
-                    "en": f"transit: between {tmp_from} and {tmp_to} (aborted)",
-                    "es": f"transit: entre {tmp_from} y {tmp_to} (abortado)",
+                    "en": "waypoint: stopped (travel aborted)",
+                    "es": "waypoint: detenido (viaje abortado)",
                 }
                 print(msg.get(locale, msg["en"]))
     print(
@@ -6663,12 +6661,6 @@ def _travel_targets_for_completion(state) -> list[str]:
         for node_id in sorted(reachable_from(state.world, current_node_id))
         if node_id != current_node_id and node_id != "UNKNOWN"
     ]
-    if (
-        getattr(state.world, "active_tmp_node_id", None)
-        and current_node_id == state.world.active_tmp_node_id
-    ):
-        allowed = {state.world.active_tmp_from, state.world.active_tmp_to}
-        candidates = [node_id for node_id in candidates if node_id in allowed]
     return candidates
 
 

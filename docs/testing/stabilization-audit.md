@@ -13,7 +13,7 @@ mechanics, tests, balance, or content.
 > reception, narrative protection, and save policy. These audit matrices are
 > retained as a diagnosis of the behavior that was observed.
 
-## 0. Phase 4B closure and updates through 4D-1
+## 0. Phase 4B closure and updates through 4D-2
 
 Open decisions in this audit are closed or reassigned as follows:
 
@@ -40,6 +40,7 @@ The current executive matrix, with full criteria in the contract, is:
 | F-DEAD-02 — cooldown at `t=0` | **Fixed** | `deadnode_cooldown_zero_smoke.py` | **4C-2d complete** |
 | F-WGEN-01 — `modules_pool` filters | **Fixed** | `worldgen_modules_pool_smoke.py` | **4C-3 complete** |
 | F-ROUTE-01 — known-route integrity | **Fixed** | `known_routes_integrity_smoke.py` | **4D-1 complete** |
+| F-NAV-01 — stopped waypoint and cleanup | **Fixed** | `nav_abort_waypoint_cleanup_smoke.py`: scan, solve/travel C/A/B, repeated aborts, references/jobs, five save/load phases | **4D-2 complete** |
 
 This ordering supersedes historical priorities in sections 4, 7, and 8 where
 they conflict. F-LORE-01 was subsequently fixed in 4C-1, F-SENS-01 in 4C-2a,
@@ -110,9 +111,10 @@ The cap fixture now explicitly injects a stale edge because the publisher
 rejects it. Both CLI/Textual completion fixtures now use a synthetic physical
 node under the cap instead of depending on absent `CURL_12`; no inactive
 authored content was enabled. The F-ROUTE-01 diagnosis below remains historical;
-its closure is in the current executive matrix above. F-NAV-01 and F-DEAD-01
-remain pending: waypoint cleanup, bridges, thresholds, cooldowns, and topology
-are unchanged. The 4C regressions remain green.
+its closure is in the current executive matrix above. At the end of 4D-1,
+F-NAV-01 and F-DEAD-01 remained pending. Waypoint operation/cleanup was later
+completed in 4D-2; bridges, thresholds, cooldowns and topology remain outside
+that phase. The 4C regressions remain green.
 
 Final 4D-1 validation: 31/31 smokes pass, including the 4C regressions, routes,
 recovery, deadnodes, lazy worldgen, persistence, and CLI/Textual completion.
@@ -126,8 +128,8 @@ knowledge, and published routes—but several consumers do not apply the same
 validity criterion. The highest-priority problems are:
 
 1. F-ROUTE-01 was corrected in 4D-1: invalid `known_links` records are no
-   longer operational routes/frontiers. `nav abort` can still leave orphaned
-   references (F-NAV-01), now inert pending their specific cleanup.
+   longer operational routes/frontiers. F-NAV-01 waypoint operation and live
+   reference cleanup were subsequently completed in 4D-2.
 2. Deadnodes places its bridge near the target rather than a reachable origin
    and publishes a hint from the current node without validating 45 ly. In the
    probe, the bridge was 99.38 ly away, had no physical links or pool, and route
@@ -164,7 +166,7 @@ telemetry or play sample, not that the case is unlikely.
 | ID | Problem | Subsystems | Evidence | Preconditions | Player consequence | Severity | Frequency | Current recovery | Existing tests | Tests needed | Pending decision | Order |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | F-ROUTE-01 | Nonexistent or over-cap known routes count as frontier/route for recovery and deadnodes, but travel rejects them. | Intel, `WorldState`, travel, recovery, deadnodes, save | Implementation + in-memory probe | Import `LINK` with missing endpoint, load stale state, or retain invalid edge | Phantom frontier; rescue stays off and target is excluded from deadnodes | High | Unknown; dangling import is player-accessible | No cleanup command; unrelated valid routes may still work | `route_hop_cap_smoke` covers travel rejection only | Dangling/over-cap import → frontier → deadnodes → travel, before/after sanitation | Rejection and save-migration policy | 1 |
-| F-NAV-01 | `_clear_tmp_node` removes the waypoint and its own entry but leaves reverse references at both endpoints. | Aborted travel, routes, recovery, persistence | Implementation + probe | `nav abort` followed by leaving the waypoint | Phantom route created by normal play; may trigger F-ROUTE-01 | High | Unknown | None automatic | No focused coverage | Abort → resume → arrival → temporary id absent everywhere, including after save/load | Cleanup itself needs no design; migration of existing states does | 1 |
+| F-NAV-01 — historical diagnosis; fixed in 4D-2 | `_clear_tmp_node` removed the waypoint and its own entry but left reverse references at both endpoints. | Aborted travel, routes, recovery, persistence | Implementation + probe + 4D-2 regression | `nav abort` followed by leaving the waypoint | Former phantom route from normal play | High before correction | Unknown | Targeted cleanup now implemented | `nav_abort_waypoint_cleanup_smoke.py` | Covered: normal exploration at T, C/A/B travel, live references/jobs, repeated aborts, history and save/load | No migration or global sanitation | Closed |
 | F-DEAD-01 | Deadnode bridge is created near the target and its hint starts at current node without cap validation; it also has no physical link or pool. | Deadnodes, intel, navigation, worldgen, pools | Implementation + probe: 99.38 ly and dropped route | Distant inaccessible target reaches `dead` threshold | Both indirect attempts may be unusable; direct attempt can remain over-cap | High | Unknown | Repeats every 5 years, then direct hint, with no usefulness guarantee | No dedicated test | Reachable origin → threshold → under-cap bridge → import → travel; far/generated/un generated sectors | Bridge origin, topology, pool, persistence contract | 2 |
 | F-LORE-01 — fixed in 4C-1 | `uplink_only` was marked delivered when LINK was invalid/over-cap and had no effect. | Scheduler, primaries, intel, persistence | Implementation + synthetic regression | Piece bound to `uplink_only` with unparsable line or invalid hop | One-shot content consumed and primary remains locked | High before fix | Zero with current active data | Failures retain assignment/pending state; public retry does not repeat the pool | `uplink_only_delivery_retry_smoke.py` | Covered: malformed, missing, over-cap, new/preexisting, retry, and save/load | Implemented | Closed |
 | F-SENS-01 — fixed in 4C-2a | `UPGRADED` passed the gate but was absent from the detection map and fell back to `CRITICAL` (0.35). | Scan, systems, balance | Implementation + deterministic regression | Sensors are `UPGRADED` | Upgrade detected less than nominal | Medium before fix | Unknown | Nominal factor; recovery-entry guarantee unchanged | `sensor_detection_factor_smoke.py` | Covered: factors, thresholds, clamps, gates, and recovery exception | Nominal 1.00 implemented; larger bonus remains balance work | Closed |
@@ -234,7 +236,7 @@ flowchart LR
 | Priority | Outcome | Recommended scope | Exit criterion |
 | --- | --- | --- | --- |
 | P0 — Characterization | Turn critical probes into isolated regressions | Invalid routes, waypoint, `UPGRADED`, intel, modules, invalid sector, no-effect delivery, persistence | Red tests only where a fix is planned; deliberate decisions locked green |
-| P1 — Route integrity | Published route is travelable or explicitly marked/not published | Shared criterion/importers completed in 4D-1; F-NAV-01 waypoint cleanup remains pending; read-only current-save projection needs no pruning | No dangling/over-cap edge counts as frontier or deadnode resolution |
+| P1 — Route integrity | Published route is travelable or explicitly marked/not published | Shared criterion/importers completed in 4D-1; F-NAV-01 waypoint cleanup completed in 4D-2; read-only current-save projection needs no global pruning | No dangling/over-cap edge counts as frontier or deadnode resolution |
 | P2 — Recovery | Deadnodes/recovery offer only consumable opportunities | Reachable bridge origin, cap, topology/pool, cooldown, `stuck`; confirm arrival/dock | Deadnode E2E and save/load green |
 | P3 — Narrative integrity | Do not consume pieces without effect or assign without access policy | Delivery outcome, retry, breadcrumb, unlock, protection | Synthetic primaries cover success, failure, and preexisting route |
 | P4 — Bounded data/UI defects | Independent low-risk repairs | `UPGRADED`, sector ids, intel order, and `modules_pool` fixed; radiation field awaits its decision | State/region matrices and clear public errors |
@@ -261,7 +263,7 @@ literal seeds, `create_initial_state_sandbox/prologue`, `Engine`, and
 | IT-06 | Import missing and over-cap LINK; load stale edge; run frontier, deadnodes, travel | Reject/do not publish; no false frontier; contact keeps chosen semantics; migration is idempotent | New invalid-route fixture; reuse parser and Engine |
 | IT-07 | Save before and after global/deadnode activation; load twice | IDs, paths, pools, thresholds, attempts, bridge persist; no duplicate generation/hint | Zero-time deadnode cooldown is covered with `TemporaryDirectory`; full global/deadnode chain persistence remains |
 | IT-08 | Filter one real active single, controlled probability/interval, known open receiver, trigger, read/import, save/load | Correct binding, one delivery, real asset readable, expected intel effect (none when asset has none), persistence | Real loader + local filter; do not copy content into test |
-| IT-09 | Travel → abort → optional save/load → resume to each endpoint | Waypoint absent from nodes, routes, applicable knowledge/intel/fine ranges, and components | New local test for `TravelAbort`/`_clear_tmp_node` |
+| IT-09 — covered 4D-2 | Travel → abort → scan → solve C → travel C/A/B; repeated aborts and save/load | Waypoint absent from live nodes/routes/indexes/jobs; history retained | `nav_abort_waypoint_cleanup_smoke.py` |
 | IT-10 | Generate bulge/halo/disk with known seeds and applicable salvage node | Count follows min/max and every module matches approved tag/id semantics; deterministic | Reuse loader and worldgen descriptor; explicit seed table |
 
 The in-memory audit probe confirmed F-ROUTE-01, F-NAV-01, F-DEAD-01,
@@ -338,10 +340,9 @@ Algorithm fixtures should not depend on authored narrative names.
 
 1. Repair the three fixtures without product changes and add characterization
    for deliberate decisions.
-2. Maintain IT-06 and the shared criterion completed in 4D-1; IT-09 and
-   F-NAV-01 cleanup remain for the next phase.
-3. Fix/sanitize phantom routes and waypoint; then revalidate recovery and known
-   components.
+2. Maintain IT-06 and the shared criterion completed in 4D-1, plus IT-09
+   and F-NAV-01 stopped-waypoint operation/cleanup completed in 4D-2.
+3. Maintain recovery and known-component regressions after bounded waypoint cleanup.
 4. Agree bridge contract and complete IT-04 + IT-07 before changing deadnodes.
 5. Keep the closed F-LORE-01 regression; still agree breadcrumb and protection
    and complete the forced-arc IT-05 before extending those paths.
@@ -385,3 +386,74 @@ Owning implementation:
   effective configuration.
 - [`io/save_load.py`](../../src/retorno/io/save_load.py): V2 persistence,
   checksum, and backup fallback.
+
+### Phase 4D-2: stopped waypoints and F-NAV-01
+
+Prerequisite verified: clean `main`, HEAD and published `origin/main` at
+`32c74c9` (F-ROUTE-01), with empty staging. The initial check saw `4fd3909`;
+the checkout was externally updated to `32c74c9` before any edits.
+`tests/nav_abort_waypoint_cleanup_smoke.py` reproduced seven failing groups
+before production changed (three already passed): scan locked by node kind,
+CLI completion hiding C, travel to solved C rejected, reverse route surviving
+arrival, save/load retaining the restriction, repeated third-destination abort
+blocked, and deleted T1 left in `active_tmp_from`. A further red test exposed
+an active solve job operating from removed T1 before job cleanup was added.
+
+The corrected contract permits remaining and exploring at T with normal gates,
+solving and travelling to C, or returning to A / continuing to B. Position at
+25% of `(0,0,0) -> (8,4,2)` is `(2,1,0.5)`; a second halfway abort toward
+`C=(2,1.1,0.5)` is `(2,1.05,0.5)` within floating-point tolerance. Neither
+abort advances time, arrives, or grants displacement. The inclusive 45 ly cap,
+normal sensor probabilities and gates, directed routes and F-ROUTE-01 remain.
+
+The canonical navigation reference owns the temporary-reference inventory.
+Cleanup is targeted and idempotent, preserving permanent routes, legitimate
+contacts and historical intel; active waypoint scan/solve jobs are finalized
+as cancelled using existing localized events. Three temporary save/load cycles
+at each of five phases preserve physical coordinates, travel, jobs and routes:
+A→B active, stopped T, solved T→C, active T→C, and arrived/cleaned C. Repeated
+aborts also round-trip and leave normal exploration/navigation available.
+No real saves, schema migration, F-DEAD-01 work, worldgen or balance changes.
+
+Final validation: **31/31 checks passed** (30 smoke scripts plus manual style),
+including all twelve groups in the new regression. All Python commands used
+the checkout's canonical virtual environment. `compileall -q src tests`,
+`git diff --check`, local documentation links, matching technical identifiers
+in the EN/ES waypoint sections/manual additions and the modified localized
+UI dictionaries also passed. No Ruff installation was needed.
+
+| Validation group | Scripts under `tests/` (all passed) |
+| --- | --- |
+| Waypoints, discovery and routes | `nav_abort_waypoint_cleanup_smoke.py`, `scan_job_smoke.py`, `route_hop_cap_smoke.py`, `route_solve_out_of_range_origins_smoke.py`, `known_routes_integrity_smoke.py`, `contacts_smoke.py`, `contacts_sector_smoke.py` |
+| Maps, CLI/Textual and jobs | `nav_map_galaxy_smoke.py`, `nav_map_galaxy_dependencies_smoke.py`, `nav_map_galaxy_determinism_smoke.py`, `textual_completion_context_smoke.py`, `drone_completion_context_smoke.py`, `textual_active_jobs_job_id_smoke.py`, `job_id_numbering_smoke.py` |
+| Recovery, persistence and 4C stabilization | `save_load_smoke.py`, `exploration_recovery_smoke.py`, `uplink_authored_and_failsafe_smoke.py`, `uplink_once_per_node_smoke.py`, `deadnode_cooldown_zero_smoke.py`, `sensor_detection_factor_smoke.py`, `sector_intel_validation_smoke.py`, `intel_recent_order_smoke.py`, `worldgen_modules_pool_smoke.py`, `uplink_only_delivery_retry_smoke.py`, `lore_channel_preference_and_unlock_smoke.py`, `forced_hidden_ad_hoc_smoke.py`, `energy_policy_smoke.py` |
+| Physical context and documentation | `transit_radiation_progression_smoke.py`, `worldgen_sparse_archetypes_smoke.py`, `debug_worldgen_graph_smoke.py`, `manuals_style_check.py` |
+
+The first broad run passed 30/31 checks. The radiation smoke failed before
+navigation because inactive authored `DERELICT_A3` was absent. Its fixture now
+uses two synthetic physical endpoints; its interpolation assertions are
+unchanged. No authored content was enabled. The new waypoint fixture uses
+controlled sectors, a powered ship, short real journeys and pending survey
+data so recovery/energy balance does not obscure the navigation checks.
+HEAD remains `32c74c9`; all changes are unstaged, with no commit or push.
+F-DEAD-01 and later phases remain unstarted.
+
+#### Final cleanup-event review (4D-2)
+
+Three additional regression groups cover arrival, repeated abort and the
+defensive docking-job cleanup branch (a controlled retained waypoint; normal
+arrival removes it before docking). Before correction, arrival recorded
+`E00011` twice and docking recorded `E00010` twice in `state.events.recent`;
+the repeated-abort case already passed. `_clear_tmp_node` both recorded and
+returned each cancellation, then `tick` recorded the returned event again.
+
+The helper now returns unrecorded events. `tick` records arrival/job events
+once at its existing boundary; `TravelAbort` explicitly records cleanup events
+once. No global deduplication, physics or navigation-rule change is involved.
+All **15 waypoint regression groups** and the original **31/31 checks** pass.
+The new cases verify one returned event and one history entry per cancellation,
+one terminal finalization, matching event/job ids, removal from active jobs,
+terminal history, EN/ES CLI/Textual rendering, later ticks and three temporary
+save/load cycles without duplicates or changes to terminal ids/sequences.
+Python compilation and `git diff --check` also pass. The original 16 pending
+files remain; this review only changes engine, regression and this EN/ES audit.

@@ -21,7 +21,11 @@ Description
 - `nav map contacts sector`: group known contacts by sector and order sectors by proximity.
 - `nav <node_id>`: start transit to destination.
 - `nav --no-cruise <node_id>`: start transit without forcing CRUISE profile.
-- `nav abort`: abort active transit and revert to origin.
+- `nav abort`: stop active travel at the exact current position, creating a temporary waypoint. It does not return the ship to its origin.
+- At a stopped waypoint you can remain, use ship systems, save/load and `scan` with normal requirements.
+- Use `route solve <node_id>` and then `nav <node_id>` to reach a valid third destination within sensor range and 45 ly; returning to the origin is optional.
+- Routes back to the origin or onward to the previous destination still require real travel.
+- The waypoint remains during departure travel; arrival elsewhere or another abort clears its temporary references while retaining historical intel.
 
 Accepted aliases (hidden from `help`)
 - `nav sectors` -> `nav map sectors`

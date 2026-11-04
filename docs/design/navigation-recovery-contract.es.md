@@ -62,9 +62,12 @@ aristas dangling/sobre cap ya no conectan componentes ni cuentan como frontera,
 y sus pistas históricas permanecen. El detalle de productores, consumidores,
 lazy y persistencia está en la referencia canónica de navegación.
 
-**Pendiente (F-NAV-01):** `nav abort` todavía puede dejar referencias inversas
-a un waypoint eliminado. La proyección impide usarlas; su limpieza específica
-no forma parte de 4D-1.
+**Implementado en 4D-2 (F-NAV-01):** abortar detiene la nave en la posición
+interpolada exacta. Un waypoint detenido permite scan y route solve normales;
+una ruta válida permite viajar realmente a un tercer destino sin regresar antes.
+La llegada o el reemplazo limpian referencias temporales vivas y conservan el
+historial. El [inventario canónico](../systems/discovery-navigation-intel.es.md#aborto-y-nodo-temporal)
+detalla vida útil, jobs, abortos repetidos y persistencia.
 
 ### 2.2 Recuperación progresiva
 
@@ -327,14 +330,15 @@ trabajo de Fase 4C-2a en la misma fecha.
 
 ### 4.2 Casos cubiertos y preparados
 
-Estos casos son criterios futuros, no pruebas verdes del comportamiento actual:
+Estos casos distinguen los criterios cubiertos de la integración todavía pendiente:
 
 - **IT-01/IT-06:** importar o construir en la versión vigente un LINK
   dangling/sobre-cap; conservar la pista histórica, excluirlo de ruta/frontera
   y demostrar estado estable tras save/load. Incluir una referencia procedural
   válida todavía no materializada. No exige migrar un save de otra versión.
-- **IT-09:** crear waypoint temporal, abortar y llegar a ambos extremos; no debe
-  quedar ninguna referencia al id, tampoco tras save/load.
+- **IT-09 — cubierto en 4D-2:** abortar en posición interpolada, escanear,
+  resolver y viajar a C o a cada extremo; limpiar referencias vivas, conservar
+  historial, repetir abortos y guardar/cargar las cinco fases en slots temporales.
 - **IT-04/IT-07:** alcanzar deadnode lejano; cada pista sólo se confirma si hay
   un salto válido y la cadena completa termina en el objetivo. Con receptor
   apagado, sin cadena o con target protegido, no avanzan intentos/cooldown. La
@@ -363,6 +367,7 @@ planificador sin crear nodos nuevos.
 | Defecto | Prioridad | Regresión previa a la corrección | Criterio de aceptación | Fase propuesta |
 | --- | --- | --- | --- | --- |
 | F-ROUTE-01 — integridad de rutas conocidas | **Corregido** | `known_routes_integrity_smoke.py`: diez grupos de selección/publicación, importación EN/ES, componentes, frontera, deadnodes, lazy, viaje/jobs, waypoint inerte y save/load | Sin fronteras fantasma; contactos/historial conservados y ninguna ruta inválida operativa tras save/load | **4D-1 completada** |
+| F-NAV-01 — waypoint detenido y limpieza | **Corregido** | `nav_abort_waypoint_cleanup_smoke.py`, seed 314159 | Exploración/navegación normales en T; limpieza dirigida idempotente, historial conservado, abortos repetidos y save/load | **4D-2 completada** |
 | `uplink_only` consume primary sin efecto válido | **Corregido** | Casos sintéticos malformed, extremo ausente, sobre-cap, LINK nuevo válido y LINK válido preexistente | Sólo nuevo/preexistente válido marca `delivered` y desbloquea; los fallos quedan pendientes y reintentables | **4C-1 completada** |
 | Sensores `UPGRADED` caían al factor `CRITICAL` | **Corregido** | `sensor_detection_factor_smoke.py`: matriz determinista de factor/detección para cada `SystemState` | `UPGRADED` usa el factor nominal; los demás estados, alcance, energía y duración no cambian | **4C-2a completada** |
 | `SECTOR` malformado materializa origen | **Corregido** | `sector_intel_validation_smoke.py`: ids canónicos existentes/lazy/amplios y formatos inválidos mediante importaciones públicas | Rechazo localizado sin mutación; formatos canónicos siguen materializando | **4C-2b completada** |
@@ -471,7 +476,7 @@ SECTOR lazy y el helper existente de prefijos siguen ejecutándose antes de
 validar; no se inventan alias de ids. Save/load repetido e incompatibles están
 cubiertos con directorios temporales. El
 [inventario canónico](../systems/discovery-navigation-intel.es.md#rutas-operativas-y-pistas-históricas-4d-1)
-detalla cada consumidor. F-NAV-01 y F-DEAD-01 siguen pendientes.
+detalla cada consumidor. F-NAV-01 quedó corregido después en 4D-2; F-DEAD-01 sigue pendiente.
 
 ## 6. Riesgos y límites vigentes
 
@@ -497,6 +502,19 @@ detalla cada consumidor. F-NAV-01 y F-DEAD-01 siguen pendientes.
 El contrato incorpora las decisiones de Fase 4B y registra 4C-1 como primera
 corrección productiva completada. `uplink_only` ya no consume piezas sin efecto
 y dispone de reintento público compatible con el pool one-shot. La matriz
-registra también 4C-2a/b/c/d, 4C-3 y 4D-1 como completadas; F-WGEN-01 ya respeta
+registra también 4C-2a/b/c/d, 4C-3 y 4D-1/2 como completadas; F-WGEN-01 ya respeta
 las categorías regionales. Las demás intervenciones, comunicaciones y defectos
 permanecen pendientes.
+
+### Fase 4D-2: waypoints detenidos y F-NAV-01
+
+`nav_abort_waypoint_cleanup_smoke.py` fija el contrato con seed `314159`:
+abortar conserva coordenadas interpoladas y detiene la nave; scan usa T como
+origen sin unlock de tránsito; route solve y viaje real admiten C o los extremos
+anteriores con gates normales y cap inclusivo de 45 ly. La limpieza es dirigida
+e idempotente, conserva rutas permanentes, contactos e intel histórica. Los
+abortos repetidos reemplazan el waypoint anterior sin origen operativo inválido;
+sus jobs scan/solve pendientes se cancelan con el finalizador existente.
+Tres ciclos temporales de save/load cubren cada una de cinco fases del viaje.
+El [cierre de auditoría](../testing/stabilization-audit.es.md#fase-4d-2-waypoints-detenidos-y-f-nav-01)
+registra pruebas rojas, coordenadas y validación completa. F-DEAD-01 sigue abierto.

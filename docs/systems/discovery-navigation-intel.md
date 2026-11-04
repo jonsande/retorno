@@ -149,11 +149,11 @@ are read-only and never generate sectors, reveal contacts, or prune history.
 | Bootstrap, `route solve`, `nav abort` | Publish through `add_known_link`; completed solve jobs revalidate endpoints/cap. Valid waypoint routes remain supported. |
 | Explicit import, `cat`/mail auto-import, `[INTEL]` LINK tokens | Share `_import_link_intel`; attempt existing lazy materialization first, retain contacts and deduplicated link history, publish only valid hops. |
 | Uplink and lore `uplink_only` | Publish with the same domain check; no pool lifecycle, weights, narrative delivery, or probability changes. Pool candidate exclusion uses operational routes. |
-| Travel | Requires a recorded direct edge and the shared physical criterion, plus its existing knowledge, waypoint, and ship gates. |
+| Travel | Requires a recorded direct edge and the shared physical criterion, plus its existing knowledge and ship gates. |
 | Navigation graph/path/components, route list, origin hints, contacts, survey, CLI/Textual completion | Use the operational projection for connections and route flags; contact inventory stays independent. Both interfaces share the same renderers/helpers. |
 | Global recovery and deadnodes | Share `reachable_known_nodes`; invalid edges cannot create frontier, expose remote payloads through an invalid component, or exclude a target as connected. |
 | Intel list/show/export and raw debug diagnostics | History/inspection, not authorization. Invalid recorded clues remain visible/exportable; debug graph/cap counts may still expose raw stale records. |
-| Save/load and temporary-node cleanup | Persistence retains raw state. `_clear_tmp_node` cleanup is unchanged (F-NAV-01); leftover reverse references are operationally inert. |
+| Save/load and temporary-node cleanup | Persistence retains raw state. Since 4D-2, `_clear_tmp_node` removes the departed/replaced waypoint's live references; history remains intact. |
 
 No destructive load normalization is needed: the idempotent projection filters
 invalid records immediately, before or after save/load. Existing contacts,
@@ -180,8 +180,10 @@ Public syntax: `scan`.
 
 **Requirements at start and during the job:** operational terminal, noncritical
 power state, power quality above the blocking threshold, sensors at least
-`LIMITED`, and the `sensord` service running. At a node of kind `transit`, the
-`scan_in_transit` module unlock is also required.
+`LIMITED`, and the `sensord` service running. A stopped waypoint (`kind="transit"`, `ship.in_transit=False`) uses these
+normal gates and needs no `scan_in_transit` unlock. The public action gate still
+rejects scans during active travel; queued scans retain the `scan_in_transit`
+check when `ship.in_transit=True`. This does not expand active-travel scanning.
 
 The command queues a `SCAN` job lasting `Balance.SCAN_TIME_S` (currently 8 s)
 and records the origin node. The job fails if sensors or `sensord` become
@@ -381,8 +383,8 @@ Travel syntax:
 
 The engine logically validates that the ship is neither in transit nor docked,
 the destination exists, is known, differs from the current node, appears in
-`known_links[current]`, and is no farther than 45 ly. At a temporary waypoint,
-only the original endpoints are allowed.
+`known_links[current]`, and is no farther than 45 ly. A stopped temporary waypoint uses the same operational-route rules;
+its destinations are not restricted to the previous endpoints.
 
 `SpaceNode.links` does not participate in this authorization. Therefore:
 
@@ -402,15 +404,47 @@ window closes, and the initial `UNKNOWN` placeholder is dropped when relevant.
 
 ### Abort and temporary node
 
-After CLI confirmation, `nav abort` interpolates current position and creates a
-physical `NAV_PT_<hex>` node of kind `transit`. It becomes the current node and
-gets bidirectional known routes to origin and destination. It is not added to
-`known_nodes` or `known_contacts`. Only travel toward an endpoint is allowed.
+After CLI confirmation, `nav abort` stops the ship at the exact interpolated
+position and creates a physical `NAV_PT_<hex>` node of kind `transit`.
+`ship.in_transit` becomes false; abort itself advances no time and causes no
+arrival or free displacement. It records cap-valid bidirectional known routes
+to the surviving origin and destination. The waypoint is initially the current
+position rather than a discovered contact; a later scan can discover it too.
 
-On leaving the waypoint, `_clear_tmp_node` removes the node and its own
-`known_links` entry, but does not explicitly remove reverse references to the
-temporary id stored at the endpoints. Views filter missing physical
-destinations, but state may retain those stale references.
+The player can remain there, operate ship systems, save/load, and run `scan`
+with normal sensors, `sensord`, and power requirements. Detection distances are
+measured from T. `route solve C` can publish a route to an eligible physical
+third destination within sensor range and 45 ly, using the F-ROUTE-01 criterion.
+Travel to C then requires that operational route and all normal ship gates.
+There is no obligation to return to A or pass through B, and no navigation to
+arbitrary coordinates. CLI and Textual completion share
+`_travel_targets_for_completion`; maps and completion use `reachable_from`.
+
+The departure waypoint remains physical while travel needs it for interpolation.
+On arrival elsewhere, or replacement by a repeated abort, `_clear_tmp_node`
+removes only that temporary id. A repeated abort computes position and ambient
+radiation before removing T1; T2 retains links only to surviving endpoints.
+The deleted origin is not retained in `active_tmp_from`. Exploration and route
+solve from T2 remain available; historical destinations need a normal new route.
+
+#### Temporary-reference inventory (4D-2)
+
+| State / consumer | Lifetime and cleanup |
+| --- | --- |
+| `space.nodes`, `SpaceNode.links`, `space.edges`, `known_links` | Remove T, its outgoing entry and every incoming reference to T; preserve all other edges and directions. No global sanitation. |
+| `known_nodes`, `known_contacts`, `known_intel`, `forced_hidden_nodes`, `visited_nodes`, `salvage_tip_nodes`, `fine_ranges_km` | Remove only entries keyed by T, including self-discovery from scan. Keep legitimate contacts and target intel. |
+| `node_pools`, `dead_nodes`, pool `uplink_route_pool` | Remove T's live pool/tracker and T as a pending route candidate in other pools; preserve unrelated payloads. |
+| `sector_states` | Waypoints are not generated sector members; remove T alone if present in node/hub indexes. Sector ids, generated-sector records, intersector pairs and permanent link counts remain intact. |
+| SCAN / ROUTE_SOLVE jobs | Cancel active jobs whose target/origin is removed T through the existing finalizer and localized cancellation event. Keep terminal jobs as history. |
+| `active_tmp_*`, ship transit origin | Reset active temporary metadata; clear a deleted transit endpoint after arrival, keeping the arrival event's historical origin. Replacement records only surviving endpoints. |
+| `intel`, events, deadnode logs | Historical records can retain T as a source/id; they are not operational graph edges and are not deleted. |
+| Lore/arc placements, recovery anchors, filesystem hints | Audited: normal waypoint creation/scan does not make T an eligible authored/procedural narrative host or recovery anchor. No blanket edits to these systems. |
+| Save/load | Existing serialization preserves each phase without normalization, schema changes or migration. Repeated cycles and cleanup are idempotent. |
+
+Regression: `tests/nav_abort_waypoint_cleanup_smoke.py`, seed `314159`, real
+Engine actions and temporary save slots. It covers `(0,0,0) -> (8,4,2)` aborted
+at 25% = `(2,1,0.5)`, scan detection of C from T, T→C/A/B, repeated aborts,
+pending jobs, negative gates, and five persistence phases.
 
 ## 7. Transition table
 
@@ -428,7 +462,7 @@ destinations, but state may retain those stale references.
 | Lore `uplink_only` | Eligible piece, both physical endpoints, and cap. | Adds route/contacts and marks primary unlocked; on failure keeps assignment and pending state. | Direct `IntelItem(link)` only after success. |
 | Lore/failsafe breadcrumb | Eligible trigger. | Writes local/remote file; may create hidden nodes. | No route change until file import. |
 | `nav <id>` | Known node, direct route, cap, and gates. | Starts transit; arrival updates node/position/visit. | Discovers no new routes. |
-| `nav abort` | In transit and CLI confirmation. | Creates temporary waypoint and routes to endpoints. | Return/resume access, not a normal contact. |
+| `nav abort` | In transit and CLI confirmation. | Creates temporary waypoint and routes to endpoints. | Stopped position for scan, solve, and real travel to valid destinations. |
 
 ## 8. Narrative protection and exceptions
 
@@ -525,8 +559,8 @@ operating narrative protection or activated content.
 - Route solve does not require prior knowledge or check that the ship remains
   at the origin; automatic sensor shutdown on entering `CRUISE` will usually
   interrupt it on the next tick.
-- Aborting travel may leave reverse references to a removed waypoint in
-  `known_links`.
+- Since 4D-2, waypoint removal cleans its live references and cancels its
+  pending navigation jobs; historical scan/intel sources remain intact.
 - `locked_primary_targets` only recognizes `link` and `node` primaries; other
   types produce no locked target.
 - If an `uplink_only` primary is malformed, lacks a physical endpoint, or
@@ -559,6 +593,7 @@ all build in-memory states; no real save was opened or modified.
 | `sector_intel_validation_smoke.py` | PASSED | Existing and lazy canonical sectors, wide signed indices, invalid formats without serializable-state mutation, sector-only `[INTEL]` blocks without corrupt recovery/RNG use, EN/ES feedback, and continued valid-line processing. |
 | `intel_recent_order_smoke.py` | PASSED | Empty/single histories, default 20, N/all limits, descending timestamps, reverse-insertion ties, EN/ES, Textual adapter, read-only state, and unchanged show/export. |
 | `known_routes_integrity_smoke.py` | PASSED | Seed 271828; endpoints/inclusive cap, EN/ES import/history, mixed components, real recovery without phantom frontier, deadnode candidates, lazy sectors, inert waypoint, jobs, and idempotent save/load without clue loss. |
+| `nav_abort_waypoint_cleanup_smoke.py` | PASSED | Seed 314159; interpolated abort, scan/solve/travel C, A/B return, CLI/Textual, targeted cleanup, pending jobs, repeated aborts, negative gates, EN/ES and five save/load phases. |
 
 The stale fixture was later repaired without revealing `HARBOR_12` or changing
 product code. The deliberate `route solve` characterization was also added in
@@ -572,7 +607,7 @@ Coverage gaps:
 - no test demonstrates the exact scope and bypasses of
   `locked_primary_targets` with an isolated loaded arc;
 - origin changes during a route-solve job are not covered;
-- complete cleanup of temporary-waypoint references is not checked;
+- temporary-waypoint operation and cleanup are covered by the 4D-2 regression;
 - no tested contract enforces convergence of `known_nodes` and
   `known_contacts`;
 - unlocking a target after uplink-pool freeze is not tested;
@@ -610,7 +645,7 @@ Coverage gaps:
 5. Decide when uplink pools are recalculated after worldgen or late unlocks.
 6. Unify the two import parsers and define the `[INTEL]` and corrupt-intel
    contract precisely.
-7. Define and test complete temporary-waypoint cleanup.
+7. Maintain the stopped-waypoint and complete-cleanup regression added in 4D-2.
 8. Keep the repaired synthetic `forced_hidden_ad_hoc_smoke.py` fixture from
    accidentally making unknown authored nodes initial contacts.
 9. Measure whether `UPGRADED` should later receive a bonus above its implemented

@@ -62,9 +62,12 @@ longer connect components or count as frontier; their historical clues remain.
 Producer/consumer, lazy-generation, and persistence details are in the canonical
 navigation reference.
 
-**Pending (F-NAV-01):** `nav abort` can still leave reverse references to a
-removed waypoint. The projection prevents their use; specific cleanup is not
-part of 4D-1.
+**Implemented in 4D-2 (F-NAV-01):** abort stops at the exact interpolated
+position. A stopped waypoint supports normal scan and route solve; a valid
+route permits real travel to a third destination without returning first.
+Arrival or replacement cleans live temporary references, preserving history.
+The [canonical inventory](../systems/discovery-navigation-intel.md#abort-and-temporary-node)
+details lifetime, jobs, repeated aborts, and persistence.
 
 ### 2.2 Progressive recovery
 
@@ -329,15 +332,16 @@ worktree on the same date.
 ### 4.2 Covered and prepared cases
 
 The route-integrity portion of IT-01/IT-06 is covered in 4D-1; the remaining
-criteria are still pending:
+criteria and their current coverage are:
 
 - **IT-01/IT-06:** import or construct a dangling/over-cap LINK in the current
   version; retain the historical clue, exclude it from routes/frontiers, and
   demonstrate stable state after save/load. Include a valid, not-yet-
   materialized procedural reference. This does not require migrating a save
   from another version.
-- **IT-09:** create a temporary waypoint, abort, and arrive at both endpoints;
-  no reference to the id remains, including after save/load.
+- **IT-09 — covered in 4D-2:** abort at an interpolated position, scan, solve
+  and travel to C or either endpoint; clean all live references, retain history,
+  repeat aborts, and round-trip all five phases with temporary saves.
 - **IT-04/IT-07:** reach a remote deadnode; each clue is confirmed only if its
   hop is valid and the complete chain terminates at the target. With the
   receiver off, no chain, or a protected target, attempts/cooldown do not
@@ -366,6 +370,7 @@ existing receivers/stages that the planner can reuse without creating nodes.
 | Defect | Priority | Regression before correction | Acceptance criterion | Proposed phase |
 | --- | --- | --- | --- | --- |
 | F-ROUTE-01 — known-route integrity | **Fixed** | `known_routes_integrity_smoke.py`: ten groups for validation/publication, EN/ES import, components, frontier, deadnodes, lazy, travel/jobs, inert waypoint, and save/load | No phantom frontier; contacts/history retained and no invalid operational route after save/load | **4D-1 complete** |
+| F-NAV-01 — stopped waypoint and cleanup | **Fixed** | `nav_abort_waypoint_cleanup_smoke.py`, seed 314159 | Normal exploration/navigation at T; targeted idempotent cleanup, history preserved, repeated aborts and save/load | **4D-2 complete** |
 | `uplink_only` consumes a primary without a valid effect | **Fixed** | Synthetic malformed, missing-endpoint, over-cap, valid-new-LINK, and valid-preexisting-LINK cases | Only valid new/preexisting links set `delivered` and unlock; failures remain pending and retryable | **4C-1 complete** |
 | `UPGRADED` sensors fell back to the `CRITICAL` factor | **Fixed** | `sensor_detection_factor_smoke.py`: deterministic factor/detection matrix for every `SystemState` | `UPGRADED` uses the nominal factor; other states, range, energy, and duration are unchanged | **4C-2a complete** |
 | Malformed `SECTOR` materializes origin | **Fixed** | `sector_intel_validation_smoke.py`: canonical existing/lazy/wide ids and invalid formats through public imports | Localized rejection without mutation; canonical formats still materialize | **4C-2b complete** |
@@ -471,7 +476,7 @@ pending references, mutating the world, or materializing on load. Lazy SECTOR
 and the existing prefix helper still run before checking; no id aliases are
 invented. Repeated save/load and incompatible files are covered with temporary
 directories. The [canonical inventory](../systems/discovery-navigation-intel.md#operational-routes-and-historical-clues-4d-1)
-details every consumer. F-NAV-01 and F-DEAD-01 remain pending.
+details every consumer. F-NAV-01 was subsequently fixed in 4D-2; F-DEAD-01 remains pending.
 
 ## 6. Current risks and boundaries
 
@@ -496,6 +501,19 @@ details every consumer. F-NAV-01 and F-DEAD-01 remain pending.
 The contract incorporates the Phase 4B decisions and records 4C-1 as the first
 completed production correction. `uplink_only` no longer consumes pieces
 without an effect and has a public retry compatible with the one-shot pool.
-The matrix also records 4C-2a/b/c/d, 4C-3, and 4D-1 as complete; F-WGEN-01 now respects
+The matrix also records 4C-2a/b/c/d, 4C-3, and 4D-1/2 as complete; F-WGEN-01 now respects
 regional categories. Other interventions, communications work, and defects
 remain pending.
+
+### Phase 4D-2: stopped waypoints and F-NAV-01
+
+`nav_abort_waypoint_cleanup_smoke.py` fixes the contract with seed `314159`:
+abort preserves interpolated coordinates and stops the ship; scan uses T as
+its origin without a transit unlock; route solve and real travel support C
+or the previous endpoints under normal gates and the inclusive 45 ly cap.
+Cleanup is targeted and idempotent, preserving permanent routes, contacts and
+historical intel. Repeated aborts replace the old waypoint without an invalid
+operational origin; its pending scan/solve jobs are cancelled using the existing
+finalizer. Three temporary save/load cycles cover each of five travel phases.
+The [audit closure](../testing/stabilization-audit.md#phase-4d-2-stopped-waypoints-and-f-nav-01)
+records the red tests, coordinates and full validation. F-DEAD-01 remains open.

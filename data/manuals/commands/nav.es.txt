@@ -21,7 +21,11 @@ Descripción
 - `nav map contacts sector`: agrupa los contactos conocidos por sector y ordena los sectores por cercanía.
 - `nav <node_id>`: inicia tránsito al destino.
 - `nav --no-cruise <node_id>`: inicia tránsito sin forzar perfil CRUISE.
-- `nav abort`: aborta tránsito en curso y revierte al origen.
+- `nav abort`: detiene el viaje en la posición exacta actual y crea un waypoint temporal. No devuelve la nave al origen.
+- En un waypoint detenido puedes permanecer, usar sistemas, guardar/cargar y ejecutar `scan` con sus requisitos normales.
+- Usa `route solve <node_id>` y después `nav <node_id>` para llegar a un tercer destino válido dentro de sensores y 45 ly; regresar al origen es opcional.
+- Volver al origen o continuar al destino anterior sigue exigiendo un viaje real.
+- El waypoint permanece durante el viaje de salida; llegar a otro nodo u otro aborto limpia sus referencias temporales y conserva la intel histórica.
 
 Aliases aceptados (no aparecen en `help`)
 - `nav sectors` -> `nav map sectors`

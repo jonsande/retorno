@@ -13,7 +13,7 @@ tests, balance ni contenido.
 > diferida, protección narrativa y política de partidas. Las matrices de esta
 > auditoría se conservan como diagnóstico del comportamiento observado.
 
-## 0. Cierre de Fase 4B y actualizaciones hasta 4D-1
+## 0. Cierre de Fase 4B y actualizaciones hasta 4D-2
 
 Las decisiones abiertas de esta auditoría se cierran o reasignan así:
 
@@ -40,6 +40,7 @@ La matriz ejecutiva vigente, con criterios completos en el contrato, es:
 | F-DEAD-02 — cooldown en `t=0` | **Corregido** | `deadnode_cooldown_zero_smoke.py` | **4C-2d completada** |
 | F-WGEN-01 — filtros `modules_pool` | **Corregido** | `worldgen_modules_pool_smoke.py` | **4C-3 completada** |
 | F-ROUTE-01 — integridad de rutas conocidas | **Corregido** | `known_routes_integrity_smoke.py` | **4D-1 completada** |
+| F-NAV-01 — waypoint detenido y limpieza | **Corregido** | `nav_abort_waypoint_cleanup_smoke.py`: scan, solve/viaje C/A/B, abortos repetidos, referencias/jobs, cinco fases save/load | **4D-2 completada** |
 
 El orden anterior sustituye las prioridades históricas de las secciones 4, 7 y
 8 cuando entren en conflicto. F-LORE-01 quedó corregido posteriormente en 4C-1,
@@ -114,8 +115,9 @@ publicador ya la rechaza. Las dos fixtures de compleción CLI/Textual ahora usan
 un nodo físico sintético dentro del cap, en lugar de depender de `CURL_12`
 ausente. No se activó contenido authored inactivo. El diagnóstico histórico
 F-ROUTE-01 inferior se conserva; su cierre está en la matriz vigente superior.
-F-NAV-01 y F-DEAD-01 siguen pendientes: no se cambian limpieza de waypoint,
-puentes, umbrales, cooldowns ni topología. Las regresiones 4C permanecen verdes.
+Al cerrar 4D-1, F-NAV-01 y F-DEAD-01 seguían pendientes. Operatividad/limpieza
+de waypoint se completaron después en 4D-2; puentes, umbrales, cooldowns y
+topología siguen fuera de esa fase. Las regresiones 4C permanecen verdes.
 
 Validación final de 4D-1: 31/31 smokes pasan, incluidas las regresiones 4C,
 rutas, recuperación, deadnodes, worldgen lazy, persistencia y compleción
@@ -129,8 +131,8 @@ conocimiento y rutas publicadas—, pero varios consumidores no aplican el mismo
 criterio de validez. Los problemas de mayor prioridad son:
 
 1. F-ROUTE-01 quedó corregido en 4D-1: los registros inválidos de `known_links`
-   ya no son rutas/fronteras operativas. `nav abort` todavía puede dejar
-   referencias huérfanas (F-NAV-01), ahora inertes hasta su limpieza específica.
+   ya no son rutas/fronteras operativas. Operatividad de waypoint y limpieza
+   de referencias vivas F-NAV-01 se completaron después en 4D-2.
 2. Deadnodes coloca el puente cerca del objetivo, no de un origen alcanzable, y
    publica una pista desde el nodo actual sin validar 45 ly. En la sonda, el
    puente quedó a 99,38 ly, sin enlaces físicos ni pool, y la importación rechazó
@@ -168,7 +170,7 @@ telemetría ni muestra de partidas, no que el caso sea improbable.
 | ID | Problema | Subsistemas | Evidencia | Precondiciones | Consecuencia para el jugador | Severidad | Frecuencia | Recuperación actual | Pruebas existentes | Pruebas necesarias | Decisión pendiente | Orden |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | F-ROUTE-01 | Rutas conocidas inexistentes o sobre-cap cuentan como frontera/ruta para recuperación y deadnodes, pero viaje las rechaza. | Intel, `WorldState`, viaje, recuperación, deadnodes, save | Implementación + sonda en memoria | Importar `LINK` con extremo inexistente, cargar estado obsoleto o conservar arista inválida | Frontera fantasma; no se activa rescate y el destino no entra en deadnodes | Alta | Desconocida; el import dangling está disponible al jugador | No hay comando de limpieza; otras rutas independientes pueden seguir funcionando | `route_hop_cap_smoke` sólo cubre rechazo de viaje | Import dangling/sobre-cap → frontera → deadnodes → viaje, antes/después de sanear | Política de rechazo/migración para saves | 1 |
-| F-NAV-01 | `_clear_tmp_node` elimina el waypoint y su entrada, pero deja referencias inversas en los extremos. | Viaje abortado, rutas, recuperación, persistencia | Implementación + sonda | `nav abort` y posterior salida del waypoint | Ruta fantasma producida por juego normal; puede activar F-ROUTE-01 | Alta | Desconocida | Ninguna automática | Sin cobertura específica | Abort → reanudar → llegada → ausencia total del id temporal, también tras save/load | Ninguna para la limpieza; definir migración de estados existentes | 1 |
+| F-NAV-01 — diagnóstico histórico; corregido en 4D-2 | `_clear_tmp_node` eliminaba el waypoint y su entrada, pero dejaba referencias inversas en los extremos. | Viaje abortado, rutas, recuperación, persistencia | Implementación + sonda + regresión 4D-2 | `nav abort` y posterior salida del waypoint | Antigua ruta fantasma de juego normal | Alta antes de corregir | Desconocida | Limpieza dirigida implementada | `nav_abort_waypoint_cleanup_smoke.py` | Cubierto: exploración normal en T, viajes C/A/B, referencias/jobs vivos, abortos repetidos, historial y save/load | Sin migración ni saneado global | Cerrado |
 | F-DEAD-01 | El puente deadnode se crea junto al objetivo y la pista parte del nodo actual sin validar cap; además no tiene enlace físico ni pool. | Deadnodes, intel, navegación, worldgen, pools | Implementación + sonda: 99,38 ly y ruta descartada | Objetivo inaccesible lejano alcanza umbral `dead` | Dos intentos indirectos pueden ser inutilizables; el directo puede seguir sobre-cap | Alta | Desconocida | Repetición cada 5 años y pista directa, sin garantía de utilidad | No hay test dedicado | Origen alcanzable → umbral → puente bajo cap → import → viaje; casos lejano, sector generado/no generado | Contrato del puente: origen, topología, pool y persistencia | 2 |
 | F-LORE-01 — corregido 4C-1 | `uplink_only` se marcaba entregado aunque el LINK fuera inválido/sobre-cap y no hubiera efecto. | Scheduler, primaries, intel, persistencia | Implementación + regresión sintética | Pieza asignada a `uplink_only` con línea no parseable o salto inválido | Contenido irrepetible consumido y primary no desbloqueado | Alta antes de corregir | Cero con los datos activos actuales | Fallos conservan asignación/pendiente; reintento público no repite el pool | `uplink_only_delivery_retry_smoke.py` | Cubierto: malformed, ausente, sobre-cap, nuevo/preexistente, retry y save/load | Implementado | Cerrado |
 | F-SENS-01 — corregido 4C-2a | `UPGRADED` superaba el gate pero faltaba en el mapa de detección y caía a `CRITICAL` (0,35). | Scan, sistemas, balance | Implementación + regresión determinista | Sensores en estado `UPGRADED` | Una mejora detectaba menos que nominal | Media antes de corregir | Desconocida | Factor nominal; excepción de entrada de recuperación intacta | `sensor_detection_factor_smoke.py` | Cubierto: factores, umbrales, límites, gates y excepción de recuperación | Nominal 1.00 implementado; una bonificación mayor sigue en balance | Cerrado |
@@ -239,7 +241,7 @@ flowchart LR
 | Prioridad | Resultado | Alcance recomendado | Criterio de salida |
 | --- | --- | --- | --- |
 | P0 — Caracterización | Convertir sondas críticas en regresiones aisladas | Rutas inválidas, waypoint, `UPGRADED`, intel, módulos, sector inválido, entrega sin efecto, persistencia | Tests rojos sólo donde se va a corregir; decisiones deliberadas fijadas en verde |
-| P1 — Integridad de rutas | Una ruta publicada es viajable o está explícitamente marcada/no publicada | Criterio común/importadores completados en 4D-1; limpieza waypoint F-NAV-01 pendiente; proyección de saves vigentes de sólo lectura sin poda | Ninguna arista dangling/sobre-cap cuenta como frontera o resolución deadnode |
+| P1 — Integridad de rutas | Una ruta publicada es viajable o está explícitamente marcada/no publicada | Criterio común/importadores completados en 4D-1; limpieza waypoint F-NAV-01 completada en 4D-2; proyección de saves vigentes de sólo lectura sin poda global | Ninguna arista dangling/sobre-cap cuenta como frontera o resolución deadnode |
 | P2 — Recuperación | Deadnodes y recuperación sólo ofrecen oportunidades consumibles | Origen de puente alcanzable, cap, topología/pool, cooldown y semántica `stuck`; confirmar llegada/dock | Cadena deadnode E2E y save/load verde |
 | P3 — Integridad narrativa | No consumir piezas sin efecto ni asignarlas sin política de acceso | Resultado de entrega, retry, breadcrumb, unlock y protección | Primaries sintéticos cubren éxito, fallo y ruta preexistente |
 | P4 — Defectos acotados de datos/UI | Reparaciones independientes y de bajo riesgo | `UPGRADED`, ids de sector, orden intel y `modules_pool` corregidos; campo de radiación pendiente de decisión | Matrices por estado/región y errores públicos claros |
@@ -266,7 +268,7 @@ literales, `create_initial_state_sandbox/prologue`, `Engine` y
 | IT-06 | Importar LINK inexistente y sobre-cap; cargar arista obsoleta; ejecutar frontera, deadnodes y viaje | Rechazo/no publicación; ningún falso frontier; contacto conserva semántica decidida; migración idempotente | Nueva fixture de rutas inválidas; reutilizar parser y Engine |
 | IT-07 | Guardar antes y después de activar recuperación global/deadnode; cargar dos veces | IDs, paths, pools, thresholds, attempts y bridge persisten; no se duplica generación/pista | El cooldown deadnode en tiempo cero está cubierto con `TemporaryDirectory`; queda la persistencia de la cadena global/deadnode completa |
 | IT-08 | Filtrar un single real activo, probabilidad/intervalo controlados, receptor conocido abierto, trigger, lectura/import, save/load | Binding correcto, un solo delivery, contenido real legible, efecto intel esperado (ninguno si el archivo no contiene intel), persistencia | Loader real + filtro local; no copiar el contenido al test |
-| IT-09 | Viaje → abort → save/load opcional → reanudar a cada extremo | Waypoint desaparece de nodos, rutas, conocidos, intel/fine ranges aplicables y componentes | Nueva prueba local sobre `TravelAbort`/`_clear_tmp_node` |
+| IT-09 — cubierto 4D-2 | Viaje → abort → scan → solve C → viaje C/A/B; abortos repetidos y save/load | Waypoint ausente de nodos/rutas/índices/jobs vivos; historial conservado | `nav_abort_waypoint_cleanup_smoke.py` |
 | IT-10 | Generar bulge/halo/disk con seeds conocidas y nodo salvage aplicable | Conteo respeta min/max y cada módulo pertenece a la semántica aprobada; determinismo | Reusar loader y descriptor de worldgen; tabla de seeds explícita |
 
 La sonda de auditoría en memoria confirmó F-ROUTE-01, F-NAV-01, F-DEAD-01,
@@ -344,10 +346,9 @@ Las fixtures de algoritmos no deben depender de nombres narrativos authored.
 
 1. Reparar las tres fixtures sin cambios productivos y añadir caracterizaciones
    para decisiones deliberadas.
-2. Mantener IT-06 y el criterio común completados en 4D-1; IT-09 y la limpieza
-   F-NAV-01 siguen para la fase siguiente.
-3. Corregir/sanear rutas fantasma y waypoint; después revalidar recuperación y
-   componentes conocidos.
+2. Mantener IT-06 y el criterio común completados en 4D-1, además de IT-09
+   y operatividad/limpieza de waypoint F-NAV-01 completadas en 4D-2.
+3. Mantener regresiones de recuperación y componentes tras la limpieza acotada del waypoint.
 4. Acordar el puente y completar IT-04 + IT-07 antes de tocar deadnodes.
 5. Mantener cerrada la regresión F-LORE-01; acordar todavía breadcrumb y
    protección y completar el IT-05 de arco forzado antes de ampliar esas rutas.
@@ -391,3 +392,78 @@ Implementación propietaria:
   configuración efectiva.
 - [`io/save_load.py`](../../src/retorno/io/save_load.py): persistencia V2,
   checksum y fallback a backup.
+
+### Fase 4D-2: waypoints detenidos y F-NAV-01
+
+Requisito previo verificado: `main` limpio, HEAD y `origin/main` publicado en
+`32c74c9` (F-ROUTE-01), staging vacío. La primera consulta vio `4fd3909`;
+el checkout se actualizó externamente a `32c74c9` antes de editar.
+`tests/nav_abort_waypoint_cleanup_smoke.py` reprodujo siete grupos fallidos
+antes de modificar producción (tres ya pasaban): scan bloqueado por tipo,
+autocompletado CLI ocultando C, viaje a C resuelto rechazado, ruta inversa tras
+llegada, save/load conservando la restricción, segundo aborto hacia C bloqueado
+y T1 eliminado conservado en `active_tmp_from`. Otra prueba roja detectó un
+job solve activo operando desde T1 eliminado antes de añadir su limpieza.
+
+El contrato corregido permite permanecer y explorar en T con gates normales,
+resolver y viajar a C, o regresar a A / continuar a B. La posición al 25% de
+`(0,0,0) -> (8,4,2)` es `(2,1,0.5)`; un segundo aborto a mitad de camino hacia
+`C=(2,1.1,0.5)` queda en `(2,1.05,0.5)` con tolerancia de coma flotante.
+Ningún aborto avanza tiempo, produce llegada ni regala desplazamiento. Se
+conservan cap inclusivo de 45 ly, probabilidades/gates normales de sensores,
+dirección de rutas y F-ROUTE-01.
+
+La referencia canónica de navegación mantiene el inventario temporal.
+La limpieza es dirigida e idempotente, conserva rutas permanentes, contactos
+legítimos e intel histórica; finaliza como cancelados los jobs scan/solve del
+waypoint mediante eventos localizados existentes. Tres ciclos temporales de
+save/load en cada una de cinco fases conservan coordenadas, viaje, jobs y rutas:
+A→B activo, T detenido, T→C resuelto, T→C activo y llegada/limpieza en C.
+Los abortos repetidos también sobreviven a save/load y permiten continuar
+exploración/navegación normal. Sin partidas reales, migración de esquema,
+trabajo F-DEAD-01 ni cambios de worldgen o balance.
+
+Validación final: **31/31 comprobaciones pasan** (30 scripts smoke y estilo de
+manuales), incluidos los doce grupos de la nueva regresión. Todos los comandos
+Python usaron el entorno virtual canónico del checkout. También pasan
+`compileall -q src tests`, `git diff --check`, enlaces locales de documentación,
+identificadores técnicos coincidentes en secciones de waypoint/adiciones de
+manuales EN/ES y diccionarios localizados de UI modificados. No se instaló Ruff.
+
+| Grupo de validación | Scripts de `tests/` (todos pasan) |
+| --- | --- |
+| Waypoints, descubrimiento y rutas | `nav_abort_waypoint_cleanup_smoke.py`, `scan_job_smoke.py`, `route_hop_cap_smoke.py`, `route_solve_out_of_range_origins_smoke.py`, `known_routes_integrity_smoke.py`, `contacts_smoke.py`, `contacts_sector_smoke.py` |
+| Mapas, CLI/Textual y jobs | `nav_map_galaxy_smoke.py`, `nav_map_galaxy_dependencies_smoke.py`, `nav_map_galaxy_determinism_smoke.py`, `textual_completion_context_smoke.py`, `drone_completion_context_smoke.py`, `textual_active_jobs_job_id_smoke.py`, `job_id_numbering_smoke.py` |
+| Recuperación, persistencia y estabilización 4C | `save_load_smoke.py`, `exploration_recovery_smoke.py`, `uplink_authored_and_failsafe_smoke.py`, `uplink_once_per_node_smoke.py`, `deadnode_cooldown_zero_smoke.py`, `sensor_detection_factor_smoke.py`, `sector_intel_validation_smoke.py`, `intel_recent_order_smoke.py`, `worldgen_modules_pool_smoke.py`, `uplink_only_delivery_retry_smoke.py`, `lore_channel_preference_and_unlock_smoke.py`, `forced_hidden_ad_hoc_smoke.py`, `energy_policy_smoke.py` |
+| Contexto físico y documentación | `transit_radiation_progression_smoke.py`, `worldgen_sparse_archetypes_smoke.py`, `debug_worldgen_graph_smoke.py`, `manuals_style_check.py` |
+
+La primera tanda amplia pasó 30/31 comprobaciones. El smoke de radiación falló
+antes de navegar porque faltaba el authored inactivo `DERELICT_A3`. Su fixture
+usa ahora dos extremos físicos sintéticos; sus aserciones de interpolación no
+cambian. No se activó contenido authored. La nueva fixture de waypoint usa
+sectores controlados, nave con suministro energético, viajes reales cortos y
+datos de survey pendientes para que recuperación/balance energético no oculten
+las comprobaciones de navegación. HEAD sigue en `32c74c9`; cambios sin stage,
+sin commit ni push. F-DEAD-01 y fases posteriores siguen sin iniciarse.
+
+#### Revisión final de eventos de limpieza (4D-2)
+
+Tres grupos de regresión adicionales cubren llegada, aborto repetido y limpieza
+defensiva al finalizar docking (waypoint retenido de forma controlada; la
+llegada normal lo elimina antes del docking). Antes de corregir, llegada
+registraba `E00011` dos veces y docking registraba `E00010` dos veces en
+`state.events.recent`; el aborto repetido ya pasaba. `_clear_tmp_node`
+registraba y devolvía cada cancelación; después `tick` volvía a registrar el
+evento devuelto.
+
+El helper ahora devuelve eventos sin registrarlos. `tick` registra eventos de
+llegada/jobs una vez en su punto existente; `TravelAbort` registra expresamente
+los de limpieza una vez. Sin deduplicación global ni cambios físicos o de
+reglas de navegación. Pasan los **15 grupos de regresión de waypoint** y los
+**31/31 controles** originales. Los nuevos casos verifican un evento devuelto
+y una entrada histórica por cancelación, una finalización terminal, ids de
+evento/job coherentes, salida de jobs activos, historial terminal, presentación
+CLI/Textual EN/ES, ticks posteriores y tres ciclos temporales save/load sin
+duplicados ni cambios de ids/secuencias terminales. También pasan compilación
+Python y `git diff --check`. Se conservan los 16 archivos pendientes originales;
+esta revisión sólo cambia engine, regresión y esta auditoría EN/ES.

@@ -2,14 +2,19 @@ from __future__ import annotations
 
 from retorno.bootstrap import create_initial_state_sandbox
 from retorno.core.engine import Engine
+from retorno.model.world import SpaceNode
 
 
 def main() -> None:
     state = create_initial_state_sandbox()
     engine = Engine()
 
-    from_id = "ARCHIVE_01"
-    to_id = "DERELICT_A3"
+    # Synthetic endpoints keep this interpolation check independent of which
+    # authored locations are active in the current world.
+    from_id = "RADIATION_FROM"
+    to_id = "RADIATION_TO"
+    state.world.space.nodes[from_id] = SpaceNode(from_id, from_id, "derelict")
+    state.world.space.nodes[to_id] = SpaceNode(to_id, to_id, "derelict", x_ly=10.0)
     from_node = state.world.space.nodes[from_id]
     to_node = state.world.space.nodes[to_id]
     from_node.radiation_rad_per_s = 0.001

@@ -9,6 +9,8 @@ Requirements (gating)
 
 Operational behavior
 - Queues a scan job with a timed active sweep.
+- After `nav abort`, a stopped waypoint is a normal scan origin: range is measured from that position and no transit scan module is required.
+- Active travel keeps its existing scan restrictions; this does not authorize scanning during a journey.
 - On completion, updates local contact awareness and may reveal detection events.
 - If new contacts are discovered, it emits `signal_detected` and its mapped cue.
 - If operating context changes before completion, the job may be interrupted.

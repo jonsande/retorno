@@ -110,6 +110,7 @@ class Engine:
 
         arrived_this_tick = False
         if state.ship.in_transit and state.clock.t >= state.ship.arrival_t:
+            arrival_from = state.ship.transit_from
             state.ship.in_transit = False
             state.ship.current_node_id = state.ship.transit_to or state.ship.current_node_id
             state.world.current_node_id = state.ship.current_node_id
@@ -120,7 +121,7 @@ class Engine:
                 if node.kind != "transit":
                     state.world.visited_nodes.add(node.node_id)
                     close_window_on_orbit_entry(state, node.node_id)
-            self._clear_tmp_node(state)
+            events.extend(self._clear_tmp_node(state))
             self._drop_initial_unknown_node(state)
             events.append(
                 self._make_event(
@@ -130,7 +131,7 @@ class Engine:
                     SourceRef(kind="ship", id=state.ship.ship_id),
                     f"Arrived at {state.ship.current_node_id}",
                     data={
-                        "from": state.ship.transit_from,
+                        "from": arrival_from,
                         "to": state.ship.transit_to,
                         "distance_ly": state.ship.last_travel_distance_ly,
                     },
@@ -275,21 +276,6 @@ class Engine:
                 self._record_event(state.events, event)
                 return [event]
             current_id = state.world.current_node_id
-            if (
-                state.world.active_tmp_node_id
-                and current_id == state.world.active_tmp_node_id
-                and action.node_id not in {state.world.active_tmp_from, state.world.active_tmp_to}
-            ):
-                event = self._make_event(
-                    state,
-                    EventType.BOOT_BLOCKED,
-                    Severity.WARN,
-                    SourceRef(kind="ship", id=state.ship.ship_id),
-                    "Travel blocked: temporary waypoint allows only origin/destination",
-                    data={"message_key": "boot_blocked", "reason": "no_route", "node_id": action.node_id},
-                )
-                self._record_event(state.events, event)
-                return [event]
             if action.node_id == current_id:
                 event = self._make_event(
                     state,
@@ -499,12 +485,14 @@ class Engine:
             else:
                 x, y, z = state.world.current_pos_ly
 
-            self._clear_tmp_node(state)
+            transit_env_rad = self._compute_env_radiation_rad_per_s(state)
+            cleanup_events = self._clear_tmp_node(state)
+            for cleanup_event in cleanup_events:
+                self._record_event(state.events, cleanup_event)
             rng = self._rng(state)
             tmp_id = f"NAV_PT_{rng.getrandbits(16):04X}"
-            while tmp_id in state.world.space.nodes:
+            while tmp_id in state.world.space.nodes or tmp_id == from_id:
                 tmp_id = f"NAV_PT_{rng.getrandbits(16):04X}"
-            transit_env_rad = self._compute_env_radiation_rad_per_s(state)
             tmp_node = SpaceNode(
                 node_id=tmp_id,
                 name="Nav Point",
@@ -519,8 +507,10 @@ class Engine:
             state.ship.current_node_id = tmp_id
             state.world.current_pos_ly = (x, y, z)
             state.world.active_tmp_node_id = tmp_id
-            state.world.active_tmp_from = from_id
-            state.world.active_tmp_to = to_id
+            # Repeated aborts replace the old waypoint. Its deleted id remains
+            # historical in the event, not an operational endpoint.
+            state.world.active_tmp_from = from_id if from_id in state.world.space.nodes else None
+            state.world.active_tmp_to = to_id if to_id in state.world.space.nodes else None
             state.world.active_tmp_progress = progress
             state.ship.docked_node_id = None
             if from_id:
@@ -552,7 +542,7 @@ class Engine:
                 },
             )
             self._record_event(state.events, event)
-            return [event]
+            return cleanup_events + [event]
 
         if isinstance(action, Hibernate):
             return []
@@ -3773,11 +3763,10 @@ class Engine:
                 "Scan blocked: sensord not running. Try: boot sensord",
                 {"message_key": "boot_blocked", "reason": "scan_sensord_not_running"},
             )
-        node = state.world.space.nodes.get(state.world.current_node_id)
-        if node and node.kind == "transit" and not self._has_unlock(state, "scan_in_transit"):
+        if state.ship.in_transit and not self._has_unlock(state, "scan_in_transit"):
             return (
                 SourceRef(kind="world", id=state.world.current_node_id),
-                "Scan blocked: sensors lock unavailable while adrift",
+                "Scan blocked: sensors lock unavailable during transit",
                 {"message_key": "boot_blocked", "reason": "scan_locked_in_transit"},
             )
         return None
@@ -3895,16 +3884,68 @@ class Engine:
     def _survey_reports_data_signatures(self, state: GameState, node_id: str, job_id: str, data_available: bool) -> bool:
         return survey_reports_data_signatures(state, node_id, job_id, data_available)
 
-    def _clear_tmp_node(self, state: GameState) -> None:
+    def _clear_tmp_node(self, state: GameState) -> list[Event]:
+        """Remove the waypoint and return events for the caller to record once."""
         tmp_id = state.world.active_tmp_node_id
         if not tmp_id:
-            return
-        state.world.space.nodes.pop(tmp_id, None)
-        state.world.known_links.pop(tmp_id, None)
+            return []
+        events: list[Event] = []
+        for job_key in list(state.jobs.active_job_ids):
+            job = state.jobs.jobs.get(job_key)
+            if not job or job.job_type not in {JobType.SCAN, JobType.ROUTE_SOLVE}:
+                continue
+            if tmp_id not in {job.target.id if job.target else None,
+                              job.params.get("origin_node_id"), job.params.get("from_id")}:
+                continue
+            self._finalize_job(state.jobs, job, JobStatus.CANCELLED)
+            event = self._make_job_outcome_event(
+                state, job, EventType.JOB_FAILED, Severity.INFO,
+                SourceRef(kind="ship", id=state.ship.ship_id),
+                f"Job cancelled: {job.job_id}",
+                data={"job_type": job.job_type.value, "message_key": "job_cancelled"},
+            )
+            events.append(event)
+        world = state.world
+        world.space.nodes.pop(tmp_id, None)
+        world.known_links.pop(tmp_id, None)
+        for links in world.known_links.values():
+            links.discard(tmp_id)
+        for node in world.space.nodes.values():
+            node.links.discard(tmp_id)
+        world.space.edges.pop(tmp_id, None)
+        for origin, links in world.space.edges.items():
+            if tmp_id in links:
+                world.space.edges[origin] = [dest for dest in links if dest != tmp_id]
+        # Scan can discover the waypoint itself; pool synchronization can then
+        # create a pool for it. These indexes describe live nodes, not history.
+        for values in (world.known_nodes, world.known_contacts, world.visited_nodes,
+                       world.forced_hidden_nodes, world.salvage_tip_nodes):
+            values.discard(tmp_id)
+        for index in (world.known_intel, world.fine_ranges_km, world.node_pools, world.dead_nodes):
+            index.pop(tmp_id, None)
+        for pool in world.node_pools.values():
+            if tmp_id in pool.uplink_route_pool:
+                pool.uplink_route_pool = [dest for dest in pool.uplink_route_pool if dest != tmp_id]
+        # Waypoints are not worldgen members; remove only this id if a live
+        # sector index happens to reference it, leaving permanent topology alone.
+        for sector in world.sector_states.values():
+            if tmp_id in sector.node_ids:
+                sector.node_ids = [nid for nid in sector.node_ids if nid != tmp_id]
+            if sector.topology_hub_node_id == tmp_id:
+                sector.topology_hub_node_id = None
+            if sector.playable_hub_node_id == tmp_id:
+                sector.playable_hub_node_id = None
+        if not state.ship.in_transit:
+            if state.ship.transit_from == tmp_id:
+                state.ship.transit_from = ""
+            if state.ship.transit_to == tmp_id:
+                state.ship.transit_to = ""
+        # Intel items, terminal jobs and events retain their historical source.
         state.world.active_tmp_node_id = None
         state.world.active_tmp_from = None
         state.world.active_tmp_to = None
         state.world.active_tmp_progress = None
+        return events
 
     def _drop_initial_unknown_node(self, state: GameState) -> None:
         unknown_id = "UNKNOWN"
@@ -4223,7 +4264,7 @@ class Engine:
                     state.world.visited_nodes.add(node.node_id)
                     close_window_on_orbit_entry(state, node.node_id)
             if state.world.active_tmp_node_id and job.target.id != state.world.active_tmp_node_id:
-                self._clear_tmp_node(state)
+                events.extend(self._clear_tmp_node(state))
             events.append(
                 self._make_event(
                     state,
