@@ -18,7 +18,7 @@ Uso: intel | intel <amount> | intel all
 - Tipos de intel:
   node: nodo/contacto conocido específico (p. ej., HARBOR_12).
   sector: identificador de sector conocido (p. ej., S+001_-002_+000).
-  link: ruta conocida entre dos nodos (A -> B).
+  link: conexión comunicada entre dos nodos (A -> B); el registro por sí solo no autoriza viaje.
   coord: coordenadas exactas (x,y,z) que señalan un punto de navegación.
 
 intel show <intel_id>
@@ -29,7 +29,9 @@ intel import <path>
 - Marcadores soportados: NODE:, LINK:, SECTOR:, COORD:
 - Bloques opcionales:
   [INTEL] ... [/INTEL]
-  - Si el bloque contiene un LINK, se importa como ruta.
+  - Un LINK sólo se convierte en ruta operativa si ambos extremos están resueltos y el salto no supera 45 ly.
+  - Un LINK no resuelto o más largo se conserva como contacto y registro histórico; no autoriza viaje.
+  - Importa primero un SECTOR canónico cuando sus destinos aún necesiten materializarse y después reimporta el LINK.
   - Si contiene un node_id, name o id de sector, se añade el registro de navegación correspondiente como contacto conocido.
   - La intel corrupta puede no resolverse o generar un nuevo contacto hub.
 - Archivos en /data/nav, /mail o /logs pueden auto‑importar al hacer cat.

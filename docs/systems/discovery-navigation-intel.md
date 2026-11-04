@@ -4,6 +4,8 @@ Status: **canonical documentation of implemented behavior**. Production code
 was reviewed at commit `3658577`; tests were run later on the Phase 3B working
 tree based on `9f38d2e`.
 
+Updated for F-ROUTE-01 in Phase 4D-1 on top of `45f2900` (2026-11-04).
+
 Spanish version: [discovery-navigation-intel.es.md](discovery-navigation-intel.es.md)
 
 ## 1. Purpose and scope
@@ -83,7 +85,7 @@ flowchart LR
 | `generated_sectors` / `sector_states` | Materialized sectors and generation metadata. | Worldgen state, not player knowledge. |
 | `known_nodes: set[str]` | Operational set treated by UI, maps, scan, travel, and pools as known nodes. | De facto canonical node knowledge. |
 | `known_contacts: set[str]` | Historical mirror maintained by most writers; several consumers union it with `known_nodes` or use it as fallback. | Compatibility/auxiliary representation. |
-| `known_links: dict[str, set[str]]` | Graph of routes published to the player. | Canonical for travel reach and known connectivity. |
+| `known_links: dict[str, set[str]]` | Graph of routes published to the player. | Raw records; the operational projection is canonical for reach/connectivity. |
 | `intel: list[IntelItem]` | Typed, deduplicated record of `node`, `link`, `sector`, or `coord` intel. | Canonical for history/provenance, not accessibility. |
 | `known_intel: dict[str, dict]` | Sparse index written mainly by `NODE`, `SECTOR`, and `COORD` imports; travel accepts its keys as legacy knowledge. | Cache/compatibility, not a complete intel inventory. |
 | `fine_ranges_km` | Refined local distance for selected contacts in the same sector. | Derived cache. |
@@ -128,6 +130,47 @@ None automatically implies the other two. In particular, `SECTOR:` calls
 The accepted id is the canonical worldgen form: capital `S` plus three
 underscore-separated signed decimal indices, each formatted as `{value:+04d}`.
 The width is a minimum, so larger indices remain valid.
+
+### Operational routes and historical clues (4D-1)
+
+`is_hop_within_cap` in `model/world.py` is the shared physical criterion: both
+endpoints must exist and their distance must be at most 45 ly, inclusive.
+`add_known_link` also rejects empty endpoints and self-links. No physical
+`SpaceNode.links` edge, prior discovery, sensor state, or power state is needed
+for structural validity; command-specific travel/solve gates still apply.
+
+`reachable_from` projects only valid direct destinations from `known_links`;
+`reachable_known_nodes` traverses those directed hops. Every hop is checked, so
+an invalid intermediate edge cannot make a remote component reachable. Queries
+are read-only and never generate sectors, reveal contacts, or prune history.
+
+| Producer/consumer | Required layer and treatment |
+| --- | --- |
+| Bootstrap, `route solve`, `nav abort` | Publish through `add_known_link`; completed solve jobs revalidate endpoints/cap. Valid waypoint routes remain supported. |
+| Explicit import, `cat`/mail auto-import, `[INTEL]` LINK tokens | Share `_import_link_intel`; attempt existing lazy materialization first, retain contacts and deduplicated link history, publish only valid hops. |
+| Uplink and lore `uplink_only` | Publish with the same domain check; no pool lifecycle, weights, narrative delivery, or probability changes. Pool candidate exclusion uses operational routes. |
+| Travel | Requires a recorded direct edge and the shared physical criterion, plus its existing knowledge, waypoint, and ship gates. |
+| Navigation graph/path/components, route list, origin hints, contacts, survey, CLI/Textual completion | Use the operational projection for connections and route flags; contact inventory stays independent. Both interfaces share the same renderers/helpers. |
+| Global recovery and deadnodes | Share `reachable_known_nodes`; invalid edges cannot create frontier, expose remote payloads through an invalid component, or exclude a target as connected. |
+| Intel list/show/export and raw debug diagnostics | History/inspection, not authorization. Invalid recorded clues remain visible/exportable; debug graph/cap counts may still expose raw stale records. |
+| Save/load and temporary-node cleanup | Persistence retains raw state. `_clear_tmp_node` cleanup is unchanged (F-NAV-01); leftover reverse references are operationally inert. |
+
+No destructive load normalization is needed: the idempotent projection filters
+invalid records immediately, before or after save/load. Existing contacts,
+`known_intel`, files, provenance and pending references are retained exactly.
+Repeated save/load does not mutate the world or generate sectors. New rejected
+LINK imports are stored as historical `IntelItem` records, not new operational
+edges. Reimport after materialization can publish a now-valid route. Existing
+raw pending edges are reevaluated against current physical state on each query.
+Incompatible files retain their explicit rejection and are never deleted.
+
+Lazy generation keeps its current protocol. A canonical `SECTOR:` materializes
+the sector before a subsequent LINK to its actual generated id is validated;
+sector import alone does not reveal the cluster. The existing `S...:...` helper
+also requests its canonical sector before validation, but creates no alias for
+the `KIND_HEX` ids worldgen generates. An unresolved literal remains a contact
+and historical clue, not an operational route. No new id-resolution protocol
+or generation-order policy is introduced.
 
 ## 4. Discovery and import paths
 
@@ -200,6 +243,9 @@ destination in both known sets. It adds no `SpaceNode.links` edge and, contrary
 to the old guide, **does not call `record_intel`**. Sensors and service are
 revalidated during the job, but continued presence at the stored origin is not.
 
+Completion revalidates physical endpoints and the cap before publication. If
+an endpoint disappeared, publication is rejected without reporting a solved route.
+
 ### 4.3 `uplink`
 
 Public syntax: `uplink`; alias: `relay uplink`.
@@ -260,14 +306,14 @@ explicitly imported manuals normally use 0.8.
 | Format | Implemented effect |
 | --- | --- |
 | `NODE: <id>` | Adds the literal text to `known_nodes`, `known_contacts`, and `known_intel`, then records node intel. It only materializes a sector when the id has procedural `S...:...` form; an arbitrary id may have no physical node. |
-| `LINK: <from> -> <to>` | Attempts to add a bidirectional known route. If known physical distance exceeds the cap, it keeps both endpoints as contacts but not the route. |
+| `LINK: <from> -> <to>` | Attempts to add a bidirectional known route. If a physical endpoint is missing or the hop exceeds the cap, it retains contacts/history without publishing a route. |
 | `LINK: <to>` | Same, with the current node as origin. |
 | `SECTOR: <sector_id>` | For a canonical id, calls worldgen, records sector intel and `known_intel`, but does not reveal sector nodes. A noncanonical id is rejected with localized feedback before world or intel mutation; later valid lines in the file still run. |
 | `COORD: x, y, z` | Creates a physical `NAV_<hash>` if absent, marks it known, and records coordinate intel; it publishes no route. |
 
-A `LINK` whose endpoints do not exist may enter `known_links`: the cap helper
-accepts a distance it cannot calculate. Travel remains blocked because it
-requires the physical destination node.
+Since 4D-1, an unverifiable LINK retains contacts and historical intel but is
+not published as an operational route. Feedback distinguishes missing endpoints
+and over-cap hops in EN/ES.
 
 #### `[INTEL]...[/INTEL]` blocks
 
@@ -315,7 +361,7 @@ node intel with confidence 0.4.
 | Action | Start gates | Job/time | Revalidation or interruption |
 | --- | --- | --- | --- |
 | `scan` | Valid power, sensors ≥ `LIMITED`, `sensord`; unlock at a `transit` node. | `SCAN`, 8 s. | Fails if sensors/service stop serving or current node changes; cancellable. |
-| `route solve <id>` | Power/Core OS, sensors ≥ `LIMITED`, `sensord`, both physical nodes, sensor range and cap. | `ROUTE_SOLVE`, 100–6800 s. | Fails if sensors/service stop serving; cancellable; origin not revalidated. |
+| `route solve <id>` | Power/Core OS, sensors ≥ `LIMITED`, `sensord`, both physical nodes, sensor range and cap. | `ROUTE_SOLVE`, 100–6800 s. | Fails if sensors/service stop serving; cancellable; ship co-location with origin is not revalidated. |
 | `uplink` | Dock, compatible hub, power, `data_core` ≥ `LIMITED`, `datad`; the first attempt uses the unconsumed pool. | Immediate in REPL; not a `Job`. | No interruptible phase; the route pool is consumed once and later attempts only reevaluate pending `uplink_only`. |
 | `intel import` | Existing file and sufficient access; Core OS/terminal permits command. | Immediate. | May materialize the world and mutate knowledge while parsing. |
 | `nav <id>` | Not already in transit or docked; physical known destination; direct known route; cap and power/Core OS. | Transit state until `arrival_t`; not a `Job`. | `nav abort` creates a waypoint; arrival occurs in `Engine.tick`. |
@@ -376,7 +422,7 @@ destinations, but state may retain those stale references.
 | First node `uplink` | Dock, compatible hub, `data_core`/`datad`, unconsumed pool. | Adds accepted routes/contacts, log, conditional counters, and consumes pool. | `IntelItem(link)` per new route; possible lore/failsafe delivery. |
 | Later `uplink` | Same gates; consumed route pool and pending `uplink_only`. | Does not repeat pool/log/counters; retries only that narrative channel. | `IntelItem(link)` only if the pending LINK has become valid. |
 | `NODE:` | Accessible file. | Adds id to known sets and `known_intel`. | `IntelItem(node)`; may be dangling. |
-| `LINK:` | Accessible file; cap when distance is known. | Adds known endpoints and, if accepted, `known_links`. | `IntelItem(link)` only for a new route. |
+| `LINK:` | Accessible file; physical endpoints and cap for publication. | Retains contacts/history; adds `known_links` only if valid. | Deduplicated `IntelItem(link)`, including rejected clues. |
 | `SECTOR:` | Accessible file and canonical sector id. | Materializes sector and marks `known_intel`; an invalid id has no effect. | `IntelItem(sector)`; nodes remain hidden. |
 | `COORD:` | Three valid numbers. | Creates/knows `NAV_<hash>`. | `IntelItem(coord)`; no route. |
 | Lore `uplink_only` | Eligible piece, both physical endpoints, and cap. | Adds route/contacts and marks primary unlocked; on failure keeps assignment and pending state. | Direct `IntelItem(link)` only after success. |
@@ -459,8 +505,8 @@ operating narrative protection or activated content.
 
 - An arbitrary `NODE:` may produce a contact without a physical node; it is
   incomplete in views and cannot be used for route solve or travel.
-- A `LINK:` with missing endpoints may produce a dangling known route because
-  distance is unavailable and accepted; travel blocks it.
+- A `LINK:` with missing endpoints retains contact/history; since 4D-1 it
+  cannot produce an operational route or phantom frontier.
 - A `COORD:` contact is physical and known but inaccessible until a route is
   acquired or solved.
 - Malformed sector ids are rejected before worldgen or intel mutation. This
@@ -512,6 +558,7 @@ all build in-memory states; no real save was opened or modified.
 | `forced_hidden_ad_hoc_smoke.py` | PASSED | Known/unvisited synthetic host with breadcrumb only in its eligible pool. |
 | `sector_intel_validation_smoke.py` | PASSED | Existing and lazy canonical sectors, wide signed indices, invalid formats without serializable-state mutation, sector-only `[INTEL]` blocks without corrupt recovery/RNG use, EN/ES feedback, and continued valid-line processing. |
 | `intel_recent_order_smoke.py` | PASSED | Empty/single histories, default 20, N/all limits, descending timestamps, reverse-insertion ties, EN/ES, Textual adapter, read-only state, and unchanged show/export. |
+| `known_routes_integrity_smoke.py` | PASSED | Seed 271828; endpoints/inclusive cap, EN/ES import/history, mixed components, real recovery without phantom frontier, deadnode candidates, lazy sectors, inert waypoint, jobs, and idempotent save/load without clue loss. |
 
 The stale fixture was later repaired without revealing `HARBOR_12` or changing
 product code. The deliberate `route solve` characterization was also added in
@@ -556,8 +603,8 @@ Coverage gaps:
 2. Revisit later whether to retain the deliberate choice not to require prior
    discovery for route solve, and decide whether it should revalidate its origin
    on completion.
-3. Define whether every known route must correspond to physical nodes and/or
-   edges, and how dangling intel should behave.
+3. The operational contract was implemented in 4D-1: physical endpoints, cap,
+   no physical-edge requirement, and retained clues.
 4. Determine whether narrative protection should be global or remain a partial
    procedural-reveal filter.
 5. Decide when uplink pools are recalculated after worldgen or late unlocks.

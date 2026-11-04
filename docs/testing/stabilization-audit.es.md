@@ -13,7 +13,7 @@ tests, balance ni contenido.
 > diferida, protección narrativa y política de partidas. Las matrices de esta
 > auditoría se conservan como diagnóstico del comportamiento observado.
 
-## 0. Cierre de Fase 4B y actualizaciones hasta 4C-3
+## 0. Cierre de Fase 4B y actualizaciones hasta 4D-1
 
 Las decisiones abiertas de esta auditoría se cierran o reasignan así:
 
@@ -39,6 +39,7 @@ La matriz ejecutiva vigente, con criterios completos en el contrato, es:
 | F-INTEL-01 — `intel N` antiguo | **Corregido** | `intel_recent_order_smoke.py` | **4C-2c completada** |
 | F-DEAD-02 — cooldown en `t=0` | **Corregido** | `deadnode_cooldown_zero_smoke.py` | **4C-2d completada** |
 | F-WGEN-01 — filtros `modules_pool` | **Corregido** | `worldgen_modules_pool_smoke.py` | **4C-3 completada** |
+| F-ROUTE-01 — integridad de rutas conocidas | **Corregido** | `known_routes_integrity_smoke.py` | **4D-1 completada** |
 
 El orden anterior sustituye las prioridades históricas de las secciones 4, 7 y
 8 cuando entren en conflicto. F-LORE-01 quedó corregido posteriormente en 4C-1,
@@ -77,16 +78,59 @@ estudios de balance siguen pendientes. La fila de riesgo F-WGEN-01 inferior
 conserva el diagnóstico histórico anterior a corregir; la matriz ejecutiva
 superior muestra su estado vigente.
 
+### Cierre de Fase 4D-1: F-ROUTE-01
+
+Estado inicial limpio: `main` y `origin/main` en `45f2900`, cierre publicado de
+4C-3, sin staging. El inventario de productores/consumidores está en la
+[referencia canónica de navegación](../systems/discovery-navigation-intel.es.md#rutas-operativas-y-pistas-históricas-4d-1).
+La causa combinaba `is_hop_within_cap` aceptando distancia ausente, publicación
+sin validación y recorridos crudos de `known_links`.
+
+Antes de cambiar producción, `known_routes_integrity_smoke.py` (seed `271828`)
+dejó nueve grupos en rojo; el caso de solve/viaje válido ya pasó:
+
+| Grupo de aserciones | Fallo reproducido antes de corregir |
+| --- | --- |
+| `_assert_hops_and_publication` | Un extremo ausente pasaba el criterio de salto. |
+| `_assert_import_history_and_locales` | Se publicaba `A -> MISSING`. |
+| `_assert_components_and_views` | La arista inválida contaminaba el componente alcanzable. |
+| `_assert_recovery_frontier` | Aparecía una frontera fantasma. |
+| `_assert_deadnode_candidates` | La ruta inválida excluía un candidato deadnode. |
+| `_assert_lazy_sector` | La parte válida SECTOR/LINK pasaba; un literal prefijado no resuelto quedaba operativo. |
+| `_assert_job_endpoint_disappears` | El trabajo completado publicaba un extremo desaparecido. |
+| `_assert_waypoint_is_inert_after_removal` | El waypoint eliminado seguía operativo. |
+| `_assert_persistence` | La arista inválida cargada seguía operativa. |
+
+Tras corregir pasan los diez grupos: saltos válidos e inclusivos a 45 ly,
+rechazo dangling/sobre cap, sentido inverso y dirigido, componentes mixtos,
+contactos/historial/export EN/ES, sectores lazy, recuperación global real,
+candidatos deadnode sin crear puentes, viaje/jobs, waypoint inerte y save/load
+repetido. La proyección compartida es idempotente y de sólo lectura: no requiere
+poda destructiva al cargar ni cambia formato, historial o referencias pendientes.
+Los incompatibles se rechazan sin borrar ni modificar el archivo.
+
+La fixture de cap ahora inyecta expresamente una arista obsoleta porque el
+publicador ya la rechaza. Las dos fixtures de compleción CLI/Textual ahora usan
+un nodo físico sintético dentro del cap, en lugar de depender de `CURL_12`
+ausente. No se activó contenido authored inactivo. El diagnóstico histórico
+F-ROUTE-01 inferior se conserva; su cierre está en la matriz vigente superior.
+F-NAV-01 y F-DEAD-01 siguen pendientes: no se cambian limpieza de waypoint,
+puentes, umbrales, cooldowns ni topología. Las regresiones 4C permanecen verdes.
+
+Validación final de 4D-1: 31/31 smokes pasan, incluidas las regresiones 4C,
+rutas, recuperación, deadnodes, worldgen lazy, persistencia y compleción
+CLI/Textual. Compilación Python, enlaces locales y paridad técnica EN/ES
+verificados; Ruff no está instalado y no se añadieron dependencias.
+
 ## 1. Resumen ejecutivo
 
 La integración usa tres capas legítimamente distintas —universo físico,
 conocimiento y rutas publicadas—, pero varios consumidores no aplican el mismo
 criterio de validez. Los problemas de mayor prioridad son:
 
-1. `known_links` puede contener destinos inexistentes o saltos sobre el cap.
-   Viaje los rechaza, mientras recuperación global y deadnodes los tratan como
-   rutas/fronteras válidas. `nav abort` puede producir referencias inexistentes
-   de este tipo durante juego normal.
+1. F-ROUTE-01 quedó corregido en 4D-1: los registros inválidos de `known_links`
+   ya no son rutas/fronteras operativas. `nav abort` todavía puede dejar
+   referencias huérfanas (F-NAV-01), ahora inertes hasta su limpieza específica.
 2. Deadnodes coloca el puente cerca del objetivo, no de un origen alcanzable, y
    publica una pista desde el nodo actual sin validar 45 ly. En la sonda, el
    puente quedó a 99,38 ly, sin enlaces físicos ni pool, y la importación rechazó
@@ -195,7 +239,7 @@ flowchart LR
 | Prioridad | Resultado | Alcance recomendado | Criterio de salida |
 | --- | --- | --- | --- |
 | P0 — Caracterización | Convertir sondas críticas en regresiones aisladas | Rutas inválidas, waypoint, `UPGRADED`, intel, módulos, sector inválido, entrega sin efecto, persistencia | Tests rojos sólo donde se va a corregir; decisiones deliberadas fijadas en verde |
-| P1 — Integridad de rutas | Una ruta publicada es viajable o está explícitamente marcada/no publicada | Validador compartido, importadores, limpieza waypoint, normalización de saves | Ninguna arista dangling/sobre-cap cuenta como frontera o resolución deadnode |
+| P1 — Integridad de rutas | Una ruta publicada es viajable o está explícitamente marcada/no publicada | Criterio común/importadores completados en 4D-1; limpieza waypoint F-NAV-01 pendiente; proyección de saves vigentes de sólo lectura sin poda | Ninguna arista dangling/sobre-cap cuenta como frontera o resolución deadnode |
 | P2 — Recuperación | Deadnodes y recuperación sólo ofrecen oportunidades consumibles | Origen de puente alcanzable, cap, topología/pool, cooldown y semántica `stuck`; confirmar llegada/dock | Cadena deadnode E2E y save/load verde |
 | P3 — Integridad narrativa | No consumir piezas sin efecto ni asignarlas sin política de acceso | Resultado de entrega, retry, breadcrumb, unlock y protección | Primaries sintéticos cubren éxito, fallo y ruta preexistente |
 | P4 — Defectos acotados de datos/UI | Reparaciones independientes y de bajo riesgo | `UPGRADED`, ids de sector, orden intel y `modules_pool` corregidos; campo de radiación pendiente de decisión | Matrices por estado/región y errores públicos claros |
@@ -280,8 +324,8 @@ Las fixtures de algoritmos no deben depender de nombres narrativos authored.
 
 ## 7. Decisiones que requieren intervención del desarrollador
 
-1. Definir si una ruta inválida se rechaza, se conserva sólo como contacto/intel
-   o se marca explícitamente como no navegable; y cómo sanear saves existentes.
+1. F-ROUTE-01 resuelto en 4D-1: las pistas/contactos se conservan y la
+   proyección excluye rutas inválidas sin poda destructiva de saves vigentes.
 2. Elegir el contrato físico del puente deadnode: origen alcanzable, enlace,
    pool, sector y estrategia cuando el objetivo está a más de un salto.
 3. `uplink_only` ya tiene éxito/reintento definido e implementado; sigue abierta
@@ -300,7 +344,8 @@ Las fixtures de algoritmos no deben depender de nombres narrativos authored.
 
 1. Reparar las tres fixtures sin cambios productivos y añadir caracterizaciones
    para decisiones deliberadas.
-2. Añadir IT-06 e IT-09, acordar el contrato de ruta y centralizar validación.
+2. Mantener IT-06 y el criterio común completados en 4D-1; IT-09 y la limpieza
+   F-NAV-01 siguen para la fase siguiente.
 3. Corregir/sanear rutas fantasma y waypoint; después revalidar recuperación y
    componentes conocidos.
 4. Acordar el puente y completar IT-04 + IT-07 antes de tocar deadnodes.

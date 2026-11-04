@@ -76,7 +76,16 @@ from retorno.model.jobs import (
     job_id_numeric_suffix,
 )
 from retorno.model.ship_layout import canonical_ship_sector_id, drone_bay_sector_id_for_ship
-from retorno.model.world import SECTOR_SIZE_LY, add_known_link, is_hop_within_cap, record_intel, SpaceNode, sector_id_for_pos
+from retorno.model.world import (
+    SECTOR_SIZE_LY,
+    SpaceNode,
+    add_known_link,
+    distance_between_nodes_ly,
+    is_hop_within_cap,
+    reachable_from,
+    record_intel,
+    sector_id_for_pos,
+)
 from retorno.runtime.data_loader import load_locations, load_modules
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path, mount_files
 from retorno.model.systems import Dependency, ShipSystem, SystemState
@@ -317,8 +326,17 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            distance_ly = self._distance_between_nodes(state, current_id, action.node_id)
-            if distance_ly > float(Balance.MAX_ROUTE_HOP_LY):
+            distance_ly = distance_between_nodes_ly(state.world, current_id, action.node_id)
+            if distance_ly is None:
+                event = self._make_event(
+                    state, EventType.BOOT_BLOCKED, Severity.WARN,
+                    SourceRef(kind="world", id=current_id),
+                    f"Travel blocked: node {current_id} not found",
+                    data={"message_key": "boot_blocked", "reason": "node_missing", "node_id": current_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            if not is_hop_within_cap(state.world, current_id, action.node_id):
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
@@ -1627,7 +1645,7 @@ class Engine:
 
         if isinstance(action, RouteSolve):
             current_id = state.world.current_node_id
-            if action.node_id in state.world.known_links.get(current_id, set()):
+            if action.node_id in reachable_from(state.world, current_id):
                 fine_km = self._maybe_set_fine_range(state, current_id, action.node_id)
                 if fine_km is not None:
                     event = self._make_event(
@@ -4565,6 +4583,8 @@ class Engine:
             if is_hop_within_cap(state.world, from_id, node_id, float(Balance.MAX_ROUTE_HOP_LY)):
                 link_added = add_known_link(state.world, from_id, node_id, bidirectional=True)
             else:
+                distance = distance_between_nodes_ly(state.world, from_id, node_id)
+                missing_id = from_id if from_id not in state.world.space.nodes else node_id
                 events.append(
                     self._make_event(
                         state,
@@ -4572,19 +4592,22 @@ class Engine:
                         Severity.WARN,
                         SourceRef(kind="world", id=node_id),
                         (
+                            f"Route solve rejected: node {missing_id} not found"
+                            if distance is None else
                             f"Route solve rejected: hop exceeds cap "
                             f"({float(job.params.get('distance_ly', 0.0)):.2f}ly > {Balance.MAX_ROUTE_HOP_LY:.1f}ly)"
                         ),
                         data={
                             "message_key": "boot_blocked",
-                            "reason": "hop_cap_exceeded",
+                            "reason": "node_missing" if distance is None else "hop_cap_exceeded",
                             "from_id": from_id,
-                            "node_id": node_id,
+                            "node_id": missing_id if distance is None else node_id,
                             "distance_ly": float(job.params.get("distance_ly", 0.0)),
                             "max_hop_ly": float(Balance.MAX_ROUTE_HOP_LY),
                         },
                     )
                 )
+                return events
             if link_added:
                 state.world.known_nodes.add(node_id)
                 state.world.known_contacts.add(node_id)

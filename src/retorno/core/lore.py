@@ -16,6 +16,7 @@ from retorno.model.world import (
     SpaceNode,
     add_known_link,
     is_hop_within_cap,
+    reachable_from,
     record_intel,
     region_for_pos,
     sector_id_for_pos,
@@ -380,7 +381,7 @@ def _precompute_uplink_route_pool_for_node(state, node_id: str, max_new: int = 3
     sx, sy, sz = _parse_sector_id(current_sector)
     ensure_sector_generated(state, current_sector)
 
-    routes = set(state.world.known_links.get(node_id, set()))
+    routes = reachable_from(state.world, node_id)
     locked_primary_targets = _locked_primary_targets(state)
     authored_ids = _location_node_ids()
     hub_kinds = {"relay", "station", "waystation"}

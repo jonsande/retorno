@@ -40,9 +40,12 @@ def main() -> None:
         sensors = state.ship.systems["sensors"]
         sensors.state = SystemState.OFFLINE
 
-        state.world.known_nodes.update({"ECHO_7", "CURL_12"})
-        state.world.known_contacts.update({"ECHO_7", "CURL_12", in_range_id, out_of_range_id})
-        add_known_link(state.world, "ECHO_7", "CURL_12", bidirectional=True)
+        state.world.space.nodes["COMPLETION_REMOTE"] = _make_node(
+            "COMPLETION_REMOTE", current.x_ly + 10.0,
+        )
+        state.world.known_nodes.update({"ECHO_7", "COMPLETION_REMOTE"})
+        state.world.known_contacts.update({"ECHO_7", "COMPLETION_REMOTE", in_range_id, out_of_range_id})
+        add_known_link(state.world, "ECHO_7", "COMPLETION_REMOTE", bidirectional=True)
 
         dock_candidates = set(app._get_completion_candidates(state, "dock ", ""))
         assert dock_candidates == {"ECHO_7"}, dock_candidates
@@ -51,7 +54,7 @@ def main() -> None:
         assert route_candidates == {"ECHO_7", in_range_id}, route_candidates
 
         nav_candidates = set(app._get_completion_candidates(state, "nav ", ""))
-        assert "CURL_12" in nav_candidates, nav_candidates
+        assert "COMPLETION_REMOTE" in nav_candidates, nav_candidates
         assert in_range_id not in nav_candidates, nav_candidates
         assert out_of_range_id not in nav_candidates, nav_candidates
 
@@ -70,7 +73,7 @@ def main() -> None:
         }
         assert expected_ship_sectors.issubset(deploy_candidates), deploy_candidates
         assert "ECHO_7" in deploy_candidates, deploy_candidates
-        assert "CURL_12" not in deploy_candidates, deploy_candidates
+        assert "COMPLETION_REMOTE" not in deploy_candidates, deploy_candidates
         assert in_range_id not in deploy_candidates, deploy_candidates
         assert out_of_range_id not in deploy_candidates, deploy_candidates
 

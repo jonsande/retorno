@@ -56,11 +56,15 @@ node when its exact id is known, it is within sensor range and the hop cap, and
 published in `known_links` without changing `SpaceNode.links`. Missing nodes
 and out-of-range hops are rejected.
 
-**Divergence:** some consumers traverse `known_links` without checking that
-both endpoints exist or that the distance remains under the cap. A dangling or
-over-cap route can therefore count as a recovery frontier even though travel
-rejects it. `nav abort` can also leave reverse references to a removed temporary
-waypoint.
+**Implemented in 4D-1:** F-ROUTE-01 was corrected with the shared physical-hop
+criterion and operational known-graph projection. Dangling/over-cap edges no
+longer connect components or count as frontier; their historical clues remain.
+Producer/consumer, lazy-generation, and persistence details are in the canonical
+navigation reference.
+
+**Pending (F-NAV-01):** `nav abort` can still leave reverse references to a
+removed waypoint. The projection prevents their use; specific cleanup is not
+part of 4D-1.
 
 ### 2.2 Progressive recovery
 
@@ -322,9 +326,10 @@ representation of real balance. The eleven preexisting rows passed on the Phase
 4C-1 worktree on 2026-11-03; the sensor-factor row passed on the Phase 4C-2a
 worktree on the same date.
 
-### 4.2 Prepared cases for defects not yet corrected
+### 4.2 Covered and prepared cases
 
-These are future acceptance criteria, not green tests of current behavior:
+The route-integrity portion of IT-01/IT-06 is covered in 4D-1; the remaining
+criteria are still pending:
 
 - **IT-01/IT-06:** import or construct a dangling/over-cap LINK in the current
   version; retain the historical clue, exclude it from routes/frontiers, and
@@ -344,7 +349,8 @@ These are future acceptance criteria, not green tests of current behavior:
 - **Reception:** each channel with requirements on, off, later restored, a
   save/load between attempts, and no duplicates.
 
-These remain future corrections; IT-05 is now implemented and covered without
+The remaining criteria are future corrections; IT-05 and route integrity are
+implemented and covered without
 freezing any former defect as desired behavior.
 
 ### 4.3 Items to measure
@@ -359,6 +365,7 @@ existing receivers/stages that the planner can reuse without creating nodes.
 
 | Defect | Priority | Regression before correction | Acceptance criterion | Proposed phase |
 | --- | --- | --- | --- | --- |
+| F-ROUTE-01 — known-route integrity | **Fixed** | `known_routes_integrity_smoke.py`: ten groups for validation/publication, EN/ES import, components, frontier, deadnodes, lazy, travel/jobs, inert waypoint, and save/load | No phantom frontier; contacts/history retained and no invalid operational route after save/load | **4D-1 complete** |
 | `uplink_only` consumes a primary without a valid effect | **Fixed** | Synthetic malformed, missing-endpoint, over-cap, valid-new-LINK, and valid-preexisting-LINK cases | Only valid new/preexisting links set `delivered` and unlock; failures remain pending and retryable | **4C-1 complete** |
 | `UPGRADED` sensors fell back to the `CRITICAL` factor | **Fixed** | `sensor_detection_factor_smoke.py`: deterministic factor/detection matrix for every `SystemState` | `UPGRADED` uses the nominal factor; other states, range, energy, and duration are unchanged | **4C-2a complete** |
 | Malformed `SECTOR` materializes origin | **Fixed** | `sector_intel_validation_smoke.py`: canonical existing/lazy/wide ids and invalid formats through public imports | Localized rejection without mutation; canonical formats still materialize | **4C-2b complete** |
@@ -452,11 +459,24 @@ with D1, including cargo and depletion persistence. The
 [inventory and seeds](../systems/world-generation.md#regional-module-categories-f-wgen-01-fixed-in-4c-3)
 are recorded in the canonical worldgen reference. No data or balance changed.
 
+### Completed known-route integrity: Phase 4D-1
+
+`known_routes_integrity_smoke.py` reproduced nine failing assertion groups
+before production changed and now passes all ten groups with seed `271828`.
+The shared criterion requires physical endpoints and the inclusive cap;
+publication, components, frontiers, deadnode candidates, views, and completion
+reuse it. Import retains contacts and historical records of unverifiable clues.
+The read-only projection leaves persisted invalid records inert without pruning
+pending references, mutating the world, or materializing on load. Lazy SECTOR
+and the existing prefix helper still run before checking; no id aliases are
+invented. Repeated save/load and incompatible files are covered with temporary
+directories. The [canonical inventory](../systems/discovery-navigation-intel.md#operational-routes-and-historical-clues-4d-1)
+details every consumer. F-NAV-01 and F-DEAD-01 remain pending.
+
 ## 6. Current risks and boundaries
 
-- `is_hop_within_cap` currently returns true when an endpoint is missing. 4C-1
-  checks both nodes before calling it for `uplink_only`; other importers still
-  need the future shared route contract.
+- Since 4D-1, `is_hop_within_cap` rejects missing endpoints. Operational
+  producers and consumers share the criterion without destroying history.
 - `SECTOR` now has a strict canonical format and rejects malformed references.
   The broader route/node contract still cannot validate procedural references
   merely by looking them up in `space.nodes`; that remains separate work.
@@ -476,6 +496,6 @@ are recorded in the canonical worldgen reference. No data or balance changed.
 The contract incorporates the Phase 4B decisions and records 4C-1 as the first
 completed production correction. `uplink_only` no longer consumes pieces
 without an effect and has a public retry compatible with the one-shot pool.
-The matrix also records 4C-2a/b/c/d and 4C-3 as complete; F-WGEN-01 now respects
+The matrix also records 4C-2a/b/c/d, 4C-3, and 4D-1 as complete; F-WGEN-01 now respects
 regional categories. Other interventions, communications work, and defects
 remain pending.

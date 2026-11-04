@@ -31,7 +31,11 @@ def _assert_travel_cap_blocks_long_hop() -> None:
     )
     state.world.known_nodes.add(far_id)
     state.world.known_contacts.add(far_id)
-    add_known_link(state.world, current_id, far_id, bidirectional=True)
+    # The publisher rejects this hop; inject a stale current-version record to
+    # exercise travel's independent cap check.
+    assert not add_known_link(state.world, current_id, far_id, bidirectional=True)
+    state.world.known_links.setdefault(current_id, set()).add(far_id)
+    state.world.known_links.setdefault(far_id, set()).add(current_id)
 
     events = engine.apply_action(state, Travel(node_id=far_id))
     assert events, "travel should be blocked by hop cap"

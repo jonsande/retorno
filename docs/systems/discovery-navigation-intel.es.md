@@ -4,6 +4,8 @@ Estado: **documentación canónica del comportamiento implementado**. El código
 productivo se revisó en el commit `3658577`; las pruebas se ejecutaron después
 sobre el árbol de trabajo de la Fase 3B, basado en `9f38d2e`.
 
+Actualizado para F-ROUTE-01 en Fase 4D-1 sobre `45f2900` (2026-11-04).
+
 Versión inglesa: [discovery-navigation-intel.md](discovery-navigation-intel.md)
 
 ## 1. Propósito y alcance
@@ -83,7 +85,7 @@ flowchart LR
 | `generated_sectors` / `sector_states` | Sectores materializados y metadatos de generación. | Estado de worldgen, no conocimiento del jugador. |
 | `known_nodes: set[str]` | Conjunto operativo que UI, mapas, scan, viaje y pools tratan como nodos conocidos. | Canónico de facto para conocimiento de nodos. |
 | `known_contacts: set[str]` | Espejo histórico mantenido por la mayoría de escritores; varios consumidores lo unen con `known_nodes` o lo usan como fallback. | Compatibilidad/representación auxiliar. |
-| `known_links: dict[str, set[str]]` | Grafo de rutas publicadas al jugador. | Canónico para alcance de viaje y conectividad conocida. |
+| `known_links: dict[str, set[str]]` | Grafo de rutas publicadas al jugador. | Registros crudos; la proyección operativa es canónica para alcance y conectividad. |
 | `intel: list[IntelItem]` | Registro tipado y deduplicado de intel: `node`, `link`, `sector` o `coord`. | Canónico para historial/procedencia, no para accesibilidad. |
 | `known_intel: dict[str, dict]` | Índice disperso escrito principalmente por importaciones `NODE`, `SECTOR` y `COORD`; viaje acepta sus claves como conocimiento heredado. | Caché/compatibilidad, no inventario completo de intel. |
 | `fine_ranges_km` | Distancia local refinada para determinados contactos del mismo sector. | Caché derivada. |
@@ -131,6 +133,50 @@ El id admitido tiene la forma canónica de worldgen: `S` mayúscula y tres
 índices decimales con signo separados por guiones bajos, cada uno formateado
 como `{value:+04d}`. La anchura es mínima, por lo que los índices mayores siguen
 siendo válidos.
+
+### Rutas operativas y pistas históricas (4D-1)
+
+`is_hop_within_cap` de `model/world.py` es el criterio físico compartido: ambos
+extremos deben existir y su distancia debe ser como máximo 45 ly, inclusive.
+`add_known_link` rechaza además extremos vacíos y autoenlaces. La validez
+estructural no exige una arista física de `SpaceNode.links`, descubrimiento
+previo, estado de sensores ni potencia; siguen aplicándose los gates propios
+de viaje y resolución.
+
+`reachable_from` proyecta sólo destinos directos válidos de `known_links`;
+`reachable_known_nodes` recorre esos saltos dirigidos. Cada salto se comprueba,
+por lo que una arista intermedia inválida no vuelve alcanzable un componente
+remoto. Las consultas son de sólo lectura: no generan sectores, revelan
+contactos ni podan historial.
+
+| Productor/consumidor | Capa necesaria y tratamiento |
+| --- | --- |
+| Bootstrap, `route solve`, `nav abort` | Publican mediante `add_known_link`; los trabajos solve completados revalidan extremos/cap. Las rutas válidas de waypoint siguen admitidas. |
+| Importación explícita, autoimportación `cat`/mail, tokens LINK de `[INTEL]` | Comparten `_import_link_intel`; intentan primero la materialización lazy existente, conservan contactos e historial de enlaces deduplicado y sólo publican saltos válidos. |
+| Uplink y lore `uplink_only` | Publican con el mismo criterio de dominio; no cambian ciclo de pools, pesos, entrega narrativa ni probabilidades. La exclusión de candidatos del pool usa rutas operativas. |
+| Viaje | Exige una arista directa registrada y el criterio físico compartido, además de los gates vigentes de conocimiento, waypoint y nave. |
+| Grafo/caminos/componentes de navegación, listado de rutas, sugerencias de origen, contactos, survey y compleción CLI/Textual | Usan la proyección operativa para conexiones y flags de ruta; el inventario de contactos sigue siendo independiente. Ambas interfaces comparten renderers/helpers. |
+| Recuperación global y deadnodes | Comparten `reachable_known_nodes`; las aristas inválidas no crean frontera, no hacen accesibles payloads remotos mediante un componente inválido ni excluyen un objetivo como conectado. |
+| Listado/show/export de intel y diagnósticos debug crudos | Historial/inspección, no autorización. Las pistas inválidas registradas siguen visibles/exportables; los conteos debug de grafo/cap pueden mostrar registros obsoletos crudos. |
+| Save/load y limpieza de nodos temporales | La persistencia conserva el estado crudo. La limpieza `_clear_tmp_node` no cambia (F-NAV-01); las referencias inversas restantes quedan operativamente inertes. |
+
+No hace falta normalización destructiva al cargar: la proyección idempotente
+filtra registros inválidos inmediatamente, antes y después de save/load.
+Contactos, `known_intel`, archivos, procedencia y referencias pendientes se
+conservan exactamente. Repetir save/load no muta el mundo ni genera sectores.
+Los LINK rechazados nuevos se guardan como registros históricos `IntelItem`,
+no como aristas operativas nuevas. Reimportar tras materializar puede publicar
+una ruta ahora válida. Las aristas pendientes crudas existentes se reevalúan
+contra el estado físico actual en cada consulta. Los archivos incompatibles
+conservan su rechazo explícito y nunca se eliminan.
+
+La generación lazy conserva su protocolo vigente. Un `SECTOR:` canónico
+materializa el sector antes de validar un LINK posterior a su id generado real;
+importar sólo el sector no revela el cluster. El helper existente `S...:...`
+también solicita su sector canónico antes de validar, pero no crea alias para
+los ids `KIND_HEX` generados por worldgen. Un literal no resuelto sigue siendo
+contacto y pista histórica, no ruta operativa. No se introduce un protocolo
+nuevo de resolución de ids ni una política de orden de generación.
 
 ## 4. Vías de descubrimiento e importación
 
@@ -206,6 +252,9 @@ contrariamente a la guía antigua, **no llama a `record_intel`**. Durante el
 trabajo se revalidan sensores y servicio, pero no se revalida que la nave siga
 en el nodo de origen almacenado.
 
+Al completar se revalidan extremos físicos y cap antes de publicar. Si un
+extremo desapareció, se rechaza la publicación sin informar una ruta resuelta.
+
 ### 4.3 `uplink`
 
 Sintaxis pública: `uplink`; alias: `relay uplink`.
@@ -266,14 +315,14 @@ y manuales importados explícitamente usan normalmente 0.8.
 | Formato | Efecto implementado |
 | --- | --- |
 | `NODE: <id>` | Añade el texto literalmente a `known_nodes`, `known_contacts` y `known_intel`, y registra intel de nodo. Sólo materializa un sector si el id tiene forma procedural `S...:...`; un id arbitrario puede quedar sin nodo físico. |
-| `LINK: <from> -> <to>` | Intenta añadir ruta bidireccional conocida. Si la distancia física conocida supera el cap, conserva ambos extremos como contactos pero no la ruta. |
+| `LINK: <from> -> <to>` | Intenta añadir ruta bidireccional conocida. Si falta un extremo físico o el salto supera el cap, conserva contactos e historial pero no publica la ruta. |
 | `LINK: <to>` | Igual, tomando el nodo actual como origen. |
 | `SECTOR: <sector_id>` | Para un id canónico, llama a worldgen, registra intel de sector y `known_intel`, pero no revela los nodos del sector. Un id no canónico se rechaza con feedback localizado antes de mutar mundo o intel; las líneas válidas posteriores del archivo siguen procesándose. |
 | `COORD: x, y, z` | Crea un `NAV_<hash>` físico si falta, lo marca conocido y registra intel de coordenada; no publica ruta. |
 
-Una ruta `LINK` cuyos extremos no existen puede entrar en `known_links`: la
-función de cap considera aceptable una distancia que no puede calcular. Viaje
-seguirá bloqueado porque exige que el nodo destino exista físicamente.
+Desde 4D-1, todo LINK no verificable conserva contactos e intel histórica,
+pero no se publica como ruta operativa. El feedback distingue extremos ausentes
+y saltos sobre cap en EN/ES.
 
 #### Bloques `[INTEL]...[/INTEL]`
 
@@ -323,7 +372,7 @@ intel de nodo con confianza 0.4.
 | Acción | Gates al iniciar | Trabajo/tiempo | Revalidación o interrupción |
 | --- | --- | --- | --- |
 | `scan` | Potencia válida, sensores ≥ `LIMITED`, `sensord`; unlock si está en nodo `transit`. | `SCAN`, 8 s. | Falla si sensores/servicio dejan de servir o cambia el nodo actual; cancelable. |
-| `route solve <id>` | Potencia/Core OS, sensores ≥ `LIMITED`, `sensord`, ambos nodos físicos, rango de sensores y cap. | `ROUTE_SOLVE`, 100–6800 s. | Falla si sensores o servicio dejan de servir; cancelable; no revalida el origen. |
+| `route solve <id>` | Potencia/Core OS, sensores ≥ `LIMITED`, `sensord`, ambos nodos físicos, rango de sensores y cap. | `ROUTE_SOLVE`, 100–6800 s. | Falla si sensores o servicio dejan de servir; cancelable; no comprueba que la nave siga en origen. |
 | `uplink` | Dock, tipo compatible, potencia, `data_core` ≥ `LIMITED`, `datad`; el primer intento usa el pool no consumido. | Inmediato en REPL; no es `Job`. | No hay fase interrumpible; el pool de rutas se consume una vez y los intentos posteriores sólo reevalúan `uplink_only` pendiente. |
 | `intel import` | Archivo existente y nivel de acceso suficiente; Core OS/terminal permiten el comando. | Inmediato. | Puede materializar mundo y mutar conocimiento durante el parseo. |
 | `nav <id>` | No estar ya en tránsito ni docked; destino físico y conocido; ruta directa conocida; cap y potencia/Core OS. | Estado de tránsito hasta `arrival_t`; no es `Job`. | `nav abort` crea un waypoint; la llegada ocurre en `Engine.tick`. |
@@ -375,8 +424,9 @@ los extremos.
 
 Al abandonar el waypoint, `_clear_tmp_node` elimina el nodo y su entrada propia
 de `known_links`, pero no elimina explícitamente las referencias inversas al id
-temporal almacenadas en los extremos. Las vistas filtran destinos físicos
-ausentes, pero el estado puede conservar esas referencias obsoletas.
+temporal almacenadas en los extremos. La proyección operativa excluye
+esas referencias ausentes de rutas y componentes, pero el estado puede
+conservarlas: la limpieza específica F-NAV-01 sigue pendiente.
 
 ## 7. Tabla de transiciones
 
@@ -388,7 +438,7 @@ ausentes, pero el estado puede conservar esas referencias obsoletas.
 | Primer `uplink` del nodo | Dock, hub compatible, `data_core`/`datad`, pool no consumido. | Añade rutas/contactos aceptados, log, contadores condicionales y consume pool. | `IntelItem(link)` por ruta nueva; posibles entregas de lore/failsafe. |
 | `uplink` posterior | Mismos gates; pool de rutas consumido y `uplink_only` pendiente. | No repite pool/log/contadores; sólo reintenta ese canal narrativo. | `IntelItem(link)` únicamente si el LINK pendiente pasa a ser válido. |
 | `NODE:` | Archivo accesible. | Añade id a conocidos y a `known_intel`. | `IntelItem(node)`; puede ser dangling. |
-| `LINK:` | Archivo accesible; cap si se conoce distancia. | Añade extremos conocidos y, si acepta, `known_links`. | `IntelItem(link)` sólo si la ruta era nueva. |
+| `LINK:` | Archivo accesible; extremos físicos y cap para publicar. | Conserva contactos/historial; sólo añade `known_links` si es válida. | `IntelItem(link)` deduplicado, también para pistas rechazadas. |
 | `SECTOR:` | Archivo accesible e id de sector canónico. | Materializa sector y marca `known_intel`; un id inválido no tiene efecto. | `IntelItem(sector)`; nodos siguen ocultos. |
 | `COORD:` | Tres números válidos. | Crea/conoce `NAV_<hash>`. | `IntelItem(coord)`; sin ruta. |
 | Lore `uplink_only` | Pieza elegible, ambos extremos físicos y cap. | Añade ruta/contactos y marca primary desbloqueado; si falla, conserva asignación y pendiente. | `IntelItem(link)` directo sólo tras éxito. |
@@ -477,8 +527,8 @@ una protección narrativa operativa ni contenido activado.
 
 - Un `NODE:` arbitrario puede producir un contacto sin nodo físico; aparecerá
   de forma incompleta y no podrá usarse para route solve o viaje.
-- Un `LINK:` con extremos inexistentes puede producir una ruta conocida dangling
-  porque la distancia es incalculable y se acepta; el viaje la bloquea.
+- Un `LINK:` con extremos inexistentes se conserva como pista histórica y
+  contacto; desde 4D-1 no produce ruta operativa ni frontera fantasma.
 - Un contacto `COORD:` es físico y conocido, pero queda inaccesible hasta obtener
   o resolver una ruta.
 - Los ids de sector malformados se rechazan antes de mutar worldgen o intel.
@@ -530,6 +580,7 @@ construyen estados en memoria; no se abrió ni modificó ningún save real.
 | `forced_hidden_ad_hoc_smoke.py` | PASSED | Host sintético conocido/no visitado y breadcrumb únicamente en su pool elegible. |
 | `sector_intel_validation_smoke.py` | PASSED | Sectores canónicos existentes y lazy, índices con signo amplios, formatos inválidos sin mutar estado serializable, bloques `[INTEL]` sólo de sector sin recovery corrupta/uso de RNG, feedback EN/ES y continuación de líneas válidas. |
 | `intel_recent_order_smoke.py` | PASSED | Historiales vacío/único, límite 20 por defecto, límites N/all, timestamps descendentes, desempate por inserción inversa, EN/ES, adaptador Textual, estado de sólo lectura y show/export sin cambios. |
+| `known_routes_integrity_smoke.py` | PASSED | Seed 271828; extremos/cap inclusivo, historial e importación EN/ES, componentes mixtos, frontera real sin fantasmas, candidatos deadnode, sectores lazy, waypoint inerte, jobs y save/load idempotente sin pérdida de pistas. |
 
 La fixture desalineada se reparó posteriormente sin revelar `HARBOR_12` ni
 cambiar producto. La caracterización deliberada de `route solve` también se
@@ -575,8 +626,8 @@ Lagunas de cobertura:
 2. Revisar posteriormente si conviene mantener la decisión deliberada de no
    exigir descubrimiento previo en route solve, y decidir si debe revalidar el
    origen al completar.
-3. Definir si toda ruta conocida debe corresponder a nodos y/o aristas físicas,
-   y cómo tratar intel dangling.
+3. El contrato operativo quedó implementado en 4D-1: extremos físicos, cap,
+   ninguna exigencia de arista física y conservación de pistas.
 4. Determinar si la protección narrativa debe ser global o seguir siendo un
    filtro parcial de revelaciones procedurales.
 5. Decidir cuándo se recalculan pools uplink ante worldgen o desbloqueos tardíos.

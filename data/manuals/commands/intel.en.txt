@@ -18,7 +18,7 @@ Usage: intel | intel <amount> | intel all
 - Intel kinds:
   node: a specific known node/contact (e.g., HARBOR_12).
   sector: a known sector identifier (e.g., S+001_-002_+000).
-  link: a known route between two nodes (A -> B).
+  link: a reported connection between two nodes (A -> B); the record alone does not authorize travel.
   coord: exact coordinates (x,y,z) that point to a nav point.
 
 intel show <intel_id>
@@ -29,7 +29,9 @@ intel import <path>
 - Supported markers: NODE:, LINK:, SECTOR:, COORD:
 - Optional blocks:
   [INTEL] ... [/INTEL]
-  - If the block contains a LINK, it is imported as a route.
+  - A LINK becomes an operational route only when both endpoints are resolved and the hop is at most 45 ly.
+  - An unresolved or longer LINK remains a contact and historical record; it does not authorize travel.
+  - Import a canonical SECTOR first when its destinations still need to be materialized, then reimport the LINK.
   - If it contains a node_id, name, or sector id, the matching navigation record is added as a known contact.
   - Corrupt intel may fail to resolve or yield a new (unknown) hub contact.
 - Files under /data/nav, /mail or /logs may auto-import on cat.

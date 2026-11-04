@@ -16,7 +16,7 @@ Descripción
 - `nav map graph`: muestra el grafo global de nodos/rutas conocidas.
 - `nav map graph <node_id>`: enfoca el grafo en un nodo conocido.
 - `nav map path <node_id>`: calcula la mejor ruta conocida desde el nodo actual.
-- `nav map routes`: lista rutas directas conocidas desde el nodo actual.
+- `nav map routes`: lista rutas directas operativas desde el nodo actual.
 - `nav map contacts`: lista contactos conocidos con sector, región y estado de ruta relativo al nodo actual.
 - `nav map contacts sector`: agrupa los contactos conocidos por sector y ordena los sectores por cercanía.
 - `nav <node_id>`: inicia tránsito al destino.

@@ -72,7 +72,8 @@ una promesa de acceso.
 `generator.py` aporta worldgen lazy, sincronización sectorial y el guardrail del
 origen. `engine.py` y `repl.py` determinan el orden de evaluación. El importador
 de intel es quien convierte texto en conocimiento/rutas y aplica el cap de
-45 ly. Ninguno de estos componentes calcula una prueba global de alcanzabilidad.
+45 ly. El recorrido compartido comprueba el componente conocido operativo;
+no garantiza conectividad universal.
 
 ## 4. Condiciones de activación
 
@@ -273,6 +274,31 @@ persistente en vez de interpretar cero como centinela de ausencia. Una
 evaluación bloqueada no cambia contador, timestamp, puente, secuencia de eventos,
 archivos de pista, rutas ni intel, y save/load conserva los mismos límites.
 
+### Integridad de rutas conocidas: F-ROUTE-01 corregido en 4D-1
+
+Recuperación global y deadnodes comparten `reachable_known_nodes` de
+`model/world.py`. Recorre sólo los vecinos operativos de `reachable_from`:
+ambos extremos físicos existen y el salto satisface `is_hop_within_cap`, con
+45 ly inclusivos. Cada salto se valida: una arista inválida intermedia tampoco
+da acceso a payloads remotos ni acerca artificialmente un objetivo al componente.
+La frontera de rutas usa esos mismos vecinos; solve conserva contacto, rango
+real de sensores y cap como requisitos.
+
+Los registros dangling/sobre cap del estado vigente quedan inertes en la
+proyección de sólo lectura. Save/load no poda contactos, intel, archivos ni
+referencias lazy. Los LINK nuevos rechazados se registran como historial, sin
+publicar ruta. La [referencia de navegación](discovery-navigation-intel.es.md)
+inventaría productores/consumidores y detalla la resolución lazy antes de validar.
+
+`known_routes_integrity_smoke.py`, seed `271828`, reprodujo antes de corregir
+frontera fantasma, contaminación multihop y exclusión falsa de deadnodes. Ahora
+demuestra activación global real sin frontera válida, bloqueo con ruta válida
+no visitada, candidatos deadnode rastreados sin alcanzar umbrales ni crear
+puentes, historial/export EN/ES y save/load repetido sin mutaciones. F-NAV-01
+conserva pendiente su limpieza; sus referencias inversas ya no son operativas.
+F-DEAD-01 sigue pendiente: no cambian puentes, cadenas, thresholds, cooldowns
+ni recepción.
+
 ## 9. Interacciones entre mecanismos
 
 En `dock`, `salvage data`, `scan` y `route`, el motor ejecuta primero lore cuando
@@ -292,8 +318,8 @@ Consecuencias observables:
   pendientes.
 - Una ruta importada puede sacar un objetivo de deadnodes y, si lleva a un nodo
   no visitado, pasa a contar como frontera global.
-- Una ruta conocida hacia un identificador inexistente también cuenta como
-  frontera global; el algoritmo no valida que el destino físico exista.
+- Desde 4D-1, una referencia inexistente o sobre cap no conecta componentes
+  ni cuenta como frontera global; su historial permanece disponible.
 - Los enlaces físicos no se convierten automáticamente en rutas conocidas, y
   una ruta conocida no requiere un `SpaceNode.link` físico equivalente.
 
@@ -320,7 +346,7 @@ intersectoriales ya registrados.
 | Nodo ad hoc oculto sin pool conocido no limpio para breadcrumb | Riesgo confirmado por flujo de código | Scan si queda cerca; deadnodes con el tiempo | La pieza puede quedar asignada sin pista inicial |
 | Pieza forzada asignada a receptor inaccesible | Riesgo potencial con impacto narrativo | Breadcrumb, deadnodes o scan | No hay prueba extremo a extremo ni exclusión de objetivos protegidos |
 | Pista obtenida pero no importada | Comportamiento deliberado | Leer/importar; autoimport sólo en rutas de lectura reconocidas | Mientras el archivo exista puede contar como frontera y bloquear otra generación |
-| Ruta publicada hacia nodo inexistente | Fallo funcional posible con referencias malformadas | Ninguna reparación garantizada | Puede suprimir deadnodes y mantener una frontera fantasma |
+| Registro de ruta hacia nodo inexistente | F-ROUTE-01 corregido en 4D-1 | Contacto e historial conservados; ruta operativa excluida | Ya no suprime deadnodes ni mantiene una frontera fantasma |
 | Nodo insertado tras cierre topológico sectorial | Limitación confirmada | Enlace manual de nodos anclados | Puentes deadnode no tienen enlace manual ni rebuild |
 | Pool cerrado, pero no limpio | Comportamiento admitido | Breadcrumb puede inyectarse; archivos existentes siguen contando | El scheduler no lo elige como receptor normal |
 | Pool actual limpio | Bloqueo específico de deadnodes | Recuperación global se evalúa después | Deadnodes no revisa ningún objetivo en ese trigger |
@@ -338,7 +364,8 @@ intersectoriales ya registrados.
   reutilizado está entre 12 y 45 ly y es un hub desconocido no authored.
 - La recuperación global no activa otra generación mientras reconozca una
   frontera o una de sus pistas pendientes.
-- La importación de enlaces aplica el cap de 45 ly cuando existen ambos nodos.
+- La publicación y consulta operativa exigen ambos nodos físicos y el cap
+  inclusivo de 45 ly; las pistas rechazadas se conservan como historial.
 - El guardrail de origen y los thresholds por deadnode son deterministas para
   la seed y las claves correspondientes.
 - El scheduler no relaja candidatos explícitos no procedurales para forzar un
@@ -351,14 +378,11 @@ a todos los failsafes ni que el grafo global permanezca conectado.
 
 ## 12. Casos límite y riesgos de bloqueo permanente
 
-1. `_has_known_route_frontier` acepta destinos no visitados sin validar que
-   exista su `SpaceNode` ni que el salto siga bajo el cap; una ruta fantasma u
-   obsoleta puede impedir indefinidamente la recuperación global y también
-   excluir el objetivo de deadnodes.
-2. Deadnodes también acepta como candidato un `known_contact` inexistente. Tras
-   intentos indirectos fallidos publica un enlace directo; como no se puede
-   calcular distancia, el importador puede admitirlo. La ruta hace desaparecer
-   el estado deadnode, pero viajar sigue siendo imposible.
+1. F-ROUTE-01 quedó corregido en 4D-1: los registros inválidos no cuentan como
+   frontera ni contaminan componentes. Se conserva la pista histórica original.
+2. Deadnodes todavía admite un `known_contact` inexistente y puede escribir
+   pistas inviables; su planificador sigue pendiente (F-DEAD-01). El importador
+   ya no publica esas pistas como rutas ni resuelve falsamente su seguimiento.
 3. El puente se coloca cerca del objetivo, no cerca de la nave. La nota
    `actual -> puente` puede exceder el cap y ser descartada en ambos intentos.
 4. Los umbrales `stuck` y `dead_since_uplinks` se almacenan pero no gobiernan
@@ -394,6 +418,7 @@ directorios temporales. No se abrió ni modificó ninguna partida real.
 | `uplink_once_per_node_smoke.py` | PASSED | Consumo único del pool de uplink |
 | `drone_salvage_survey_smoke.py` | PASSED | Survey y salvage de datos aislados |
 | `save_load_smoke.py` | PASSED | Serialización temporal general y guardrail sparse |
+| `known_routes_integrity_smoke.py` | PASSED | Rutas válidas/límite, ausencia de frontera fantasma, componentes mixtos, candidatos deadnode, lazy, historial EN/ES y save/load idempotente; F-NAV-01/F-DEAD-01 no corregidos |
 | `deadnode_cooldown_zero_smoke.py` | PASSED | Reproducción previa al fix, timestamps cero/positivos, bloqueo inmediato y anterior al límite, expiración exacta, candidatos independientes, efectos observables y persistencia save/load específica |
 | `forced_hidden_ad_hoc_smoke.py` | PASSED | Host sintético conocido/no visitado, nodo oculto y breadcrumb sólo en el pool elegible |
 | `lore_secondary_count_weights_hard_smoke.py` | PASSED | Receptores sintéticos y casos independientes de count, pesos y hard-force |
@@ -412,8 +437,8 @@ sin breadcrumb ni de interferencia con objetivos protegidos.
 - Implementar la cadena completa aprobada: cada salto bajo cap desde un origen
   alcanzable, revelación progresiva e integración coherente con topología y
   pools.
-- Rechazar identificadores inexistentes como rutas operativas antes de que una
-  ruta fantasma cierre deadnodes o bloquee la recuperación global.
+- F-ROUTE-01 corregido en 4D-1: el criterio compartido excluye identificadores
+  inexistentes y saltos sobre cap de rutas, componentes y fronteras operativas.
 - La recepción de un broadcast al llegar a cobertura está aprobada para el
   futuro `comms` + `radiod`; no debe adelantar triggers de lore que exigen dock.
   Nombre, evento y tests deberán expresar esa distinción.
@@ -430,7 +455,7 @@ sin breadcrumb ni de interferencia con objetivos protegidos.
 
 Las decisiones aprobadas proceden del
 [contrato de navegación y recuperación](../design/navigation-recovery-contract.es.md);
-ninguna de ellas está implementada por esta actualización documental.
+las correcciones implementadas se identifican expresamente; las demás siguen pendientes.
 
 ## 15. Referencias al código
 

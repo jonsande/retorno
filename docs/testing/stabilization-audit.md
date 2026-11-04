@@ -13,7 +13,7 @@ mechanics, tests, balance, or content.
 > reception, narrative protection, and save policy. These audit matrices are
 > retained as a diagnosis of the behavior that was observed.
 
-## 0. Phase 4B closure and updates through 4C-3
+## 0. Phase 4B closure and updates through 4D-1
 
 Open decisions in this audit are closed or reassigned as follows:
 
@@ -39,6 +39,7 @@ The current executive matrix, with full criteria in the contract, is:
 | F-INTEL-01 — old `intel N` | **Fixed** | `intel_recent_order_smoke.py` | **4C-2c complete** |
 | F-DEAD-02 — cooldown at `t=0` | **Fixed** | `deadnode_cooldown_zero_smoke.py` | **4C-2d complete** |
 | F-WGEN-01 — `modules_pool` filters | **Fixed** | `worldgen_modules_pool_smoke.py` | **4C-3 complete** |
+| F-ROUTE-01 — known-route integrity | **Fixed** | `known_routes_integrity_smoke.py` | **4D-1 complete** |
 
 This ordering supersedes historical priorities in sections 4, 7, and 8 where
 they conflict. F-LORE-01 was subsequently fixed in 4C-1, F-SENS-01 in 4C-2a,
@@ -74,16 +75,59 @@ IT-10 are covered; `radiation_base`, generation-order independence, and balance
 studies remain pending. The F-WGEN-01 risk row below retains the historical
 pre-correction diagnosis; the executive matrix above gives its current status.
 
+### Phase 4D-1 closure: F-ROUTE-01
+
+Initial clean state: `main` and `origin/main` at `45f2900`, published 4C-3
+closure, with empty staging. The producer/consumer inventory is in the
+[canonical navigation reference](../systems/discovery-navigation-intel.md#operational-routes-and-historical-clues-4d-1).
+The cause combined `is_hop_within_cap` accepting missing distance, unchecked
+publication, and raw `known_links` traversal.
+
+Before production changed, `known_routes_integrity_smoke.py` (seed `271828`)
+left nine groups red; the valid solve/travel case already passed:
+
+| Assertion group | Failure reproduced before correction |
+| --- | --- |
+| `_assert_hops_and_publication` | A missing endpoint passed the hop criterion. |
+| `_assert_import_history_and_locales` | `A -> MISSING` was published. |
+| `_assert_components_and_views` | An invalid edge contaminated the reachable component. |
+| `_assert_recovery_frontier` | A phantom frontier appeared. |
+| `_assert_deadnode_candidates` | An invalid route excluded a deadnode candidate. |
+| `_assert_lazy_sector` | Valid SECTOR/LINK passed; an unresolved prefixed literal became operational. |
+| `_assert_job_endpoint_disappears` | The completed job published a vanished endpoint. |
+| `_assert_waypoint_is_inert_after_removal` | The removed waypoint remained operational. |
+| `_assert_persistence` | The loaded invalid edge remained operational. |
+
+All ten groups pass after correction: valid/inclusive-45-ly hops, dangling and
+over-cap rejection, reverse/directed routes, mixed components, EN/ES contacts,
+history/export, lazy sectors, actual global recovery, deadnode candidates
+without creating bridges, travel/jobs, inert waypoint, and repeated save/load.
+The shared projection is idempotent and read-only: it needs no destructive load
+pruning and changes neither format, history, nor pending references.
+Incompatible files are rejected without deletion or modification.
+
+The cap fixture now explicitly injects a stale edge because the publisher
+rejects it. Both CLI/Textual completion fixtures now use a synthetic physical
+node under the cap instead of depending on absent `CURL_12`; no inactive
+authored content was enabled. The F-ROUTE-01 diagnosis below remains historical;
+its closure is in the current executive matrix above. F-NAV-01 and F-DEAD-01
+remain pending: waypoint cleanup, bridges, thresholds, cooldowns, and topology
+are unchanged. The 4C regressions remain green.
+
+Final 4D-1 validation: 31/31 smokes pass, including the 4C regressions, routes,
+recovery, deadnodes, lazy worldgen, persistence, and CLI/Textual completion.
+Python compilation, local links, and EN/ES technical parity verified; Ruff is
+not installed and no dependencies were added.
+
 ## 1. Executive summary
 
 Integration legitimately uses three distinct layers—the physical universe,
 knowledge, and published routes—but several consumers do not apply the same
 validity criterion. The highest-priority problems are:
 
-1. `known_links` may contain nonexistent destinations or hops above the cap.
-   Travel rejects them, while global recovery and deadnodes treat them as valid
-   routes/frontiers. `nav abort` can produce nonexistent references of this kind
-   during normal play.
+1. F-ROUTE-01 was corrected in 4D-1: invalid `known_links` records are no
+   longer operational routes/frontiers. `nav abort` can still leave orphaned
+   references (F-NAV-01), now inert pending their specific cleanup.
 2. Deadnodes places its bridge near the target rather than a reachable origin
    and publishes a hint from the current node without validating 45 ly. In the
    probe, the bridge was 99.38 ly away, had no physical links or pool, and route
@@ -190,7 +234,7 @@ flowchart LR
 | Priority | Outcome | Recommended scope | Exit criterion |
 | --- | --- | --- | --- |
 | P0 — Characterization | Turn critical probes into isolated regressions | Invalid routes, waypoint, `UPGRADED`, intel, modules, invalid sector, no-effect delivery, persistence | Red tests only where a fix is planned; deliberate decisions locked green |
-| P1 — Route integrity | Published route is travelable or explicitly marked/not published | Shared validator, importers, waypoint cleanup, save normalization | No dangling/over-cap edge counts as frontier or deadnode resolution |
+| P1 — Route integrity | Published route is travelable or explicitly marked/not published | Shared criterion/importers completed in 4D-1; F-NAV-01 waypoint cleanup remains pending; read-only current-save projection needs no pruning | No dangling/over-cap edge counts as frontier or deadnode resolution |
 | P2 — Recovery | Deadnodes/recovery offer only consumable opportunities | Reachable bridge origin, cap, topology/pool, cooldown, `stuck`; confirm arrival/dock | Deadnode E2E and save/load green |
 | P3 — Narrative integrity | Do not consume pieces without effect or assign without access policy | Delivery outcome, retry, breadcrumb, unlock, protection | Synthetic primaries cover success, failure, and preexisting route |
 | P4 — Bounded data/UI defects | Independent low-risk repairs | `UPGRADED`, sector ids, intel order, and `modules_pool` fixed; radiation field awaits its decision | State/region matrices and clear public errors |
@@ -294,7 +338,8 @@ Algorithm fixtures should not depend on authored narrative names.
 
 1. Repair the three fixtures without product changes and add characterization
    for deliberate decisions.
-2. Add IT-06 and IT-09, agree route contract, and centralize validation.
+2. Maintain IT-06 and the shared criterion completed in 4D-1; IT-09 and
+   F-NAV-01 cleanup remain for the next phase.
 3. Fix/sanitize phantom routes and waypoint; then revalidate recovery and known
    components.
 4. Agree bridge contract and complete IT-04 + IT-07 before changing deadnodes.

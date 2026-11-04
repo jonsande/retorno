@@ -255,15 +255,15 @@ def distance_between_nodes_ly(state: WorldState, from_id: str, to_id: str) -> fl
 def is_hop_within_cap(state: WorldState, from_id: str, to_id: str, max_hop_ly: float | None = None) -> bool:
     cap = float(Balance.MAX_ROUTE_HOP_LY if max_hop_ly is None else max_hop_ly)
     dist = distance_between_nodes_ly(state, from_id, to_id)
-    if dist is None:
-        return True
-    return dist <= cap
+    return dist is not None and dist <= cap
 
 
 def add_known_link(
     state: WorldState, from_id: str, to_id: str, bidirectional: bool = False
 ) -> bool:
     if not from_id or not to_id or from_id == to_id:
+        return False
+    if not is_hop_within_cap(state, from_id, to_id):
         return False
     before = len(state.known_links.get(from_id, set()))
     state.known_links.setdefault(from_id, set()).add(to_id)
@@ -321,4 +321,26 @@ def record_intel(
 
 
 def reachable_from(state: WorldState, current_id: str) -> set[str]:
-    return set(state.known_links.get(current_id, set()))
+    """Direct operational destinations; unresolved/stale records stay inert.
+
+    This read-only projection deliberately does not generate sectors, reveal
+    contacts, require physical links, or change persisted history.
+    """
+    return {
+        dest for dest in state.known_links.get(current_id, set())
+        if dest != current_id and is_hop_within_cap(state, current_id, dest)
+    }
+
+
+def reachable_known_nodes(state: WorldState, current_id: str) -> set[str]:
+    """Directed component reached through operational known hops only."""
+    if current_id not in state.space.nodes:
+        return set()
+    visited = {current_id}
+    queue = [current_id]
+    for node_id in queue:
+        for dest in sorted(reachable_from(state, node_id)):
+            if dest not in visited:
+                visited.add(dest)
+                queue.append(dest)
+    return visited

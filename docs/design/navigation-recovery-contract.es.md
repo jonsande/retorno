@@ -56,11 +56,15 @@ del cap y `sensord` funciona. Es deliberado. El destino pasa a conocido y se
 publica en `known_links`, sin modificar `SpaceNode.links`. Un nodo ausente y un
 salto fuera de rango se rechazan.
 
-**Divergencia:** algunos consumidores recorren `known_links` sin validar que
-ambos extremos existan ni que la distancia siga bajo el cap. Por eso una ruta
-dangling o sobre-cap puede contar hoy como frontera para recuperación aunque
-viaje la rechace. `nav abort` también puede dejar referencias inversas a un
-waypoint temporal eliminado.
+**Implementado en 4D-1:** F-ROUTE-01 quedó corregido mediante el criterio
+compartido de salto físico y la proyección operativa del grafo conocido. Las
+aristas dangling/sobre cap ya no conectan componentes ni cuentan como frontera,
+y sus pistas históricas permanecen. El detalle de productores, consumidores,
+lazy y persistencia está en la referencia canónica de navegación.
+
+**Pendiente (F-NAV-01):** `nav abort` todavía puede dejar referencias inversas
+a un waypoint eliminado. La proyección impide usarlas; su limpieza específica
+no forma parte de 4D-1.
 
 ### 2.2 Recuperación progresiva
 
@@ -321,7 +325,7 @@ balance real. Las once filas preexistentes pasaron en el árbol de trabajo de
 Fase 4C-1 el 2026-11-03; la fila de factores de sensores pasó en el árbol de
 trabajo de Fase 4C-2a en la misma fecha.
 
-### 4.2 Casos preparados para defectos aún no corregidos
+### 4.2 Casos cubiertos y preparados
 
 Estos casos son criterios futuros, no pruebas verdes del comportamiento actual:
 
@@ -342,8 +346,8 @@ Estos casos son criterios futuros, no pruebas verdes del comportamiento actual:
 - **Recepción:** cada canal se prueba con requisitos activos, apagados, reintento
   tras recuperación, save/load entre ambos y ausencia de duplicados.
 
-Estas siguen siendo correcciones futuras; IT-05 ya está implementado y cubierto
-sin congelar como deseable ningún defecto anterior.
+Los criterios restantes siguen pendientes; IT-05 y la integridad de rutas ya
+están implementados y cubiertos sin congelar como deseable ningún defecto anterior.
 
 ### 4.3 Aspectos por medir
 
@@ -358,6 +362,7 @@ planificador sin crear nodos nuevos.
 
 | Defecto | Prioridad | Regresión previa a la corrección | Criterio de aceptación | Fase propuesta |
 | --- | --- | --- | --- | --- |
+| F-ROUTE-01 — integridad de rutas conocidas | **Corregido** | `known_routes_integrity_smoke.py`: diez grupos de selección/publicación, importación EN/ES, componentes, frontera, deadnodes, lazy, viaje/jobs, waypoint inerte y save/load | Sin fronteras fantasma; contactos/historial conservados y ninguna ruta inválida operativa tras save/load | **4D-1 completada** |
 | `uplink_only` consume primary sin efecto válido | **Corregido** | Casos sintéticos malformed, extremo ausente, sobre-cap, LINK nuevo válido y LINK válido preexistente | Sólo nuevo/preexistente válido marca `delivered` y desbloquea; los fallos quedan pendientes y reintentables | **4C-1 completada** |
 | Sensores `UPGRADED` caían al factor `CRITICAL` | **Corregido** | `sensor_detection_factor_smoke.py`: matriz determinista de factor/detección para cada `SystemState` | `UPGRADED` usa el factor nominal; los demás estados, alcance, energía y duración no cambian | **4C-2a completada** |
 | `SECTOR` malformado materializa origen | **Corregido** | `sector_intel_validation_smoke.py`: ids canónicos existentes/lazy/amplios y formatos inválidos mediante importaciones públicas | Rechazo localizado sin mutación; formatos canónicos siguen materializando | **4C-2b completada** |
@@ -453,11 +458,25 @@ un módulo con D1, incluida la persistencia de cargo y depleción. El
 [inventario y las seeds](../systems/world-generation.es.md#categorías-regionales-de-módulos-f-wgen-01-corregido-en-4c-3)
 quedan en la referencia canónica de worldgen. No se cambiaron datos ni balance.
 
+### Integridad de rutas conocidas completada: Fase 4D-1
+
+`known_routes_integrity_smoke.py` reprodujo nueve grupos de aserciones fallidas
+antes de modificar producción y ahora pasa sus diez grupos con seed `271828`.
+El criterio compartido exige extremos físicos y cap inclusivo; publicación,
+componentes, fronteras, candidatos deadnode, vistas y compleción lo reutilizan.
+Importar conserva contactos y registros históricos de pistas no verificables.
+La proyección de sólo lectura deja inertes los registros inválidos persistidos
+sin podar referencias pendientes, mutar el mundo ni materializar al cargar.
+SECTOR lazy y el helper existente de prefijos siguen ejecutándose antes de
+validar; no se inventan alias de ids. Save/load repetido e incompatibles están
+cubiertos con directorios temporales. El
+[inventario canónico](../systems/discovery-navigation-intel.es.md#rutas-operativas-y-pistas-históricas-4d-1)
+detalla cada consumidor. F-NAV-01 y F-DEAD-01 siguen pendientes.
+
 ## 6. Riesgos y límites vigentes
 
-- `is_hop_within_cap` devuelve actualmente verdadero si falta un extremo. 4C-1
-  comprueba ambos nodos antes de llamarlo para `uplink_only`; los demás
-  importadores siguen necesitando el futuro contrato común de rutas.
+- Desde 4D-1, `is_hop_within_cap` rechaza extremos ausentes. Los productores
+  y consumidores operativos comparten el criterio sin destruir historial.
 - `SECTOR` ya tiene un formato canónico estricto y rechaza referencias
   malformadas. El contrato más amplio de rutas/nodos aún no puede validar
   referencias procedurales sólo buscándolas en `space.nodes`; sigue siendo
@@ -478,6 +497,6 @@ quedan en la referencia canónica de worldgen. No se cambiaron datos ni balance.
 El contrato incorpora las decisiones de Fase 4B y registra 4C-1 como primera
 corrección productiva completada. `uplink_only` ya no consume piezas sin efecto
 y dispone de reintento público compatible con el pool one-shot. La matriz
-registra también 4C-2a/b/c/d y 4C-3 como completadas; F-WGEN-01 ya respeta
+registra también 4C-2a/b/c/d, 4C-3 y 4D-1 como completadas; F-WGEN-01 ya respeta
 las categorías regionales. Las demás intervenciones, comunicaciones y defectos
 permanecen pendientes.

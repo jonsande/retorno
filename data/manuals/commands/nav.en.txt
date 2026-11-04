@@ -16,7 +16,7 @@ Description
 - `nav map graph`: show the global graph of known nodes/routes.
 - `nav map graph <node_id>`: focus graph output around one known node.
 - `nav map path <node_id>`: compute the best known path from current node.
-- `nav map routes`: list known direct routes from current node.
+- `nav map routes`: list operational direct routes from current node.
 - `nav map contacts`: list known contacts with sector, region, and route status relative to current node.
 - `nav map contacts sector`: group known contacts by sector and order sectors by proximity.
 - `nav <node_id>`: start transit to destination.

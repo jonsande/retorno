@@ -71,7 +71,8 @@ access guarantee.
 `generator.py` supplies lazy worldgen, sector synchronization, and the origin
 guardrail. `engine.py` and `repl.py` determine evaluation order. The intel
 importer turns text into knowledge/routes and enforces the 45 ly cap. None of
-these components computes a global reachability proof.
+these components guarantees universal connectivity. The shared traversal
+checks the operational known component.
 
 ## 4. Activation conditions
 
@@ -268,6 +269,31 @@ treating zero as an absence sentinel. A blocked evaluation changes neither the
 counter, timestamp, bridge, event sequence, hint files, routes, nor intel, and
 save/load preserves the same boundary behavior.
 
+### Known-route integrity: F-ROUTE-01 fixed in 4D-1
+
+Global recovery and deadnodes share `reachable_known_nodes` from
+`model/world.py`. It traverses only operational neighbors from `reachable_from`:
+both physical endpoints exist and the hop satisfies `is_hop_within_cap`, with
+an inclusive 45 ly cap. Every hop is checked: an invalid intermediate edge
+cannot expose remote payloads or artificially bring a target near the component.
+Route frontier uses those same neighbors; solve retains its contact, actual
+sensor range, and cap requirements.
+
+Dangling/over-cap current-version records are inert in the read-only projection.
+Save/load does not prune contacts, intel, files, or lazy references. New rejected
+LINK clues are recorded as history without publishing routes. The
+[navigation reference](discovery-navigation-intel.md) inventories producers and
+consumers and details lazy resolution before validation.
+
+`known_routes_integrity_smoke.py`, seed `271828`, reproduced phantom frontier,
+multihop contamination, and false deadnode exclusion before correction. It now
+proves actual global activation without a valid frontier, suppression with a
+valid unvisited route, retained deadnode tracking without reaching thresholds
+or creating bridges, EN/ES history/export, and mutation-free repeated save/load.
+F-NAV-01 cleanup remains pending; its leftover reverse references are no longer
+operational. F-DEAD-01 remains pending: bridges, chains, thresholds, cooldowns,
+and reception are unchanged.
+
 ## 9. Mechanism interactions
 
 For `dock`, `salvage data`, `scan`, and `route`, the engine runs lore when
@@ -285,8 +311,8 @@ Observable consequences include:
   become a deadnode candidate while its piece or breadcrumb is still pending.
 - An imported route can remove a target from deadnodes and, if it leads to an
   unvisited node, become a global frontier.
-- A known route to a nonexistent ID also counts as a global frontier; the
-  algorithm does not validate that the physical destination exists.
+- Since 4D-1, a missing/over-cap reference cannot connect components or count
+  as global frontier; its history remains available.
 - Physical links are not automatically known routes, and known routes need not
   have a matching `SpaceNode.link`.
 
@@ -312,7 +338,7 @@ are not reevaluated either.
 | Hidden ad hoc node with no known non-clean pool for breadcrumb | Risk confirmed by control flow | Scan if nearby; deadnodes over time | Piece may be assigned without an initial hint |
 | Forced piece assigned to an inaccessible receiver | Potential narrative-impact risk | Breadcrumb, deadnodes, or scan | No end-to-end test or protected-target exclusion |
 | Hint obtained but not imported | Deliberate behavior | Read/import; autoimport only on recognized read paths | Existing file can count as frontier and block another generation |
-| Route published to a nonexistent node | Possible functional defect with malformed references | No guaranteed repair | May suppress deadnodes and retain a phantom frontier |
+| Route record to a nonexistent node | F-ROUTE-01 fixed in 4D-1 | Contact/history retained; operational route excluded | Cannot suppress deadnodes or retain phantom frontier |
 | Node inserted after sector topology closes | Confirmed limitation | Manual link for anchored nodes | Deadnode bridges have neither manual link nor rebuild |
 | Closed but non-clean pool | Accepted behavior | Breadcrumb may be injected; existing files still count | Scheduler will not select it as a normal receiver |
 | Clean current pool | Deadnodes-specific block | Global recovery is evaluated later | Deadnodes checks no target on that trigger |
@@ -330,7 +356,8 @@ are not reevaluated either.
   reused gateway is 12–45 ly away and is an unknown non-authored hub.
 - Global recovery does not activate another generation while it recognizes a
   frontier or one of its pending hints.
-- Link import enforces the 45 ly cap when both nodes exist.
+- Operational publication/queries require both physical nodes and the
+  inclusive 45 ly cap; rejected clues remain in history.
 - The origin guardrail and per-deadnode thresholds are deterministic for their
   seed and keys.
 - The scheduler does not relax explicit non-procedural candidates to force an
@@ -343,14 +370,11 @@ connected.
 
 ## 12. Edge cases and permanent-block risks
 
-1. `_has_known_route_frontier` accepts unvisited destinations without checking
-   that their `SpaceNode` exists or that the hop remains under the cap; a
-   phantom or stale route can prevent global recovery indefinitely and also
-   exclude the target from deadnodes.
-2. Deadnodes also accepts a nonexistent `known_contact`. After failed indirect
-   attempts it publishes a direct link; because distance cannot be computed,
-   the importer may accept it. The route removes deadnode state, but travel is
-   still impossible.
+1. F-ROUTE-01 was fixed in 4D-1: invalid records cannot count as frontier or
+   contaminate components. The original historical clue is retained.
+2. Deadnodes still accepts a nonexistent `known_contact` and may write unusable
+   clues; its planner remains pending (F-DEAD-01). The importer no longer
+   publishes those clues as routes or falsely resolves tracking.
 3. The bridge is placed near the target, not the ship. The
    `current -> bridge` note may exceed the cap and be dropped on both indirect
    attempts.
@@ -386,6 +410,7 @@ states or temporary directories. No real save was opened or modified.
 | `uplink_once_per_node_smoke.py` | PASSED | One-shot uplink pool |
 | `drone_salvage_survey_smoke.py` | PASSED | Isolated survey and data salvage |
 | `save_load_smoke.py` | PASSED | General temporary serialization and sparse guardrail |
+| `known_routes_integrity_smoke.py` | PASSED | Valid/boundary routes, no phantom frontier, mixed components, deadnode candidates, lazy generation, EN/ES history, and idempotent save/load; F-NAV-01/F-DEAD-01 not corrected |
 | `deadnode_cooldown_zero_smoke.py` | PASSED | Pre-fix reproduction plus zero/positive timestamps, immediate and pre-limit blocking, exact expiry, independent candidates, observable effects, and focused save/load persistence |
 | `forced_hidden_ad_hoc_smoke.py` | PASSED | Known/unvisited synthetic host, hidden node, and breadcrumb only in the eligible pool |
 | `lore_secondary_count_weights_hard_smoke.py` | PASSED | Synthetic receivers and independent count, weight, and hard-force cases |
@@ -403,8 +428,8 @@ protected-target interference.
   studies; they are not part of the closed decisions.
 - Implement the approved complete chain: every hop under the cap from a
   reachable origin, progressive reveal, and coherent topology/pool integration.
-- Reject nonexistent identifiers as operational routes before a phantom route
-  closes deadnodes or blocks global recovery.
+- F-ROUTE-01 fixed in 4D-1: the shared criterion excludes nonexistent ids and
+  over-cap hops from operational routes, components, and frontiers.
 - Receiving a broadcast on entering coverage is approved for future
   `comms` + `radiod`; it must not advance lore triggers that require dock. Its
   name, event, and tests must express that distinction.
@@ -421,7 +446,7 @@ protected-target interference.
 
 The approved decisions come from the
 [navigation and recovery contract](../design/navigation-recovery-contract.md);
-none of them is implemented by this documentation update.
+implemented corrections are explicitly identified; the others remain pending.
 
 ## 15. Code references
 

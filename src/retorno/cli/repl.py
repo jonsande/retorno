@@ -80,6 +80,7 @@ from retorno.model.world import (
     add_known_link,
     distance_between_nodes_ly,
     is_hop_within_cap,
+    reachable_from,
     record_intel,
     sector_id_for_pos,
 )
@@ -393,7 +394,7 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ),
                 ("nav map graph [node_id]", "show known route graph", "muestra grafo de rutas conocido"),
                 ("nav map path <node_id>", "show best known path", "muestra mejor camino conocido"),
-                ("nav map routes", "list direct known routes", "lista rutas directas conocidas"),
+                ("nav map routes", "list direct operational routes", "lista rutas operativas directas"),
                 ("nav map contacts", "list known contacts", "lista contactos conocidos"),
                 ("nav <node_id>", "start transit to node", "inicia tránsito al nodo"),
                 ("nav --no-cruise <node_id>", "start transit without cruise profile", "inicia tránsito sin perfil cruise"),
@@ -3513,7 +3514,7 @@ def _collect_known_contact_entries(state) -> list[dict[str, object]]:
         x, y, z = current.x_ly, current.y_ly, current.z_ly
     else:
         x, y, z = state.world.current_pos_ly
-    routes = state.world.known_links.get(current_id, set())
+    routes = reachable_from(state.world, current_id)
     current_pos = (x, y, z)
     entries: list[dict[str, object]] = []
     for cid in sorted(known):
@@ -4035,11 +4036,11 @@ def _handle_uplink(state) -> None:
     for dest in fixed_pool:
         if not dest or dest == current_node_id:
             continue
-        added_link, blocked_by_cap, _ = _try_add_known_link_with_cap(
+        added_link, rejected, distance = _try_add_known_link_with_cap(
             state, current_node_id, dest, bidirectional=True
         )
-        if blocked_by_cap:
-            discarded_by_cap += 1
+        if rejected:
+            discarded_by_cap += int(distance is not None)
             continue
         if added_link:
             added.append(dest)
@@ -4281,6 +4282,50 @@ def _ensure_sector_for_procedural_node_id(state, node_id: str) -> None:
     ensure_sector_generated(state, sector_id)
 
 
+def _import_link_intel(state, payload: str, source_path: str, messages: list[str]) -> bool:
+    """Retain the clue/contact; publish only after existing lazy resolution.
+
+    Return whether a measurable hop exceeded the cap for existing summaries.
+    """
+    if "->" in payload:
+        left, right = [part.strip() for part in payload.split("->", 1)]
+    else:
+        left, right = state.world.current_node_id, payload.strip()
+    if not left or not right or left == right:
+        return False
+    for node_id in (left, right):
+        _ensure_sector_for_procedural_node_id(state, node_id)
+    added, rejected, distance = _try_add_known_link_with_cap(state, left, right, bidirectional=True)
+    state.world.known_nodes.update((left, right))
+    state.world.known_contacts.update((left, right))
+    source_kind, confidence, source_ref = _infer_intel_source(source_path)
+    record_intel(
+        state.world, t=state.clock.t, kind="link", from_id=left, to_id=right,
+        confidence=confidence, source_kind=source_kind, source_ref=source_ref,
+    )
+    locale = state.os.locale.value
+    if rejected:
+        if distance is None:
+            msg = {
+                "en": f"(intel) route retained as intel (missing endpoint): {left} -> {right}",
+                "es": f"(intel) ruta conservada como intel (extremo ausente): {left} -> {right}",
+            }
+        else:
+            msg = {
+                "en": f"(intel) route skipped (hop cap): {left} -> {right}",
+                "es": f"(intel) ruta descartada (cap de salto): {left} -> {right}",
+            }
+        messages.append(msg.get(locale, msg["en"]))
+    elif added:
+        _mark_arc_discovered(state, left, right)
+        msg = {
+            "en": f"(intel) route added: {left} -> {right}",
+            "es": f"(intel) ruta añadida: {left} -> {right}",
+        }
+        messages.append(msg.get(locale, msg["en"]))
+    return rejected and distance is not None
+
+
 def _process_intel_token(state, token: str, source_path: str, messages: list[str]) -> None:
     token = token.strip()
     if not token:
@@ -4294,49 +4339,7 @@ def _process_intel_token(state, token: str, source_path: str, messages: list[str
     for raw in token.splitlines():
         line = raw.strip()
         if line.upper().startswith("LINK:"):
-            payload = line.split(":", 1)[1].strip()
-            if "->" in payload:
-                left, right = [p.strip() for p in payload.split("->", 1)]
-                if left and right:
-                    for nid in (left, right):
-                        _ensure_sector_for_procedural_node_id(state, nid)
-                    added_link, blocked_by_cap, dist_ly = _try_add_known_link_with_cap(
-                        state, left, right, bidirectional=True
-                    )
-                    if blocked_by_cap:
-                        state.world.known_nodes.add(left)
-                        state.world.known_nodes.add(right)
-                        state.world.known_contacts.add(left)
-                        state.world.known_contacts.add(right)
-                        messages.append(
-                            f"(intel) route skipped (hop cap): {left} -> {right}"
-                        )
-                        if state.os.debug_enabled:
-                            locale = state.os.locale.value
-                            msg = {
-                                "en": f"[DEBUG] intel link dropped by cap: {left}->{right} dist={(dist_ly or 0.0):.2f}ly",
-                                "es": f"[DEBUG] enlace intel descartado por cap: {left}->{right} dist={(dist_ly or 0.0):.2f}ly",
-                            }
-                            print(msg.get(locale, msg["en"]))
-                        return
-                    if added_link:
-                        _mark_arc_discovered(state, left, right)
-                        state.world.known_nodes.add(left)
-                        state.world.known_nodes.add(right)
-                        state.world.known_contacts.add(left)
-                        state.world.known_contacts.add(right)
-                        source_kind, confidence, source_ref = _infer_intel_source(source_path)
-                        record_intel(
-                            state.world,
-                            t=state.clock.t,
-                            kind="link",
-                            from_id=left,
-                            to_id=right,
-                            confidence=confidence,
-                            source_kind=source_kind,
-                            source_ref=source_ref,
-                        )
-                        messages.append(f"(intel) route added: {left} -> {right}")
+            _import_link_intel(state, line.split(":", 1)[1].strip(), source_path, messages)
             return
 
     # Non-link token: try authored matches.
@@ -4480,71 +4483,9 @@ def _handle_intel_import(state, path: str) -> None:
                 added_msgs,
             )
         if line.upper().startswith("LINK:"):
-            payload = line.split(":", 1)[1].strip()
-            if "->" in payload:
-                left, right = [p.strip() for p in payload.split("->", 1)]
-                if left and right:
-                    for nid in (left, right):
-                        _ensure_sector_for_procedural_node_id(state, nid)
-                    added_link, blocked_by_cap, _ = _try_add_known_link_with_cap(
-                        state, left, right, bidirectional=True
-                    )
-                    if blocked_by_cap:
-                        discarded_by_cap += 1
-                        state.world.known_nodes.add(left)
-                        state.world.known_nodes.add(right)
-                        state.world.known_contacts.add(left)
-                        state.world.known_contacts.add(right)
-                        added_msgs.append(f"(intel) route skipped (hop cap): {left} -> {right}")
-                    if added_link:
-                        _mark_arc_discovered(state, left, right)
-                        state.world.known_nodes.add(left)
-                        state.world.known_nodes.add(right)
-                        state.world.known_contacts.add(left)
-                        state.world.known_contacts.add(right)
-                        record_intel(
-                            state.world,
-                            t=state.clock.t,
-                            kind="link",
-                            from_id=left,
-                            to_id=right,
-                            confidence=confidence,
-                            source_kind=source_kind,
-                            source_ref=source_ref,
-                        )
-                        added_msgs.append(f"(intel) route added: {left} -> {right}")
-            else:
-                to_id = payload
-                if to_id:
-                    from_id = state.world.current_node_id
-                    _ensure_sector_for_procedural_node_id(state, to_id)
-                    added_link, blocked_by_cap, _ = _try_add_known_link_with_cap(
-                        state, from_id, to_id, bidirectional=True
-                    )
-                    if blocked_by_cap:
-                        discarded_by_cap += 1
-                        state.world.known_nodes.add(from_id)
-                        state.world.known_nodes.add(to_id)
-                        state.world.known_contacts.add(from_id)
-                        state.world.known_contacts.add(to_id)
-                        added_msgs.append(f"(intel) route skipped (hop cap): {from_id} -> {to_id}")
-                    if added_link:
-                        _mark_arc_discovered(state, from_id, to_id)
-                        state.world.known_nodes.add(from_id)
-                        state.world.known_nodes.add(to_id)
-                        state.world.known_contacts.add(from_id)
-                        state.world.known_contacts.add(to_id)
-                        record_intel(
-                            state.world,
-                            t=state.clock.t,
-                            kind="link",
-                            from_id=from_id,
-                            to_id=to_id,
-                            confidence=confidence,
-                            source_kind=source_kind,
-                            source_ref=source_ref,
-                        )
-                        added_msgs.append(f"(intel) route added: {from_id} -> {to_id}")
+            discarded_by_cap += int(_import_link_intel(
+                state, line.split(":", 1)[1].strip(), path, added_msgs,
+            ))
         if line.upper().startswith("COORD:"):
             coord_txt = line.split(":", 1)[1].strip()
             try:
@@ -4643,71 +4584,9 @@ def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str
                 added_msgs,
             )
         if line.upper().startswith("LINK:"):
-            payload = line.split(":", 1)[1].strip()
-            if "->" in payload:
-                left, right = [p.strip() for p in payload.split("->", 1)]
-                if left and right:
-                    for nid in (left, right):
-                        _ensure_sector_for_procedural_node_id(state, nid)
-                    added_link, blocked_by_cap, _ = _try_add_known_link_with_cap(
-                        state, left, right, bidirectional=True
-                    )
-                    if blocked_by_cap:
-                        discarded_by_cap += 1
-                        state.world.known_nodes.add(left)
-                        state.world.known_nodes.add(right)
-                        state.world.known_contacts.add(left)
-                        state.world.known_contacts.add(right)
-                        added_msgs.append(f"(intel) route skipped (hop cap): {left} -> {right}")
-                    if added_link:
-                        _mark_arc_discovered(state, left, right)
-                        state.world.known_nodes.add(left)
-                        state.world.known_nodes.add(right)
-                        state.world.known_contacts.add(left)
-                        state.world.known_contacts.add(right)
-                        record_intel(
-                            state.world,
-                            t=state.clock.t,
-                            kind="link",
-                            from_id=left,
-                            to_id=right,
-                            confidence=confidence,
-                            source_kind=source_kind,
-                            source_ref=source_ref,
-                        )
-                        added_msgs.append(f"(intel) route added: {left} -> {right}")
-            else:
-                to_id = payload
-                if to_id:
-                    from_id = state.world.current_node_id
-                    _ensure_sector_for_procedural_node_id(state, to_id)
-                    added_link, blocked_by_cap, _ = _try_add_known_link_with_cap(
-                        state, from_id, to_id, bidirectional=True
-                    )
-                    if blocked_by_cap:
-                        discarded_by_cap += 1
-                        state.world.known_nodes.add(from_id)
-                        state.world.known_nodes.add(to_id)
-                        state.world.known_contacts.add(from_id)
-                        state.world.known_contacts.add(to_id)
-                        added_msgs.append(f"(intel) route skipped (hop cap): {from_id} -> {to_id}")
-                    if added_link:
-                        _mark_arc_discovered(state, from_id, to_id)
-                        state.world.known_nodes.add(from_id)
-                        state.world.known_nodes.add(to_id)
-                        state.world.known_contacts.add(from_id)
-                        state.world.known_contacts.add(to_id)
-                        record_intel(
-                            state.world,
-                            t=state.clock.t,
-                            kind="link",
-                            from_id=from_id,
-                            to_id=to_id,
-                            confidence=confidence,
-                            source_kind=source_kind,
-                            source_ref=source_ref,
-                        )
-                        added_msgs.append(f"(intel) route added: {from_id} -> {to_id}")
+            discarded_by_cap += int(_import_link_intel(
+                state, line.split(":", 1)[1].strip(), source_path, added_msgs,
+            ))
         if line.upper().startswith("COORD:"):
             coord_txt = line.split(":", 1)[1].strip()
             try:
@@ -4750,9 +4629,12 @@ def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str
                 )
                 added_msgs.append(f"(intel) node known: {nid}")
     if discarded_by_cap > 0:
-        added_msgs.append(
-            f"(intel) links skipped by hop cap: {discarded_by_cap} (>{Balance.MAX_ROUTE_HOP_LY:.1f}ly)"
-        )
+        locale = state.os.locale.value
+        msg = {
+            "en": f"(intel) links skipped by hop cap: {discarded_by_cap} (>{Balance.MAX_ROUTE_HOP_LY:.1f}ly)",
+            "es": f"(intel) enlaces descartados por cap de salto: {discarded_by_cap} (>{Balance.MAX_ROUTE_HOP_LY:.1f}ly)",
+        }
+        added_msgs.append(msg.get(locale, msg["en"]))
     return added_msgs
 
 def render_ship_sectors(state) -> None:
@@ -4788,14 +4670,7 @@ def _map_known_nodes(state) -> set[str]:
 
 
 def _map_known_adjacency(state, nodes: set[str]) -> dict[str, set[str]]:
-    adj: dict[str, set[str]] = {nid: set() for nid in nodes}
-    for src, dests in state.world.known_links.items():
-        if src not in adj:
-            continue
-        for dst in dests:
-            if dst in adj and dst != src:
-                adj[src].add(dst)
-    return adj
+    return {nid: reachable_from(state.world, nid) & nodes for nid in nodes}
 
 
 def _map_component_count(nodes: set[str], adj: dict[str, set[str]]) -> int:
@@ -4897,7 +4772,7 @@ def _route_solve_sources_for_target(state, target_id: str, source_ids: set[str])
         if src_id == target_id:
             continue
         dist = _distance_ly_between_nodes(state, src_id, target_id)
-        if dist is None or dist > sensors_range_ly:
+        if dist is None or dist > sensors_range_ly or not is_hop_within_cap(state.world, src_id, target_id):
             continue
         candidates.append((dist, src_id))
     candidates.sort(key=lambda item: (item[0], item[1]))
@@ -4913,7 +4788,7 @@ def _route_solve_origin_hints(state, target_id: str) -> list[tuple[float, str, b
 
     hints: list[tuple[float, str, bool, bool]] = []
     for dist, src_id in _route_solve_sources_for_target(state, target_id, known_nodes):
-        route_known = target_id in state.world.known_links.get(src_id, set())
+        route_known = target_id in reachable_from(state.world, src_id)
         hints.append((dist, src_id, src_id in reachable, route_known))
 
     hints.sort(key=lambda item: (0 if item[2] else 1, 0 if item[3] else 1, item[0], item[1]))
@@ -5330,7 +5205,7 @@ def render_nav_routes(state) -> None:
     player_ship_id = getattr(state.ship, "ship_id", "RETORNO_SHIP")
     routes = {
         rid
-        for rid in state.world.known_links.get(current_id, set())
+        for rid in reachable_from(state.world, current_id)
         if rid != current_id and rid != player_ship_id and not _is_hidden_origin_contact_id(rid)
     }
     current = state.world.space.nodes.get(current_id)
@@ -5522,7 +5397,7 @@ def render_ship_survey(state, target_id: str) -> None:
     known = target_norm in (
         state.world.known_nodes if state.world.known_nodes else state.world.known_contacts
     )
-    route = target_norm == current_id or target_norm in state.world.known_links.get(current_id, set())
+    route = target_norm == current_id or target_norm in reachable_from(state.world, current_id)
     visited = target_norm in state.world.visited_nodes
     in_sensor_range = distance <= state.ship.sensors_range_ly
     radiation_known = visited or in_sensor_range
@@ -6765,7 +6640,7 @@ def _route_solve_targets_for_completion(state) -> list[str]:
     current_node_id = getattr(state.world, "current_node_id", "")
     if not current_node_id:
         return []
-    known_routes = set(state.world.known_links.get(current_node_id, set()))
+    known_routes = reachable_from(state.world, current_node_id)
     sensors_range_ly = max(0.0, float(getattr(state.ship, "sensors_range_ly", Balance.SENSORS_RANGE_LY)))
     return [
         node_id
@@ -6774,6 +6649,7 @@ def _route_solve_targets_for_completion(state) -> list[str]:
         and (
             (dist := _distance_ly_between_nodes(state, current_node_id, node_id)) is not None
             and dist <= sensors_range_ly
+            and is_hop_within_cap(state.world, current_node_id, node_id)
         )
     ]
 
@@ -6784,7 +6660,7 @@ def _travel_targets_for_completion(state) -> list[str]:
         return []
     candidates = [
         node_id
-        for node_id in sorted(state.world.known_links.get(current_node_id, set()))
+        for node_id in sorted(reachable_from(state.world, current_node_id))
         if node_id != current_node_id and node_id != "UNKNOWN"
     ]
     if (

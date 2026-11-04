@@ -15,7 +15,7 @@ from retorno.core.lore import (
 )
 from retorno.model.events import Event, SourceRef
 from retorno.model.systems import SystemState
-from retorno.model.world import SpaceNode, sector_id_for_pos
+from retorno.model.world import SpaceNode, is_hop_within_cap, reachable_from, reachable_known_nodes, sector_id_for_pos
 from retorno.worldgen.generator import ensure_sector_generated
 
 
@@ -97,19 +97,6 @@ def uplink_blocked_reason(state) -> str | None:
     return None
 
 
-def _reachable_component(known_links: dict[str, set[str]], start_id: str) -> set[str]:
-    visited = {start_id}
-    queue = [start_id]
-    while queue:
-        current = queue.pop(0)
-        for dest in known_links.get(current, set()):
-            if dest in visited:
-                continue
-            visited.add(dest)
-            queue.append(dest)
-    return visited
-
-
 def _distance_ly(left: SpaceNode, right: SpaceNode) -> float:
     dx = left.x_ly - right.x_ly
     dy = left.y_ly - right.y_ly
@@ -124,7 +111,7 @@ def _known_node_ids(state) -> set[str]:
 def _has_known_route_frontier(state, reachable: set[str]) -> bool:
     visited = set(getattr(state.world, "visited_nodes", set()) or set())
     for node_id in reachable:
-        for dest_id in state.world.known_links.get(node_id, set()):
+        for dest_id in reachable_from(state.world, node_id):
             if dest_id not in visited:
                 return True
     return False
@@ -142,16 +129,17 @@ def _has_route_solve_frontier(state, reachable: set[str]) -> bool:
         origin = nodes.get(from_id)
         if not origin:
             continue
+        routes = reachable_from(state.world, from_id)
         for dest_id in known:
             if dest_id == from_id or dest_id in visited:
                 continue
-            if dest_id in state.world.known_links.get(from_id, set()):
+            if dest_id in routes:
                 continue
             dest = nodes.get(dest_id)
             if not dest:
                 continue
             dist = _distance_ly(origin, dest)
-            if dist <= sensors_range and dist <= float(Balance.MAX_ROUTE_HOP_LY):
+            if dist <= sensors_range and is_hop_within_cap(state.world, from_id, dest_id):
                 return True
     return False
 
@@ -219,7 +207,7 @@ def _has_passive_recovery_frontier(state) -> bool:
 
 def has_exploration_frontier(state) -> bool:
     current_id = state.world.current_node_id
-    reachable = _reachable_component(state.world.known_links, current_id)
+    reachable = reachable_known_nodes(state.world, current_id)
     if _has_known_route_frontier(state, reachable):
         return True
     if _has_route_solve_frontier(state, reachable):

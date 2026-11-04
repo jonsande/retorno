@@ -6,7 +6,7 @@ import random
 from retorno.config.balance import Balance
 from retorno.core.lore import write_local_intel
 from retorno.model.events import Event
-from retorno.model.world import DeadNodeState, SpaceNode
+from retorno.model.world import DeadNodeState, SpaceNode, reachable_known_nodes
 from retorno.worldgen.generator import _generate_node_id, _name_from_node_id, sync_sector_state_for_node
 
 
@@ -19,19 +19,6 @@ def _hash_rng(seed: int, *parts: str) -> random.Random:
             h &= 0xFFFFFFFFFFFFFFFF
     h ^= seed & 0xFFFFFFFFFFFFFFFF
     return random.Random(h)
-def _reachable_nodes(known_links: dict[str, set[str]], start_id: str) -> set[str]:
-    if start_id not in known_links:
-        return {start_id}
-    visited = {start_id}
-    queue = [start_id]
-    while queue:
-        cur = queue.pop(0)
-        for nxt in known_links.get(cur, set()):
-            if nxt in visited:
-                continue
-            visited.add(nxt)
-            queue.append(nxt)
-    return visited
 
 
 def _distance_ly(a: SpaceNode, b: SpaceNode) -> float:
@@ -39,13 +26,6 @@ def _distance_ly(a: SpaceNode, b: SpaceNode) -> float:
     dy = a.y_ly - b.y_ly
     dz = a.z_ly - b.z_ly
     return math.sqrt(dx * dx + dy * dy + dz * dz)
-
-
-def _node_has_known_route(known_links: dict[str, set[str]], reachable: set[str], node_id: str) -> bool:
-    for src in reachable:
-        if node_id in known_links.get(src, set()):
-            return True
-    return False
 
 
 def _is_within_route_range(state, reachable: set[str], node_id: str) -> bool:
@@ -110,7 +90,7 @@ def evaluate_dead_nodes(state, trigger: str, debug: bool = False) -> list[Event]
     events: list[Event] = []
     uplinks_total = state.world.lore.counters.get("uplink_count", 0)
     year = state.clock.t / Balance.YEAR_S if Balance.YEAR_S else 0.0
-    reachable = _reachable_nodes(state.world.known_links, state.world.current_node_id)
+    reachable = reachable_known_nodes(state.world, state.world.current_node_id)
 
     candidates = []
     source_nodes = set(state.world.known_contacts) | set(getattr(state.world, "forced_hidden_nodes", set()) or set())
@@ -118,7 +98,7 @@ def evaluate_dead_nodes(state, trigger: str, debug: bool = False) -> list[Event]
         node_pool = getattr(state.world, "node_pools", {}).get(node_id)
         if node_pool and getattr(node_pool, "node_cleaned", False):
             continue
-        if _node_has_known_route(state.world.known_links, reachable, node_id):
+        if node_id in reachable:
             continue
         if _is_within_route_range(state, reachable, node_id):
             continue

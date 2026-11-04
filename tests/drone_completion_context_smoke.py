@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from retorno.bootstrap import create_initial_state_sandbox
 from retorno.cli import repl
-from retorno.model.world import add_known_link
+from retorno.model.world import SpaceNode, add_known_link
 
 
 def main() -> None:
@@ -11,9 +11,13 @@ def main() -> None:
     state.ship.current_node_id = "ECHO_7"
     state.ship.docked_node_id = None
 
+    # Use an explicit physical fixture outside sensors and within the hop cap.
+    state.world.space.nodes["COMPLETION_REMOTE"] = SpaceNode(
+        node_id="COMPLETION_REMOTE", name="Completion Remote", kind="station", x_ly=10.0,
+    )
     # Keep a remote contact known to ensure completion remains local-only.
-    state.world.known_nodes.update({"ECHO_7", "CURL_12"})
-    state.world.known_contacts.update({"ECHO_7", "CURL_12"})
+    state.world.known_nodes.update({"ECHO_7", "COMPLETION_REMOTE"})
+    state.world.known_contacts.update({"ECHO_7", "COMPLETION_REMOTE"})
 
     dock_targets = repl._dock_targets_for_completion(state)
     assert dock_targets == ["ECHO_7"], f"Expected only current node for dock completion in orbit, got {dock_targets!r}"
@@ -23,9 +27,9 @@ def main() -> None:
         f"Expected in-range unresolved route-solve targets from current node, got {route_solve_targets!r}"
     )
 
-    add_known_link(state.world, "ECHO_7", "CURL_12", bidirectional=True)
+    add_known_link(state.world, "ECHO_7", "COMPLETION_REMOTE", bidirectional=True)
     travel_targets = repl._travel_targets_for_completion(state)
-    assert travel_targets == ["CURL_12"], (
+    assert travel_targets == ["COMPLETION_REMOTE"], (
         f"Expected only known-route travel targets from current node, got {travel_targets!r}"
     )
 
@@ -47,13 +51,13 @@ def main() -> None:
     }
     assert expected_ship_sectors.issubset(set(move_targets)), move_targets
     assert "ECHO_7" in move_targets, move_targets
-    assert "CURL_12" not in move_targets, move_targets
+    assert "COMPLETION_REMOTE" not in move_targets, move_targets
     assert "DRN-BAY" in move_targets, move_targets
 
     deploy_targets = repl._drone_deploy_targets_for_completion(state)
     assert expected_ship_sectors.issubset(set(deploy_targets)), deploy_targets
     assert "ECHO_7" in deploy_targets, deploy_targets
-    assert "CURL_12" not in deploy_targets, deploy_targets
+    assert "COMPLETION_REMOTE" not in deploy_targets, deploy_targets
     assert "DRN-BAY" in deploy_targets, deploy_targets
 
     state.ship.docked_node_id = "ECHO_7"
