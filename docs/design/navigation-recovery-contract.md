@@ -13,8 +13,9 @@ Phase 4. It does not replace the canonical references for
 that future corrections must preserve.
 
 The investigation used `320d06c` and the Phase 4A/4B documentation worktree.
-These phases changed documentation and tests only: no proposal in this document
-should be read as behavior that has already been implemented.
+These phases changed documentation and tests only. Later corrections are
+explicitly marked complete; other proposals must not be read as implemented
+behavior.
 
 Labels used below:
 
@@ -363,7 +364,7 @@ existing receivers/stages that the planner can reuse without creating nodes.
 | Malformed `SECTOR` materializes origin | **Fixed** | `sector_intel_validation_smoke.py`: canonical existing/lazy/wide ids and invalid formats through public imports | Localized rejection without mutation; canonical formats still materialize | **4C-2b complete** |
 | `intel N` returns the oldest records | **Fixed** | `intel_recent_order_smoke.py`: empty/single/large histories, limits, timestamp ties, EN/ES, CLI/Textual, show/export, and read-only state | Shows the N newest in stable order and preserves `intel show/export` | **4C-2c complete** |
 | Deadnode cooldown is skipped at `t=0` | **Fixed** | `deadnode_cooldown_zero_smoke.py`: zero/positive timestamps, immediate/pre-limit/exact-limit evaluations, independent candidates, and save/load | `attempts > 0` identifies a prior action; zero remains a valid persisted timestamp and blocked evaluations do not mutate effects | **4C-2d complete** |
-| Regional `modules_pool` treats categories as ids | P1 — medium | Inventory actual metadata and generate per-region seeds with nonzero counts | Categories filter real modules; counts, membership, and determinism respect configuration | 4C-3 |
+| Regional `modules_pool` treated categories as ids | **Fixed** | `worldgen_modules_pool_smoke.py`: real loader, seeds 1/2, selection and disk/bulge/halo clusters, legitimate zeros, empty/unknown filters, save/load, and normal salvage | Catalog `pool` categories filter real ids; counts, candidate order, replacement, and RNG preserved; same-sequence determinism and authored/unrelated-state integrity | **4C-3 complete** |
 
 Single frequency, uplink snapshots, `radiation_base`, generation-order
 dependence, and general balance remain independent studies.
@@ -439,6 +440,18 @@ action exactly at the boundary, independence between candidates, unchanged
 positive-time behavior, and the same semantics after save/load. It does not
 resolve deadnode route validity or bridge topology (F-DEAD-01).
 
+### Completed regional category correction: Phase 4C-3
+
+F-WGEN-01 was reproduced before correction in both compound selection and real
+generation. The inventory confirmed sufficient `pool` metadata and no used
+explicit-id lists. Only procedural `_pick_modules` changed; authored state,
+counts/zeros, replacement, order, and RNG calls are preserved.
+`worldgen_modules_pool_smoke.py` covers seeds `1`/`2`, regional clusters,
+same-sequence determinism, temporary save/load, and normal module recovery
+with D1, including cargo and depletion persistence. The
+[inventory and seeds](../systems/world-generation.md#regional-module-categories-f-wgen-01-fixed-in-4c-3)
+are recorded in the canonical worldgen reference. No data or balance changed.
+
 ## 6. Current risks and boundaries
 
 - `is_hop_within_cap` currently returns true when an endpoint is missing. 4C-1
@@ -454,14 +467,15 @@ resolve deadnode route validity or bridge topology (F-DEAD-01).
   scalable service dependencies, idempotent pending state, and non-repeating
   transition events are still missing. They must not be modeled as duplicate
   lists.
-- `modules_pool` categories are approved as filters over real modules; existing
-  metadata must still be mapped to those categories. `radiation_base`,
-  generation-order determinism, single frequency, and final uplink-pool policy
-  remain open.
+- Since 4C-3, `modules_pool` categories filter the catalog's actual `pool` field.
+  `radiation_base`, generation-order independence, single frequency, final
+  uplink-pool policy, and balance remain open.
 
 ## 7. Result of this phase
 
 The contract incorporates the Phase 4B decisions and records 4C-1 as the first
 completed production correction. `uplink_only` no longer consumes pieces
 without an effect and has a public retry compatible with the one-shot pool.
-Other interventions, communications work, and defects remain pending.
+The matrix also records 4C-2a/b/c/d and 4C-3 as complete; F-WGEN-01 now respects
+regional categories. Other interventions, communications work, and defects
+remain pending.

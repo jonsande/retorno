@@ -13,8 +13,9 @@ estabilización posterior a la Fase 4. No sustituye las referencias canónicas d
 diseño que deberán respetar las futuras correcciones.
 
 La investigación se hizo sobre `320d06c` y el árbol documental de Fases 4A/4B.
-Estas fases sólo actualizaron documentación y pruebas: ninguna propuesta de
-este documento debe leerse como comportamiento ya implementado.
+Estas fases sólo actualizaron documentación y pruebas. Las correcciones
+posteriores se identifican expresamente como completadas; las demás propuestas
+no deben leerse como comportamiento ya implementado.
 
 Etiquetas usadas:
 
@@ -362,7 +363,7 @@ planificador sin crear nodos nuevos.
 | `SECTOR` malformado materializa origen | **Corregido** | `sector_intel_validation_smoke.py`: ids canónicos existentes/lazy/amplios y formatos inválidos mediante importaciones públicas | Rechazo localizado sin mutación; formatos canónicos siguen materializando | **4C-2b completada** |
 | `intel N` devuelve los más antiguos | **Corregido** | `intel_recent_order_smoke.py`: historiales vacío/único/amplio, límites, empates de timestamp, EN/ES, CLI/Textual, show/export y estado de sólo lectura | Muestra los N más recientes en orden estable y conserva `intel show/export` | **4C-2c completada** |
 | Cooldown deadnode se omite en `t=0` | **Corregido** | `deadnode_cooldown_zero_smoke.py`: timestamps cero/positivos, evaluaciones inmediata/anterior al límite/en el límite, candidatos independientes y save/load | `attempts > 0` identifica una acción previa; cero sigue siendo timestamp persistente válido y las evaluaciones bloqueadas no mutan efectos | **4C-2d completada** |
-| `modules_pool` regional trata categorías como ids | P1 — media | Inventariar metadatos reales y generar seeds por disk/bulge/halo con conteos no nulos | Las categorías actúan como filtros sobre módulos reales; conteos, pertenencia y determinismo respetan configuración | 4C-3 |
+| `modules_pool` regional trataba categorías como ids | **Corregido** | `worldgen_modules_pool_smoke.py`: loader real, seeds 1/2, selección y clusters disk/bulge/halo, ceros legítimos, filtros vacíos/desconocidos, save/load y salvage normal | Categorías del campo `pool` filtran ids reales; conteos, orden de candidatos, repetición y RNG preservados; determinismo con igual secuencia y estado authored/ajeno íntegro | **4C-3 completada** |
 
 Frecuencia de singles, snapshots uplink, `radiation_base`, dependencia del orden
 de worldgen y balance general permanecen en estudios independientes.
@@ -440,6 +441,18 @@ vencer, nueva acción exactamente en el límite, independencia entre candidatos,
 comportamiento positivo sin cambios y la misma semántica tras save/load. No
 resuelve la validez de rutas deadnode ni la topología del puente (F-DEAD-01).
 
+### Corrección de categorías regionales completada: Fase 4C-3
+
+F-WGEN-01 se reprodujo antes de corregir tanto en la selección compuesta como
+en la generación real. El inventario confirmó metadatos `pool` suficientes sin
+listas de ids explícitos utilizadas. Sólo cambió `_pick_modules` procedural;
+se conservan authored, conteos/ceros, repetición, orden y llamadas RNG.
+`worldgen_modules_pool_smoke.py` cubre seeds `1`/`2`, clusters regionales,
+determinismo con igual secuencia, save/load temporal y recuperación normal de
+un módulo con D1, incluida la persistencia de cargo y depleción. El
+[inventario y las seeds](../systems/world-generation.es.md#categorías-regionales-de-módulos-f-wgen-01-corregido-en-4c-3)
+quedan en la referencia canónica de worldgen. No se cambiaron datos ni balance.
+
 ## 6. Riesgos y límites vigentes
 
 - `is_hop_within_cap` devuelve actualmente verdadero si falta un extremo. 4C-1
@@ -456,14 +469,15 @@ resuelve la validez de rutas deadnode ni la topología del puente (F-DEAD-01).
   nombres/descripciones, soporte de dependencias de servicio escalable, estado
   pendiente idempotente y eventos de transición no repetitivos. No deben
   modelarse con listas duplicadas.
-- Las categorías de `modules_pool` ya se aprobaron como filtros sobre módulos
-  reales; falta contrastar qué metadatos existentes representan cada categoría.
-  Siguen abiertos `radiation_base`, determinismo por orden, frecuencia de
-  singles y política final de pools uplink.
+- Las categorías de `modules_pool` ya filtran el campo real `pool` del catálogo
+  desde 4C-3. Siguen abiertos `radiation_base`, independencia del orden de
+  generación, frecuencia de singles, política final de pools uplink y balance.
 
 ## 7. Resultado de esta fase
 
 El contrato incorpora las decisiones de Fase 4B y registra 4C-1 como primera
 corrección productiva completada. `uplink_only` ya no consume piezas sin efecto
-y dispone de reintento público compatible con el pool one-shot. Las demás
-intervenciones, comunicaciones y defectos permanecen pendientes.
+y dispone de reintento público compatible con el pool one-shot. La matriz
+registra también 4C-2a/b/c/d y 4C-3 como completadas; F-WGEN-01 ya respeta
+las categorías regionales. Las demás intervenciones, comunicaciones y defectos
+permanecen pendientes.

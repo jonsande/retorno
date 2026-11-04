@@ -1,7 +1,8 @@
 # Physical universe and procedural generation
 
 Status: **canonical documentation of implemented behavior**, reviewed against
-commit `3658577`.
+commit `3658577`, with the Phase 4C-3 module-filter correction reviewed on top
+of `4fd3909` on 2026-11-04.
 
 Spanish version: [world-generation.es.md](world-generation.es.md)
 
@@ -307,15 +308,45 @@ nothing.
 | `data/worldgen/archetypes/*.json` | Counts, kinds, caps, hubs, and link budgets/probabilities. |
 | `data/modules.json` | Recoverable module catalog and pools. |
 
-Two fields/configurations need attention:
+Regional JSON `radiation_base` values are not read. Effective radiation uses
+`PROCEDURAL_RAD_BASE`, `PROCEDURAL_RAD_REGION_MULT`, kind multiplier, variation,
+and spikes from `Balance`. Its configuration contract remains pending.
 
-- Regional JSON `radiation_base` values are not read. Effective radiation uses
-  `PROCEDURAL_RAD_BASE`, `PROCEDURAL_RAD_REGION_MULT`, kind multiplier,
-  variation, and spikes from `Balance`.
-- `_pick_modules` interprets a list-valued `modules_pool` as a list of **module
-  ids**, not pool labels. Bulge and halo declare `['tech','rare']`, but no module
-  has either id, so those selections are currently empty. It is not established
-  whether the data or the intended loader semantics are wrong.
+### Regional module categories (F-WGEN-01 fixed in 4C-3)
+
+Previously, `_pick_modules` treated `['tech','rare']` as literal module ids.
+Neither exists, so bulge lost its guaranteed 1–3 modules and halo lost nonzero
+module rolls. Categories now filter the real catalog's `pool` field:
+
+| Effective `pool` | Loaded module ids, in catalog order |
+| --- | --- |
+| `common` | `bus_stabilizer`, `aux_battery_cell`, `utility_cargo_frame`, `reinforced_frame` |
+| `tech` | `micro_reactor_patch`, `selftest_rig`, `field_service_rig`, `high_density_cell` |
+| `rare` | `transit_sensor_pack`, `rapid_maneuver_module` |
+
+`load_modules()` normalizes scope and drone metadata; all ten definitions
+already declare their categories. No rarity inference or data edits are needed.
+Both ship and drone modules participate in regional salvage.
+
+The procedural selector accepts a category string or a list of categories.
+`common` retains its candidates and exact RNG behavior; `['tech','rare']` selects
+from those six modules. Candidates follow `module_ids` (catalog order in worldgen),
+regardless of category order or duplicates. Counts still use one `randint`, then
+uniform choices with replacement. Disk retains 0–2, bulge 1–3, and halo 0–1
+modules per applicable salvage node.
+
+Empty or entirely unknown filters yield no modules without a whole-catalog
+fallback. Mixed lists match only their known categories. `None` retains the
+internal unfiltered default. Only real catalog ids can be returned. No JSON or
+test establishes an explicit-id-list contract, so procedural lists are categories
+only. An unknown filter can yield fewer modules than its minimum; all active
+regional filters have sufficient candidates.
+
+Authored salvage stays in `_bootstrap_locations` (`bootstrap.py`), with a shared
+bootstrap RNG and per-location profiles. Active authored profiles use `common`
+or `tech`; inactive location templates also use `rare` and `all`. Although
+bootstrap contains an id-list branch, no active/inactive JSON or test uses it.
+This correction changes only the procedural picker and preserves authored loot.
 
 ## 10. Determinism
 
@@ -400,7 +431,8 @@ world can contain sectors produced under different seeds.
 The production code was originally reviewed at commit `3658577`; the original
 tests were run later, after updating `worldgen_sparse_archetypes_smoke.py`, on
 the Phase 3A.1 working tree. Phase 4C-2b later added the strict sector-id
-regression and reran the relevant tests:
+regression and reran the relevant tests. Phase 4C-3 added the module-pool
+regression and reran the relevant smokes on 2026-11-04:
 
 | Test | Result | Relevant coverage |
 | --- | --- | --- |
@@ -413,6 +445,27 @@ regression and reran the relevant tests:
 | `scan_job_smoke.py` | PASSED | Scan, indirect materialization, and discovery. |
 | `worldgen_sparse_archetypes_smoke.py` | PASSED | Active catalog and caps, allowed/forbidden kinds, per-archetype counts, internal links to the topology hub, sparse distribution, same-order determinism, guardrail, and no neighbor revelation. |
 | `sector_intel_validation_smoke.py` | PASSED | Canonical minimum/wide signed ids, existing/lazy sectors, rejection without serializable-state mutation, sector-only `[INTEL]` blocks without corrupt recovery/RNG use, localized public feedback, and continued processing of other valid lines. |
+| `worldgen_modules_pool_smoke.py` | PASSED | Real loader, category unions, common RNG compatibility, ranges/zeros, empty/unknown filters, valid ids, regional clusters, same-sequence determinism, authored/unrelated-state preservation, temporary save/load, and normal drone recovery/depletion. |
+
+The module regression uses seeds `1` and `2` with the request sequence
+`S+020_+000_+000` → `S-25000_+000_+000` → `S+16000_+000_+000` →
+`S+000_+000_+000`. The first three centers map to galactic X coordinates
+250205, 5, and 410005 ly, including the operational origin's 250000 ly offset.
+Target-sector counts, in sorted node-id order, are:
+
+| Seed | Disk (`relay_corridor`) | Bulge (`ruin_field`) | Halo (`empty`) |
+| --- | --- | --- | --- |
+| `1` | 0, 2, 2 | 1, 2 | 0 |
+| `2` | 0, 1 | 2, 3 | 1 |
+
+Before correction, category-union selection failed with `(0, ['tech','rare'], [])`;
+real integration independently failed with bulge counts `[0,0]` for seed `1`.
+Both now pass. The regression covers all generated nodes, including Gaussian Z
+outliers outside recorded sector metadata. Sandbox seed `2` deploys D1 normally
+to procedural `DERELICT_36B4F8`: the first module job misses and the second
+recovers `transit_sensor_pack` at the configured find probability. Temporary
+save/load preserves remaining modules and cargo without replenishing loot on
+repeated generation requests.
 
 Verification gaps:
 
@@ -420,8 +473,7 @@ Verification gaps:
 - no test asserts Z remains within its requested sector;
 - authored duplicates and already-over-cap sectors are untested;
 - there is no physical galaxy-boundary test;
-- list-valued `modules_pool` and regional `radiation_base` semantics are not
-  validated;
+- regional `radiation_base` configuration semantics remain unresolved;
 - topology rebuilding after special-node insertion into generated/empty sectors
   is untested;
 - there is no automated check that the canonical table in this document tracks

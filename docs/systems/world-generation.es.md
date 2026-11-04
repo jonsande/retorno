@@ -1,7 +1,8 @@
 # Universo físico y generación procedural
 
 Estado: **documentación canónica del comportamiento implementado**, revisada
-contra el commit `3658577`.
+contra el commit `3658577`, con la corrección de filtros de módulos de Fase
+4C-3 revisada sobre `4fd3909` el 2026-11-04.
 
 Versión inglesa: [world-generation.md](world-generation.md)
 
@@ -315,16 +316,48 @@ la definición authored ya lo crea, por lo que el fallback normalmente no actúa
 | `data/worldgen/archetypes/*.json` | Conteos, tipos, caps, hubs y presupuestos/probabilidades de enlaces. |
 | `data/modules.json` | Catálogo y pool de módulos recuperables. |
 
-Dos campos/configuraciones requieren atención:
+Los `radiation_base` de los JSON regionales no son consultados. La radiación
+efectiva usa `PROCEDURAL_RAD_BASE`, `PROCEDURAL_RAD_REGION_MULT`, multiplicador
+por tipo, variación y spikes de `Balance`. Su contrato de configuración sigue pendiente.
 
-- Los `radiation_base` de los JSON regionales no son consultados. La radiación
-  efectiva usa `PROCEDURAL_RAD_BASE`, `PROCEDURAL_RAD_REGION_MULT`, multiplicador
-  por tipo, variación y spikes de `Balance`.
-- En `_pick_modules`, una lista `modules_pool` se interpreta como una lista de
-  **ids de módulo**, no como etiquetas de pool. Bulge y halo declaran
-  `['tech','rare']`, pero no existen módulos con esos ids; actualmente esa
-  selección queda vacía. No se ha establecido si el problema está en los datos
-  o en la semántica esperada del loader.
+### Categorías regionales de módulos (F-WGEN-01 corregido en 4C-3)
+
+Antes, `_pick_modules` trataba `['tech','rare']` como ids literales de módulos.
+Ninguno existe, por lo que bulge perdía sus 1–3 módulos garantizados y halo sus
+sorteos no nulos. Las categorías ahora filtran el campo `pool` del catálogo real:
+
+| `pool` efectivo | Ids de módulos cargados, en orden de catálogo |
+| --- | --- |
+| `common` | `bus_stabilizer`, `aux_battery_cell`, `utility_cargo_frame`, `reinforced_frame` |
+| `tech` | `micro_reactor_patch`, `selftest_rig`, `field_service_rig`, `high_density_cell` |
+| `rare` | `transit_sensor_pack`, `rapid_maneuver_module` |
+
+`load_modules()` normaliza scope y metadatos de drones; las diez definiciones
+ya declaran sus categorías. No hace falta inferir rarezas ni editar datos.
+Los módulos de nave y de dron participan en el salvage regional.
+
+El selector procedural acepta una categoría como cadena o una lista de categorías.
+`common` conserva sus candidatos y el comportamiento exacto del RNG;
+`['tech','rare']` selecciona entre esos seis módulos. Los candidatos siguen
+`module_ids` (orden de catálogo en worldgen), independientemente del orden o
+duplicados de categorías. Los conteos siguen usando un `randint`, seguido de
+selecciones uniformes con repetición. Disk conserva 0–2, bulge 1–3 y halo 0–1
+módulos por nodo de salvage aplicable.
+
+Los filtros vacíos o totalmente desconocidos no producen módulos ni fallback al
+catálogo completo. Las listas mixtas sólo coinciden con sus categorías conocidas.
+`None` conserva el valor interno por defecto sin filtro. Sólo se devuelven ids
+reales del catálogo. Ningún JSON ni test establece un contrato de listas de ids
+explícitos, por lo que las listas procedurales son sólo categorías. Un filtro
+desconocido puede producir menos módulos que su mínimo; todos los filtros
+regionales activos disponen de candidatos suficientes.
+
+El salvage authored sigue en `_bootstrap_locations` (`bootstrap.py`), con un RNG
+compartido de bootstrap y perfiles por ubicación. Los perfiles authored activos
+usan `common` o `tech`; las plantillas inactivas de ubicaciones también usan
+`rare` y `all`. Aunque bootstrap contiene una rama para listas de ids, ningún
+JSON activo/inactivo ni test la usa. Esta corrección sólo cambia el selector
+procedural y conserva el loot authored.
 
 ## 10. Determinismo
 
@@ -413,7 +446,8 @@ El código productivo se revisó originalmente en el commit `3658577`; las
 pruebas originales se ejecutaron después, tras actualizar
 `worldgen_sparse_archetypes_smoke.py`, sobre el árbol de trabajo de la Fase
 3A.1. La Fase 4C-2b añadió posteriormente la regresión estricta de ids de sector
-y volvió a ejecutar las pruebas pertinentes:
+y volvió a ejecutar las pruebas pertinentes. La Fase 4C-3 añadió la regresión de
+pools de módulos y repitió los smokes pertinentes el 2026-11-04:
 
 | Prueba | Resultado | Cobertura relevante |
 | --- | --- | --- |
@@ -426,6 +460,27 @@ y volvió a ejecutar las pruebas pertinentes:
 | `scan_job_smoke.py` | PASSED | Scan, materialización indirecta y descubrimiento. |
 | `worldgen_sparse_archetypes_smoke.py` | PASSED | Catálogo y caps activos, tipos prohibidos/permitidos, conteos por arquetipo, enlaces internos al topology hub, dispersión, determinismo con el mismo orden, guardrail y no revelación de vecinos. |
 | `sector_intel_validation_smoke.py` | PASSED | Ids canónicos con signo de anchura mínima/ampliada, sectores existentes/lazy, rechazo sin mutar estado serializable, bloques `[INTEL]` sólo de sector sin recovery corrupta/uso de RNG, feedback público localizado y procesamiento posterior de otras líneas válidas. |
+| `worldgen_modules_pool_smoke.py` | PASSED | Loader real, unión de categorías, compatibilidad RNG de common, rangos/ceros, filtros vacíos/desconocidos, ids válidos, clusters regionales, determinismo con igual secuencia, preservación authored/estado ajeno, save/load temporal y recuperación/depleción normal con dron. |
+
+La regresión de módulos usa seeds `1` y `2` con la secuencia de solicitudes
+`S+020_+000_+000` → `S-25000_+000_+000` → `S+16000_+000_+000` →
+`S+000_+000_+000`. Los tres primeros centros se trasladan a coordenadas X
+galácticas de 250205, 5 y 410005 ly, incluido el desplazamiento de 250000 ly
+del origen operacional. Los conteos por sector objetivo, en orden de id de nodo, son:
+
+| Seed | Disk (`relay_corridor`) | Bulge (`ruin_field`) | Halo (`empty`) |
+| --- | --- | --- | --- |
+| `1` | 0, 2, 2 | 1, 2 | 0 |
+| `2` | 0, 1 | 2, 3 | 1 |
+
+Antes de corregir, la selección por unión de categorías falló con
+`(0, ['tech','rare'], [])`; la integración real falló independientemente con
+conteos bulge `[0,0]` para seed `1`. Ambas pasan ahora. La regresión cubre todos
+los nodos generados, incluidos los outliers gaussianos de Z fuera de los
+metadatos sectoriales registrados. La seed `2` de sandbox despliega D1 normalmente
+en el procedural `DERELICT_36B4F8`: el primer trabajo de módulo falla y el segundo
+recupera `transit_sensor_pack` con la probabilidad configurada. Save/load temporal
+conserva módulos restantes y cargo sin reponer loot al repetir solicitudes de generación.
 
 Lagunas de verificación:
 
@@ -433,8 +488,7 @@ Lagunas de verificación:
 - no se comprueba que Z permanezca dentro del sector;
 - no se prueban duplicados authored ni sectores que ya excedan caps;
 - no hay una prueba de frontera física de la galaxia;
-- no se valida la semántica de `modules_pool` como lista ni el uso de
-  `radiation_base` regional;
+- la semántica de configuración de `radiation_base` regional sigue sin resolver;
 - no se verifica la reconstrucción de topología tras añadir nodos especiales a
   sectores ya generados o vacíos;
 - no existe todavía una prueba que detecte automáticamente divergencias entre

@@ -312,16 +312,13 @@ def _pick_modules(
         return []
     count = rng.randint(min_count, max_count)
     modules = load_modules()
-    pool_map: dict[str, list[str]] = {"common": [], "rare": [], "tech": []}
-    for mid in module_ids:
-        tag = modules.get(mid, {}).get("pool", "common")
-        pool_map.setdefault(tag, []).append(mid)
-    if isinstance(pool, list) and pool:
-        candidates = [m for m in pool if m in module_ids]
-    elif isinstance(pool, str) and pool in pool_map:
-        candidates = pool_map[pool]
-    else:
-        candidates = module_ids
+    # Regional pools are category filters; keep candidates in catalog order.
+    categories = pool if isinstance(pool, list) else [pool]
+    candidates = [
+        mid
+        for mid in module_ids
+        if mid in modules and (pool is None or modules[mid].get("pool", "common") in categories)
+    ]
     if not candidates:
         return []
     return [rng.choice(candidates) for _ in range(count)]

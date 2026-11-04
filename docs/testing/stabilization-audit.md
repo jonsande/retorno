@@ -13,7 +13,7 @@ mechanics, tests, balance, or content.
 > reception, narrative protection, and save policy. These audit matrices are
 > retained as a diagnosis of the behavior that was observed.
 
-## 0. Phase 4B closure and 4C-1 update
+## 0. Phase 4B closure and updates through 4C-3
 
 Open decisions in this audit are closed or reassigned as follows:
 
@@ -24,8 +24,8 @@ Open decisions in this audit are closed or reassigned as follows:
   `data_core`/`datad`, while salvage does not use radio;
 - failsafes guarantee coherent opportunities, not survival, free resources, or
   universal repair;
-- `modules_pool` categories filter real modules; metadata must be audited before
-  implementation;
+- `modules_pool` categories filter real modules; metadata was audited and
+  F-WGEN-01 was corrected in 4C-3;
 - singles, uplink pools, `radiation_base`, worldgen order, and general balance
   remain independent studies.
 
@@ -38,12 +38,41 @@ The current executive matrix, with full criteria in the contract, is:
 | F-WGEN-02 — malformed `SECTOR` | **Fixed** | `sector_intel_validation_smoke.py` | **4C-2b complete** |
 | F-INTEL-01 — old `intel N` | **Fixed** | `intel_recent_order_smoke.py` | **4C-2c complete** |
 | F-DEAD-02 — cooldown at `t=0` | **Fixed** | `deadnode_cooldown_zero_smoke.py` | **4C-2d complete** |
-| F-WGEN-01 — `modules_pool` filters | P1 medium | metadata plus per-region seeds | 4C-3 |
+| F-WGEN-01 — `modules_pool` filters | **Fixed** | `worldgen_modules_pool_smoke.py` | **4C-3 complete** |
 
 This ordering supersedes historical priorities in sections 4, 7, and 8 where
 they conflict. F-LORE-01 was subsequently fixed in 4C-1, F-SENS-01 in 4C-2a,
-F-WGEN-02 in 4C-2b, F-INTEL-01 in 4C-2c, and F-DEAD-02 in 4C-2d; historical
-matrix text describes the pre-fix evidence where explicitly identified.
+F-WGEN-02 in 4C-2b, F-INTEL-01 in 4C-2c, F-DEAD-02 in 4C-2d, and F-WGEN-01
+in 4C-3; historical matrix text describes the pre-fix evidence where explicitly
+identified.
+
+### Phase 4C-3 closure: F-WGEN-01 (2026-11-04)
+
+The pre-change audit confirmed ten real modules with explicit `pool` metadata:
+four `common`, four `tech`, and two `rare`. The
+[worldgen reference](../systems/world-generation.md#regional-module-categories-f-wgen-01-fixed-in-4c-3)
+records their ids and the authored/procedural distinction. No JSON or test uses
+explicit-id lists. Regional lists now filter catalog categories; empty/unknown
+filters cannot silently select the whole catalog. Counts, candidate order,
+replacement policy, and count/choice RNG calls are preserved.
+
+`tests/worldgen_modules_pool_smoke.py` was added before production changed:
+compound selection failed with `(0, ['tech','rare'], [])`, and independent real
+integration failed with seed `1` bulge counts `[0,0]`. It now passes with seeds
+`1` and `2`, actual disk/bulge/halo clusters, legitimate disk/halo zeros, category
+membership and valid ids, same-sequence determinism, authored/unrelated-state
+preservation, and temporary save/load. Normal drone deploy/module jobs recover
+`transit_sensor_pack` from procedural `DERELICT_36B4F8` with seed `2` on the
+second attempt; depletion and cargo persist. The worldgen reference records
+sector ids, request order, and counts. A temporary pre-fix `WorldState` capture
+also matched every post-fix field except procedural bulge/halo module lists
+for both seeds (17 and 19 changed nodes respectively).
+
+All eleven required smokes passed, plus `drone_modular_v1_smoke.py`,
+`debug_worldgen_graph_smoke.py`, and `scan_job_smoke.py` (14/14). F-WGEN-01 and
+IT-10 are covered; `radiation_base`, generation-order independence, and balance
+studies remain pending. The F-WGEN-01 risk row below retains the historical
+pre-correction diagnosis; the executive matrix above gives its current status.
 
 ## 1. Executive summary
 
@@ -69,9 +98,9 @@ corrected in 4C-2b: malformed sector ids are rejected without world or intel
 mutation. F-INTEL-01 was corrected in 4C-2c: all list forms now show newest
 records first with deterministic insertion-order ties. F-DEAD-02 was corrected
 in 4C-2d: an action at `t = 0` now starts the same five-year cooldown as a
-positive timestamp and remains enforced after save/load. The remaining smaller
-confirmed defect is that bulge/halo recover no modules because of
-`modules_pool` interpretation.
+positive timestamp and remains enforced after save/load. F-WGEN-01 was corrected
+in 4C-3: bulge/halo now recover real modules filtered by their `modules_pool`
+categories, respecting regional counts.
 
 Two undecided policies are not classified as bugs. Allowing `route solve` for
 an undiscovered physical node inside sensors/cap is deliberate. Frozen uplink
@@ -164,7 +193,7 @@ flowchart LR
 | P1 — Route integrity | Published route is travelable or explicitly marked/not published | Shared validator, importers, waypoint cleanup, save normalization | No dangling/over-cap edge counts as frontier or deadnode resolution |
 | P2 — Recovery | Deadnodes/recovery offer only consumable opportunities | Reachable bridge origin, cap, topology/pool, cooldown, `stuck`; confirm arrival/dock | Deadnode E2E and save/load green |
 | P3 — Narrative integrity | Do not consume pieces without effect or assign without access policy | Delivery outcome, retry, breadcrumb, unlock, protection | Synthetic primaries cover success, failure, and preexisting route |
-| P4 — Bounded data/UI defects | Independent low-risk repairs | `UPGRADED`, sector ids, and intel order fixed; `modules_pool` and radiation field remain after their decisions | State/region matrices and clear public errors |
+| P4 — Bounded data/UI defects | Independent low-risk repairs | `UPGRADED`, sector ids, intel order, and `modules_pool` fixed; radiation field awaits its decision | State/region matrices and clear public errors |
 | P5 — Opportunity policy | Decide from evidence, not intuition | Frozen pools, windows, annual cycle, singles, request-order determinism | Reproducible simulation and approved product threshold |
 | P6 — Persistence/migration | Preserve invariants while loading older state | Route sanitation, temporary ids, recovery/lore versioning | Before/after temporary tests and documented compatibility strategy |
 
@@ -256,7 +285,7 @@ Algorithm fixtures should not depend on authored narrative names.
 5. Confirm arrival versus dock for gateway hint.
 6. Confirm strict uplink snapshot and window policy only after R-OPP-01/02 are
    measured.
-7. Define list-valued `modules_pool` semantics and the fate of `radiation_base`.
+7. `modules_pool` was resolved in 4C-3; still decide the fate of `radiation_base`.
 8. Define whether determinism must be independent of generation order.
 9. Set a single-frequency metric before changing balance.
 10. Decide whether `stuck` is a real phase and what counts as deadnode uplink.
@@ -273,7 +302,7 @@ Algorithm fixtures should not depend on authored narrative names.
    and complete the forced-arc IT-05 before extending those paths.
 6. Keep the closed `UPGRADED` regression; fix intel listing and sector id as
    separate bounded changes.
-7. Resolve `modules_pool`/`radiation_base` with IT-10 and review existing data.
+7. Maintain the IT-10 `modules_pool` regression; resolve `radiation_base` separately.
 8. Run multi-seed opportunity simulation and decide pools, windows, singles,
    and determinism without premature rebalancing.
 9. Close with full suite, save/load/migrations, documentation parity, and an
