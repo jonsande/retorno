@@ -1,0 +1,17 @@
+# Diecinueve personas
+
+**REGISTRO PERSONAL DE TURNO — OPERACIÓN AMANECER**
+
+19 personas en la terminal. 12 plazas disponibles.
+
+El capitán Arendt ha dicho que el transporte no puede esperar más. Le he pedido que me envíe la orden por escrito. Me ha contestado que no tiene tiempo para formalidades. Le he dicho que encontraría tiempo si tuviera que explicar a siete familias por qué las dejábamos aquí. Ha cortado la comunicación.
+
+Hay una mujer con dos niños. Uno de ellos no deja de preguntar cuándo van a desayunar. Tenemos comida para unas seis horas, pero nadie se atreve a abrir los contenedores de emergencia. El médico no responde.
+
+He pedido voluntarios para quedarse. Nadie ha levantado la mano.
+
+Por supuesto que nadie ha levantado la mano. No sé en qué estaba pensando.
+
+El capitán vuelve a llamar. Dice que me quedan cinco minutos.
+
+No voy a elegir. Que venga él y lo haga.

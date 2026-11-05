@@ -1,7 +1,7 @@
 # RETORNO — Hoja de ruta de preexistencia procedural, lore y F-DEAD-01
 
-**Versión:** 1.1 — 2026-11-05  
-**Estado:** planificación acordada; no constituye afirmación de implementación de las fases futuras.  
+**Versión:** 1.2 — 2026-11-05  
+**Estado:** planificación acordada; **4D-3e2 está en ejecución según comunicación del desarrollador**. No se presupone su resultado, ni el estado actual de Git.  
 **Destino recomendado en el repositorio:** `docs/design/roadmap-worldgen-lore-f-dead01.es.md`.
 
 > **Propósito:** conservar las decisiones de diseño y la secuencia de trabajo durante la estabilización final del universo procedural, sin prolongarla indefinidamente ni perder el objetivo de volver a jugar RETORNO con Textual y sonido, y después desarrollar arcos, singles y contenido nuevo.
@@ -10,10 +10,13 @@
 
 ## 1. Punto de partida y estado verificable
 
-- **Finalizadas y confirmadas anteriormente:** 4D-1 (rutas operativas y cap físico), 4D-2 (waypoints al abortar), 4D-3b (planificador puro), 4D-3c (rodeos físicos), 4D-3d (comparación contextual). El failsafe productivo antiguo de `src/retorno/core/deadnodes.py` **aún no utiliza** el nuevo planificador.
-- **4D-3e1 — catálogo consultivo:** Codex entregó `src/retorno/worldgen/catalog.py`, extracción del muestreador común, pruebas de caracterización y documentación EN/ES. La revisión posterior lo **aprobó para commit**, pero **no consta en esta conversación una confirmación posterior del commit/push**. Verificar `git status`, `git log` y `origin/main` antes de comenzar la siguiente orden.
-- **Hallazgo determinante:** la generación procedural actual no es completamente independiente del orden de generación: guardrail inicial, desbordamiento Z/cupos, identidades en colisiones y enlaces intersectoriales. El catálogo 4D-3e1 ofrece hechos físicos existentes y **muestras condicionales**, pero todavía no certifica emplazamientos latentes como existentes.
-- **Baseline conocido antes de 4D-3e1:** `dd5b471` (actualización de audio), después de `6ae813e` (documentos canónicos) y `10a092f` (4D-3d). No tratar este SHA como HEAD actual sin comprobarlo.
+- **Finalizadas y confirmadas anteriormente:** 4D-1 (rutas operativas y cap físico), 4D-2 (waypoints al abortar), 4D-3b (planificador puro), 4D-3c (rodeos físicos), 4D-3d (comparación contextual). El failsafe productivo antiguo de `src/retorno/core/deadnodes.py` no utilizaba todavía el nuevo planificador en la última revisión; comprobar su estado en el código actual.
+- **4D-3e1 — catálogo consultivo:** Codex entregó `src/retorno/worldgen/catalog.py`, extracción del muestreador común, pruebas de caracterización y documentación EN/ES. La revisión anterior lo aprobó para commit; el SHA final no está registrado en esta hoja.
+- **4D-3e1b — contrato/prototipo:** figura como trabajo previo previsto en esta hoja. **No se afirma aquí que su entrega esté aprobada o integrada**: verificar el informe y el historial del repositorio en la conversación de implementación.
+- **4D-3e2 — integración productiva de worldgen:** **Codex ya está ejecutando esta orden** al aprobarse la versión 1.2. No interrumpir esa ejecución ni alterar en caliente su prompt. Revisar la entrega frente a las decisiones nuevas y programar únicamente la adaptación indispensable que no estuviera contemplada.
+- **Hallazgo de partida:** el worldgen anterior no era completamente independiente del orden de generación (guardrail inicial, desbordamiento Z/cupos, colisiones de ID y enlaces intersectoriales). El catálogo 4D-3e1 distinguía hechos físicos de muestras condicionales; verificar qué cambia realmente tras 4D-3e2.
+- **Referencia histórica, no HEAD actual:** `dd5b471` (audio), `6ae813e` (canon) y `10a092f` (4D-3d). Usar `git log`, `git status`, rama y upstream actuales antes de cualquier operación.
+- **Decisión adicional durante 4D-3e2:** los **requisitos narrativos estructurados** de todos los arcos, singles y documentos instalados deben constituir una entrada de la construcción del universo de cada nueva partida (§2 y §3.4). Esta decisión es **objetivo de arquitectura pendiente de implementar/verificar**, no una característica ya funcional del generador.
 
 ## 2. Decisiones aprobadas — contrato de producto
 
@@ -39,12 +42,22 @@
 | **D18 — Autoría y semántica** | **Preservar la capacidad de crear estaciones, pecios y lugares expresamente diseñados para arcos/singles**, declarados como localizaciones *authored* integradas en la definición física del universo antes de exponerlas al jugador. **Mencionar** un lugar en prosa no equivale a **declararlo**, y **declararlo** no equivale a **revelarlo**. No eliminar esta capacidad al sustituir ad hoc. |
 | **D19 — Compatibilidad de sintaxis** | Mantener, siempre que sea técnicamente coherente, las instrucciones existentes `NODE:`, `LINK:`, `SECTOR:`, `COORD:`, los bloques de intel y las referencias *authored* reconocidas. Preservar su propósito sin fingir que todas crean estaciones; compatibilidad y diferencias respecto al comportamiento actual deben verificarse mediante tests. No introducir silenciosamente una nueva sintaxis o cambiar el formato de autoría sin consulta. |
 | **D20 — Autoría de historias esenciales** | El contenido esencial necesita una definición y una comprobación de emplazamientos/canales elegibles **antes de que el jugador pueda consumir su fuente**. Reservar o vincular hosts preexistentes cuando proceda, sin reabrir pools ni garantizar descubrimiento; si las restricciones son imposibles, informar en validación de contenido, no improvisar una estación durante la partida. |
+| **D21 — Worldgen condicionado por el lore** | **Antes de comenzar una nueva partida**, recopilar los requisitos espaciales vinculantes de los **arcos, singles y demás documentos/paquetes narrativos instalados**. El manifiesto de esa partida debe incorporar sus entidades y relaciones canónicas junto a la generación procedural, de manera que las pistas puedan conducir a lugares reales, estables y congruentes. No depender de leer la pista, activar el arco o generar un sector para decidir retroactivamente si el lugar existe. |
+| **D22 — Declaraciones estructuradas y validación** | No inferir verdades físicas automáticamente de toda frase en prosa. Separar hechos canónicos explícitamente declarados, referencias a entidades, afirmaciones inciertas/engañosas y datos de intel que se revelarán en juego. Resolver identidades/alias, restricciones de tipo, ubicación, región, cercanía, rutas, cronología y contradicciones antes de iniciar la partida. Informar de errores de autoría de forma accionable, sin resolver conflictos creando nodos sobre la marcha. |
+| **D23 — Autoría extensible** | Un diseñador debe poder añadir nuevos arcos y singles y sus requisitos físicos **sin modificar código del generador para cada historia**. Reutilizar formatos y guías existentes cuando sea viable; proponer cualquier esquema declarativo nuevo de forma **compatible y versionable**, sujeto a revisión antes de imponerlo. La inclusión de una historia en el catálogo de contenido no implica revelar su secreto ni garantizar que todas sus piezas narrativas aparezcan. |
+| **D24 — Relaciones y pistas verificables** | No basta con que exista cada nombre: deben poder satisfacerse las relaciones espaciales que se hayan declarado (p. ej. pecio próximo a una estación, señal procedente de un relé, coordenadas coherentes), respetando topología, límites físicos y reglas de descubrimiento. Distinguir relación histórica, ruta física posible, ruta conocida por el jugador y pista aproximada o falsa. |
+
 
 ## 3. Reglas específicas de distribución de contenido
 
 ### 3.1 Worldgen y manifiesto
 
 - Las localizaciones *authored* forman parte de la base explícita del universo y tienen prioridad de identidad/ocupación según contrato validado.
+- **Entradas de worldgen al preparar una partida:** semilla, versión/reglas, base authored del universo, y **catálogo/versiones de contenido narrativo instalado con sus requisitos físicos estructurados**. Compilar/validar estas entradas y fijar un manifiesto estable antes de las oportunidades de exploración; la realización física sigue pudiendo ser *lazy*.
+- La integración debe considerar tanto entidades singulares (naves, estaciones, pecios, relés, sectores, puntos de interés) como **relaciones** y restricciones narrativas declaradas (identidad, localización, proximidad, región, cronología y conectividad, cuando se exijan). «Una nave mencionada» no significa automáticamente «un pecio explorable».
+- Una pieza de lore opcional puede no llegar a entregarse, pero cualquier **hecho físico canónico declarado como requisito del mundo** debe ser consistente con la partida. Distinguir el *world requirement* de la probabilidad de aparición del texto.
+- La definición de manifiesto **no puede depender del orden de lectura de archivos, activación de arcos, exploración de sectores o descubrimiento de intel**. Establecer claves/IDs estables y política verificable ante conflictos de autoría; no inventar una política de prioridades silenciosa.
+
 - Los emplazamientos procedurales históricos se determinan por reglas/semilla/versionado independientes del orden de exploración; la materialización puede ser diferida.
 - No asumir que un centro de sector o una muestra condicional de 4D-3e1 es una estación real.
 - Coordinar con sectores de **10 años luz**, regiones físicas, posibles desbordamientos de coordenada Z, caps y conexión de hubs; no cambiar densidad por intuición.
@@ -52,6 +65,9 @@
 ### 3.2 Lore, arcos y singles
 
 - La colocación de piezas puede continuar siendo probabilística, condicionada por región, distancia, tiempo, tipo, ventanas y canales.
+- Distinguir el **catálogo de contenido instalado** (declaraciones que condicionan el universo) de la **selección y distribución dinámica de documentos** durante la partida. Un single opcional no obliga a emitir su documento; sus requisitos físicos canónicos, si se incluyen en el manifiesto, sí deben respetarse.
+- Los escritores deben poder expresar relaciones y pistas comprobables sin alterar a mano el código Python del generador. La especificación y el validador de contenido deben detectar referencias no resueltas, tipos incompatibles, condiciones geométricas imposibles y contradicciones antes de iniciar partida.
+
 - Arcos esenciales: comprobar de antemano que sus restricciones admiten **al menos una vía legítima de colocación/entrega** en las configuraciones relevantes. Esto no equivale a garantizárselas al jugador.
 - Singles y piezas secundarias: conservar libertad para no aparecer, aparecer más adelante o quedar sin descubrir.
 - Un contenido histórico nuevo no se inyecta retroactivamente en una fuente cuyo pool o posibilidad de recuperación ya se haya agotado. Se permiten señales o comunicaciones posteriores **si** su emisión, canal y recepción son legítimos.
@@ -104,7 +120,39 @@ Los identificadores del ejemplo son ilustrativos, **no** contenido ya declarado.
 
 **Documentación:** una vez implementado y probado, actualizar las guías prácticas de autoría y las referencias técnicas para explicar declaración, mención y revelación con **ejemplos ejecutables reales**, no sintaxis hipotética. Antes de 4D-3e4, las guías existentes no deben reescribirse como si las nuevas funciones ya estuvieran disponibles.
 
-### 3.5 F-DEAD-01
+### 3.5 Contrato adicional: el contenido narrativo condiciona el universo (v1.2)
+
+**Caso de uso rector:** un diseñador crea un arco sobre una estación abandonada llamada Némesis, la nave Ícaro desaparecida cerca de ella, un relé que registró una señal y documentos que contienen pistas espaciales. Al iniciar una partida nueva con ese contenido instalado, el universo debe contener los **hechos físicos canónicos declarados** (por ejemplo estación, pecio si se ha declarado como lugar explorable y relé), con identidades y relaciones coherentes. La lectura posterior de un documento puede descubrirlos, pero **no crearlos**.
+
+**Canal de autoría propuesto como requisito, no como sintaxis ya aprobada o implementada:**
+
+1. Mantener texto literario libre y las instrucciones de intel existentes para **revelaciones diegéticas**.
+2. Disponer de una **declaración estructurada de requisitos de mundo** por paquete/arco/single, o un registro referenciado por ellos: tipos de entidad, IDs/alias, hechos físicos vinculantes, relaciones, restricciones y estatus narrativo (canónico, rumor, afirmación falsa o desconocida).
+3. Compilar y validar el conjunto de declaraciones de todo el contenido instalado **antes de fijar el manifiesto de una partida nueva**. Reutilizar entidades authored comunes; rechazar o reportar ambigüedades y contradicciones no resueltas. La política de ubicación flexible/elección de semilla se decidirá con criterios explícitos y tests, no mediante excepciones por historia en el generador.
+4. Combinar los requisitos con emplazamientos procedurales de forma determinista y estable, sin alterar silenciosamente densidades, rutas, límite de salto ni secretos. Puede reservarse una ubicación o fijarse una restricción sin cargar físicamente todos los sectores.
+5. Mantener separadas **referencia narrativa → declaración canónica → manifestación física → conocimiento del jugador → ruta operativa**. Un documento puede contener nombres sin coordenadas, coordenadas aproximadas, datos falsos o información parcial; solo las reglas de intel determinan qué descubre el jugador.
+6. Incorporar nuevos paquetes narrativos **en nuevas partidas** mediante datos de autoría; no reinterpretar silenciosamente el manifiesto de una partida ya empezada cuando cambian archivos o mods. Versionar/identificar el conjunto de contenido asociado al mundo guardado y definir conducta ante discrepancias.
+
+**Ejemplos de intención, NO sintaxis ejecutable:**
+
+- `NEMESIS_STATION` es una estación histórica, existente pero desconocida al inicio.
+- `ICARO_WRECK` es un pecio físico cuya posición debe satisfacer una relación *cerca de* Némesis, dentro de los límites que se definan formalmente.
+- `RELAY_08` es fuente de una señal histórica, pero recibir el mensaje requiere un canal implementado y legítimo.
+- Un informe que solo diga «la Ícaro desapareció» **no** declara necesariamente un pecio localizable; un informe deliberadamente erróneo no obliga a falsear el manifiesto.
+
+**Pruebas de aceptación adicionales para la integración de contenido (4D-3e4, con comprobaciones del contrato desde 4D-3e2):**
+
+1. Dos paquetes narrativos independientes, instalados simultáneamente, definen entidades y relaciones compatibles; el mismo seed/config/conjunto de contenido produce idéntico manifiesto aunque cambien el orden de carga, activación y exploración.
+2. Una nueva historia con estación, pecio y relé propios se incorpora **mediante datos**, sin modificar el generador; las relaciones canónicas se satisfacen o se comunica una validación fallida.
+3. Una referencia a entidad inexistente, un alias ambiguo y dos requisitos espaciales incompatibles generan diagnósticos concretos **antes de jugar**; no una reparación ad hoc en mitad de la partida.
+4. Prosa normal, rumor y afirmación falsa no producen estaciones ni revelaciones; `NODE`, `LINK`, `SECTOR`, `COORD` y bloques intel mantienen su semántica real sin confundir existencia física y conocimiento.
+5. Un contenido opcional no emitido no causa una sorpresa retrospectiva: si su requisito físico fue declarado como canónico, permanece estable; si es solo una posibilidad narrativa, no se convierte automáticamente en instalación física.
+6. Guardar/cargar preserva identidad/versión del mundo y del contenido instalado. La alteración posterior del catálogo de historias no cambia silenciosamente los hechos históricos de la partida ya iniciada.
+7. Se mide el impacto de la incorporación authored sobre densidad, colisiones, hubs y navegabilidad para varias semillas. **No** prometer integración de cualquier conjunto contradictorio.
+
+**Límite del hito:** no construir ahora un editor visual, un parser libre de lenguaje natural ni un sistema general de mods. Diseñar la interfaz de datos mínima y verificable que sostenga autoría futura, y completarla cuando corresponda a lore/intel.
+
+### 3.6 F-DEAD-01
 
 - Buscar primero candidatos ya existentes físicamente o manifiestos legítimos cercanos; ampliar el ámbito cuando falten.
 - Medir la proximidad por **acceso completo dirigido desde la nave** y cadena resultante, no por solo distancia en línea recta. Si no hay ruta válida, no afirmar acceso navegable.
@@ -119,21 +167,21 @@ Los identificadores del ejemplo son ilustrativos, **no** contenido ya declarado.
 | Orden | Identificador de trabajo | Entrega obligatoria | Criterio de salida |
 | --- | --- | --- | --- |
 | **1** | **4D-3e1b — Contrato de manifiesto** | Diseño verificable y prototipo puro: identidad, generación-sector vs sector físico, authored, guardrail, colisiones, Z, conexiones estables; conservar la posibilidad de estaciones *authored* para arcos y singles y la separación entre declarar/mencionar/revelar; baterías comparativas de semillas/órdenes y distribuciones. Sin sustituir worldgen. | Especificar qué será independiente del orden y demostrarlo en el prototipo; decisiones de balance explícitamente pendientes. |
-| **2** | **4D-3e2 — Integración de worldgen** | Implementación productiva por manifiesto, generación *lazy*, IDs/topología, coexistencia con ubicaciones *authored*, versionado de algoritmo, límites de materialización, tests de guardado y comparación estadística de mapas. | Igual semilla/configuración produce mismo universo histórico/topología independiente del orden; no leaks de conocimiento ni cambios silenciosos de balance. |
+| **2** | **4D-3e2 — Integración de worldgen (EN CURSO al redactar v1.2)** | Implementación productiva por manifiesto, generación *lazy*, IDs/topología, coexistencia con ubicaciones *authored*, versionado de algoritmo, límites de materialización, tests de guardado y comparación estadística de mapas. **Revisar a la entrega la extensibilidad para requisitos narrativos declarativos; no alterar el prompt en ejecución.** | Igual semilla/configuración produce mismo universo histórico/topología independiente del orden; no leaks de conocimiento ni cambios silenciosos de balance. **La compilación completa de paquetes de lore no se presume terminada en esta orden.** |
 | **3** | **4D-3e3 — Memoria de scan** | Registro persistente y acotado de observaciones (posición, alcance efectivo, estado de sensores, resultados y tiempo), modelo de evidencia negativa no infalible y pruebas; evitar repetición compulsiva. | Scan normal e historial sobreviven save/load; escaneos negativos no certifican vacío; sensores degradados se tratan conforme al contrato actual salvo cambio aprobado. |
-| **4** | **4D-3e4 — Lore/intel/ad hoc** | Adaptar selección de hosts, reservas de contenido esencial y declaraciones authored; preservar/verificar `NODE/LINK/SECTOR/COORD`, bloques intel, reconocimiento authored y diferencia entre mención narrativa y revelación; mantener fuentes no consumidas y eliminar creación retrospectiva de instalaciones antiguas por piezas forzosas. Ejecutar la regresión end-to-end de §3.4 y revisar las guías de autoría. | No se abre un pool agotado ni se crea una estación por necesidad tardía de lore; sigue siendo posible declarar estaciones concretas para arcos/singles; las piezas esenciales disponen de validación de viabilidad y las instrucciones de intel conservan efectos correctos sin revelación gratuita. |
+| **4** | **4D-3e4 — Lore/intel/ad hoc** | Implementar el mínimo **contrato de datos + compilación/validación de requisitos físicos de arcos/singles/documentos instalados antes de la nueva partida**, integrado con el manifiesto; adaptar hosts, reservas y declaraciones authored; preservar/verificar `NODE/LINK/SECTOR/COORD`, bloques intel y mención frente a revelación; retirar creación retrospectiva. Ejecutar §3.4 y §3.5; revisar las guías de autoría. | Historias nuevas pueden declarar entidades/relaciones **sin tocar código del generador**; se validan contradicciones; el universo es consistente con pistas canónicas; no se reabren pools ni se crea una estación por necesidad tardía, y la sintaxis intel sigue operativa. |
 | **5** | **4D-3e5 — F-DEAD-01** | Integrar selector contextual con manifiesto, búsqueda próxima que se amplía progresivamente, condiciones estructurales sin filtros económicos, preparación atómica e idempotente de pistas, distinción pendiente/recibida, validaciones de navegación y protección. | Sin salto >45 ly, sin rescate gratuito ni estación retrospectiva; intentos fallidos no consumidos; la búsqueda agotada es «incompleta» y la recepción respeta canales reales. |
 | **6** | **4D-3e6 — Validación jugable y cierre** | Regresión integrada, varios universos/semillas, save/load repetido, casos de fallo, prueba con controles públicos en Textual y **sonido**, informe de experiencia y defectos. | Recorrido jugable estable; cerrar F-DEAD-01 solo con evidencias. Volver a producir arcos, singles y contenido tras bloquear únicamente defectos graves. |
 
 **Orden 7 opcional:** correcciones de bloqueos detectados en 2–6; no es una invitación a perfeccionar el motor indefinidamente. Si la orden 5 exige una separación por seguridad de materialización y recepción, usar la reserva disponible y ajustar el cierre.
 
-**Dependencias críticas:** no consumir muestras `conditional` del catálogo como emplazamientos históricos certificados antes de cerrar 1–2. No forzar la migración de `scan` antes de disponer del contrato físico estable. La adaptación de lore y de deadnodes debe usar la misma noción de preexistencia.
+**Dependencias críticas:** v1.2 se aprueba **con 4D-3e2 ya en ejecución**: no atribuirle retrospectivamente requisitos no incluidos en su prompt. Verificar su extensibilidad al revisarlo, y planificar cualquier adaptación puntual imprescindible dentro de 4D-3e4 o una corrección acotada con aprobación, evitando rehacer worldgen por defecto. No consumir muestras `conditional` del catálogo como emplazamientos históricos certificados antes de cerrar 1–2. No forzar la migración de `scan` antes de disponer del contrato físico estable. La adaptación de lore y de deadnodes debe usar la misma noción de preexistencia.
 
 ## 5. Comprobaciones mínimas antes de cerrar cada orden
 
 1. Leer `AGENTS.md`, canon y documentos técnicos relevantes; verificar `git status`, rama y SHA antes de tocar código.
 2. Delimitar el alcance. Si hace falta cambiar densidades, probabilidades, recursos, política de guardrail, formato de arcos o canales, **detener la decisión sustantiva y consultar**.
-3. Pruebas nuevas + smoke tests de worldgen, generación de lore, intel, route solve, deadnodes, save/load; incluir regresiones de localizaciones authored, bloques `[INTEL]`, `NODE/LINK/SECTOR/COORD` y colocación forzosa; ampliar matriz si cambia un contrato.
+3. Pruebas nuevas + smoke tests de worldgen, generación de lore, intel, route solve, deadnodes, save/load; incluir regresiones de localizaciones authored, bloques `[INTEL]`, `NODE/LINK/SECTOR/COORD`, colocación forzosa y **requisitos narrativos estructurados** (entidades, relaciones, contradicciones y orden de carga); ampliar matriz si cambia un contrato.
 4. Verificar determinismo entre procesos/orden de materialización, ausencia de alteraciones ilegítimas de `known_nodes/known_links`, fuentes agotadas y objetivos narrativos protegidos.
 5. Distinguir «verificado», «condicional», «no evaluado por presupuesto», «pendiente de entrega» y «no válido».
 6. Reporte claro de cambios por archivo, pruebas ejecutadas, limitaciones; ZIP solo con archivos cambiados/nuevos y rutas relativas; `git diff --check`; **sin `git add`, commit ni push** por Codex.
@@ -142,6 +190,7 @@ Los identificadores del ejemplo son ilustrativos, **no** contenido ya declarado.
 ## 6. Qué queda deliberadamente fuera del hito
 
 - Nuevos arcos y singles completos (se retoman al acabar este hito, pero se pueden **diseñar** antes sin integrarlos).
+- Editor visual de contenido, parser automático de prosa en lenguaje natural, gestor universal de mods y migración automática de universos ya iniciados tras instalar historias.
 - Nuevas clases de instalaciones y reajustes generales de densidad, loot o recursos sin evidencia.
 - Sistema complejo de triangulación y múltiples modos de sensores; basta un historial honesto y verificable.
 - Simulación completa de sucesos dinámicos futuros, combate u otros sistemas ajenos.
@@ -155,6 +204,8 @@ Los identificadores del ejemplo son ilustrativos, **no** contenido ya declarado.
 - **Nodos authored y generación Z:** no cambiar reglas por comodidad; cuantificar el efecto del desbordamiento y acordar política antes de corregirlo.
 - **Topología dependiente de vecino:** no reconstruir enlaces pasados de forma retroactiva ni depender del orden en que el jugador solicite los sectores.
 - **Arcos esenciales con restricciones imposibles:** reportar y validar capacidad de alojamiento; permitir estaciones authored declaradas antes de la partida, pero no forzar instalaciones nuevas como solución automática durante la exploración.
+- **Paquetes narrativos incompatibles:** detectar en preparación del mundo identidades duplicadas, nombres ambiguos y restricciones espaciales contradictorias, sin improvisar un mapa que falsee los documentos.
+- **Actualización del catálogo con partida iniciada:** los requisitos de historias recién añadidas no deben alterar retroactivamente la geografía histórica del save; vincular manifiesto y versión/listado de contenido.
 - **Regresión de autoría:** si la refactorización deja de reconocer la sintaxis vigente, impide declarar una estación para un arco, convierte una simple mención en revelación o confunde `COORD` con una estación, detener el cierre y corregir antes de declarar la fase compatible.
 - **Recuperación vs supervivencia:** separar criterios estructurales de gates que afectan a la capacidad efectiva de ejecución de una acción. Estos últimos pueden seguir rigiendo el viaje o la recepción, pero **no la legitimidad de un candidato**.
 - **Escaneos repetidos:** si se convierten en obligación mecánica tediosa, replantear el feedback antes de aumentar complejidad.
@@ -178,4 +229,19 @@ Al iniciar otra conversación dentro del proyecto RETORNO:
 
 **Control de versión:** al modificar el roadmap, conservar los acuerdos anteriores, incrementar su versión y hacer un commit documental separado, para que otras conversaciones y órdenes futuras lean el texto actualizado.
 
-**Próxima acción al aprobar esta hoja:** comprobar el commit de 4D-3e1 y preparar **4D-3e1b**, contrato/prototipo del manifiesto procedural estable, sin sustitución productiva prematura.
+### Actualización documental durante una orden de Codex en curso
+
+1. **No detener ni reescribir 4D-3e2** por el cambio de v1.1 a v1.2. Conservar su informe y ZIP de cambios tal como los produzca la orden original.
+2. Revisar **4D-3e2** con sus criterios originales, anotando separadamente la **nueva dependencia de v1.2**: entrada futura de requisitos narrativos y compilación de contenido. No declarar un fallo de implementación solo por una función que no se le pidió.
+3. Para actualizar la hoja en Git, preferir **después de que termine Codex y de revisar/commitear 4D-3e2**, haciendo **un commit documental separado** de `docs/design/roadmap-worldgen-lore-f-dead01.es.md`. Si urge compartir el documento antes, hacerlo por el chat como adjunto y **no ejecutar `git add .` ni `git commit -a`** en un árbol mezclado con cambios de Codex.
+4. Antes de cada commit, ejecutar `git status --short --branch`, `git diff --name-only`, `git diff --check` y usar `git diff --cached --name-only` después de `git add` selectivo. Verificar que el commit solo incluya los archivos aprobados.
+5. `git push` sin asumir rama (`main` o `master`): confirmar `git branch --show-current` y `git branch -vv`. Si la rama ya tiene upstream, `git push`; si no, establecerlo explícitamente solo tras verificar el remoto y la rama de destino.
+6. El nuevo contrato de autoría debe incorporarse al **siguiente prompt aún no enviado**, y sus resultados verificarse especialmente al preparar **4D-3e4**. Si 4D-3e2 revela una incompatibilidad arquitectónica real, proponer un parche acotado y pedir decisión antes de otro cambio grande.
+
+**Siguiente coordinación efectiva:** recibir y revisar la salida de **4D-3e2**; registrar el commit aprobado y la versión v1.2 en la conversación de implementación antes de preparar 4D-3e3. No confundir aprobación de decisiones con implementación verificada.
+
+### Historial del documento
+
+- **v1.0:** secuencia de trabajo del manifiesto, scan, lore y F-DEAD-01.
+- **v1.1:** preservación de localizaciones authored y sintaxis de intel; declaración, mención y revelación.
+- **v1.2:** contenido narrativo instalado como entrada de worldgen; entidades/relaciones estructuradas y validación previa a la partida; procedimiento seguro con 4D-3e2 en curso.
