@@ -30,6 +30,20 @@ FIXTURES = Path(__file__).parent / "fixtures/narrative_world"
 KEY = "arc:synthetic_alpha:primary"
 
 
+def _radio_at_host(state, node_id):
+    """e4b fixture: push delivery now requires a real local, powered receiver."""
+    state.world.current_node_id = state.ship.current_node_id = node_id
+    state.ship.docked_node_id = node_id
+    state.ship.power.power_quality = 1
+    state.ship.power.brownout = False
+    for ident in ("comms", "energy_distribution"):
+        system = state.ship.systems[ident]
+        system.state = SystemState.NOMINAL
+        system.health = .9
+        system.forced_offline = False
+    state.ship.systems["comms"].service.is_running = True
+
+
 @contextmanager
 def installed(*, reverse=False, mutate=None):
     with TemporaryDirectory(prefix="retorno-narrative-") as directory:
@@ -193,6 +207,7 @@ def test_05_optional_probability_delivery_and_no_physical_dependency():
             lore._evaluate_non_forced_pieces(s, [single])
         key = "single:synthetic_beta"
         node_id = s.world.lore_placements.piece_to_node[key]
+        _radio_at_host(s, node_id)
         delivery = lore.maybe_deliver_lore(s, "dock", lore.build_lore_context(s, node_id))
         assert delivery.applied and delivery.events
         signal_path = delivery.events[0].data["path"]
@@ -432,6 +447,7 @@ def test_14_all_existing_push_channels_keep_reading_separate():
         with installed(mutate=configure):
             s = create_initial_state_prologue(seed=0)
             lore.run_lore_scheduler_tick(s)
+            _radio_at_host(s, "TEST_HOST")
             delivery = lore.maybe_deliver_lore(s, trigger, lore.build_lore_context(s, "TEST_HOST"))
             assert delivery.applied and KEY in s.world.lore.delivered
             if channel == "uplink_only":
@@ -610,6 +626,7 @@ def test_20_essential_payload_matches_real_delivery_and_language_fallback():
                     if channel == "salvage_data":
                         content = s.world.node_pools["TEST_HOST"].injected_files[0]["content"]
                     else:
+                        _radio_at_host(s, "TEST_HOST")
                         delivery = lore.maybe_deliver_lore(s, "dock", lore.build_lore_context(s, "TEST_HOST"))
                         assert delivery.applied
                         content = s.os.fs[delivery.events[0].data["path"]].content

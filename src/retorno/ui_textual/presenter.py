@@ -4,6 +4,7 @@ import io
 from contextlib import redirect_stdout
 
 from retorno.cli import repl
+from retorno.core.communications import radio_diagnostic_lines
 from retorno.util.timefmt import format_elapsed_short
 from retorno.config.balance import Balance
 from retorno.runtime.operator_config import resolve_help_verbose
@@ -75,7 +76,7 @@ def build_status_lines(state) -> list[str]:
             parts = [p for p in compact.split() if not (p.startswith("svc=") or p.startswith("running="))]
             compact = " ".join(parts)
             sys_lines.append(compact)
-    return sys_lines if sys_lines else lines
+    return sys_lines + radio_diagnostic_lines(state) if sys_lines else lines
 
 
 def build_alerts_lines(state) -> list[str]:

@@ -129,6 +129,25 @@ class SectorGenState:
 
 
 @dataclass(slots=True)
+class RadioOpportunity:
+    opportunity_id: str
+    channel: str
+    source_kind: str
+    source_id: str
+    origin_node_id: str
+    trigger: str
+    require_docked: bool
+    content_by_locale: dict[str, str]
+    prepared_t: float
+    delivery: dict = field(default_factory=dict)
+    status: str = "pending"
+    received_t: float | None = None
+    read_t: float | None = None
+    path: str | None = None
+    received_locale: str | None = None
+
+
+@dataclass(slots=True)
 class WorldState:
     space: SpaceGraph = field(default_factory=SpaceGraph)
     known_contacts: set[str] = field(default_factory=set)
@@ -169,6 +188,8 @@ class WorldState:
     narrative_snapshot: dict = field(default_factory=dict)
     scan_observations: list[ScanObservation] = field(default_factory=list)
     next_scan_observation_seq: int = 1
+    radio_opportunities: dict[str, RadioOpportunity] = field(default_factory=dict)
+    recovery_activation_deferred: bool = False
 
     def __setstate__(self, state) -> None:
         """Backward-compatible unpickle for slot additions."""

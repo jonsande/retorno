@@ -66,7 +66,8 @@ from retorno.io.save_load import (
     save_single_slot,
 )
 from retorno.ui_theme import ThemedStdout, normalize_theme_preset
-from retorno.model.systems import SystemState
+from retorno.model.systems import SystemState, system_name_for_locale, service_name_for_locale
+from retorno.core.communications import radio_diagnostic_lines, mark_radio_read
 from retorno.model.drones import DroneLocation, DroneState, DroneStatus, compute_drone_effective_profile
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, list_dir, normalize_path, read_file, required_access_label
 from retorno.model.galaxy import (
@@ -419,6 +420,9 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
             [
                 ("diag <system_id>", "inspect system diagnostics", "inspecciona diagnóstico del sistema"),
                 ("boot <service_name>", "start system service", "arranca servicio de sistema"),
+                ("power on comms", "activate passive radio hardware; then boot radiod", "activa el receptor pasivo; después boot radiod"),
+                ("boot radiod", "start passive radio after power on comms", "arranca radio pasiva después de power on comms"),
+                ("diag comms", "radio gates and pending count without message contents", "puertas de radio y pendientes sin mostrar contenido"),
                 ("power status", "show power telemetry", "muestra telemetría eléctrica"),
                 ("power plan cruise", "set cruise power profile", "activa plan energético cruise"),
                 ("power plan normal", "set normal power profile", "activa plan energético normal"),
@@ -885,6 +889,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             parts.append(f"Q+{float(effects['power_quality_offset']):.2f}")
         return ", ".join(parts)
     boot_blocked_reasons = {
+        "service_owner_unavailable": {
+            "en": "Boot blocked: {service} requires its powered, recoverable owner; use diag comms for radiod.",
+            "es": "Arranque bloqueado: {service} necesita su sistema propietario alimentado y recuperable; usa diag comms para radiod.",
+        },
         "service_missing": {
             "en": "Unknown service '{service}'. Available: {available}{suggestion}",
             "es": "Servicio desconocido '{service}'. Disponibles: {available}{suggestion}",
@@ -1155,6 +1163,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         },
     }
     job_completed_keys = {
+        "job_failed_boot_unavailable": {
+            "en": "Service boot interrupted: {service}; owner, installation, dependencies or power unavailable.",
+            "es": "Arranque de servicio interrumpido: {service}; sistema propietario, instalación, dependencias o potencia no disponibles.",
+        },
         "job_completed_repair": {
             "en": "Repair completed for {system_id} (scrap spent: {scrap_spent})",
             "es": "Reparación completada en {system_id} (chatarra gastada: {scrap_spent})",
@@ -1594,6 +1606,16 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             continue
         if e.type == EventType.ACTION_WARNING:
             locale = state.os.locale.value
+            if e.data.get("message_key") == "service_activation_notice":
+                owner = state.ship.systems.get(e.data["owner"])
+                svc = owner.service if owner else None
+                name = service_name_for_locale(svc, locale) if svc else e.data["service"]
+                status = e.data["service_status"]
+                labels = {"en": {"stopped": "stopped", "not_installed": "not installed", "blocked": "blocked"},
+                          "es": {"stopped": "detenido", "not_installed": "no instalado", "blocked": "bloqueado"}}
+                print(f"[{origin_tag}] {name} ({e.data['service']}): {labels.get(locale, labels['en'])[status]}" +
+                      (f"; boot {e.data['service']}" if status == "stopped" else f"; diag {e.data['owner']}"))
+                continue
             if e.data.get("message_key") == "radiation_level_changed":
                 level_labels = {
                     "en": {
@@ -2106,6 +2128,8 @@ def render_status(state) -> None:
             svc = f" svc={sys.service.service_name} running={sys.service.is_running}"
         fo = " forced_offline" if sys.forced_offline else ""
         print(f" - {sid:18s} state={sys.state.value:8s} health={sys.health:.2f}{fo}{svc}")
+    for line in radio_diagnostic_lines(state):
+        print(line)
 
 
 def render_auth_status(state) -> None:
@@ -2138,11 +2162,15 @@ def render_power_status(state) -> None:
 def render_diag(state, system_id: str) -> None:
     sys = state.ship.systems.get(system_id)
     if not sys:
-        print(f"(diag) system_id no encontrado: {system_id}")
+        print({"en": f"(diag) system_id not found: {system_id}",
+               "es": f"(diag) system_id no encontrado: {system_id}"}.get(state.os.locale.value))
+        if system_id == "comms":
+            for line in radio_diagnostic_lines(state):
+                print(line)
         return
     print("\n=== DIAG ===")
     print(f"id: {sys.system_id}")
-    print(f"name: {sys.name}")
+    print(f"name: {system_name_for_locale(sys, state.os.locale.value)}")
     locale = state.os.locale.value
     sector_id = canonical_ship_sector_id(sys.sector_id)
     sector = state.ship.sectors.get(sector_id)
@@ -2157,15 +2185,20 @@ def render_diag(state, system_id: str) -> None:
     print(f"forced_offline: {sys.forced_offline}")
     if sys.forced_offline:
         if sys.auto_offline_reason == "energy_distribution_offline":
-            print("notes: auto-offline due to energy_distribution collapse.")
+            print({"en": "notes: auto-offline due to energy_distribution collapse.",
+                   "es": "notas: apagado automático por colapso de energy_distribution."}.get(locale))
         else:
-            print("notes: manually powered down (power off/shutdown).")
+            print({"en": "notes: manually powered down (power off/shutdown).",
+                   "es": "notas: apagado manualmente (power off/shutdown)."}.get(locale))
     if sys.dependencies:
         print("dependencies:")
         for d in sys.dependencies:
             print(f" - {d.dep_type} {d.target_id} >= {d.value}")
     if sys.service:
-        print(f"service: {sys.service.service_name} running={sys.service.is_running} boot_time={sys.service.boot_time_s}s")
+        print(f"service: {service_name_for_locale(sys.service, locale)} ({sys.service.service_name}) installed={sys.service.is_installed} running={sys.service.is_running} boot_time={sys.service.boot_time_s}s")
+    if system_id == "comms":
+        for line in radio_diagnostic_lines(state):
+            print(line)
     if system_id == "energy_distribution" and sys.state != SystemState.NOMINAL:
         print("notes: grid phase alignment unstable. manual intervention required.")
     if system_id == "power_core" and sys.state == SystemState.DAMAGED:
@@ -4445,6 +4478,7 @@ def _handle_intel_import(state, path: str) -> None:
         return
 
     messages = _auto_import_intel_from_text(state, content, path)
+    mark_radio_read(state, path)
     for message in sorted(set(messages)):
         print(message)
     if not messages:
@@ -5849,6 +5883,7 @@ def render_cat(state, path: str) -> None:
         if added:
             for msg in sorted(set(added)):
                 print(msg)
+    mark_radio_read(state, path)
 
 
 def _mail_headers_from_content(content: str) -> tuple[str | None, str | None]:

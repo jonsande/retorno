@@ -56,6 +56,7 @@ from retorno.core.lore import (
 )
 from retorno.core.deadnodes import evaluate_dead_nodes
 from retorno.core.exploration_recovery import ensure_exploration_recovery
+from retorno.core.communications import retry_radio_opportunities
 from retorno.core.power_policy import (
     is_action_allowed_in_critical_state,
     is_critical_power_state,
@@ -211,6 +212,7 @@ class Engine:
 
         events.extend(self._apply_critical_system_consequences(state, dt))
         events.extend(self._update_alerts(state, p_load, p_gen, power_quality))
+        events.extend(retry_radio_opportunities(state))
 
         for event in events:
             self._record_event(state.events, event)
@@ -1760,6 +1762,8 @@ class Engine:
             system = state.ship.systems.get(action.system_id)
             if not system:
                 return []
+            if system.service:
+                system.service.is_running = False
             if system.state != SystemState.OFFLINE:
                 old_state = system.state
                 system.state = SystemState.OFFLINE
@@ -3273,6 +3277,16 @@ class Engine:
                 self._record_event(state.events, event)
                 return [event]
 
+            if self._boot_owner_unavailable(system):
+                event = self._make_event(
+                    state, EventType.BOOT_BLOCKED, Severity.WARN,
+                    SourceRef(kind="ship_system", id=system.system_id),
+                    f"Boot blocked: {service_name} owner unavailable",
+                    data={"message_key": "boot_blocked", "reason": "service_owner_unavailable", "service": service_name},
+                )
+                self._record_event(state.events, event)
+                return [event]
+
             return self._enqueue_job(
                 state,
                 JobType.BOOT_SERVICE,
@@ -3353,6 +3367,22 @@ class Engine:
         return events
 
     def _check_job_interruption(self, state: GameState, job: Job) -> Event | None:
+        if job.job_type == JobType.BOOT_SERVICE:
+            system = state.ship.systems.get(job.params.get("system_id"))
+            service_id = job.target.id if job.target else ""
+            if (not system or not system.service or system.service.service_name != service_id
+                    or not system.service.is_installed or self._boot_owner_unavailable(system)
+                    or self._dependencies_blocked(state.ship.systems, system.dependencies)
+                    or self._service_power_unavailable(state, system)):
+                if system and system.service:
+                    system.service.is_running = False
+                    system.service.last_boot_error = "service_owner_unavailable"
+                return self._make_job_outcome_event(
+                    state, job, EventType.JOB_FAILED, Severity.WARN,
+                    SourceRef(kind="service", id=service_id),
+                    f"Service boot interrupted: {service_id}",
+                    data={"message_key": "job_failed_boot_unavailable", "service": service_id, "job_type": job.job_type.value},
+                )
         if job.job_type == JobType.REPAIR_SYSTEM:
             drone_id = str(job.params.get("drone_id", "") or "")
             target_system_id = str(job.target.id if job.target else "")
@@ -4096,10 +4126,15 @@ class Engine:
             return events
 
         if job.job_type == JobType.BOOT_SERVICE and job.target:
+            interrupted = self._check_job_interruption(state, job)
+            if interrupted is not None:
+                self._finalize_job(state.jobs, job, JobStatus.FAILED)
+                return [interrupted]
             system_id = job.params.get("system_id")
             system = state.ship.systems.get(system_id) if system_id else None
             if system and system.service:
                 system.service.is_running = True
+                system.service.last_boot_error = None
                 if system.state_locked:
                     system.state_locked = False
                 if not system.forced_offline:
@@ -4954,6 +4989,8 @@ class Engine:
                 if "critical" in sys.tags or sys.system_id in {"energy_distribution"}:
                     return 1.0
                 if sys.system_id in cruise_shed_targets:
+                    return 1.0
+                if sys.system_id == "comms":
                     return 1.0
                 return 0.1
             return sum(sys.p_effective_kw() * _factor(sys) for sys in systems) + job_load_kw
@@ -6146,7 +6183,7 @@ class Engine:
             if dep.dep_type != "system_state_at_least":
                 continue
             target = systems.get(dep.target_id)
-            if not target:
+            if not target or target.forced_offline:
                 return True
             required = self._state_rank(SystemState(dep.value))
             if self._state_rank(target.state) < required:
@@ -6162,6 +6199,8 @@ class Engine:
             target = systems.get(dep.target_id)
             if not target:
                 return (dep.target_id, str(dep.value), "missing")
+            if target.forced_offline:
+                return (dep.target_id, str(dep.value), SystemState.OFFLINE.value)
             required = SystemState(dep.value)
             if self._state_rank(target.state) < self._state_rank(required):
                 return (dep.target_id, required.value, target.state.value)
@@ -6177,6 +6216,46 @@ class Engine:
             SystemState.UPGRADED: 5,
         }
         return order[state]
+
+    def _boot_owner_unavailable(self, system: ShipSystem) -> bool:
+        if system.forced_offline or system.health <= Balance.SYSTEM_HEALTH_MIN_ON:
+            return True
+        if system.service and getattr(system.service, "requires_active_owner", False):
+            return self._state_rank(system.state) < self._state_rank(SystemState.LIMITED)
+        # Legacy sensord boot also activates its initially unforced OFFLINE owner.
+        return False
+
+    def _service_power_unavailable(self, state: GameState, system: ShipSystem) -> bool:
+        return bool(state.os.terminal_lock or (
+            self._is_noncritical_system(system) and (
+                is_critical_power_state(state)
+                or state.ship.power.power_quality < Balance.POWER_QUALITY_CRITICAL_THRESHOLD
+            )
+        ))
+
+    def _service_activation_notices(self, state: GameState, system_id: str) -> list[Event]:
+        events = []
+        for owner in state.ship.systems.values():
+            if owner.system_id != system_id and not any(d.target_id == system_id for d in owner.dependencies):
+                continue
+            svc = owner.service
+            if svc is None or svc.is_running:
+                continue
+            status = "stopped"
+            if not svc.is_installed:
+                status = "not_installed"
+            elif (self._boot_owner_unavailable(owner)
+                  or self._dependencies_blocked(state.ship.systems, owner.dependencies)
+                  or self._service_power_unavailable(state, owner)):
+                status = "blocked"
+            events.append(self._make_event(
+                state, EventType.ACTION_WARNING, Severity.INFO,
+                SourceRef(kind="ship_system", id=owner.system_id),
+                f"Service {svc.service_name}: {status}",
+                data={"message_key": "service_activation_notice", "service": svc.service_name,
+                      "owner": owner.system_id, "service_status": status},
+            ))
+        return events
 
     def _compute_env_radiation_rad_per_s(self, state: GameState) -> float:
         fallback = max(0.0, float(state.ship.radiation_env_rad_per_s))
@@ -6752,6 +6831,13 @@ class Engine:
                     },
                 )
             )
+            if (cause in {"manual_restore", "repair"} and (
+                old_state == SystemState.OFFLINE or (
+                    self._state_rank(old_state) < self._state_rank(SystemState.LIMITED)
+                    <= self._state_rank(new_state)
+                )
+            )):
+                events.extend(self._service_activation_notices(state, system.system_id))
         if system.state == SystemState.OFFLINE or system.health <= 0.0:
             if system.service:
                 system.service.is_running = False

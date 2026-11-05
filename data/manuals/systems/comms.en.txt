@@ -1,0 +1,37 @@
+SYSTEM SUMMARY — comms
+Ref: OS-MAN/SYS/COMMS
+
+The Communications System receives passive radio traffic independently of the exploration sensors and data uplink stack.
+
+Function
+- Captures locally available signals and station broadcasts into readable files.
+- Separates pending reception, captured messages and subsequent reading/import.
+
+Operational dependencies
+- Hardware in BRG-01; energy_distribution >= nominal and effective electrical supply.
+- Power on comms, then boot radiod (Radio Communications Service; 5 seconds).
+- No sensors, sensord, data_core or datad dependency for passive radio.
+- Reception is suspended during transit, hibernation, terminal lock or insufficient power.
+
+Command impact by state
+- LIMITED, NOMINAL and UPGRADED can receive with radiod running.
+- DAMAGED, CRITICAL and OFFLINE cannot receive.
+- Nominal load: 0.15 kW; LIMITED: 0.12 kW. diag comms reports actual state and load.
+- Internal mail and salvage do not require radio. Uplink retains data_core/datad requirements.
+
+Common symptoms
+- No newly captured signal despite a pending communication.
+- radiod stopped, uninstalled, power dependency unavailable or source outside local reception conditions.
+- Pending counts do not reveal message contents or destinations.
+
+Recovery pattern
+- Inspect diag comms and stabilize electrical distribution.
+- Repair damaged comms with a drone in BRG-01 when required.
+- power on comms; boot radiod. Power activation does not start the service.
+- Remain at the legitimate source; lore triggered by docking still requires docking.
+- Pending reception retries automatically while its source remains locally available.
+- Read the received file with cat or mail read to apply valid intel.
+
+Related commands
+- diag comms, power on comms, power off comms, boot radiod, jobs
+- drone deploy D1 BRG-01, drone repair D1 comms, cat <path>, intel import <path>

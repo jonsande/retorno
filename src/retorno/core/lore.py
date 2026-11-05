@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 
 from retorno.config.balance import Balance
+from retorno.core.communications import prepare_radio_opportunity, capture_radio_opportunity, RADIO_CHANNELS
 from retorno.model.events import Event, EventType, Severity, SourceRef
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path, register_mail
 from retorno.model.world import (
@@ -116,7 +117,14 @@ def deliver_ship_mail(
     *,
     mail_from: str | None = None,
     mail_subject: str | None = None,
+    external_origin: bool = False,
 ) -> str:
+    if external_origin:
+        path, _event = write_local_intel(
+            state, "ship_os_mail", _content_from_ref(content_ref, state),
+            mail_from=mail_from, mail_subject=mail_subject, external_origin=True,
+        )
+        return path or ""
     _ensure_dir(state.os.fs, "/mail")
     _ensure_dir(state.os.fs, "/mail/inbox")
     seq = state.events.next_event_seq
@@ -133,26 +141,49 @@ def deliver_ship_mail(
 
 
 def deliver_captured_signal(state, content_ref: str, lang: str) -> str:
-    _ensure_dir(state.os.fs, "/logs")
-    _ensure_dir(state.os.fs, "/logs/signals")
-    seq = state.events.next_event_seq
-    path = normalize_path(f"/logs/signals/{seq:04d}.{lang}.txt")
-    content = _content_from_ref(content_ref, state)
-    state.os.fs[path] = FSNode(path=path, node_type=FSNodeType.FILE, content=content, access=AccessLevel.GUEST)
-    return path
+    path, _event = write_local_intel(state, "captured_signal", _content_from_ref(content_ref, state))
+    return path or ""
 
 
 def deliver_station_broadcast(state, node_id: str, content_ref: str, lang: str) -> str:
-    _ensure_dir(state.os.fs, "/logs")
-    _ensure_dir(state.os.fs, "/logs/broadcasts")
-    seq = state.events.next_event_seq
-    path = normalize_path(f"/logs/broadcasts/{node_id}_{seq:04d}.{lang}.txt")
-    content = _content_from_ref(content_ref, state)
-    state.os.fs[path] = FSNode(path=path, node_type=FSNodeType.FILE, content=content, access=AccessLevel.GUEST)
-    return path
+    path, _event = write_local_intel(state, "station_broadcast", _content_from_ref(content_ref, state), node_id=node_id)
+    return path or ""
 
 
 def write_local_intel(
+    state, channel: str, content: str, *, node_id: str | None = None,
+    source: SourceRef | None = None, mail_from: str | None = None,
+    mail_subject: str | None = None, opportunity_id: str | None = None,
+    trigger: str = "local", require_docked: bool = False,
+    delivery: dict | None = None, external_origin: bool = False,
+    content_by_locale: dict[str, str] | None = None,
+) -> tuple[str | None, Event | None]:
+    if channel in RADIO_CHANNELS or (channel == "ship_os_mail" and (
+        external_origin or (source is not None and source.kind == "external")
+    )):
+        origin = node_id or state.world.current_node_id
+        source = source or SourceRef(kind="world", id=origin)
+        identity = opportunity_id or "local:" + hashlib.sha256(
+            repr((channel, origin, source.kind, source.id, content, mail_from, mail_subject)).encode("utf-8")
+        ).hexdigest()
+        metadata = dict(delivery or {})
+        metadata.update(mail_from=mail_from, mail_subject=mail_subject)
+        opportunity = prepare_radio_opportunity(
+            state, identity, channel, content_by_locale or {state.os.locale.value: content},
+            node_id=origin, trigger=trigger, source=source,
+            require_docked=require_docked, delivery=metadata,
+        )
+        event = capture_radio_opportunity(state, opportunity)
+        return opportunity.path, event
+    if channel == "uplink_trace":
+        from retorno.core.exploration_recovery import uplink_blocked_reason
+        if uplink_blocked_reason(state):
+            return None, None
+    return _write_local_intel(state, channel, content, node_id=node_id, source=source,
+                              mail_from=mail_from, mail_subject=mail_subject)
+
+
+def _write_local_intel(
     state,
     channel: str,
     content: str,
@@ -255,6 +286,34 @@ def write_local_intel(
         return path, event
 
     raise ValueError(f"Unsupported local intel channel: {channel}")
+
+
+def commit_radio_delivery(state, opportunity) -> None:
+    """Commit producer bookkeeping only after a real, single capture."""
+    delivery = opportunity.delivery
+    kind = delivery.get("kind")
+    if kind == "lore":
+        key = delivery["piece_key"]
+        state.world.lore.delivered.add(key)
+        state.world.lore.last_delivery_t = state.clock.t
+        prefix = {"captured_signal": "signal", "station_broadcast": "broadcast", "ship_os_mail": "mail"}[opportunity.channel]
+        state.world.lore.delivery_log.append(f"{prefix}:{delivery['piece_id']}:{opportunity.path}")
+        if opportunity.channel == "captured_signal":
+            counters = state.world.lore.counters
+            counters["signal_count"] = counters.get("signal_count", 0) + 1
+        pool = state.world.node_pools.get(opportunity.origin_node_id)
+        if pool:
+            pool.delivered_piece_ids.add(key)
+            pool.pending_push_piece_ids.discard(key)
+            recompute_node_completion(state, opportunity.origin_node_id)
+    elif kind == "recovery_gateway":
+        rec = state.world.exploration_recovery
+        rec.dock_hint_path = opportunity.path
+        rec.dock_hint_delivered = True
+    elif kind == "deadnode":
+        tracker = state.world.dead_nodes[delivery["target"]]
+        tracker.attempts += 1
+        tracker.last_action_t = state.clock.t
 
 
 def _known_node_ids(state) -> list[str]:
@@ -1725,6 +1784,8 @@ def _deliver_piece(
     ctx: LoreContext,
     *,
     is_primary: bool = False,
+    piece_key: str | None = None,
+    trigger: str = "local",
 ) -> LoreDelivery:
     delivered_files: list[dict] = []
     events: list[Event] = []
@@ -1768,6 +1829,18 @@ def _deliver_piece(
 
     content_ref = _content_ref_for_piece(piece, lang)
 
+    if channel in RADIO_CHANNELS or (channel == "ship_os_mail" and piece.get("mail_origin") == "external"):
+        key = piece_key or (f"arc:{arc_id}:{piece_id}" if arc_id else f"single:{piece_id}")
+        contents = {locale: _content_from_ref(_content_ref_for_piece(piece, locale), state) for locale in ("en", "es")}
+        opportunity = prepare_radio_opportunity(
+            state, f"lore:{key}", channel, contents, node_id=ctx.node_id,
+            trigger=trigger, require_docked=trigger in {"dock", "uplink", "salvage_data"},
+            delivery={"kind": "lore", "piece_key": key, "piece_id": piece_id,
+                      "mail_from": piece.get("mail_from"), "mail_subject": piece.get("mail_subject")},
+        )
+        event = capture_radio_opportunity(state, opportunity)
+        return LoreDelivery([], [event] if event else [], applied=event is not None)
+
     if channel == "ship_os_mail":
         mail_from = str(piece.get("mail_from", "") or "").strip() or None
         mail_subject = str(piece.get("mail_subject", "") or "").strip() or None
@@ -1788,49 +1861,6 @@ def _deliver_piece(
                 event_id=f"E{state.events.next_event_seq:05d}",
                 t=int(state.clock.t),
                 type=EventType.MAIL_RECEIVED,
-                severity=Severity.INFO,
-                source=SourceRef(kind="world", id=ctx.node_id),
-                message=msg,
-                data={"path": path},
-            )
-        )
-        state.events.next_event_seq += 1
-        return LoreDelivery(delivered_files, events, applied=True)
-
-    if channel == "captured_signal":
-        path = deliver_captured_signal(state, content_ref or "", lang)
-        state.world.lore.delivery_log.append(f"signal:{piece_id}:{path}")
-        state.world.lore.counters["signal_count"] = state.world.lore.counters.get("signal_count", 0) + 1
-        msg = {
-            "en": f"signal_captured :: Signal captured: {path} (hint: cat {path})",
-            "es": f"signal_captured :: Señal capturada: {path} (pista: cat {path})",
-        }.get(lang, f"signal_captured :: Signal captured: {path}")
-        events.append(
-            Event(
-                event_id=f"E{state.events.next_event_seq:05d}",
-                t=int(state.clock.t),
-                type=EventType.SIGNAL_CAPTURED,
-                severity=Severity.INFO,
-                source=SourceRef(kind="world", id=ctx.node_id),
-                message=msg,
-                data={"path": path},
-            )
-        )
-        state.events.next_event_seq += 1
-        return LoreDelivery(delivered_files, events, applied=True)
-
-    if channel == "station_broadcast":
-        path = deliver_station_broadcast(state, ctx.node_id, content_ref or "", lang)
-        state.world.lore.delivery_log.append(f"broadcast:{piece_id}:{path}")
-        msg = {
-            "en": f"broadcast_received :: Station broadcast: {path}",
-            "es": f"broadcast_received :: Emisión recibida: {path}",
-        }.get(lang, f"broadcast_received :: Station broadcast: {path}")
-        events.append(
-            Event(
-                event_id=f"E{state.events.next_event_seq:05d}",
-                t=int(state.clock.t),
-                type=EventType.BROADCAST_RECEIVED,
                 severity=Severity.INFO,
                 source=SourceRef(kind="world", id=ctx.node_id),
                 message=msg,
@@ -1891,6 +1921,7 @@ def _deliver_assigned_for_trigger(
                 channel,
                 ctx,
                 is_primary=(piece_entry.get("role") == "primary"),
+                piece_key=piece_key, trigger=trigger,
             )
             delivered_files.extend(result.files)
             events.extend(result.events)

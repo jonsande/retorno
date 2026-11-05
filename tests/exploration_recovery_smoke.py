@@ -6,8 +6,9 @@ from retorno.config.balance import Balance
 from retorno.core.exploration_recovery import has_exploration_frontier
 from retorno.core.actions import Dock, RouteSolve, Travel
 from retorno.core.engine import Engine
-from retorno.core.lore import sync_node_pools_for_known_nodes
+from retorno.core.lore import sync_node_pools_for_known_nodes, write_local_intel
 from retorno.model.world import ExplorationRecoveryState, SpaceNode
+from retorno.model.systems import SystemState
 
 
 def _job_eta_s(state) -> float:
@@ -58,24 +59,23 @@ def _assert_diegetic_recovery_chain_is_consumable() -> None:
     state, current_id = _make_blocked_state(docked=False)
     engine = Engine()
 
-    recovery_events = repl.ensure_exploration_recovery(state, "scan")
-    assert recovery_events, "Expected recovery activation on blocked exploration state"
-
+    before = set(state.world.space.nodes)
+    assert repl.ensure_exploration_recovery(state, "scan") == []
+    assert set(state.world.space.nodes) == before and state.world.recovery_activation_deferred
+    # e4b may consume a previously prepared chain, but cannot create one.
+    entry_id, gateway_id = "EXISTING_ENTRY_TEST", "EXISTING_GATEWAY_TEST"
+    state.world.space.nodes[entry_id] = SpaceNode(entry_id, "Existing entry", "station", x_ly=1, is_hub=True)
+    state.world.space.nodes[gateway_id] = SpaceNode(gateway_id, "Existing gateway", "station", x_ly=15, is_hub=True)
+    state.world.exploration_recovery = ExplorationRecoveryState(generation=1, entry_node_id=entry_id, gateway_node_id=gateway_id)
+    comms = state.ship.systems["comms"]
+    comms.state = SystemState.NOMINAL
+    comms.forced_offline = False
+    comms.service.is_running = True
+    path, event = write_local_intel(state, "captured_signal", f"NODE: {entry_id}\n", opportunity_id="existing-entry")
+    assert event is not None
     recovery = state.world.exploration_recovery
-    entry_id = recovery.entry_node_id
-    gateway_id = recovery.gateway_node_id
-    assert entry_id and gateway_id, "Expected both recovery entry and gateway nodes"
-    assert entry_id not in state.world.known_nodes, "Recovery entry must not become known before intel import"
-    assert gateway_id not in state.world.known_nodes, "Recovery gateway must stay hidden before intel import"
-    assert gateway_id not in state.world.known_links.get(current_id, set()), "Gateway link must not be granted directly"
-    assert recovery.passive_hint_path in state.os.fs, "Passive hint path must exist"
-    entry_pool = state.world.node_pools.get(entry_id)
-    assert entry_pool is not None, "Recovery entry must have a node pool"
-    assert any(
-        str(gateway_id) in str(entry.get("content", ""))
-        for entry in entry_pool.injected_files
-    ), "Recovery entry must contain salvageable intel for the gateway"
-
+    recovery.passive_hint_path = path
+    assert entry_id not in state.world.known_nodes and gateway_id not in state.world.known_nodes
     passive_text = state.os.fs[recovery.passive_hint_path].content
     passive_msgs = repl._auto_import_intel_from_text(state, passive_text, recovery.passive_hint_path)
     assert entry_id in state.world.known_nodes, "Passive hint import must reveal recovery entry"
@@ -108,15 +108,13 @@ def _assert_diegetic_recovery_chain_is_consumable() -> None:
     assert any(gateway_id in msg for msg in broadcast_msgs), broadcast_msgs
 
 
-def _assert_hibernate_recovery_uses_mail_channel() -> None:
+def _assert_hibernate_recovery_defers_external_cache_creation() -> None:
     state, _ = _make_blocked_state(docked=False)
-    recovery_events = repl.ensure_exploration_recovery(state, "hibernate_end")
-    assert recovery_events, "Expected recovery activation for hibernate-end trigger"
-    recovery = state.world.exploration_recovery
-    assert recovery.passive_hint_channel == "ship_os_mail", recovery.passive_hint_channel
-    assert recovery.passive_hint_path is not None and recovery.passive_hint_path.startswith("/mail/inbox/"), (
-        recovery.passive_hint_path
-    )
+    before = set(state.os.fs), set(state.world.space.nodes)
+    assert repl.ensure_exploration_recovery(state, "hibernate_end") == []
+    assert (set(state.os.fs), set(state.world.space.nodes)) == before
+    assert state.world.recovery_activation_deferred
+    assert state.world.exploration_recovery.passive_hint_path is None
 
 
 def _assert_uplink_frontier_blocks_recovery_activation() -> None:
@@ -155,7 +153,7 @@ def _assert_uplink_frontier_blocks_recovery_activation() -> None:
 
 def main() -> None:
     _assert_diegetic_recovery_chain_is_consumable()
-    _assert_hibernate_recovery_uses_mail_channel()
+    _assert_hibernate_recovery_defers_external_cache_creation()
     _assert_uplink_frontier_blocks_recovery_activation()
     print("EXPLORATION RECOVERY SMOKE PASSED")
 

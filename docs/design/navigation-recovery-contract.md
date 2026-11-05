@@ -2,6 +2,23 @@
 
 Spanish version: [navigation-recovery-contract.es.md](navigation-recovery-contract.es.md)
 
+## Implemented 4D-3e4b update — 2026-11-06
+
+Physical `comms` in BRG-01, nominal 0.15 kW, initially powered off;
+`radiod` service independent of sensors/data. Persistent opportunities,
+legitimate local capture and subsequent reading/import are implemented, with
+idempotent retries and model-derived service notices. [Technical contract](../systems/passive-communications.md)
+and [tests/report](../testing/passive-communications-review.md).
+Section 3 audit paragraphs describe the state **before** this correction;
+this update and the technical contract take precedence where they differ.
+
+Legacy activations requiring fabricated entry/gateway/bridge nodes are
+explicitly deferred without success/cooldown commits. Existing stages use the
+common ledger. F-DEAD-01 and structural selection remain e5 work. Degradation
+uses deterministic LIMITED/NOMINAL/UPGRADED reception; interference, reduced
+range, latency and probabilistic restarts are not implemented. There is no
+galactic network or promise of a universal exit.
+
 ## 1. Status and scope
 
 This document records developer-approved decisions for stabilization after
@@ -192,12 +209,12 @@ appropriate to its architecture. Later clues are found by exploring each new
 stage, and every indispensable clue must lead to a navigable possibility rather
 than merely mention an out-of-range destination.
 
-**Approved architecture for a later phase:** `captured_signal` and
-`station_broadcast` will require an operational physical `comms` system and an
+**Implemented in 4D-3e4b within the limits above:** `captured_signal` and
+`station_broadcast` require an operational physical `comms` system and an
 active `radiod` service, in addition to emitter-specific conditions. A
 broadcast may be received upon entering coverage without docking when its
 physical emitter model allows it; this does not advance lore pieces whose
-current trigger is `dock`. `ship_os_mail` will distinguish internal operating-
+current trigger is `dock`. `ship_os_mail` distinguishes internal operating-
 system messages from external mail or communications. `uplink_trace` keeps the
 current uplink and `datad` gates without imposing `comms` on every uplink.
 `salvage_data` does not depend on `radiod`. Reception and later reading remain
@@ -238,11 +255,11 @@ normalization.
 
 ### 2.7 The `comms` system and `radiod` service
 
-**Approved:** a later phase will add an independent physical system named
+**Implemented in 4D-3e4b:** an independent physical system is added, named
 `comms`. Its player-visible names are **Communications System** in English and
-**Sistema de comunicaciones** in Spanish. Passive reception will consume
-relatively less power than exploration sensors, without setting balance values
-yet, and its model will support future services without redesigning the system.
+**Sistema de comunicaciones** in Spanish. Passive reception consumes
+relatively less power than exploration sensors: a provisional nominal 0.15 kW
+subject to balance review, and its model will support future services without redesigning the system.
 
 `radiod` depends directly on `comms`, not on `sensors`, `sensord`, `data_core`,
 or `datad`. Its visible names are **Radio Communications Service** and
@@ -273,7 +290,7 @@ critical state, but still requires a docked drone with minimum integrity and a
 valid destination; it also uses failure/glitch risk. It creates no resources
 and does not guarantee that later repair is possible.
 
-## 3. Current communication dependencies
+## 3. Historical dependency audit before e4b
 
 In the current implementation, `write_local_intel` directly writes a `guest`
 file, constructs an event, and advances the sequence. It does not validate
@@ -454,7 +471,7 @@ The order prevents recovery or lore from inventing parallel validators again.
 | 2. Current-save integrity | Version/reject incompatible formats explicitly and preserve invariants within a version, without pre-alpha historical migrations. | `io/save_load.py`, model/versioning, shared validators. | Accepting corruption or deleting/replacing user data. | Current save/load, backup/checksum, incompatible-version rejection, and proof the file is not deleted. | Review policy before public alpha/beta. |
 | 3. Chain planner | Calculate every hop before publication; prefer existing unvisited nodes and create only what is needed. | `core/deadnodes.py`, `core/exploration_recovery.py`, worldgen/topology model, and pools. | Revealing content, late islands, using visited nodes, or changing determinism. | IT-04/07 with near/far targets, lazy sectors, no solution, and protection; save/load mid-chain. | New-node topology/pool and stage limit, without changing thresholds yet. |
 | 4. Progressive persistent delivery | Persist opportunity and stage before emission; reveal one stage at a time with an idempotency key. | Recovery/deadnode/lore states, `write_local_intel`, save/load. | Duplicates, loss during upgrade, stuck clues. | Repeated retries, save before/after capture, changed trigger/channel, deduplication. | Queue schema/version and expiration policy, if any. |
-| 5. `comms`, `radiod`, and reception | Add localized system/service; gate signal/broadcast and do not mark delivery with an off receiver; keep `datad` uplink-specific. | System bootstrap/model, power, engine/repl, channels, and EN/ES help/manuals. | Blocking current content, circular dependency, untranslated strings, or premature balance. | `comms` states × `radiod`, physical coverage, retry/save-load/dedup, and `manuals_style_check`. | Exact degraded penalties and consumption; no active transmission. |
+| 5. `comms`, `radiod`, and reception — implemented e4b | Add localized system/service; gate signal/broadcast and do not mark delivery with an off receiver; keep `datad` uplink-specific. | System bootstrap/model, power, engine/repl, channels, and EN/ES help/manuals. | Blocking current content, circular dependency, untranslated strings, or premature balance. | `comms` states × `radiod`, physical coverage, retry/save-load/dedup, and `manuals_style_check`. | Exact degraded penalties and consumption; no active transmission. |
 | 6. Narrative protection and receivers | Exclude protected primaries from automation without blocking scan/manual route solve; distinguish mandatory procedural receivers. | `core/lore.py`, recovery, deadnodes, locks/placements. | Impossible primary or accidental bypass. | Synthetic arcs by channel, protected target, forced ad hoc with/without host; persisted lock/unlock. | Canonical protection marker/query and policy when no host is eligible. |
 | 7. Integration, notices, and localization | Exercise the full journey, dynamic service notices, and every observable string in EN/ES. | Tests, docs, manuals, help, and modules touched in 0–6. | A green suite missing player decisions; CLI/Textual divergence or incomplete translation. | IT-01–IT-10, full suite, EN/ES locales, links, manuals, and saves at each boundary. | Success metrics, acceptable frequency, and any later rebalancing. |
 
@@ -544,10 +561,9 @@ details every consumer. F-NAV-01 was subsequently fixed in 4D-2; F-DEAD-01 remai
 - Preparing clues before a visit requires a coherent operation across planner,
   pool, and persistence; writing first and completing later can expose partial
   stages.
-- `comms` and `radiod` are approved, but a localized name/description catalog,
-  scalable service dependencies, idempotent pending state, and non-repeating
-  transition events are still missing. They must not be modeled as duplicate
-  lists.
+- `comms`, `radiod`, EN/ES names, idempotent pending reception and transition
+  notices are implemented in e4b. Interstellar communications, deterioration
+  balance and full F-DEAD-01 structural reception remain pending.
 - Since 4C-3, `modules_pool` categories filter the catalog's actual `pool` field.
   `radiation_base`, generation-order independence, single frequency, final
   uplink-pool policy, and balance remain open.

@@ -1,12 +1,28 @@
 # RETORNO — Hoja de ruta de preexistencia procedural, lore y F-DEAD-01
 
-**Versión:** 1.2 — 2026-11-05  
-**Estado:** planificación acordada; **4D-3e2 está en ejecución según comunicación del desarrollador**. No se presupone su resultado, ni el estado actual de Git.  
+**Versión:** 1.3 — 2026-11-06
+**Estado:** 4D-3e4 integrada en `78676dbfce5e7b98db36b2e241a427a19b0632fe`; 4D-3e4b implementada para revisión externa antes de e5. [English](roadmap-worldgen-lore-f-dead01.md).
 **Destino recomendado en el repositorio:** `docs/design/roadmap-worldgen-lore-f-dead01.es.md`.
 
 > **Propósito:** conservar las decisiones de diseño y la secuencia de trabajo durante la estabilización final del universo procedural, sin prolongarla indefinidamente ni perder el objetivo de volver a jugar RETORNO con Textual y sonido, y después desarrollar arcos, singles y contenido nuevo.
 >
 > **Precedencia:** esta hoja documenta decisiones de producto y coordinación. No reemplaza `docs/canon/universo.md`, `docs/canon/guia_coherencia.md`, los contratos técnicos existentes ni el código probado. Las discrepancias entre documentos o cambios de mecánica se deben señalar para decisión del desarrollador; no resolver por suposición.
+
+## Acuerdo explícito adicional v1.3
+
+El desarrollador autoriza intercalar **4D-3e4b — comunicaciones pasivas** antes de
+4D-3e5. Es una intervención adicional acotada, no la reserva de correcciones ni
+una declaración de F-DEAD-01 terminado. Implementa comms/radiod, oportunidades
+persistentes, captura local y lectura, avisos, compatibilidad de guardado y
+pruebas EN/ES. Consumo nominal provisional autorizado: 0.15 kW. Véanse
+[contrato](../systems/passive-communications.es.md) e
+[informe](../testing/passive-communications-review.es.md).
+
+No se reescriben D01–D24 ni los criterios de e5/e6. Se aplazan explícitamente las
+activaciones legacy que necesitan fabricar nodos correctivos; la recuperación
+estructural y su selección permanecen en e5. Las referencias siguientes a e2 en
+curso y al procedimiento v1.1→v1.2 conservan su contexto histórico de coordinación,
+no describen el estado actual del checkout. La tabla incorpora la intervención.
 
 ## 1. Punto de partida y estado verificable
 
@@ -170,6 +186,7 @@ Los identificadores del ejemplo son ilustrativos, **no** contenido ya declarado.
 | **2** | **4D-3e2 — Integración de worldgen (EN CURSO al redactar v1.2)** | Implementación productiva por manifiesto, generación *lazy*, IDs/topología, coexistencia con ubicaciones *authored*, versionado de algoritmo, límites de materialización, tests de guardado y comparación estadística de mapas. **Revisar a la entrega la extensibilidad para requisitos narrativos declarativos; no alterar el prompt en ejecución.** | Igual semilla/configuración produce mismo universo histórico/topología independiente del orden; no leaks de conocimiento ni cambios silenciosos de balance. **La compilación completa de paquetes de lore no se presume terminada en esta orden.** |
 | **3** | **4D-3e3 — Memoria de scan** | Registro persistente y acotado de observaciones (posición, alcance efectivo, estado de sensores, resultados y tiempo), modelo de evidencia negativa no infalible y pruebas; evitar repetición compulsiva. | Scan normal e historial sobreviven save/load; escaneos negativos no certifican vacío; sensores degradados se tratan conforme al contrato actual salvo cambio aprobado. |
 | **4** | **4D-3e4 — Lore/intel/ad hoc** | Implementar el mínimo **contrato de datos + compilación/validación de requisitos físicos de arcos/singles/documentos instalados antes de la nueva partida**, integrado con el manifiesto; adaptar hosts, reservas y declaraciones authored; preservar/verificar `NODE/LINK/SECTOR/COORD`, bloques intel y mención frente a revelación; retirar creación retrospectiva. Ejecutar §3.4 y §3.5; revisar las guías de autoría. | Historias nuevas pueden declarar entidades/relaciones **sin tocar código del generador**; se validan contradicciones; el universo es consistente con pistas canónicas; no se reabren pools ni se crea una estación por necesidad tardía, y la sintaxis intel sigue operativa. |
+| **4b adicional** | **4D-3e4b — Comunicaciones pasivas (acuerdo v1.3)** | Sistema físico comms, radiod, recepción local persistente e idempotente, lectura/importación, gates reales, avisos y pruebas/documentación EN/ES. Aplazar activaciones legacy que fabrican nodos; no rehacer F-DEAD-01. | Receptor/servicio reales, sin capturas gratuitas ni consumo bloqueado; pendientes sobreviven save/load. Revisión externa antes de e5. |
 | **5** | **4D-3e5 — F-DEAD-01** | Integrar selector contextual con manifiesto, búsqueda próxima que se amplía progresivamente, condiciones estructurales sin filtros económicos, preparación atómica e idempotente de pistas, distinción pendiente/recibida, validaciones de navegación y protección. | Sin salto >45 ly, sin rescate gratuito ni estación retrospectiva; intentos fallidos no consumidos; la búsqueda agotada es «incompleta» y la recepción respeta canales reales. |
 | **6** | **4D-3e6 — Validación jugable y cierre** | Regresión integrada, varios universos/semillas, save/load repetido, casos de fallo, prueba con controles públicos en Textual y **sonido**, informe de experiencia y defectos. | Recorrido jugable estable; cerrar F-DEAD-01 solo con evidencias. Volver a producir arcos, singles y contenido tras bloquear únicamente defectos graves. |
 
@@ -195,7 +212,7 @@ Los identificadores del ejemplo son ilustrativos, **no** contenido ya declarado.
 - Sistema complejo de triangulación y múltiples modos de sensores; basta un historial honesto y verificable.
 - Simulación completa de sucesos dinámicos futuros, combate u otros sistemas ajenos.
 - Revisión integral de todo el contenido antiguo no afectado por la preexistencia.
-- Desarrollo completo de comunicaciones `comms`/`radiod` fuera de su plan específico. **Si su ausencia impide la recepción diegética de F-DEAD-01, no simularlas ni declarar la fase cerrada**: usar únicamente un canal legítimo ya implementado o elevar el mínimo imprescindible como dependencia explícita para decisión.
+- Desarrollo completo de comunicaciones interestelares fuera del mínimo pasivo autorizado en e4b. **Si su ausencia impide la recepción diegética de F-DEAD-01, no simularlas ni declarar la fase cerrada**: usar únicamente un canal legítimo ya implementado o elevar el mínimo imprescindible como dependencia explícita para decisión.
 - Migraciones de partidas de prueba antiguas; no borrar guardados sin acción explícita.
 
 ## 7. Riesgos y señales de parada
@@ -245,3 +262,5 @@ Al iniciar otra conversación dentro del proyecto RETORNO:
 - **v1.0:** secuencia de trabajo del manifiesto, scan, lore y F-DEAD-01.
 - **v1.1:** preservación de localizaciones authored y sintaxis de intel; declaración, mención y revelación.
 - **v1.2:** contenido narrativo instalado como entrada de worldgen; entidades/relaciones estructuradas y validación previa a la partida; procedimiento seguro con 4D-3e2 en curso.
+
+- **v1.3:** acuerdo explícito para insertar e4b antes de e5; comms/radiod y recepción persistente local; aplazamiento seguro de activaciones correctivas legacy. D01–D24 y criterios F-DEAD-01 preservados.

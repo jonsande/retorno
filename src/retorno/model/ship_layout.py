@@ -41,6 +41,7 @@ RETORNO_CANONICAL_SECTOR_BY_ID: dict[str, CanonicalSectorSpec] = {
 RETORNO_SYSTEM_TO_SECTOR: dict[str, str] = {
     "life_support": "LFS-01",
     "core_os": "BRG-01",
+    "comms": "BRG-01",
     "data_core": "BRG-01",
     "security": "BRG-01",
     "power_core": "PWR-A1",

@@ -136,7 +136,7 @@ def _reset_to_single_anchor_state() -> tuple[object, str]:
     return state, current_id
 
 
-def _assert_uplink_activates_diegetic_recovery() -> None:
+def _assert_uplink_defers_corrective_recovery() -> None:
     state, current_id = _reset_to_single_anchor_state()
 
     pool = state.world.node_pools.get(current_id)
@@ -163,34 +163,18 @@ def _assert_uplink_activates_diegetic_recovery() -> None:
     assert state.world.known_links.get(current_id, set()) == set(), (
         "Uplink rescue must not inject a known_link directly into the reachable graph"
     )
-    assert recovery.entry_node_id, "Expected a recovery entry node after empty uplink fallback"
-    assert recovery.gateway_node_id, "Expected a recovery gateway node after empty uplink fallback"
-    assert recovery.entry_node_id in state.world.forced_hidden_nodes, "Recovery entry must remain hidden until discovered"
-    assert recovery.passive_hint_channel == "uplink_trace", recovery.passive_hint_channel
-    assert recovery.passive_hint_path in state.os.fs, "Expected passive recovery hint to be written to local FS"
-    assert recovery.passive_hint_path.startswith("/logs/nav/"), recovery.passive_hint_path
-    entry_pool = state.world.node_pools.get(recovery.entry_node_id)
-    assert entry_pool is not None, "Expected recovery entry node pool"
-    assert any(
-        str(recovery.gateway_node_id) in str(entry.get("content", ""))
-        for entry in entry_pool.injected_files
-    ), "Expected salvageable gateway hint in recovery entry node pool"
-    assert int(state.world.mobility_failsafe_count) == before_failsafe + 1, (
-        "Expected mobility_failsafe_count to increment after diegetic rescue activation"
-    )
-    assert int(state.world.mobility_no_new_uplink_count) == 0, (
-        "Expected mobility_no_new_uplink_count reset after diegetic rescue activation"
-    )
-    assert int(state.world.lore.counters.get("uplink_count", 0)) == before_uplink_count + 1, (
-        "Expected uplink_count +1 when empty uplink activates recovery intel"
-    )
+    assert recovery.entry_node_id is None and recovery.gateway_node_id is None
+    assert state.world.recovery_activation_deferred
+    assert int(state.world.mobility_failsafe_count) == before_failsafe
+    assert int(state.world.mobility_no_new_uplink_count) == int(Balance.UPLINK_FAILSAFE_N)
+    assert int(state.world.lore.counters.get("uplink_count", 0)) == before_uplink_count
     assert "no new routes found" in text or "no se encontraron rutas nuevas" in text, text
 
 
 def main() -> None:
     _assert_current_anchor_node_seeds_pool()
     _assert_authored_uplink_table_is_applied()
-    _assert_uplink_activates_diegetic_recovery()
+    _assert_uplink_defers_corrective_recovery()
     print("UPLINK AUTHORED+FAILSAFE SMOKE PASSED")
 
 

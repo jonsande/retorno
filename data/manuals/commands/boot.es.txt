@@ -1,11 +1,13 @@
 boot <service_name>
 
 Propósito
-- Arrancar un daemon de servicio de subsistema (por ejemplo `sensord`, `datad`, `securityd`).
+- Arrancar un daemon de servicio de subsistema (por ejemplo `sensord`, `datad`, `securityd`, `radiod`).
 
 Requisitos (gating)
 - El servicio debe existir y pertenecer a un subsistema instalado.
 - El subsistema objetivo debe ser recuperable (no destruido) y con dependencias satisfechas.
+- radiod exige comms encendido y al menos LIMITED: power on comms, después boot radiod.
+- radiod no necesita sensors, sensord, data_core ni datad.
 - El estado energético debe permitir arranque:
   - los arranques no críticos se bloquean en estado crítico de energía (incluido brownout activo),
   - los arranques no críticos se bloquean con calidad crítica (`Q < 0.40`),
@@ -14,12 +16,16 @@ Requisitos (gating)
 Comportamiento
 - `boot` encola un trabajo de arranque y completa tras el tiempo de boot del subsistema.
 - Si el servicio ya está en ejecución, no se encola trabajo nuevo.
+- Durante el arranque y al completar se revalidan instalación, propietario, potencia y dependencias.
+- Apagar el hardware detiene su servicio. Encenderlo no vuelve a arrancar ese servicio.
+- El arranque de radiod dura 5 segundos; diag comms explica bloqueos de recepción y recuentos pendientes.
 
 Bloqueos frecuentes
 - `service_missing`
 - `deps_unmet`
+- `service_owner_unavailable`
 - `critical_power_state` / `power_quality_critical`
 - `brownout_active`
 
 Comandos relacionados
-- `diag <system_id>`, `power status`, `shutdown <service_name>`, `jobs`
+- `diag <system_id>`, `power status`, `power off <system_id>`, `jobs`

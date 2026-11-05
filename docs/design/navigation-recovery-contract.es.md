@@ -2,6 +2,23 @@
 
 Versión inglesa: [navigation-recovery-contract.md](navigation-recovery-contract.md)
 
+## Actualización implementada 4D-3e4b — 2026-11-06
+
+Sistema físico `comms` en BRG-01, 0.15 kW nominales, inicialmente apagado;
+servicio `radiod` independiente de sensores/datos. Implementadas oportunidad
+persistente, captura legítima local y lectura/importación posterior; reintentos
+idempotentes y avisos de servicios derivados del modelo. [Contrato técnico](../systems/passive-communications.es.md)
+y [pruebas/informe](../testing/passive-communications-review.es.md).
+Los apartados de auditoría §3 describen el estado **anterior** a esta corrección;
+esta actualización y el contrato técnico prevalecen donde difieran.
+
+Las activaciones legacy que requieren fabricar entrada/gateway/puente se aplazan
+explícitamente sin éxitos ni cooldown consumidos. Se conservan etapas existentes
+mediante el ledger común. F-DEAD-01 y el selector estructural siguen pendientes
+de e5. La degradación usa una política determinista LIMITED/NOMINAL/UPGRADED;
+interferencias, alcance reducido, latencia y reinicios probabilísticos no están
+implementados. No hay red galáctica ni promesa de salida universal.
+
 ## 1. Estado y alcance
 
 Este documento registra decisiones aprobadas por el desarrollador para la
@@ -194,15 +211,15 @@ capacidades que correspondan a su arquitectura. Las pistas posteriores se
 obtendrán explorando cada nueva etapa y toda pista indispensable conducirá a
 una posibilidad navegable, no sólo a un destino fuera de alcance.
 
-**Arquitectura aprobada para la fase posterior:** `captured_signal` y
-`station_broadcast` requerirán el sistema físico `comms` operativo y el servicio
-`radiod` activo, además de las condiciones del emisor. Un broadcast podrá
+**Implementado en 4D-3e4b, con los límites anteriores:** `captured_signal` y
+`station_broadcast` requieren el sistema físico `comms` operativo y el servicio
+`radiod` activo, además de las condiciones del emisor. Un broadcast puede
 recibirse al entrar en cobertura sin dock cuando su modelo físico lo permita;
 esto no adelanta piezas de lore cuyo trigger vigente sea `dock`.
-`ship_os_mail` distinguirá mensajes internos del sistema operativo de correo o
-comunicaciones externas. `uplink_trace` mantendrá los gates actuales de uplink
-y `datad` sin imponer `comms` a todo uplink. `salvage_data` no dependerá de
-`radiod`. Recibir y leer seguirán siendo operaciones distintas.
+`ship_os_mail` distingue mensajes internos del sistema operativo de correo o
+comunicaciones externas. `uplink_trace` mantiene los gates actuales de uplink
+y `datad` sin imponer `comms` a todo uplink. `salvage_data` no depende de
+`radiod`. Recibir y leer siguen siendo operaciones distintas.
 
 ### 2.5 Protección narrativa
 
@@ -239,23 +256,23 @@ versión vigente realice normalización.
 
 ### 2.7 Sistema `comms` y servicio `radiod`
 
-**Aprobado:** una fase posterior añadirá un sistema físico independiente llamado
-`comms`. Sus nombres visibles serán **Communications System** en inglés y
-**Sistema de comunicaciones** en español. Su recepción pasiva consumirá
-relativamente menos energía que los sensores de exploración, sin fijar todavía
-valores de balance, y su modelo admitirá futuros servicios sin rediseñar el
+**Implementado en 4D-3e4b:** se añade un sistema físico independiente llamado
+`comms`. Sus nombres visibles son **Communications System** en inglés y
+**Sistema de comunicaciones** en español. Su recepción pasiva consume
+relativamente menos energía que los sensores de exploración: 0.15 kW nominales
+provisionales, sujetos a balance, y su modelo admitirá futuros servicios sin rediseñar el
 sistema.
 
-`radiod` dependerá directamente de `comms`, no de `sensors`, `sensord`,
-`data_core` ni `datad`. Sus nombres visibles serán **Radio Communications
-Service** y **Servicio de comunicaciones por radio**. Gestionará recepción y
-captura de radio; `radiod` y `sensord` podrán funcionar de forma independiente.
+`radiod` depende directamente de `comms`, no de `sensors`, `sensord`,
+`data_core` ni `datad`. Sus nombres visibles son **Radio Communications
+Service** y **Servicio de comunicaciones por radio**. Gestiona recepción y
+captura de radio; `radiod` y `sensord` pueden funcionar de forma independiente.
 Esta decisión no autoriza transmisión activa, transpondedor ni combate.
 
 `comms` deteriorado podrá conservar capacidades limitadas —por ejemplo menos
 alcance, interferencias, recepción intermitente o inestabilidad de `radiod`—,
 pero probabilidades, consumo y reinicios automáticos quedan pendientes de
-balance. Una incapacidad temporal no consumirá una oportunidad como recibida.
+balance. Una incapacidad temporal no consume una oportunidad como recibida.
 
 ### 2.8 Coherencia de recuperación, no supervivencia
 
@@ -275,7 +292,7 @@ en estado crítico, pero aún exige un dron acoplado, con integridad mínima y u
 destino válido; además usa riesgo de fallo/glitch. No crea recursos ni garantiza
 que la reparación posterior sea posible.
 
-## 3. Dependencias actuales de comunicaciones
+## 3. Auditoría histórica de dependencias anterior a e4b
 
 En la implementación actual, `write_local_intel` escribe directamente un
 archivo de acceso `guest`, construye un evento y avanza la secuencia. No valida
@@ -454,7 +471,7 @@ orden evita que recuperación o lore vuelvan a inventar validadores paralelos.
 | 2. Integridad de saves vigentes | Versionar/rechazar explícitamente formatos incompatibles y preservar invariantes dentro de la versión, sin migraciones históricas prealfa. | `io/save_load.py`, modelo/versionado y validadores compartidos. | Aceptar corrupción o borrar/reemplazar datos del usuario. | Save/load vigente, backup/checksum, rechazo de versión incompatible y confirmación de que no se borra el archivo. | Revisar la política antes de alfa/beta pública. |
 | 3. Planificador de cadenas | Calcular todos los saltos antes de publicar; preferir nodos existentes no visitados y crear sólo los necesarios. | `core/deadnodes.py`, `core/exploration_recovery.py`, worldgen/modelo de topología y pools. | Revelar contenido, crear islas tardías, usar nodos visitados o alterar determinismo. | IT-04/07 con objetivos cercanos/lejanos, sectores lazy, sin solución y protección; save/load a mitad de cadena. | Topología/pool de nodos nuevos y límite de etapas, sin tocar aún umbrales. |
 | 4. Entrega progresiva persistente | Persistir oportunidad y etapa antes de emisión; revelar una etapa por vez con clave idempotente. | Estados de recovery/deadnodes/lore, `write_local_intel`, save/load. | Duplicados, pérdida al actualizar, pistas atascadas. | Reintentos repetidos, save antes/después de captura, cambio de trigger/canal y dedup. | Esquema/versionado de la cola y política de expiración, si existe. |
-| 5. `comms`, `radiod` y recepción | Añadir sistema/servicio localizados; aplicar gates a señal/broadcast y no marcar entrega con receptor apagado; mantener `datad` específico de uplink. | Bootstrap/modelo de sistemas, energía, engine/repl, canales y ayuda/manuales EN/ES. | Bloquear contenido actual, dependencia circular, strings sin localizar o balance prematuro. | Estados `comms` × `radiod`, cobertura física, reintento/save-load/dedup y `manuals_style_check`. | Penalizaciones exactas de deterioro y consumo; no transmisión activa. |
+| 5. `comms`, `radiod` y recepción — implementado e4b | Añadir sistema/servicio localizados; aplicar gates a señal/broadcast y no marcar entrega con receptor apagado; mantener `datad` específico de uplink. | Bootstrap/modelo de sistemas, energía, engine/repl, canales y ayuda/manuales EN/ES. | Bloquear contenido actual, dependencia circular, strings sin localizar o balance prematuro. | Estados `comms` × `radiod`, cobertura física, reintento/save-load/dedup y `manuals_style_check`. | Penalizaciones exactas de deterioro y consumo; no transmisión activa. |
 | 6. Protección narrativa y receptores | Excluir primaries protegidos de automatismos, sin bloquear scan/route solve manual; distinguir receptor procedural obligatorio. | `core/lore.py`, recovery, deadnodes y locks/placements. | Primary imposible o bypass accidental. | Arcos sintéticos por canal, protected target, ad hoc forzado con/sin host; persistir lock y unlock. | Etiqueta o consulta canónica de protección; política sin host elegible. |
 | 7. Integración, avisos y localización | Probar recorrido completo, avisos dinámicos de servicios y todo texto observable en EN/ES. | Tests, docs, manuales, ayuda y módulos tocados en 0–6. | Suite verde sin decisiones del jugador; divergencia CLI/Textual o traducciones incompletas. | IT-01–IT-10, suite completa, locales EN/ES, enlaces, manuales y saves en cada frontera. | Métricas de éxito, frecuencia aceptable y cualquier rebalanceo posterior. |
 
@@ -548,10 +565,9 @@ detalla cada consumidor. F-NAV-01 quedó corregido después en 4D-2; F-DEAD-01 s
 - Preparar pistas antes de una visita exige una operación coherente entre
   planificador, pool y persistencia; escribir primero y completar después puede
   dejar etapas parcialmente visibles.
-- `comms` y `radiod` están aprobados, pero faltan un catálogo localizado de
-  nombres/descripciones, soporte de dependencias de servicio escalable, estado
-  pendiente idempotente y eventos de transición no repetitivos. No deben
-  modelarse con listas duplicadas.
+- `comms`, `radiod`, nombres EN/ES, pendientes idempotentes y avisos de transición
+  están implementados en e4b. Permanecen pendientes comunicaciones interestelares,
+  balance de deterioro y recepción estructural completa de F-DEAD-01.
 - Las categorías de `modules_pool` ya filtran el campo real `pool` del catálogo
   desde 4C-3. Siguen abiertos `radiation_base`, independencia del orden de
   generación, frecuencia de singles, política final de pools uplink y balance.

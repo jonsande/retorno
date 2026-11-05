@@ -4,9 +4,9 @@ import math
 import random
 
 from retorno.config.balance import Balance
-from retorno.core.lore import write_local_intel
+from retorno.core.lore import write_local_intel, _locked_primary_targets
 from retorno.model.events import Event
-from retorno.model.world import DeadNodeState, SpaceNode, reachable_known_nodes
+from retorno.model.world import DeadNodeState, SpaceNode, reachable_known_nodes, is_hop_within_cap
 from retorno.worldgen.generator import _generate_node_id, _name_from_node_id, sync_sector_state_for_node
 
 
@@ -139,40 +139,27 @@ def evaluate_dead_nodes(state, trigger: str, debug: bool = False) -> list[Event]
         if st.attempts > 0 and years_since_action < Balance.DEADNODE_ACTION_COOLDOWN_YEARS:
             continue
 
-        # Indirect strategy: create a bridge node near the dead node, then deliver link to it.
+        # Do not create retrospective bridges. Existing stages can use the same
+        # reception ledger as lore; structural replacement remains an e5 task.
+        target_id = node_id
         if st.attempts < Balance.DEADNODE_MAX_INDIRECT_ATTEMPTS:
-            bridge = None
-            if st.bridge_node_id and st.bridge_node_id in state.world.space.nodes:
-                bridge = state.world.space.nodes[st.bridge_node_id]
-            else:
-                bridge = _create_bridge_node(state, node_id, st.attempts)
-                if bridge:
-                    st.bridge_node_id = bridge.node_id
-            if bridge:
-                content = (
-                    "NAV NOTE\n\n"
-                    f"LINK: {state.world.current_node_id} -> {bridge.node_id}\n"
-                )
-                channel = "captured_signal" if trigger != "dock" else "station_broadcast"
-                _path, ev = write_local_intel(state, channel, content)
-                events.append(ev)
-                st.attempts += 1
-                st.last_action_t = state.clock.t
-                if debug:
-                    state.world.deadnode_log.append(f"indirect {node_id} -> {bridge.node_id}")
+            if not st.bridge_node_id or st.bridge_node_id not in state.world.space.nodes:
+                state.world.recovery_activation_deferred = True
                 continue
-
-        # Direct strategy: deliver a link to the dead node.
-        content = (
-            "NAV NOTE\n\n"
-            f"LINK: {state.world.current_node_id} -> {node_id}\n"
-        )
+            target_id = st.bridge_node_id
+        if target_id in _locked_primary_targets(state) or node_id in _locked_primary_targets(state):
+            continue
+        if not is_hop_within_cap(state.world, state.world.current_node_id, target_id):
+            state.world.recovery_activation_deferred = True
+            continue
+        content = "NAV NOTE\n\n" + f"LINK: {state.world.current_node_id} -> {target_id}\n"
         channel = "captured_signal" if trigger != "dock" else "station_broadcast"
-        _path, ev = write_local_intel(state, channel, content)
-        events.append(ev)
-        st.attempts += 1
-        st.last_action_t = state.clock.t
-        if debug:
-            state.world.deadnode_log.append(f"direct {state.world.current_node_id} -> {node_id}")
+        _path, event = write_local_intel(
+            state, channel, content, trigger=trigger, require_docked=trigger == "dock",
+            opportunity_id=f"deadnode:{node_id}:{st.attempts}",
+            delivery={"kind": "deadnode", "target": node_id, "hint_target": target_id, "attempt": st.attempts},
+        )
+        if event is not None:
+            events.append(event)
 
     return events

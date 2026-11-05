@@ -1,0 +1,37 @@
+RESUMEN DE SISTEMA — comms
+Ref: OS-MAN/SYS/COMMS
+
+El Sistema de comunicaciones recibe tráfico de radio pasivo independientemente de los sensores de exploración y del conjunto de uplink de datos.
+
+Función
+- Captura señales disponibles localmente y emisiones de estación en archivos legibles.
+- Separa recepción pendiente, mensajes capturados y lectura/importación posterior.
+
+Dependencias operativas
+- Hardware en BRG-01; energy_distribution >= nominal y alimentación eléctrica efectiva.
+- power on comms, después boot radiod (Servicio de comunicaciones por radio; 5 segundos).
+- La radio pasiva no depende de sensors, sensord, data_core ni datad.
+- La recepción se suspende durante tránsito, hibernación, bloqueo de terminal o potencia insuficiente.
+
+Impacto en comandos por estado
+- LIMITED, NOMINAL y UPGRADED pueden recibir con radiod activo.
+- DAMAGED, CRITICAL y OFFLINE no pueden recibir.
+- Carga nominal: 0.15 kW; LIMITED: 0.12 kW. diag comms muestra estado y carga actuales.
+- El correo interno y el salvamento no necesitan radio. Uplink conserva sus requisitos de data_core/datad.
+
+Síntomas comunes
+- No hay señal recién capturada aunque exista una comunicación pendiente.
+- radiod detenido, no instalado, alimentación dependiente no disponible o fuente fuera de condiciones de recepción local.
+- El recuento de pendientes no revela contenido ni destinos de mensajes.
+
+Recuperación típica
+- Consultar diag comms y estabilizar la distribución eléctrica.
+- Reparar comms dañado con un dron en BRG-01 cuando sea necesario.
+- power on comms; boot radiod. Encender el sistema no arranca el servicio.
+- Permanecer en la fuente legítima; el lore disparado por acoplamiento sigue exigiendo dock.
+- La recepción pendiente se reintenta automáticamente mientras la fuente siga disponible localmente.
+- Leer el archivo recibido con cat o mail read para aplicar intel válida.
+
+Comandos relacionados
+- diag comms, power on comms, power off comms, boot radiod, jobs
+- drone deploy D1 BRG-01, drone repair D1 comms, cat <path>, intel import <path>

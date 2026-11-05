@@ -6,7 +6,7 @@ from retorno.model.events import AlertState, Event, EventType, Severity, SourceR
 from retorno.model.ship import PowerNetworkState
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, Locale, normalize_path, register_mail, _normalize_access
 from retorno.model.ship_layout import apply_retorno_canonical_layout, build_retorno_ship_sectors
-from retorno.model.systems import Dependency, ServiceState, ShipSystem, SystemState
+from retorno.model.systems import Dependency, ServiceState, ShipSystem, SystemState, build_communications_system
 from retorno.model.world import SpaceNode, add_known_link, is_hop_within_cap, region_for_pos, sector_id_for_pos
 from retorno.worldgen.generator import ensure_sector_generated
 from retorno.runtime.data_loader import load_modules, load_locations
@@ -33,6 +33,7 @@ def create_initial_state_prologue(*, seed: int | None = None) -> GameState:
     )
 
     state.ship.systems = {
+        "comms": build_communications_system(),
         "core_os": ShipSystem(
             system_id="core_os",
             name="Core OS",

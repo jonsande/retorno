@@ -76,7 +76,7 @@ def _uplink_system_blocked_reason(state) -> str | None:
         return "data_core_shed"
     if system.state == SystemState.OFFLINE:
         return "data_core_offline"
-    if not system.service or system.service.service_name != "datad":
+    if not system.service or system.service.service_name != "datad" or not system.service.is_installed:
         return "datad_not_installed"
     if not system.service.is_running:
         return "datad_not_running"
@@ -416,52 +416,10 @@ def _activation_source(state, trigger: str) -> SourceRef:
 
 
 def _activate_recovery(state, trigger: str) -> list[Event]:
-    recovery = state.world.exploration_recovery
-    generation = int(recovery.generation) + 1
-    entry_node_id = _ensure_entry_node(state, generation)
-    if not entry_node_id:
-        return []
-    gateway_node_id = _ensure_gateway_node(state, generation, entry_node_id)
-    if not gateway_node_id:
-        _drop_hidden_node(state, entry_node_id)
-        return []
-
-    sync_node_pools_for_known_nodes(state)
-    salvage_seeded = _seed_entry_salvage_hint(state, entry_node_id, gateway_node_id, generation)
-    channel = _passive_channel_for_trigger(trigger)
-    mail_from = "CORE.OS / passive relay cache" if channel == "ship_os_mail" else None
-    mail_subject = "Recovered navigation trace" if channel == "ship_os_mail" else None
-    path, event = write_local_intel(
-        state,
-        channel,
-        _entry_hint_content(state, entry_node_id, trigger),
-        node_id=state.world.current_node_id,
-        source=_activation_source(state, trigger),
-        mail_from=mail_from,
-        mail_subject=mail_subject,
-    )
-    recovery.generation = generation
-    recovery.anchor_node_id = state.world.current_node_id
-    recovery.entry_node_id = entry_node_id
-    recovery.gateway_node_id = gateway_node_id
-    recovery.passive_hint_path = path
-    recovery.passive_hint_channel = channel
-    recovery.passive_hint_t = float(state.clock.t)
-    recovery.dock_hint_path = None
-    recovery.dock_hint_delivered = False
-    recovery.salvage_hint_seeded = salvage_seeded
-
-    state.world.mobility_failsafe_count += 1
-    state.world.mobility_hints.append(
-        {
-            "t": state.clock.t,
-            "trigger": trigger,
-            "entry": entry_node_id,
-            "gateway": gateway_node_id,
-            "channel": channel,
-        }
-    )
-    return [event]
+    # Legacy activation creates corrective historical nodes before preparing the
+    # hint. Defer it atomically until the structural planner is integrated in e5.
+    state.world.recovery_activation_deferred = True
+    return []
 
 
 def _deliver_gateway_broadcast_if_needed(state) -> list[Event]:
@@ -480,10 +438,10 @@ def _deliver_gateway_broadcast_if_needed(state) -> list[Event]:
         _gateway_hint_content(entry_node_id, gateway_node_id),
         node_id=entry_node_id,
         source=SourceRef(kind="world", id=entry_node_id),
+        opportunity_id=f"recovery:{recovery.generation}:gateway",
+        trigger="arrival", delivery={"kind": "recovery_gateway", "generation": recovery.generation, "gateway": gateway_node_id},
     )
-    recovery.dock_hint_path = path
-    recovery.dock_hint_delivered = True
-    return [event]
+    return [event] if event is not None else []
 
 
 def ensure_exploration_recovery(state, trigger: str) -> list[Event]:

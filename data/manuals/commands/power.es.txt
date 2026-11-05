@@ -10,6 +10,9 @@ Modelo operativo
 - `power status`: muestra SoC, `P_gen`, `P_load`, `Q`, brownout y márgenes.
 - `power plan cruise|normal`: aplica política de carga a nivel de perfil.
 - `power on/off <system_id>`: corte/restauración manual de energía por subsistema.
+- power on comms activa el receptor pasivo (0.15 kW nominales); boot radiod arranca su servicio por separado.
+- Al restaurar energía se avisa una vez de servicios dependientes detenidos, no instalados o bloqueados.
+- Apagar la energía detiene el servicio del subsistema propietario.
 
 Requisitos y límites
 - `power on <system_id>` requiere salud recuperable y dependencias satisfechas.

@@ -183,6 +183,11 @@ def _load_from_file(path: Path) -> GameState:
     except (ValueError,TypeError,AttributeError) as exc:
         raise SaveLoadError(f"{_universe_error(loaded)} ({exc})") from exc
 
+    # Schema 3 predates passive radio. This additive default changes no historical
+    # world/content, resources or known intel and does not rewrite the save file.
+    if "comms" not in loaded.ship.systems:
+        from retorno.model.systems import build_communications_system
+        loaded.ship.systems["comms"] = build_communications_system()
     return loaded
 
 

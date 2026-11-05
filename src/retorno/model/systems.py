@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import MISSING, dataclass, field, fields
 from enum import Enum
 from typing import Any
 
@@ -29,6 +29,15 @@ class ServiceState:
     is_running: bool = False
     boot_time_s: int = 5
     last_boot_error: str | None = None
+    requires_active_owner: bool = False
+
+    def __setstate__(self, state) -> None:
+        data = state[1] if isinstance(state, tuple) else state
+        for spec in fields(self):
+            value = data.get(spec.name, spec.default)
+            if value is MISSING:
+                raise ValueError(f"Service field missing: {spec.name}")
+            object.__setattr__(self, spec.name, value)
 
 
 def power_multiplier(state: SystemState) -> float:
@@ -68,3 +77,32 @@ class ShipSystem:
 
     def p_effective_kw(self) -> float:
         return self.p_nom_kw * power_multiplier(self.state)
+
+
+def build_communications_system() -> ShipSystem:
+    """Shared new-game and additive schema-3 default; never starts the receiver."""
+    return ShipSystem(
+        system_id="comms", name="Communications System", sector_id="BRG-01",
+        state=SystemState.OFFLINE, forced_offline=True, health=0.90,
+        p_nom_kw=0.15, priority=4, base_decay_per_s=8.5e-11,
+        k_power=0.30, k_rad=0.10,
+        dependencies=[Dependency("system_state_at_least", "energy_distribution", "nominal")],
+        service=ServiceState("radiod", boot_time_s=5, requires_active_owner=True),
+    )
+
+
+def system_name_for_locale(system: ShipSystem, locale: str) -> str:
+    if system.system_id == "comms" and locale == "es":
+        return "Sistema de comunicaciones"
+    return system.name
+
+
+def service_name_for_locale(service: ServiceState, locale: str) -> str:
+    names = {
+        "radiod": ("Radio Communications Service", "Servicio de comunicaciones por radio"),
+        "sensord": ("Sensor Service", "Servicio de sensores"),
+        "datad": ("Data Service", "Servicio de datos"),
+        "securityd": ("Security Service", "Servicio de seguridad"),
+        "core_os": ("Core OS", "Sistema operativo central"),
+    }
+    return names.get(service.service_name, (service.service_name, service.service_name))[locale == "es"]

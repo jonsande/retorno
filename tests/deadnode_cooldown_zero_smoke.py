@@ -9,6 +9,7 @@ from retorno.config.balance import Balance
 from retorno.core.deadnodes import evaluate_dead_nodes
 from retorno.io.save_load import load_single_slot, save_single_slot
 from retorno.model.world import DeadNodeState, SpaceNode
+from retorno.model.systems import SystemState
 
 
 CURRENT_ID = "DEADNODE_CURRENT_TEST"
@@ -40,6 +41,7 @@ def _ready_deadnode(action_t: float = 0.0) -> DeadNodeState:
         dead_threshold_uplinks=Balance.DEADNODE_DEAD_UPLINKS_MIN,
         stuck_threshold_years=Balance.DEADNODE_STUCK_YEARS_MIN,
         dead_threshold_years=Balance.DEADNODE_DEAD_YEARS_MIN,
+        bridge_node_id="EXISTING_BRIDGE_TEST",
     )
 
 
@@ -49,6 +51,8 @@ def _make_state(*, start_t: float = 0.0):
     state.world.space.nodes = {
         CURRENT_ID: _node(CURRENT_ID, 0.0),
         TARGET_A: _node(TARGET_A, 100.0),
+        # e4b consumes existing chains; creation of corrective bridges is deferred.
+        "EXISTING_BRIDGE_TEST": _node("EXISTING_BRIDGE_TEST", 1.0),
     }
     state.world.current_node_id = CURRENT_ID
     state.ship.current_node_id = CURRENT_ID
@@ -65,6 +69,10 @@ def _make_state(*, start_t: float = 0.0):
     state.world.node_pools = {}
     state.world.dead_nodes = {TARGET_A: _ready_deadnode(start_t)}
     state.world.lore.counters["uplink_count"] = 0
+    comms = state.ship.systems["comms"]
+    comms.state = SystemState.NOMINAL
+    comms.forced_offline = False
+    comms.service.is_running = True
     return state
 
 

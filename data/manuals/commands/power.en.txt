@@ -10,6 +10,9 @@ Operational model
 - `power status`: shows SoC, `P_gen`, `P_load`, `Q`, brownout, and margins.
 - `power plan cruise|normal`: applies profile-level load policy.
 - `power on/off <system_id>`: manual power shedding/restoration for a subsystem.
+- power on comms activates passive receiver hardware (nominal 0.15 kW); boot radiod starts its service separately.
+- Power restoration reports dependent stopped, uninstalled or blocked services once per activation.
+- Power off stops the owning subsystem service.
 
 Requirements and limits
 - `power on <system_id>` requires recoverable system health and dependency chain satisfaction.
