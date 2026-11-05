@@ -1,0 +1,431 @@
+{
+  "python": "3.12.16 (main, Oct 26 2026, 15:28:01) [GCC 11.4.0]",
+  "runs": [
+    {
+      "test": "tests/audio_config_smoke.py",
+      "exit_code": 0,
+      "seconds": 1.297,
+      "output": "AUDIO CONFIG SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/audio_runtime_notice_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.082,
+      "output": ""
+    },
+    {
+      "test": "tests/config_audio_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.368,
+      "output": "CONFIG AUDIO SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/contacts_sector_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.305,
+      "output": ""
+    },
+    {
+      "test": "tests/contacts_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.384,
+      "output": "CONTACTS SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/deadnode_chain_detours_smoke.py",
+      "exit_code": 0,
+      "seconds": 2.449,
+      "output": "_canonical_full_world_query\nPASS test_budget_exhaustion_is_incomplete_not_universal_impossibility\nPASS test_detour_save_load_hash_seeds_and_all_state_purity\nPASS test_detour_never_calls_live_writers\nPASS test_populated_world_has_bounded_search_and_preserves_state\nDEADNODE CHAIN DETOURS SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/deadnode_chain_planner_smoke.py",
+      "exit_code": 0,
+      "seconds": 2.47,
+      "output": "rigin\nPASS test_no_arbitrary_stage_limit\nPASS test_unknown_record_does_not_make_an_origin_operational\nPASS test_candidate_gates_and_missing_drone_dependency\nPASS test_full_sector_cannot_supply_extra_slots_or_forbidden_types\nPASS test_determinism_across_hash_seeds\nDEADNODE CHAIN PLANNER SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/deadnode_cooldown_zero_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.236,
+      "output": "DEADNODE COOLDOWN ZERO SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/deadnode_opportunity_selection_smoke.py",
+      "exit_code": 0,
+      "seconds": 3.217,
+      "output": "hanged\nPASS test_35_no_knowledge_or_route_publication\nPASS test_36_hash_seed_determinism\nPASS test_37_save_load_selection\nPASS test_38_thousands_of_nodes\nPASS test_39_multiple_targets_bounded_shared_queries\nPASS test_40_navigation_cap_and_stopped_waypoint\nDEADNODE OPPORTUNITY SELECTION SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/debug_add_commands_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.197,
+      "output": "DEBUG ADD COMMANDS SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/debug_galaxy_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.238,
+      "output": "DEBUG GALAXY SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/debug_lore_arcs_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.222,
+      "output": "DEBUG LORE/ARCS SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/debug_worldgen_graph_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.225,
+      "output": "DEBUG WORLDGEN/GRAPH SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/drone_completion_context_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.21,
+      "output": "DRONE COMPLETION CONTEXT SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/drone_modular_v1_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.502,
+      "output": "DRONE MODULAR V1 SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/drone_recall_all_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.204,
+      "output": "DRONE RECALL ALL SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/drone_salvage_survey_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.401,
+      "output": "DRONE SALVAGE/SURVEY SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/energy_policy_smoke.py",
+      "exit_code": 0,
+      "seconds": 1.302,
+      "output": "ENERGY POLICY SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/exploration_recovery_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.344,
+      "output": "EXPLORATION RECOVERY SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/forced_hidden_ad_hoc_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.175,
+      "output": "FORCED HIDDEN AD-HOC SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/galaxy_physical_model_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.143,
+      "output": "GALAXY PHYSICAL MODEL SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/hibernate_radiation_wake_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.231,
+      "output": "HIBERNATE RADIATION WAKE SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/hibernate_sequence_assets_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.031,
+      "output": ""
+    },
+    {
+      "test": "tests/intel_recent_order_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.279,
+      "output": "INTEL RECENT ORDER SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/job_id_numbering_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.154,
+      "output": "JOB ID NUMBERING SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/known_routes_integrity_smoke.py",
+      "exit_code": 0,
+      "seconds": 1.265,
+      "output": "rt_components_and_views\nPASS _assert_recovery_frontier\nPASS _assert_deadnode_candidates\nPASS _assert_lazy_sector\nPASS _assert_solve_and_travel\nPASS _assert_job_endpoint_disappears\nPASS _assert_waypoint_is_inert_after_removal\nPASS _assert_persistence\nKNOWN ROUTES INTEGRITY SMOKE PASSED (seed=271828)\n"
+    },
+    {
+      "test": "tests/lore_channel_preference_and_unlock_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.148,
+      "output": "LORE CHANNEL PREFERENCE + UPLINK PRIMARY UNLOCK SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/lore_distance_from_start_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.13,
+      "output": "LORE DISTANCE FROM START SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/lore_secondary_count_weights_hard_smoke.py",
+      "exit_code": 1,
+      "seconds": 0.321,
+      "output": "Traceback (most recent call last):\n  File \"<frozen runpy>\", line 198, in _run_module_as_main\n  File \"<frozen runpy>\", line 88, in _run_code\n  File \"/home/jon/prog/retorno_case/retorno/tests/lore_secondary_count_weights_hard_smoke.py\", line 278, in <module>\n    main()\n  File \"/home/jon/prog/retorno_case/retorno/tests/lore_secondary_count_weights_hard_smoke.py\", line 266, in main\n    assert not failures, \"Independent lore fixture failures:\\n- \" + \"\\n- \".join(failures)\n           ^^^^^^^^^^^^\nAssertionError: Independent lore fixture failures:\n- hard_force_constraints_and_no_relax: ValueError: Historical id occupied by a different physical node\n"
+    },
+    {
+      "test": "tests/lore_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.134,
+      "output": "LORE SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/mail_metadata_and_log_header_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.208,
+      "output": "MAIL METADATA + LOG HEADER SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/manuals_style_check.py",
+      "exit_code": 0,
+      "seconds": 0.049,
+      "output": "MANUAL STYLE CHECK PASSED\n"
+    },
+    {
+      "test": "tests/nav_abort_waypoint_cleanup_smoke.py",
+      "exit_code": 1,
+      "seconds": 0.709,
+      "output": "PASS test_abort_position_and_inactive_abort\nPASS test_scan_from_stopped_waypoint\nPASS test_scan_gates_and_real_transit\nPASS test_third_destination_completion_and_arrival\nPASS test_travel_to_third_destination\nTraceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/src/retorno/io/save_load.py\", line 128, in _pack_state\n    validate_universe_state(state)\n  File \"/home/jon/prog/retorno_case/retorno/src/retorno/worldgen/generator.py\", line 728, in validate_universe_state\n    raise ValueError(\"Complete physical inventory is missing a historical site\")\nValueError: Complete physical inventory is missing a historical site\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"<frozen runpy>\", line 198, in _run_module_as_main\n  File \"<frozen runpy>\", line 88, in _run_code\n  File \"/home/jon/prog/retorno_case/retorno/tests/nav_abort_waypoint_cleanup_smoke.py\", line 520, in <module>\n    check()\n  File \"/home/jon/prog/retorno_case/retorno/tests/nav_abort_waypoint_cleanup_smoke.py\", line 304, in test_return_and_resume_cleanup\n    _clean(_roundtrip(state), tmp)\n           ^^^^^^^^^^^^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/tests/nav_abort_waypoint_cleanup_smoke.py\", line 179, in _roundtrip\n    save_single_slot(state, path)\n  File \"/home/jon/prog/retorno_case/retorno/src/retorno/io/save_load.py\", line 61, in save_single_slot\n    payload = _pack_state(state)\n              ^^^^^^^^^^^^^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/src/retorno/io/save_load.py\", line 130, in _pack_state\n    raise SaveLoadError(_universe_error(state)) from exc\nretorno.io.save_load.SaveLoadError: Save incompatible with the historical universe version, rules or physical state. Start a new game; the existing file has been preserved.\n"
+    },
+    {
+      "test": "tests/nav_map_galaxy_dependencies_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.204,
+      "output": "NAV MAP GALAXY DEPENDENCIES SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/nav_map_galaxy_determinism_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.215,
+      "output": "NAV MAP GALAXY DETERMINISM SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/nav_map_galaxy_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.22,
+      "output": "NAV MAP GALAXY SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/procedural_radiation_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.136,
+      "output": "PROCEDURAL RADIATION SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/radiation_hull_smoke.py",
+      "exit_code": 1,
+      "seconds": 0.59,
+      "output": "Traceback (most recent call last):\n  File \"<frozen runpy>\", line 198, in _run_module_as_main\n  File \"<frozen runpy>\", line 88, in _run_code\n  File \"/home/jon/prog/retorno_case/retorno/tests/radiation_hull_smoke.py\", line 217, in <module>\n    main()\n  File \"/home/jon/prog/retorno_case/retorno/tests/radiation_hull_smoke.py\", line 183, in main\n    assert any(e.data.get(\"metric\") == \"env\" for e in ship_rad_events), ship_rad_events\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: []\n"
+    },
+    {
+      "test": "tests/route_hop_cap_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.181,
+      "output": "ROUTE HOP CAP SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/route_solve_out_of_range_origins_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.286,
+      "output": "ROUTE SOLVE OUT OF RANGE ORIGINS SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/save_load_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.349,
+      "output": "SAVE/LOAD SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/scan_job_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.387,
+      "output": "SCAN JOB SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/sector_intel_validation_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.514,
+      "output": "SECTOR INTEL VALIDATION SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/sensor_detection_factor_smoke.py",
+      "exit_code": 0,
+      "seconds": 2.875,
+      "output": "SENSOR DETECTION FACTOR SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/ship_layout_output_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.208,
+      "output": "SHIP LAYOUT OUTPUT SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/ship_survey_radiation_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.204,
+      "output": "SHIP SURVEY RADIATION SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/smoke_test.py",
+      "exit_code": 0,
+      "seconds": 0.172,
+      "output": "SMOKE TEST PASSED\n"
+    },
+    {
+      "test": "tests/textual_active_jobs_job_id_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.213,
+      "output": "TEXTUAL ACTIVE JOBS JOB ID SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/textual_command_spacing_smoke.py",
+      "exit_code": 0,
+      "seconds": 3.959,
+      "output": "TEXTUAL COMMAND SPACING SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/textual_completion_context_smoke.py",
+      "exit_code": 0,
+      "seconds": 2.179,
+      "output": "TEXTUAL COMPLETION CONTEXT SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/textual_theme_smoke.py",
+      "exit_code": 1,
+      "seconds": 3.973,
+      "output": "Traceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno_venv/lib/python3.12/site-packages/textual/timer.py\", line 189, in _tick\n    await invoke(self._callback)\n  File \"/home/jon/prog/retorno_case/retorno_venv/lib/python3.12/site-packages/textual/_callback.py\", line 96, in invoke\n    return await _invoke(callback, *params)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno_venv/lib/python3.12/site-packages/textual/_callback.py\", line 56, in _invoke\n    result = callback(*params[:parameter_count])\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/src/retorno/ui_textual/app.py\", line 1402, in refresh_panels\n    self.query_one(\"#header\", Static).update(render_rich_line(header, self._theme_preset))\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno_venv/lib/python3.12/site-packages/textual/dom.py\", line 1503, in query_one\n    raise NoMatches(f\"No nodes match {query_selector!r} on {base_node!r}\")\ntextual.css.query.NoMatches: No nodes match '#header' on Screen(id='_default')\nTraceback (most recent call last):\n  File \"<frozen runpy>\", line 198, in _run_module_as_main\n  File \"<frozen runpy>\", line 88, in _run_code\n  File \"/home/jon/prog/retorno_case/retorno/tests/textual_theme_smoke.py\", line 49, in <module>\n    main()\n  File \"/home/jon/prog/retorno_case/retorno/tests/textual_theme_smoke.py\", line 45, in main\n    asyncio.run(_run())\n  File \"/usr/lib/python3.12/asyncio/runners.py\", line 195, in run\n    return runner.run(main)\n           ^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/asyncio/runners.py\", line 118, in run\n    return self._loop.run_until_complete(task)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/asyncio/base_events.py\", line 691, in run_until_complete\n    return future.result()\n           ^^^^^^^^^^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/tests/textual_theme_smoke.py\", line 23, in _run\n    async with app.run_test() as pilot:\n               ^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/contextlib.py\", line 217, in __aexit__\n    await anext(self.gen)\n  File \"/home/jon/prog/retorno_case/retorno_venv/lib/python3.12/site-packages/textual/app.py\", line 2145, in run_test\n    raise self._exception\n  File \"/home/jon/prog/retorno_case/retorno_venv/lib/python3.12/site-packages/textual/timer.py\", line 189, in _tick\n    await invoke(self._callback)\n  File \"/home/jon/prog/retorno_case/retorno_venv/lib/python3.12/site-packages/textual/_callback.py\", line 96, in invoke\n    return await _invoke(callback, *params)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno_venv/lib/python3.12/site-packages/textual/_callback.py\", line 56, in _invoke\n    result = callback(*params[:parameter_count])\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/src/retorno/ui_textual/app.py\", line 1402, in refresh_panels\n    self.query_one(\"#header\", Static).update(render_rich_line(header, self._theme_preset))\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno_venv/lib/python3.12/site-packages/textual/dom.py\", line 1503, in query_one\n    raise NoMatches(f\"No nodes match {query_selector!r} on {base_node!r}\")\ntextual.css.query.NoMatches: No nodes match '#header' on Screen(id='_default')\n"
+    },
+    {
+      "test": "tests/transit_radiation_progression_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.132,
+      "output": "TRANSIT RADIATION PROGRESSION SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/uplink_authored_and_failsafe_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.325,
+      "output": "UPLINK AUTHORED+FAILSAFE SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/uplink_once_per_node_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.238,
+      "output": "UPLINK ONCE PER NODE SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/uplink_only_delivery_retry_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.771,
+      "output": "UPLINK_ONLY DELIVERY + RETRY SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/worldgen_manifest_integration_smoke.py",
+      "exit_code": 0,
+      "seconds": 4.045,
+      "output": "est_10_collision_namespace_and_special_nodes_do_not_consume_quotas\nPASS test_11_incompatible_saves_rules_seed_and_corruption_preserve_files\nPASS test_12_unknown_cleanup_and_authored_properties_preserved\nPASS test_13_hashseed_process_determinism\nWORLDGEN MANIFEST INTEGRATION SMOKE PASSED (13 groups)\n"
+    },
+    {
+      "test": "tests/worldgen_manifest_prototype_smoke.py",
+      "exit_code": 0,
+      "seconds": 2.623,
+      "output": "WORLDGEN MANIFEST PROTOTYPE SMOKE PASSED (17 groups)\n"
+    },
+    {
+      "test": "tests/worldgen_modules_pool_smoke.py",
+      "exit_code": 0,
+      "seconds": 1.349,
+      "output": "counts=[3, 1]\nseed=2 region=halo sector=S+16000_+000_+000 archetype=empty counts=[0]\nseed=2 drone salvage node=S-25000_+000_+000:WG1_5127933e65399a0dd8554f8138f5a6e35626a3318b346987871ce50067b8d697_0 module=field_service_rig attempts=2; depletion and cargo persist\nWORLDGEN MODULES POOL SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/worldgen_preexistence_catalog_smoke.py",
+      "exit_code": 0,
+      "seconds": 1.438,
+      "output": "WORLDGEN PREEXISTENCE CATALOG SMOKE PASSED (17 groups)\n"
+    },
+    {
+      "test": "tests/worldgen_preexistence_characterization_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.475,
+      "output": "WORLDGEN PREEXISTENCE CHARACTERIZATION SMOKE PASSED (9 groups)\n"
+    },
+    {
+      "test": "tests/worldgen_sparse_archetypes_smoke.py",
+      "exit_code": 0,
+      "seconds": 9.394,
+      "output": "WORLDGEN SPARSE ARCHETYPES SMOKE PASSED\n"
+    }
+  ],
+  "followups": [
+    {
+      "test": "tests/lore_secondary_count_weights_hard_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.441,
+      "output": "LORE SECONDARY COUNT + SINGLE WEIGHTS + HARD FORCE SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/nav_abort_waypoint_cleanup_smoke.py",
+      "exit_code": 0,
+      "seconds": 2.029,
+      "output": "PASS test_abort_position_and_inactive_abort\nPASS test_scan_from_stopped_waypoint\nPASS test_scan_gates_and_real_transit\nPASS test_third_destination_completion_and_arrival\nPASS test_travel_to_third_destination\nPASS test_return_and_resume_cleanup\nPASS test_save_load_at_all_phases\nPASS test_repeated_aborts\nPASS test_repeated_abort_drops_deleted_origin_metadata\nPASS test_pending_waypoint_jobs_become_history\nPASS test_cleanup_cancellation_event_once_on_arrival\nPASS test_cleanup_cancellation_event_once_on_repeated_abort\nPASS test_cleanup_cancellation_event_once_on_docking_completion\nPASS test_bilingual_status_and_help\nPASS test_rejections_direction_and_ordinary_arrival\nNAV ABORT WAYPOINT CLEANUP SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/textual_theme_smoke.py",
+      "exit_code": 0,
+      "seconds": 3.798,
+      "output": "TEXTUAL THEME SMOKE PASSED\n"
+    },
+    {
+      "test": "tests/worldgen_manifest_integration_smoke.py",
+      "exit_code": 0,
+      "seconds": 4.084,
+      "output": "PASS test_01_orders_grouping_later_neighbors_and_witness_seeds\nPASS test_02_partial_inventory_save_load_and_consumption\nPASS test_03_pure_queries_do_not_touch_game_rng_knowledge_or_pools\nPASS test_04_z_outlier_inverse_completeness_against_wider_sources\nPASS test_05_numerical_bound_extreme_uniform_and_rounding\nPASS test_06_domain_work_bounds_and_atomic_failure\nPASS test_07_matching_reciprocity_maximality_budgets_and_hop_cap\nPASS test_08_authored_declaration_is_not_revelation_or_prose\nPASS test_09_new_ids_intel_blocks_authored_links_and_coord_semantics\nPASS test_10_collision_namespace_and_special_nodes_do_not_consume_quotas\nPASS test_11_incompatible_saves_rules_seed_and_corruption_preserve_files\nPASS test_12_unknown_cleanup_and_authored_properties_preserved\nPASS test_13_hashseed_process_determinism\nPASS test_14_seed_command_compatibility_and_localization\nWORLDGEN MANIFEST INTEGRATION SMOKE PASSED (14 groups)\n"
+    },
+    {
+      "test": "tests/audio_runtime_notice_smoke.py",
+      "exit_code": 0,
+      "seconds": 1.175,
+      "output": "PASS test_audio_manager_consumes_backend_runtime_notice\nExecuted 1 functions\n"
+    },
+    {
+      "test": "tests/contacts_sector_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.216,
+      "output": "PASS test_contacts_outputs_hide_start_unknown_placeholder\nPASS test_contacts_render_includes_sector_region_and_sector_summary\nPASS test_contacts_sector_aliases_parse\nPASS test_nav_routes_hides_start_unknown_placeholder\nExecuted 4 functions\n"
+    },
+    {
+      "test": "tests/hibernate_sequence_assets_smoke.py",
+      "exit_code": 0,
+      "seconds": 0.032,
+      "output": "PASS test_hibernate_start_sequence_assets_exist_for_supported_locales\nPASS test_hibernate_wake_sequence_assets_exist_for_supported_locales\nExecuted 2 functions\n"
+    },
+    {
+      "test": "tests/manuals_style_check.py",
+      "exit_code": 0,
+      "seconds": 0.043,
+      "output": "MANUAL STYLE CHECK PASSED\n"
+    }
+  ],
+  "baseline_radiation": {
+    "commit": "5cdde2804c74b7cf14d01120db84b097eb8e7b23",
+    "exit_code": 1,
+    "output": "Traceback (most recent call last):\n  File \"<frozen runpy>\", line 198, in _run_module_as_main\n  File \"<frozen runpy>\", line 88, in _run_code\n  File \"/tmp/retorno-4d3e2-baseline-fhuhhp2o/tests/radiation_hull_smoke.py\", line 217, in <module>\n    main()\n  File \"/tmp/retorno-4d3e2-baseline-fhuhhp2o/tests/radiation_hull_smoke.py\", line 183, in main\n    assert any(e.data.get(\"metric\") == \"env\" for e in ship_rad_events), ship_rad_events\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: []\n"
+  },
+  "baseline_theme": {
+    "commit": "5cdde2804c74b7cf14d01120db84b097eb8e7b23",
+    "exit_code": 0,
+    "output": "TEXTUAL THEME SMOKE PASSED\n"
+  }
+}

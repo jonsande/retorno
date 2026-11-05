@@ -1,5 +1,12 @@
 # Discovery, navigation, and intel
 
+**4D-3e2 compatibility:** productive worldgen now uses [versioned stable history](../design/historical-worldgen-integration.md).
+`NODE:`/`LINK:` resolve exact `S…:WG1_<scope>_<index>` IDs to their physical sector,
+including Z spill. `SECTOR:`, `COORD:`, intel blocks and authored references keep
+their contracts; COORD remains a navigation point, not a historical station. Physical
+declaration, prose and revelation are distinct (D18–D20). Full authored/arc/single/forced
+regression remains e4; scan and lore are not claimed to implement new mechanics.
+
 Status: **canonical documentation of implemented behavior**. Production code
 was reviewed at commit `3658577`; tests were run later on the Phase 3B working
 tree based on `9f38d2e`.

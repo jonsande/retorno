@@ -1,5 +1,13 @@
 # Descubrimiento, navegación e intel
 
+**Compatibilidad 4D-3e2:** el worldgen productivo usa ahora [historia estable versionada](../design/historical-worldgen-integration.es.md).
+`NODE:`/`LINK:` resuelven los IDs `S…:WG1_<ámbito>_<índice>` exactos hacia su sector físico,
+incluido desbordamiento Z. `SECTOR:`, `COORD:`, bloques de intel y referencias authored
+conservan sus contratos; COORD sigue creando un punto de navegación, no una estación
+histórica. Declaración física, prosa y revelación son distintas (D18–D20). La regresión
+completa authored/arcos/singles/forzado sigue reservada para e4; scan y lore no se
+declaran adaptados a nuevas mecánicas.
+
 Estado: **documentación canónica del comportamiento implementado**. El código
 productivo se revisó en el commit `3658577`; las pruebas se ejecutaron después
 sobre el árbol de trabajo de la Fase 3B, basado en `9f38d2e`.

@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from dataclasses import asdict
+from types import SimpleNamespace
 import json
 import math
 from pathlib import Path
@@ -18,8 +19,10 @@ from time import perf_counter
 import tracemalloc
 from unittest.mock import patch
 
-from retorno.model.world import sector_id_for_pos
-from retorno.worldgen import generator as gen
+from retorno.model.world import sector_id_for_pos, SpaceNode
+from retorno.runtime.data_loader import load_modules
+from retorno.worldgen import manifest as production, generator as runtime
+from tests.fixtures import worldgen_legacy_5cdde28 as gen
 from retorno.worldgen.manifest_prototype import define_manifest, query_manifest, ALGORITHM_VERSION
 if __package__:
     from tests.worldgen_preexistence_characterization_smoke import _state
@@ -143,15 +146,16 @@ def _legacy(seed, ids):
     coverage=state.world.generated_sectors
     nodes={nid:{"source":owners[nid],"physical":sector_id_for_pos(n.x_ly,n.y_ly,n.z_ly),
                 "kind":n.kind,"region":n.region,"playable":n.is_hub,"topological":n.is_topology_hub,
-                "raw_id":nid,"position":(n.x_ly,n.y_ly,n.z_ly)}
+                "raw_id":nid,"position":(n.x_ly,n.y_ly,n.z_ly),
+                "resources":(n.radiation_rad_per_s,n.salvage_scrap_available,len(n.salvage_modules_available),n.recoverable_drones_count)}
            for nid,n in state.world.space.nodes.items() if owners[nid] in coverage}
     edges={key:kind for key,kind in edge_kinds.items() if key[0] in nodes and key[1] in nodes}
     archetypes={sid:s.archetype for sid,s in state.world.sector_states.items() if sid in coverage}
     return nodes,edges,archetypes,coverage
 
 
-def _prototype(definition,coverage):
-    result=query_manifest(definition,tuple(sorted(coverage)),max_sectors=len(coverage))
+def _prototype(definition,coverage,query=query_manifest):
+    result=query(definition,tuple(sorted(coverage)),max_sectors=len(coverage))
     nodes={s.identity.encoded:{"source":s.generation_sector_id,"physical":s.physical_sector_id,
             "kind":s.kind,"region":s.region,"playable":s.is_hub,"topological":s.is_topology_hub,
             "raw_id":s.identity.local_id if s.identity.namespace=='authored' else s.legacy_id_hint,
@@ -159,21 +163,34 @@ def _prototype(definition,coverage):
            for c in result.sectors for s in c.sites}
     edges={tuple(sorted((e.left.encoded,e.right.encoded))):e.kind for e in result.edges
            if e.left.encoded in nodes and e.right.encoded in nodes}
+    if definition.algorithm_version == production.ALGORITHM_VERSION:
+        templates = json.loads(definition.configuration_json)[0]
+        for cohort in result.sectors:
+            for site in cohort.sites:
+                if site.identity.namespace != 'procedural':
+                    continue
+                node = SpaceNode(site.identity.encoded,'',site.kind)
+                runtime._apply_salvage_profile(SimpleNamespace(meta=SimpleNamespace(rng_seed=definition.seed)),
+                    node,templates[cohort.template_region]['salvage'],list(load_modules()))
+                nodes[site.identity.encoded]['resources'] = (
+                    runtime.procedural_radiation_for_node(definition.seed,site.identity.encoded,site.kind,site.region),
+                    node.salvage_scrap_available,len(node.salvage_modules_available),node.recoverable_drones_count)
     return nodes,edges,{c.sector_id:c.archetype for c in result.sectors}
 
 
-def benchmark():
-    definition=define_manifest(271828)
+def benchmark(production_mode=False):
+    definition=(production.define_manifest if production_mode else define_manifest)(271828)
+    query=production.query_manifest if production_mode else query_manifest
     rows=[]
     for count in (1,9,64):
         ids=PATCHES['disk'][:count]
         times=[]
         for _ in range(3):
             start=perf_counter()
-            result=query_manifest(definition,ids)
+            result=query(definition,ids)
             times.append((perf_counter()-start)*1000)
         tracemalloc.start()
-        query_manifest(definition,ids)
+        query(definition,ids)
         _,peak=tracemalloc.get_traced_memory()
         tracemalloc.stop()
         rows.append({"requested_sectors":count,"evaluated_generation_sectors":len(result.evaluated_generation_sectors),
@@ -182,7 +199,34 @@ def benchmark():
     return rows
 
 
-def compare():
+def _resources(nodes, focus):
+    values = [n['resources'] for n in nodes.values() if n['source'] in focus
+              and n['raw_id'] not in {'UNKNOWN','ECHO_7','HARBOR_12','ARCHIVE_01'} and 'resources' in n]
+    return {'procedural_nodes':len(values),'radiation_sum':sum(v[0] for v in values),
+            'scrap':sum(v[1] for v in values),'modules':sum(v[2] for v in values),
+            'drones':sum(v[3] for v in values)}
+
+
+def physical_benchmark():
+    d=production.define_manifest(271828)
+    rows=[]
+    for count in (1,9,64):
+        ids=PATCHES['disk'][:count]
+        start=perf_counter()
+        result=production.query_physical_sectors(d,ids)
+        inverse_ms=(perf_counter()-start)*1000
+        s=_state(271828)
+        start=perf_counter()
+        runtime._ensure_sector_cluster_generated(s,list(ids))
+        materialize_ms=(perf_counter()-start)*1000
+        rows.append({'requested_sectors':count,'inverse_ms':round(inverse_ms,3),
+            'inverse_generation_sectors':len(result.examined_generation_sectors),
+            'materialize_ms':round(materialize_ms,3),'materialized_physical_sectors':len(s.world.generated_sectors),
+            'materialized_nodes':len(s.world.space.nodes)})
+    return rows
+
+
+def compare(production_mode=False):
     rows=[]
     for seed in SEEDS:
         definition=define_manifest(seed)
@@ -191,6 +235,8 @@ def compare():
             reverse=_legacy(seed,tuple(reversed(ids)))
             assert forward[3] == reverse[3]
             proposed=_prototype(definition,forward[3])
+            if production_mode:
+                productive=_prototype(production.define_manifest(seed),forward[3],production.query_manifest)
             # The comparison also asserts query-order independence of the whole
             # historical dependency closure, not just matching aggregate counts.
             check=query_manifest(definition,tuple(reversed(sorted(forward[3]))),max_sectors=len(forward[3]))
@@ -201,11 +247,17 @@ def compare():
                          "prototype":_metrics(*proposed,ids),
                          "changed_archetype_sectors_forward_reverse":sum(forward[2][sid]!=reverse[2][sid] for sid in ids),
                          "changed_archetype_sectors_forward_prototype":sum(forward[2][sid]!=proposed[2][sid] for sid in ids)})
+            if production_mode:
+                rows[-1]['production']=_metrics(*productive,ids)
+                rows[-1]['resources']={
+                    'legacy_forward':_resources(forward[0],ids),
+                    'legacy_reverse':_resources(reverse[0],ids),
+                    'production':_resources(productive[0],ids)}
         print(f"Measured seed {seed}",file=sys.stderr,flush=True)
     aggregate={}
     for region in PATCHES:
         models={}
-        for model in ('legacy_forward','legacy_reverse','prototype'):
+        for model in ('legacy_forward','legacy_reverse','prototype') + (('production',) if production_mode else ()):
             values=[row[model] for row in rows if row['region_patch']==region]
             total={key:sum(v[key] for v in values) for key in values[0] if isinstance(values[0][key],int)}
             for key in ('archetypes','kinds','actual_regions','generation_count_histogram','physical_count_histogram'):
@@ -216,21 +268,28 @@ def compare():
             total['empty_generation_fraction']=round(total['empty_generation_sectors']/total['sectors'],6)
             models[model]=total
         aggregate[region]=models
-    return {"algorithm_version":ALGORITHM_VERSION,"seeds":SEEDS,"patches":PATCHES,
+    return {"algorithm_version":production.ALGORITHM_VERSION if production_mode else ALGORITHM_VERSION,"seeds":SEEDS,"patches":PATCHES,
             "python_version":sys.version.split()[0],"python_implementation":sys.implementation.name,
             "configuration_key":define_manifest(0).configuration_key,
             "method":"forward_public_requests_and_reverse_same_union; generation_provenance_tracked_at_creation; edge_kind_tracked_in_original_link_pass; induced_focus_graph; physical_counts_from_finite_generation_coverage_not_global_inventory",
             "rows":rows,"aggregate":aggregate,
             "ideal_gaussian_outflow_probability":{region:math.erfc(5/(sigma*math.sqrt(2)))
                  for region,sigma in (('disk',.3),('bulge',.8),('halo',2))},
-            "benchmark":benchmark()}
+            "benchmark":benchmark(),
+            **({'production_benchmark':benchmark(True),'physical_materialization_benchmark':physical_benchmark(),
+                'resource_totals':{region:{model:{key:sum(row['resources'][model][key]
+                    for row in rows if row['region_patch']==region)
+                    for key in ('procedural_nodes','radiation_sum','scrap','modules','drones')}
+                    for model in ('legacy_forward','legacy_reverse','production')}
+                    for region in PATCHES}} if production_mode else {})}
 
 
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--output',type=Path)
+    parser.add_argument('--production',action='store_true')
     args=parser.parse_args()
-    result=compare()
+    result=compare(args.production)
     content=json.dumps(result,indent=2,sort_keys=True)+'\n'
     if args.output:
         args.output.write_text(content,encoding='utf-8')

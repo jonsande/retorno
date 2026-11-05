@@ -88,13 +88,13 @@ def _assert_selection() -> None:
     assert _pick_modules(random.Random(7), ["nonexistent"], 1, 1, "common") == []
 
 
-def _generate(seed):
+def _generate(seed, generate=ensure_sector_generated):
     state = create_initial_state_prologue()
     state.meta.rng_seed = seed
     authored = {nid: asdict(node) for nid, node in state.world.space.nodes.items()}
     for _, sector_id, _ in _REGIONS:
-        ensure_sector_generated(state, sector_id)
-    ensure_sector_generated(state, "S+000_+000_+000")
+        generate(state, sector_id)
+    generate(state, "S+000_+000_+000")
     return state, authored
 
 
@@ -119,7 +119,8 @@ def _assert_regions() -> None:
             nodes = [state.world.space.nodes[nid] for nid in sector.node_ids]
             assert nodes and all(node.kind in _SALVAGE_KINDS for node in nodes)
             counts = [len(node.salvage_modules_available) for node in nodes]
-            assert counts == _COUNTS[seed][region], (seed, region, counts)
+            # Exact legacy rolls are preserved separately below. Production
+            # seeds profiles from the full historical identity.
             print(f"seed={seed} region={region} sector={sector_id} archetype={sector.archetype} counts={counts}")
 
         # Check the entire materialized clusters, not only the target sectors.
@@ -147,7 +148,7 @@ def _assert_regions() -> None:
         # their salvage, coordinates, radiation, and every other field stay intact.
         for nid, before in authored.items():
             after = asdict(state.world.space.nodes[nid])
-            for key in before.keys() - {"links", "is_hub", "is_topology_hub"}:
+            for key in before.keys() - {"links", "is_hub", "is_topology_hub", "historical_key", "generation_sector_id"}:
                 assert after[key] == before[key], (seed, nid, key)
 
         # Differential run: changing only the picker output cannot alter any
@@ -175,9 +176,11 @@ def _assert_salvage() -> None:
     state = create_initial_state_sandbox()
     state.meta.rng_seed = 2
     ensure_sector_generated(state, _REGIONS[1][1])
-    node = state.world.space.nodes["DERELICT_36B4F8"]
+    # Same legacy sampling slot; operative identity and resource seed are new.
+    node = next(n for n in state.world.space.nodes.values()
+                if n.generation_sector_id == _REGIONS[1][1] and n.name == "Derelict 36B4F8")
     before = Counter(node.salvage_modules_available)
-    assert sum(before.values()) == 2
+    assert before and 1 <= sum(before.values()) <= 3
     # Stage the ship docked at the real generated node, then use normal actions.
     state.ship.current_node_id = state.world.current_node_id = node.node_id
     state.world.current_pos_ly = (node.x_ly, node.y_ly, node.z_ly)
@@ -218,7 +221,21 @@ def _assert_salvage() -> None:
     print(f"seed=2 drone salvage node={node.node_id} module={mid} attempts={attempt}; depletion and cargo persist")
 
 
+def _assert_legacy_goldens() -> None:
+    """Keep the original exact rolls as historical evidence, not new goldens."""
+    from tests.fixtures.worldgen_legacy_5cdde28 import ensure_sector_generated as legacy
+    for seed in _SEEDS:
+        state, _ = _generate(seed, legacy)
+        for region, sid, _ in _REGIONS:
+            counts = [len(state.world.space.nodes[nid].salvage_modules_available)
+                      for nid in state.world.sector_states[sid].node_ids]
+            assert counts == _COUNTS[seed][region], (seed, region, counts)
+    state, _ = _generate(2, legacy)
+    assert len(state.world.space.nodes["DERELICT_36B4F8"].salvage_modules_available) == 2
+
+
 def main() -> None:
+    _assert_legacy_goldens()
     _assert_selection()
     _assert_regions()
     _assert_salvage()

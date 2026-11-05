@@ -19,7 +19,7 @@ Propósito
 Comportamiento operativo
 - `debug on|off` alterna modo debug y control de auto-tick.
 - `debug scenario ...` reinicia estado del mundo a preset.
-- `debug seed <n>` fija semilla RNG.
+- `debug seed <n>` fija la semilla RNG antes de que la generación o el guardado fijen el universo histórico. Los cambios posteriores requieren otro escenario.
 - Los comandos de listado exponen registros internos de depuración.
 - `debug galaxy` emite informe de posición galáctica, vecindad de sectores y distribución de radiación procedural.
 - `debug galaxy map <scale>` dibuja el mapa ASCII galáctico en la escala indicada usando todos los nodos cargados.

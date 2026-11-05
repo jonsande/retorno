@@ -1,5 +1,11 @@
 # Stable procedural manifest — 4D-3e1b contract and prototype
 
+**4D-3e2 update:** this document retains historical evidence from its phase.
+The current productive contract is [Historical worldgen integration](historical-worldgen-integration.md).
+The prototype now uses the shared core and distinguishes certification by scope/reasons;
+the conditional legacy catalog lives in test fixtures. Productive limitations below
+describe the earlier state, not the current runtime.
+
 Spanish version: [stable-procedural-manifest.es.md](stable-procedural-manifest.es.md).
 Coordination: [current roadmap (Spanish)](roadmap-worldgen-lore-f-dead01.es.md).
 

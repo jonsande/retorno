@@ -5,8 +5,8 @@ import copy
 
 from retorno.bootstrap import create_initial_state_prologue
 from retorno.model.world import SpaceNode, sector_id_for_pos
-from retorno.worldgen import generator as gen
-from retorno.worldgen.catalog import SiteStatus, catalog_sector
+from tests.fixtures import worldgen_legacy_5cdde28 as gen
+from tests.fixtures.worldgen_catalog_5cdde28 import SiteStatus, catalog_sector
 
 
 def _state(seed=271828):

@@ -1,5 +1,11 @@
 # Preexistencia procedural — Fase 4D-3e1
 
+**Actualización 4D-3e2:** este documento conserva la evidencia histórica de su fase.
+El contrato productivo vigente está en [Integración del worldgen histórico](historical-worldgen-integration.es.md).
+El prototipo usa ahora el núcleo compartido y distingue su certificación por ámbito/razones;
+el catálogo condicional legacy queda en fixtures de pruebas. Las limitaciones productivas
+descritas aquí se leen como estado anterior, no como descripción del runtime actual.
+
 Versión inglesa: [procedural-preexistence.md](procedural-preexistence.md).
 
 Estado: **implementación parcial segura y auditoría reproducible**, sobre `main`

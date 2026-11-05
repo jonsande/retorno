@@ -20,7 +20,7 @@ Versión inglesa: [README.md](README.md)
 
 | Documento | Finalidad | Estado |
 | --- | --- | --- |
-| [Universo físico y generación procedural](systems/world-generation.es.md) | Referencia canónica del modelo espacial, regiones, sectores, worldgen, topología, contenido authored y determinismo. | **Verificado** contra código productivo en `3658577`, datos activos y pruebas posteriores de la Fase 3A.1. Documenta las lagunas conocidas y el efecto materializador del diagnóstico de sector; no cubre en profundidad navegación, lore o failsafes. |
+| [Universo físico y generación procedural](systems/world-generation.es.md) | Referencia canónica del modelo espacial, regiones, sectores, worldgen, topología, contenido authored y determinismo. | **Verificado** para la integración 4D-3e2 en el árbol basado en `5cdde28`, pendiente de revisión externa. Documenta las lagunas conocidas y el efecto materializador del diagnóstico de sector; no cubre en profundidad navegación, lore o failsafes. |
 | [Physical universe and procedural generation](systems/world-generation.md) | Pareja inglesa de la referencia de universo y worldgen. | **Verificado**; se mantiene como pareja lingüística del documento español. |
 | [Descubrimiento, navegación e intel](systems/discovery-navigation-intel.es.md) | Referencia canónica del conocimiento del jugador, scan, route solve, uplink, importación de intel, viaje, protección narrativa y failsafes. | **Verificado** contra código productivo y pruebas específicas, incluidas las caracterizaciones reparadas de breadcrumb y route solve por id físico no descubierto; actualmente no hay arcos activos. |
 | [Discovery, navigation, and intel](systems/discovery-navigation-intel.md) | Pareja inglesa de la referencia de descubrimiento y navegación. | **Verificado**; se mantiene como pareja lingüística del documento español. |
@@ -34,6 +34,12 @@ Versión inglesa: [README.md](README.md)
 | [Cross-system audit and stabilization plan](testing/stabilization-audit.md) | Pareja inglesa de la auditoría transversal. | **Verificado**; se mantiene como pareja lingüística del documento español. |
 | [Contrato de diseño de navegación y recuperación](design/navigation-recovery-contract.es.md) | Decisiones aprobadas para rutas, recuperación, `comms`/`radiod`, recepción, servicios, protección narrativa, localización y saves prealfa; incluye matrices y plan 4C. | **Contrato aprobado**; distingue comportamiento vigente, divergencias y trabajo futuro. No declara implementadas las correcciones. |
 | [Navigation and recovery design contract](design/navigation-recovery-contract.md) | Pareja inglesa del contrato de diseño. | **Verificado**; se mantiene como pareja lingüística del documento español. |
+
+Fase 4D-3e2: [Integración del worldgen histórico](design/historical-worldgen-integration.es.md) /
+[EN](design/historical-worldgen-integration.md) documenta la implementación productiva,
+identidades, consulta física inversa completa en dominio certificado, topología, saves,
+comparación y límites. Véase el [informe de revisión](testing/manifest-integration-review.es.md).
+Los documentos e1/e1b siguientes conservan evidencia histórica; e3/e4/e5 siguen pendientes.
 
 ## Guías existentes
 

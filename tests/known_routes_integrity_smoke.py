@@ -27,7 +27,7 @@ from retorno.model.world import (
 )
 from retorno.model.events import EventType
 from retorno.ui_textual import presenter
-from retorno.worldgen.generator import ensure_sector_generated
+from retorno.worldgen.generator import ensure_sector_generated, pin_universe
 
 
 _SEED = 271828
@@ -37,6 +37,8 @@ _IMPORT_PATH = "/logs/nav/route-integrity.txt"
 def _state():
     state = create_initial_state_sandbox()
     state.meta.rng_seed = _SEED
+    # Fix this synthetic world's definition before persistence snapshots.
+    pin_universe(state)
     world = state.world
     world.space.nodes = {
         nid: SpaceNode(node_id=nid, name=nid, kind="derelict", region="disk", x_ly=x)

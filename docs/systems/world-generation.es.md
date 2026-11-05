@@ -1,75 +1,50 @@
 # Universo físico y generación procedural
 
-Estado: **documentación canónica del comportamiento implementado**, revisada
-contra el commit `3658577`, con la corrección de filtros de módulos de Fase
-4C-3 revisada sobre `4fd3909` el 2026-11-04.
+Estado: referencia canónica implementada, actualizada en **4D-3e2**, árbol
+basado en `5cdde28`, pendiente de aprobación externa.
+Inglés: [world-generation.md](world-generation.md).
+El contrato detallado, demostración numérica, comparación y limitaciones están
+en [Integración del worldgen histórico](../design/historical-worldgen-integration.es.md).
 
-Versión inglesa: [world-generation.md](world-generation.md)
+## 1. Alcance y capas
 
-## 1. Propósito y alcance
-
-Este documento explica cómo RETORNO representa el universo físico, materializa
-sectores bajo demanda e integra localizaciones authored con nodos procedurales.
-Describe coordenadas, regiones, nodos, enlaces, determinismo, configuración y
-persistencia del estado de generación.
-
-No documenta en profundidad cómo el jugador descubre esos objetos, cómo se
-resuelven rutas, cómo se coloca lore ni cómo actúan los failsafes. Esos sistemas
-consumen y, en algunos casos, amplían el universo descrito aquí.
-
-Etiquetas de evidencia:
-
-- **Implementado:** comportamiento leído directamente en código o datos activos.
-- **Cubierto:** además existe una prueba que lo ejercita.
-- **Evidencia de diseño:** un comentario de implementación declara la finalidad.
-- **Inferencia:** explicación compatible con la evidencia, pero sin decisión de
-  diseño explícita.
-- **Pendiente:** no está garantizado o necesita una decisión/verificación.
-
-## 2. Modelo conceptual
-
-RETORNO mantiene dos capas distintas:
-
-1. El **universo físico materializado**: nodos existentes, coordenadas y enlaces
-   físicos en `WorldState.space`.
-2. El **conocimiento del jugador**: contactos, intel y rutas conocidas en
-   `known_contacts`, `known_nodes`, `known_intel`, `intel` y `known_links`.
-
-Un nodo puede existir físicamente sin haber sido descubierto. Un sector puede
-estar generado sin que sus nodos sean conocidos. Un enlace físico en
-`SpaceNode.links` tampoco se convierte automáticamente en una ruta conocida.
+Emplazamientos históricos, nodos materializados, conocimiento del jugador y
+rutas operativas son capas distintas. `historical-world-v1` define existencia
+antes de explorar; cálculo e inserción siguen lazy. `SpaceNode.links` contiene
+enlaces físicos; `known_links` publica rutas del jugador por separado.
+`SpaceGraph.edges` sigue como campo compatible sin uso. Existir históricamente
+no determina elegibilidad narrativa ni para recuperación.
 
 ```mermaid
 flowchart LR
-    A[JSON authored<br/>data/locations/*.json] --> B[bootstrap]
-    W[Plantillas regionales<br/>y arquetipos worldgen] --> L[data_loader]
-    L --> G[ensure_sector_generated]
-    S[meta.rng_seed + estado existente<br/>+ orden de solicitudes] --> G
-    B --> P[SpaceGraph.nodes<br/>universo físico]
-    G --> P
-    G --> M[SectorGenState<br/>metadatos de generación]
-    P --> E[SpaceNode.links<br/>enlaces físicos]
-    P -. scan / intel / uplink .-> K[Contactos y rutas conocidas]
-    E -. publicación o resolución .-> K
-    F[Lore y failsafes] --> P
+    A[Semilla + versión + reglas físicas + base authored] --> M[Manifiesto histórico inmutable]
+    M --> Q[Consultas puras generadoras / físicas]
+    Q --> G[Materializador lazy acotado]
+    G --> P[Nodos físicos y enlaces predeterminados]
+    P -. scan / intel / uplink / route solve .-> K[Conocimiento y rutas del jugador]
+    S[Mecanismos especiales y dinámicos existentes] --> P
 ```
 
-### Modelos y responsabilidades
+## 2. Definición y modelos
 
-| Modelo | Responsabilidad implementada |
+Bootstrap registra la huella de reglas. Materializar/guardar por primera vez
+fija la definición completa; las consultas puras no mutan el estado. Después
+se rechazan cambios de semilla, versión o configuración física. Se captura
+`MetaState.rng_seed`; `WorldState.rng_seed` permanece legacy. `debug seed`
+rechaza cambiar un universo fijado antes de modificar el estado. No hay caché
+global mutable del universo.
+
+| Campo / API | Significado |
 | --- | --- |
-| `SpaceNode` | Identidad, tipo, coordenadas, región, radiación, salvage, enlaces físicos y flags de hub. |
-| `SpaceGraph.nodes` | Registro canónico de nodos físicos materializados por `node_id`. |
-| `SpaceGraph.edges` | Campo de compatibilidad actualmente no utilizado para la topología; la implementación consulta `SpaceNode.links`. |
-| `SectorGenState` | Arquetipo, nodos observados, hubs y contadores de enlaces creados por worldgen para un sector. |
-| `WorldState.generated_sectors` | Sectores cuyo paso de generación ya se ejecutó, incluso si quedaron vacíos. |
-| `WorldState.intersector_link_pairs` | Pares de sectores cuya oportunidad de enlace ya fue evaluada. |
-| `known_*` e `intel` | Conocimiento del jugador, separado del grafo físico. |
-
-`is_hub` significa que el nodo es un hub utilizable por sistemas de juego.
-`is_topology_hub` identifica el nodo que worldgen usa como centro de la
-topología del sector. Un sector con nodos siempre intenta tener un topology hub;
-este no tiene por qué ser un hub jugable.
+| `WorldState.manifest_definition`, `universe_version`, `universe_rules_key` | Snapshot fijado y comprobación de compatibilidad. |
+| `SpaceNode.historical_key`, `generation_sector_id` | Identidad histórica y procedencia; ausentes para especiales/dinámicos. |
+| `SectorGenState.node_ids` | Todos los residentes físicos materializados. |
+| `generation_node_ids`, hubs y contadores históricos | Miembros materializados de la cohorte generadora y su topología. |
+| `generated_sectors`, `physical_inventory_complete` | Marcadores de generación física; el segundo certifica explícitamente inventario completo. |
+| `intersector_link_pairs` | Campo compatible inerte; no decide asignación histórica. |
+| `manifest.query_manifest` | Cohortes generadoras completas solicitadas y aristas incidentes. |
+| `manifest.query_physical_sectors` | Inventario histórico completo por posición física real en el dominio certificado. |
+| `catalog.catalog_sectors` | Evidencia de existencia generadora sin permiso de materialización ni elegibilidad narrativa/rutas. |
 
 ## 3. Coordenadas, sectores y regiones
 
@@ -83,8 +58,8 @@ ejemplo, `S+000_+000_+000`.
 El formato canónico es una `S` mayúscula seguida de tres índices decimales con
 signo separados por guiones bajos. Cada índice usa el resultado de
 `{value:+04d}`: el signo es obligatorio, la anchura mínima es de cuatro
-caracteres incluido el signo y los valores mayores se amplían sin un límite
-numérico arbitrario. Por ello `S+012_-013_+014` y
+caracteres incluido el signo y los valores mayores se amplían. La generación histórica tiene
+el dominio numérico explícito descrito más abajo. Por ello `S+012_-013_+014` y
 `S+12345_-12346_+000` son válidos, mientras que un signo ausente, padding no
 canónico, `-000`, otro prefijo o caracteres adicionales no lo son.
 
@@ -111,79 +86,42 @@ El generador selecciona la plantilla regional usando la región del centro del
 sector. Después recalcula la región de cada nodo a partir de sus coordenadas
 reales.
 
-## 4. Cuándo se genera el universo
+## 4. Consumidores lazy y materialización
 
-La entrada pública es `ensure_sector_generated(state, sector_id)`. La generación
-es lazy: se solicita cuando otro subsistema necesita que una zona exista.
+`ensure_sector_generated(state, sector_id)` conserva su API. Siguen siendo
+consumidores scan, preparación de uplink/pools, intel sectorial o de ID procedural
+exacto, gateways de recuperación, diagnósticos worldgen y la rama de bootstrap
+no UNKNOWN. Prólogo comienza en UNKNOWN; cambiar a ECHO en sandbox no genera
+sectores por sí mismo.
 
-Solicitantes actuales relevantes:
+Cada solicitud expande su unión 3×3 XY en el mismo Z físico. Consulta el inventario
+inverso completo, calcula dependencias históricas finitas, prepara propiedades
+y colisiones y después inserta nodos y aristas con ambos extremos presentes.
+No inserta dependencias ajenas a la unión física sólo para completar enlaces.
+Los vecinos posteriores añaden las mismas aristas predeterminadas. Repetir
+preserva IDs, recursos y conocimiento.
 
-- `scan`, para materializar los sectores cuyos índices caen dentro de la caja
-  delimitadora del radio de búsqueda;
-- preparación de pools/rutas de uplink;
-- importación de intel `SECTOR`, y referencias a determinados nodos
-  procedurales;
-- creación de gateways de recuperación de exploración;
-- comandos de diagnóstico de worldgen;
-- una rama de bootstrap para un nodo inicial distinto de `UNKNOWN`.
+`debug worldgen sector` sigue materializando antes de mostrar: no es inspección
+pura. Consulta/materialización interna no añade nodos conocidos, contactos,
+rutas conocidas, archivos ni pools, ni avanza el RNG de juego.
 
-> **Advertencia:** `debug worldgen sector <sector_id>` no es una inspección de
-> solo lectura. `render_debug_worldgen_sector` llama a
-> `ensure_sector_generated` antes de mostrar el diagnóstico, por lo que puede
-> materializar el sector solicitado, su vecindad 3×3 y sus nodos y enlaces. Ese
-> estado pasa a formar parte del universo de la partida.
+Límites técnicos: 64 sectores solicitados; unión física expandida máxima de 576;
+hasta 2.048 nodos nuevos por transacción y 32.768 cohortes calculadas por sesión.
+La inversa inspecciona hasta 20 posibles procedencias por sector físico.
+Agotar dominio o trabajo es error antes de insertar, nunca evidencia de vacío.
+Se soporta CPython 3.12 binary64, implementación gaussiana fijada e índices
+`abs(index) <= 2**48-32` (margen interior de cuatro para la inversa física).
+La demostración está en el contrato detallado.
 
-El prólogo actual comienza en `UNKNOWN`, por lo que esa rama de bootstrap no
-genera el sector inicial. El modo sandbox cambia después a `ECHO_7`, pero tampoco
-llama explícitamente al generador en ese paso. En ambos casos la primera
-materialización normal sigue siendo bajo demanda.
+## 5. Guardrail inicial fijo
 
-Una solicitud individual no genera solo el sector pedido. Construye la unión de
-su vecindad **3×3 en XY**, manteniendo el mismo índice Z. Si un consumidor, como
-`scan`, solicita varios sectores o varios planos Z, la unión materializada puede
-ser mayor.
+Se evalúan criterio y claves RNG vigentes sobre el 3×3 XY fijo del origen,
+independientemente de la primera solicitud runtime. Se conservan overrides y
+promoción determinista de vecino temprano; no se fuerza una tirada natural de
+hub. `sparse_guardrail_done` pasa a ser metadato runtime, no origen de decisiones
+históricas. No garantiza conectividad ni progresión universal.
 
-Materializar no equivale a revelar: worldgen no añade por sí mismo los nodos
-nuevos a `known_nodes` o `known_contacts`.
-
-## 5. Flujo de generación
-
-Para cada conjunto solicitado se ejecuta este flujo:
-
-1. Cargar `data/worldgen/templates/*.json` y
-   `data/worldgen/archetypes/*.json` con glob no recursivo.
-2. Expandir cada sector solicitado a su anillo 3×3 XY y ordenar los ids.
-3. Aplicar, una sola vez, el guardrail de la vecindad del origen cuando el
-   conjunto contiene el sector de `(0,0,0)`.
-4. Para cada sector aún no generado:
-   1. calcular región desde el centro;
-   2. escoger arquetipo por pesos regionales;
-   3. contar los nodos authored o especiales que ya están físicamente dentro;
-   4. decidir el total objetivo y los tipos restantes;
-   5. crear nodos, coordenadas, radiación y salvage;
-   6. registrar `SectorGenState` y marcar el sector como generado.
-5. Construir una estrella de enlaces internos alrededor del topology hub y
-   evaluar enlaces internos extra.
-6. Evaluar, una vez por pareja, enlaces entre topology hubs de sectores vecinos
-   recién materializados.
-
-### Guardrail del origen
-
-**Evidencia de diseño:** los comentarios del generador declaran una topología
-dispersa y aceptan dead ends locales. El guardrail intenta evitar que la primera
-vecindad sea un bloqueo trivial; no promete progreso para todas las ramas.
-
-- Si el arquetipo del origen no es `relay_corridor`, `isolated_station` o
-  `ruin_field`, se sustituye por `relay_corridor` para esa generación.
-- Si ningún vecino tiene arquetipo `relay_corridor` o `isolated_station`, uno se
-  promociona determinísticamente y se fuerza allí la creación de un hub jugable.
-- `sparse_guardrail_done` persiste y evita repetir el mecanismo.
-
-Si ya existe un vecino con uno de esos arquetipos, el código no fuerza que su
-tirada natural de hub tenga éxito ni que obtenga un enlace intersectorial. Por
-tanto, “guardrail” no debe documentarse como garantía formal de conectividad.
-
-## 6. Selección y distribución de nodos
+## 6. Selección, identidad y distribución de nodos
 
 Las plantillas regionales activas definen pesos de arquetipo, dispersión Z y
 salvage:
@@ -207,104 +145,58 @@ Los arquetipos activos definen densidad y topología:
 La probabilidad de enlaces internos extra es respectivamente 0, 0.12, 0.20,
 0 y 0.05 en el orden anterior.
 
-Los nodos existentes cuentan contra el total objetivo y los caps. Worldgen no
-elimina nodos authored si el sector ya supera esos límites; simplemente deja de
-crear slots adicionales.
+Sólo los ocupantes authored inmutables de una cohorte generadora consumen sus
+cupos. Los especiales runtime y la entrada Z ajena no los consumen. La base
+authored que supera caps se conserva sin slots extra. Se mantiene el muestreo
+XY y gaussiano Z sin truncar; la región real se recalcula por coordenadas.
 
-Para cada slot procedural:
+Las direcciones históricas incluyen ámbito, namespace e ID authored literal o
+`(sector generador, índice)`. No cambian IDs operativos authored. Los procedurales
+usan `S…:WG1_<hash completo del ámbito>_<índice>`, con escape `WG1C<n>`
+determinista contra IDs authored inmutables. El registro no cambia la asignación.
+El hint legacy de 24 bits sólo aporta nombre/orden de hubs. La intel usa
+`resolve_operative_id` para resolver IDs nuevos exactos a su sector físico.
 
-- X e Y se eligen uniformemente dentro del sector;
-- Z se elige mediante una normal centrada en el centro Z del sector y con
-  `z_sigma` regional;
-- el id usa prefijo por tipo y 24 bits pseudoaleatorios; los `ship` usan
-  `WRECK_`;
-- una colisión de id se resuelve con sufijos griegos y, si fuera necesario, una
-  nueva base;
-- salvage y radiación usan semillas derivadas específicas del nodo.
+La inversa incluye procedencias XY destino/anterior por redondeo lejano y cinco
+índices Z posibles. La completitud se demuestra por cota finita del muestreador
+implementado, sin truncarlo. Sector generador y físico quedan diferenciados.
 
-La normal Z no está truncada. Un resultado extremo puede colocar físicamente un
-nodo fuera del índice Z solicitado. La Fase 4D-3e1 caracteriza explícitamente
-esta posibilidad y su efecto sobre el cupo de otro sector; no acota Z.
+## 7. Topología histórica
 
-## 7. Enlaces físicos
+Cada cohorte generadora no vacía elige hub topológico, prefiriendo hub jugable y
+luego orden de hint legacy con identidad para desempatar. Estrellas internas y
+aristas extra conservan probabilidades/RNG. Los pares intersectoriales son los
+ocho vecinos XY con igual Z generador, unidos sólo por sus hubs, dentro de ambos
+presupuestos y del cap de 45 ly.
 
-### Enlaces internos
+Los pares del 3×3 inicial fijo tienen prioridad en orden legacy canónico.
+Ocho emparejamientos fijos por paridad asignan después los demás pares viables
+con sus tiradas existentes. Las dependencias de grado de rondas anteriores son
+finitas (hasta ocho saltos vecinales); la asignación maximal recíproca no depende
+del orden de materialización. Top-k mutuo queda sólo para comparar el prototipo.
 
-Si el sector contiene nodos, se elige un topology hub:
+No hay autoaristas ni publicación automática de rutas conocidas. Siguen siendo
+posibles sectores vacíos, componentes aisladas, cero salidas y callejones.
+Un desbordamiento Z puede separar miembros de la cohorte; hubs y caps deben
+consultarse por procedencia, sin confundir residencia física y propiedad.
 
-1. el primer hub jugable por `node_id`, si existe;
-2. en caso contrario, el primer nodo por `node_id`.
+## 8. Contenido authored y especial
 
-Todos los demás nodos se enlazan bidireccionalmente con ese hub. Después cada
-nodo no-hub puede recibir un enlace extra según el arquetipo. Los enlaces se
-guardan en ambos `SpaceNode.links`.
+`load_locations()` sigue leyendo `data/locations/*.json` sin recursión;
+bootstrap carga antes de insertar procedurales. UNKNOWN, ECHO_7, HARBOR_12 y
+ARCHIVE_01 conservan coordenadas, nombres, kinds, radiación y salvage.
+UNKNOWN ocupa cupo fijo en el origen incluso tras su retirada normal y nunca
+se recrea. ECHO_7 procede de su declaración activa; se elimina el fallback
+redundante que lo fabricaba si faltaba. RETORNO_SHIP conserva comportamiento
+de nave/filesystem y queda fuera de cohortes de destinos.
 
-### Enlaces intersectoriales
+Se rechazan IDs authored duplicados. Una futura estación específica puede usar
+el mecanismo físico existente sin necesitar azar de worldgen. Declarar no
+revela salvo flags explícitos vigentes. La prosa sola no declara ni revela.
+`data/locations/templates/*.json` sigue inactivo y no se carga automáticamente.
 
-Solo se consideran los ocho vecinos XY del mismo nivel Z. El enlace une los
-topology hubs y requiere:
-
-- que ambos sectores y hubs existan;
-- presupuesto disponible en ambos arquetipos;
-- superar una tirada cuya probabilidad es el mínimo de las dos probabilidades;
-- distancia no superior a `Balance.MAX_ROUTE_HOP_LY`.
-
-El par se registra como evaluado antes de comprobar el resultado. No se vuelve a
-intentar aunque más tarde aparezca un hub nuevo.
-
-### Límite de salto
-
-`MAX_ROUTE_HOP_LY = 45.0` es el límite duro usado por el generador para enlaces
-internos e intersectoriales. También se aplica en publicación/resolución de
-rutas y viaje, aunque esos usos pertenecen al subsistema de navegación.
-
-No existe una garantía de conectividad global. Son resultados válidos:
-
-- sectores `empty` con cero nodos;
-- sectores sin salida intersectorial;
-- componentes físicas desconectadas;
-- ramas locales sin continuación.
-
-## 8. Contenido authored y procedural
-
-`load_locations()` lee únicamente `data/locations/*.json`. En bootstrap, las
-definiciones se procesan por nombre de archivo ordenado antes de worldgen.
-
-Localizaciones activas:
-
-- `UNKNOWN`: origen físico y contacto conocido al inicio;
-- `ECHO_7`: station/hub authored en `(0,0,0)`;
-- `HARBOR_12`: station/hub authored;
-- `ARCHIVE_01`: derelict authored;
-- `RETORNO_SHIP`: definición especial de la nave.
-
-`RETORNO_SHIP` no se inserta como destino en `SpaceGraph`: bootstrap omite su
-`node_id`, pero sí instala sus archivos en el filesystem de la nave.
-
-Las localizaciones authored conservan coordenadas y radiación explícitas. Su
-región se recalcula con el modelo físico. Si no declaran `is_hub`, station,
-relay y waystation se consideran hubs; `is_topology_hub` hereda ese valor salvo
-configuración explícita.
-
-Cuando posteriormente se genera su sector, esos nodos ya existentes:
-
-- cuentan para el total y los caps del arquetipo;
-- pueden convertirse en topology hub;
-- participan en los enlaces internos.
-
-Los ids authored duplicados no se validan: la primera definición que creó el id
-permanece y las posteriores no la sustituyen. Los ids procedurales sí evitan
-colisiones contra todos los nodos ya materializados.
-
-`data/locations/templates/*.json` no se carga y no participa automáticamente.
-Su relación con las definiciones activas está inventariada en
-[el contrato de carga](../content-loading.es.md).
-
-### Tratamiento especial del origen
-
-El generador contiene un fallback `_ensure_fixed_origin_hub`: al generar el
-sector del origen crea `ECHO_7` si ese id no existe. En la configuración actual
-la definición authored ya lo crea, por lo que el fallback normalmente no actúa.
+Los especiales/dinámicos de lore, failsafes y tránsito continúan en runtime,
+fuera de cupos/identidades históricas. Sustituirlos pertenece a fases posteriores.
 
 ## 9. Configuración efectiva
 
@@ -359,155 +251,49 @@ usan `common` o `tech`; las plantillas inactivas de ubicaciones también usan
 JSON activo/inactivo ni test la usa. Esta corrección sólo cambia el selector
 procedural y conserva el loot authored.
 
-## 10. Determinismo
+## 10. Propiedades estables y persistencia
 
-Worldgen deriva RNG locales con BLAKE2b a partir de `state.meta.rng_seed` y
-claves como sector, arquetipo, slot, nodo o pareja de sectores. La misma semilla,
-el mismo estado previo y la misma secuencia de solicitudes reproducen el mismo
-resultado. Esto está cubierto parcialmente por pruebas.
+Los RNG locales reutilizan helpers/claves de muestreo y probabilidad de pares.
+Radiación/salvage/drones usan ahora identidad histórica completa: cambian
+resultados concretos, pero se conservan probabilidades, categorías y cantidades
+configuradas. No se regeneran recursos, flags dry ni agotamiento al repetir,
+expandir o cargar. El loot authored conserva su RNG de bootstrap.
 
-El campo `WorldState.rng_seed` no es la fuente usada por el generador; la fuente
-efectiva es `MetaState.rng_seed`.
+El esquema 3 guarda definición inmutable y procedencia en el contenedor V2 con
+checksum. La validación rechaza reglas/semilla/versión distintas, propiedades
+físicas/aristas históricas contradictorias e inventarios incompletos marcados
+completos. No se promueven marcadores de compatibilidad no certificados.
+Las partidas esquema 2 se rechazan mediante SaveLoadError EN/ES, sin migración
+compleja ni borrado automático. Se mantiene fallback a backup.
 
-La Fase 4D-3e1 añade un [catálogo de preexistencia de sólo lectura](../design/procedural-preexistence.es.md).
-Nunca llama a generación sectorial, amplía vecindarios ni concede descubrimiento.
-Sus muestras canónicas de slots son condicionales, no emplazamientos preexistentes
-verificados; auditoría y regresiones explican por qué la generación vigente no
-certifica existencia latente con independencia del orden de materialización.
+## 11. Evidencia, límites y fases posteriores
 
-El determinismo **no es independiente del orden de acciones**:
+El [contrato de integración](../design/historical-worldgen-integration.es.md)
+contiene la comparación de diez semillas. Enlaces/componentes/oportunidades
+ECHO iniciales coinciden con legacy directo canónico (20/59/51), frente al
+prototipo 13/66/45. Enlaces intersectoriales exteriores disk/bulge/halo:
+133/84/43 frente a legacy directo 126/86/39 e inverso 133/88/41. Los cambios
+halo por cupos de procedencia son pequeños pero explícitos; se cuantifican
+allí las nuevas tiradas de recursos y el coste de consultas.
 
-- los presupuestos intersectoriales se consumen cuando se evalúan parejas;
-- cada pareja se evalúa una sola vez;
-- el guardrail se ejecuta en el primer cluster que contiene el origen;
-- ids existentes y nodos authored influyen en slots y colisiones.
+La [regresión de integración](../../tests/worldgen_manifest_integration_smoke.py)
+compara estado completo por orden/agrupación, materialización parcial, saves y
+procesos hash-seed; inversa Z/redondeo, declaración authored, colisiones,
+conocimiento y versiones incompatibles. Los testigos legacy usan fixtures
+congeladas sólo de prueba. Módulos productivos conservan rangos, categorías,
+acciones y agotamiento; los resultados exactos antiguos quedan como goldens
+separados. El [informe de revisión](../testing/manifest-integration-review.es.md)
+recoge resultados completos y fallos previos.
 
-La [regresión de caracterización](../../tests/worldgen_preexistence_characterization_smoke.py)
-4D-3e1 fija ahora testigos concretos, no una nueva política deseada: semilla `2`,
-solicitudes `(20,20,0)`, `(22,20,0)`, `(20,22,0)` frente al inverso producen
-nodos iguales pero dos enlaces no dirigidos distintos. Semilla `29`, `(1,0,0)`
-y `(-1,0,0)` frente al inverso cambia arquetipo y nodos de un sector compartido
-por el guardrail. Semilla `271828` en `(15126,0,0)` tiene un outlier sobre Z=10
-que modifica el cupo posterior de `(15126,0,1)`; invertir genera nodos distintos.
-El [diseño del catálogo](../design/procedural-preexistence.es.md) separa
-direcciones muestrales estables de existencia condicional e ids finales asignados.
+El radio galáctico diagnóstico sigue sin limitar generación; el dominio numérico
+sí es límite técnico. `radiation_base` JSON regional sigue sin ser fuente efectiva
+de radiación. No se implementan memoria de scan, nuevas probabilidades, reservas
+narrativas, sustitución de ad hoc, integración nueva de F-DEAD-01, comms/radiod,
+clases de estación ni balance general. D18–D20 preservan formatos de intel y la
+distinción entre prosa, declaración física y revelación. La regresión completa
+authored/arcos/singles/forzado sigue en e4.
 
-El salvage authored usa un único RNG durante el recorrido ordenado de archivos;
-añadir una definición authored activa puede desplazar tiradas de las siguientes.
-El salvage procedural usa semillas por nodo y es más localmente estable.
-
-Cambiar la semilla después de materializar sectores no regenera los existentes,
-por lo que puede producir un mundo con sectores creados bajo semillas distintas.
-
-## 11. Invariantes y restricciones confirmadas
-
-- Un sector marcado en `generated_sectors` no vuelve a ejecutar su generación.
-- Una solicitud simple expande un anillo 3×3 XY en el mismo Z.
-- Generar no revela contactos ni rutas al jugador. **Cubierto.**
-- Los enlaces creados por worldgen son bidireccionales y no superan 45 ly.
-  **Cubierto.**
-- Un sector con nodos recibe un topology hub durante la construcción interna.
-- Un topology hub no implica necesariamente un hub jugable.
-- `empty` puede producir cero nodos y nunca crea enlaces intersectoriales.
-- El guardrail solo se consume una vez y no garantiza conectividad global.
-- Las definiciones bajo `data/locations/templates/` no intervienen.
-- Los metadatos de `SectorGenState` describen el trabajo de worldgen; enlaces o
-  nodos añadidos por otros subsistemas no siempre incrementan sus contadores.
-
-## 12. Casos límite y condiciones de fallo
-
-- Desde la Fase 4C-2b, `_parse_sector_id` rechaza ids no canónicos con
-  `ValueError`, y `ensure_sector_generated` valida antes de cualquier mutación
-  del mundo. Las importaciones `SECTOR:` convierten ese error en feedback
-  localizado y no registran intel de sector; las demás líneas válidas del mismo
-  archivo siguen procesándose.
-- Un sector vacío se marca como generado e `internal_links_built`; nodos añadidos
-  después no provocan una reconstrucción automática de la topología interna.
-- `intersector_link_pairs` impide reintentar una pareja fallida aunque cambie el
-  estado físico posterior.
-- La distribución gaussiana Z puede colocar un nodo fuera del sector solicitado.
-- No existe límite efectivo que prohíba worldgen fuera del radio galáctico.
-- JSON ausentes o incompletos tienen fallbacks parciales; rangos inválidos de
-  salvage o valores no convertibles pueden producir excepciones.
-- Los nodos authored pueden hacer que un sector exceda los máximos del
-  arquetipo; esos máximos gobiernan la creación adicional, no validan el total.
-- `SpaceGraph.edges` puede inducir a error a nuevos consumidores: la topología
-  vigente reside en `SpaceNode.links`.
-
-## 13. Interacciones con otros subsistemas
-
-- **Exploración:** scan solicita generación y después decide qué nodos se
-  descubren; existencia y visibilidad permanecen separadas.
-- **Navegación:** consume nodos físicos, publica `known_links` y aplica el mismo
-  cap de 45 ly, pero las rutas conocidas no son el grafo físico.
-- **Lore/uplink:** fuerza la materialización del sector actual para preparar
-  pools y candidatos.
-- **Failsafes:** recuperación, lore forzado y deadnodes pueden crear nodos
-  físicos después de worldgen. `register_hidden_anchored_node` crea un enlace
-  físico al ancla si está a ≤45 ly y sincroniza metadatos solo cuando el sector
-  ya tiene estado. Un gateway de recuperación también puede solicitar worldgen.
-- **Viaje abortado:** crea un nav point temporal y enlaces conocidos hacia los
-  extremos, no una arista física normal de worldgen.
-- **Persistencia:** `generated_sectors`, `sector_states`, pares evaluados, flags
-  de hubs y guardrail forman parte del save.
-
-## 14. Pruebas y estado de verificación
-
-El código productivo se revisó originalmente en el commit `3658577`; las
-pruebas originales se ejecutaron después, tras actualizar
-`worldgen_sparse_archetypes_smoke.py`, sobre el árbol de trabajo de la Fase
-3A.1. La Fase 4C-2b añadió posteriormente la regresión estricta de ids de sector
-y volvió a ejecutar las pruebas pertinentes. La Fase 4C-3 añadió la regresión de
-pools de módulos y repitió los smokes pertinentes el 2026-11-04:
-
-| Prueba | Resultado | Cobertura relevante |
-| --- | --- | --- |
-| `galaxy_physical_model_smoke.py` | PASSED | Transformación física, región disk del origen y márgenes. |
-| `procedural_radiation_smoke.py` | PASSED | Determinismo, orden regional y preservación de radiación authored. |
-| `route_hop_cap_smoke.py` | PASSED | Cap de viaje y cap de enlaces worldgen. |
-| `debug_worldgen_graph_smoke.py` | PASSED | Diagnóstico de sector y grafo físico. |
-| `debug_galaxy_smoke.py` | PASSED | Diagnóstico galáctico y mapa. |
-| `save_load_smoke.py` | PASSED | Persistencia de `SectorGenState`, guardrail y flags de hub. |
-| `scan_job_smoke.py` | PASSED | Scan, materialización indirecta y descubrimiento. |
-| `worldgen_sparse_archetypes_smoke.py` | PASSED | Catálogo y caps activos, tipos prohibidos/permitidos, conteos por arquetipo, enlaces internos al topology hub, dispersión, determinismo con el mismo orden, guardrail y no revelación de vecinos. |
-| `sector_intel_validation_smoke.py` | PASSED | Ids canónicos con signo de anchura mínima/ampliada, sectores existentes/lazy, rechazo sin mutar estado serializable, bloques `[INTEL]` sólo de sector sin recovery corrupta/uso de RNG, feedback público localizado y procesamiento posterior de otras líneas válidas. |
-| `worldgen_modules_pool_smoke.py` | PASSED | Loader real, unión de categorías, compatibilidad RNG de common, rangos/ceros, filtros vacíos/desconocidos, ids válidos, clusters regionales, determinismo con igual secuencia, preservación authored/estado ajeno, save/load temporal y recuperación/depleción normal con dron. |
-
-La regresión de módulos usa seeds `1` y `2` con la secuencia de solicitudes
-`S+020_+000_+000` → `S-25000_+000_+000` → `S+16000_+000_+000` →
-`S+000_+000_+000`. Los tres primeros centros se trasladan a coordenadas X
-galácticas de 250205, 5 y 410005 ly, incluido el desplazamiento de 250000 ly
-del origen operacional. Los conteos por sector objetivo, en orden de id de nodo, son:
-
-| Seed | Disk (`relay_corridor`) | Bulge (`ruin_field`) | Halo (`empty`) |
-| --- | --- | --- | --- |
-| `1` | 0, 2, 2 | 1, 2 | 0 |
-| `2` | 0, 1 | 2, 3 | 1 |
-
-Antes de corregir, la selección por unión de categorías falló con
-`(0, ['tech','rare'], [])`; la integración real falló independientemente con
-conteos bulge `[0,0]` para seed `1`. Ambas pasan ahora. La regresión cubre todos
-los nodos generados, incluidos los outliers gaussianos de Z fuera de los
-metadatos sectoriales registrados. La seed `2` de sandbox despliega D1 normalmente
-en el procedural `DERELICT_36B4F8`: el primer trabajo de módulo falla y el segundo
-recupera `transit_sensor_pack` con la probabilidad configurada. Save/load temporal
-conserva módulos restantes y cargo sin reponer loot al repetir solicitudes de generación.
-
-Lagunas de verificación:
-
-- la dependencia del orden y el desbordamiento Z tienen ahora testigos de
-  regresión 4D-3e1; cambiarlos sigue requiriendo un diseño de worldgen aprobado;
-- no se prueban duplicados authored ni sectores que ya excedan caps;
-- no hay una prueba de frontera física de la galaxia;
-- la semántica de configuración de `radiation_base` regional sigue sin resolver;
-- no se verifica la reconstrucción de topología tras añadir nodos especiales a
-  sectores ya generados o vacíos;
-- no existe todavía una prueba que detecte automáticamente divergencias entre
-  la tabla canónica de este documento y futuros cambios intencionados de los
-  JSON; cualquier cambio de reglas deberá actualizar datos, test y documentación
-  conjuntamente.
-
-## 15. Referencias de implementación
+## 12. Referencias de implementación
 
 - [`src/retorno/model/world.py`](../../src/retorno/model/world.py): nodos, estado
   mundial, sectores, ids, distancias y rutas conocidas.
@@ -530,3 +316,7 @@ Lagunas de verificación:
 - [`data/worldgen/`](../../data/worldgen): plantillas y arquetipos activos.
 - [`data/locations/`](../../data/locations): localizaciones authored activas y
   plantillas excluidas.
+
+- [`manifest.py`](../../src/retorno/worldgen/manifest.py) y
+  [`topology.py`](../../src/retorno/worldgen/topology.py): definición productiva,
+  inventario inverso, identidad y topología determinista.

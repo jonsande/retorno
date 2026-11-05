@@ -19,8 +19,9 @@ from retorno.core import lore
 from retorno.io.save_load import load_single_slot, save_single_slot
 from retorno.model.world import NodePoolState, SpaceNode, sector_id_for_pos
 from retorno.runtime.data_loader import load_worldgen_archetypes, load_worldgen_templates
-from retorno.worldgen import catalog, generator as gen
-from retorno.worldgen.catalog import SiteStatus, catalog_sector, catalog_sectors
+from retorno.worldgen import generator as gen
+from tests.fixtures import worldgen_catalog_5cdde28 as catalog
+from tests.fixtures.worldgen_catalog_5cdde28 import SiteStatus, catalog_sector, catalog_sectors
 if __package__:
     from tests.worldgen_preexistence_characterization_smoke import _state
 else:
@@ -199,7 +200,7 @@ def test_12_python_hash_seeds_and_processes_reproduce_results():
 from dataclasses import asdict
 import json
 from tests.worldgen_preexistence_characterization_smoke import _state
-from retorno.worldgen.catalog import catalog_sectors
+from tests.fixtures.worldgen_catalog_5cdde28 import catalog_sectors
 ids = tuple(set(('S+020_+020_+000','S+15126_+000_+000','S+000_+000_+000')))
 print(json.dumps(asdict(catalog_sectors(_state(), ids)), sort_keys=True))
 """

@@ -1,9 +1,8 @@
 """Read-only preexistence evidence, independent of recovery or ship capability.
 
-The legacy generator cannot certify unmaterialized sites independently of
-materialization order. Its current slot forecast is therefore CONDITIONAL,
-even when the canonical sample is reproducible. No result permits insertion,
-publishes knowledge, or establishes a route/information source.
+Queries certify versioned historical generation cohorts. Legacy conditional
+addresses are never upgraded into manifest sites. No result permits
+insertion, publishes knowledge, or establishes a route/information source.
 """
 from __future__ import annotations
 
@@ -12,22 +11,16 @@ from dataclasses import dataclass
 from enum import Enum
 import hashlib
 import json
-import math
-from types import SimpleNamespace
 
 from retorno.config.balance import Balance
 from retorno.core.gamestate import GameState
-from retorno.model.world import SECTOR_SIZE_LY, region_for_pos, sector_id_for_pos
-from retorno.runtime.data_loader import load_worldgen_archetypes, load_worldgen_templates
-from retorno.worldgen.generator import (
-    _parse_sector_id, _plan_sector_kinds, _sample_sector_node, _sector_center,
-    _select_archetype,
-)
+from retorno.model.world import SECTOR_SIZE_LY
+from retorno.worldgen.generator import _parse_sector_id
 
 
 class SiteStatus(str, Enum):
     PHYSICAL = "physical"
-    VERIFIED = "verified_procedural"  # Reserved: never emitted by this version.
+    VERIFIED = "verified_procedural"
     CONDITIONAL = "conditional"
     INADMISSIBLE = "inadmissible"
 
@@ -36,9 +29,9 @@ class SiteStatus(str, Enum):
 class SiteRecord:
     """Internal evidence, not player intel or recovery eligibility.
 
-    A procedural key identifies a conditional sample, NOT a reserved location.
-    node_id is supplied only for an already physical node. Its original
-    procedural address cannot be reconstructed reliably from legacy saves.
+    Public keys identify historical sites; legacy fixture keys remain conditional.
+    node_id is supplied only for an already physical node. Historical existence
+    does not establish narrative eligibility or authorize materialization.
     """
     key: str
     status: SiteStatus
@@ -97,102 +90,43 @@ def _configuration_key(templates: dict, archetypes: dict) -> str:
 
 
 def catalog_sector(state: GameState, sector_id: str) -> SectorCatalog:
-    """Inspect one generation sector without expanding its neighborhood."""
-    return catalog_sectors(state, (sector_id,)).sectors[0]
+    return catalog_sectors(state,(sector_id,)).sectors[0]
 
 
-def catalog_sectors(
-    state: GameState, sector_ids: Sequence[str], *, max_sectors: int = 64,
-) -> CatalogResult:
-    """Inspect an explicit bounded family on a coherent, read-only snapshot.
+def catalog_sectors(state: GameState, sector_ids: Sequence[str], *, max_sectors=64) -> CatalogResult:
+    """Historical generation-cohort evidence; physical reverse lookup is separate.
 
-    Exceeding the technical request bound raises ValueError before inspection;
-    it never means that no sites exist. Input order/duplicates do not affect
-    results. Work is O(physical nodes + requested sectors + returned records),
-    apart from sorting. No galaxy walk, generation, topology or global cache.
+    VERIFIED comes from the versioned manifest, never from upgrading a legacy
+    conditional sample. Discovery, source eligibility and routes remain separate.
     """
-    if type(max_sectors) is not int or max_sectors <= 0:
-        raise ValueError("max_sectors must be a positive integer")
-    if isinstance(sector_ids, (str, bytes)) or not isinstance(sector_ids, Sequence):
-        raise TypeError("sector_ids must be a bounded sequence of canonical sector ids")
+    if (type(max_sectors) is not int or max_sectors <= 0 or isinstance(sector_ids,(str,bytes))
+        or not isinstance(sector_ids,Sequence)):
+        raise ValueError("Invalid bounded historical catalog request")
     if len(sector_ids) > max_sectors:
-        raise ValueError("sector request exceeds technical bound; split into bounded families")
+        raise ValueError("Historical catalog technical budget exceeded")
     for sid in sector_ids:
         _parse_sector_id(sid)
-    ordered = sorted(set(sector_ids))
-    templates = load_worldgen_templates()
-    archetypes = load_worldgen_archetypes()
-    configuration = _configuration_key(templates, archetypes)
-    members: dict[str, dict] = {sid: {} for sid in ordered}
-    occupied = set()
-    for nid, node in state.world.space.nodes.items():
-        pos = (node.x_ly, node.y_ly, node.z_ly)
-        if not all(math.isfinite(v) for v in pos):
-            # Nonfinite nodes have no spatial sector; never pretend to place them.
-            raise ValueError(f"Physical node has nonfinite coordinates: {nid}")
-        occupied.add(pos)
-        sid = sector_id_for_pos(*pos)
-        if sid in members:
-            members[sid][nid] = node
-
+    from retorno.worldgen.generator import universe_definition
+    from retorno.worldgen.manifest import _Session,operative_id
+    definition = universe_definition(state)
+    session = _Session(definition)
     sectors = []
-    for sid in ordered:
-        region = region_for_pos(*_sector_center(sid))
-        archetype = _select_archetype(state, sid, region, templates)
+    for sid in sorted(set(sector_ids)):
+        cohort = session.sector(sid)
+        sites = []
+        for site in cohort.sites:
+            nid = operative_id(definition,site)
+            node = state.world.space.nodes.get(nid)
+            valid = node is None or (node.kind == site.kind and
+                (node.x_ly,node.y_ly,node.z_ly) == site.position_ly)
+            status = SiteStatus.INADMISSIBLE if not valid else SiteStatus.PHYSICAL if node else SiteStatus.VERIFIED
+            sites.append(SiteRecord(site.identity.encoded,status,sid,site.physical_sector_id,
+                site.position_ly,site.kind,site.region,cohort.archetype,
+                int(json.loads(site.identity.local_id)[1]) if site.identity.namespace=='procedural' else None,
+                nid if node else None,('historical_manifest_v1','no_materialization_permission')))
         recorded = state.world.sector_states.get(sid)
-        generated = sid in state.world.generated_sectors
-        sites = [SiteRecord(
-            key="physical:" + _digest((state.meta.rng_seed, nid)),
-            status=SiteStatus.PHYSICAL, generation_sector_id=None,
-            physical_sector_id=sid, position_ly=(node.x_ly, node.y_ly, node.z_ly),
-            kind=node.kind, region=region_for_pos(node.x_ly, node.y_ly, node.z_ly),
-            node_id=nid,
-        ) for nid, node in sorted(members[sid].items())]
-        limitations = ["existence_is_not_recovery_eligibility", "narrative_protection_not_assessed",
-                       "no_routes_or_information_sources_assessed", "not_a_complete_spatial_inventory"]
-        if generated:
-            limitations.append("generated_sector_no_new_slots_forecast")
-        else:
-            template = templates.get(region) or templates.get("disk")
-            cfg = archetypes.get(archetype)
-            if template is None or cfg is None:
-                limitations.append("missing_canonical_configuration")
-            else:
-                # Same indexed read view as the existing pure chain planner;
-                # _plan_sector_kinds only needs meta and this sector's nodes.
-                view = SimpleNamespace(meta=state.meta, world=SimpleNamespace(
-                    space=SimpleNamespace(nodes=members[sid])))
-                kinds, _ = _plan_sector_kinds(view, sid, archetype, region, template, cfg)
-                conditions = ("current_occupancy_not_reserved", "future_z_inflow_unresolved",
-                              "node_id_allocation_unresolved", "no_materialization_permission")
-                if not state.world.sparse_guardrail_done:
-                    conditions += ("initial_guardrail_unresolved",)
-                if sid == sector_id_for_pos(0.0, 0.0, 0.0) and "ECHO_7" not in state.world.space.nodes:
-                    conditions += ("fixed_origin_hub_not_applied",)
-                for index, kind in enumerate(kinds):
-                    pos, _ = _sample_sector_node(state.meta.rng_seed, sid, archetype, index,
-                                                kind, float(template.get("z_sigma", 0.3) or 0.3))
-                    physical_sid = sector_id_for_pos(*pos)
-                    reasons = conditions
-                    if physical_sid != sid:
-                        reasons += ("sample_outside_generation_sector",)
-                    node_region = region_for_pos(*pos)
-                    if node_region != region:
-                        reasons += ("sample_region_differs_from_template_region",)
-                    status = SiteStatus.CONDITIONAL
-                    if pos in occupied:
-                        status = SiteStatus.INADMISSIBLE
-                        reasons += ("sample_position_occupied",)
-                    sites.append(SiteRecord(
-                        key="procedural:" + _digest((configuration, state.meta.rng_seed,
-                                                     sid, archetype, index, kind)),
-                        status=status, generation_sector_id=sid, physical_sector_id=physical_sid,
-                        position_ly=pos, kind=kind, region=node_region,
-                        archetype=archetype, slot_index=index, conditions=reasons,
-                    ))
-                if not kinds:
-                    limitations.append("no_remaining_slots_in_current_snapshot")
-                limitations.append("legacy_worldgen_cannot_verify_latent_existence")
-        sectors.append(SectorCatalog(sid, region, archetype, recorded.archetype if recorded else None,
-                                     generated, tuple(sites), tuple(limitations)))
-    return CatalogResult(configuration, tuple(sectors), len(state.world.space.nodes))
+        sectors.append(SectorCatalog(sid,cohort.template_region,cohort.archetype,
+            recorded.archetype if recorded else None,sid in state.world.generated_sectors,tuple(sites),
+            ('existence_is_not_recovery_eligibility','narrative_protection_not_assessed',
+             'no_routes_or_information_sources_assessed','generation_inventory_not_physical_inventory')))
+    return CatalogResult(definition.scope,tuple(sectors),0)

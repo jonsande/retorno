@@ -20,7 +20,7 @@ Spanish version: [README.es.md](README.es.md)
 
 | Document | Purpose | Status |
 | --- | --- | --- |
-| [Physical universe and procedural generation](systems/world-generation.md) | Canonical reference for the spatial model, regions, sectors, worldgen, topology, authored content, and determinism. | **Verified** against production code at `3658577`, active data, and later Phase 3A.1 tests. It records known gaps and the sector diagnostic's materializing effect; it does not fully cover navigation, lore, or failsafes. |
+| [Physical universe and procedural generation](systems/world-generation.md) | Canonical reference for the spatial model, regions, sectors, worldgen, topology, authored content, and determinism. | **Verified** for 4D-3e2 in the working tree based on `5cdde28`, pending external review. It records known gaps and the sector diagnostic's materializing effect; it does not fully cover navigation, lore, or failsafes. |
 | [Universo físico y generación procedural](systems/world-generation.es.md) | Spanish counterpart of the universe and worldgen reference. | **Verified**; maintained as a language pair with the English document. |
 | [Discovery, navigation, and intel](systems/discovery-navigation-intel.md) | Canonical reference for player knowledge, scan, route solve, uplink, intel import, travel, narrative protection, and failsafes. | **Verified** against production code and focused tests, including repaired breadcrumb and exact-undiscovered-physical-id route-solve characterizations; no arcs are currently active. |
 | [Descubrimiento, navegación e intel](systems/discovery-navigation-intel.es.md) | Spanish counterpart of the discovery and navigation reference. | **Verified**; maintained as a language pair with the English document. |
@@ -34,6 +34,12 @@ Spanish version: [README.es.md](README.es.md)
 | [Auditoría transversal y plan de estabilización](testing/stabilization-audit.es.md) | Spanish counterpart of the cross-system audit. | **Verified**; maintained as a language pair with the English document. |
 | [Navigation and recovery design contract](design/navigation-recovery-contract.md) | Approved decisions for routes, recovery, `comms`/`radiod`, reception, services, narrative protection, localization, and pre-alpha saves, with matrices and a 4C plan. | **Approved contract**; explicitly distinguishes current behavior, divergences, and future work. It does not claim that corrections are implemented. |
 | [Contrato de diseño de navegación y recuperación](design/navigation-recovery-contract.es.md) | Spanish counterpart of the design contract. | **Verified**; maintained as a language pair with the English document. |
+
+Phase 4D-3e2: [Historical worldgen integration](design/historical-worldgen-integration.md) /
+[ES](design/historical-worldgen-integration.es.md) documents productive implementation,
+identity, complete inverse physical inventory in the certified domain, topology, saves,
+comparison and limits. See the [review report](testing/manifest-integration-review.md).
+The e1/e1b documents below retain historical evidence; e3/e4/e5 remain pending.
 
 ## Existing guides
 

@@ -22,11 +22,13 @@ from retorno.model.world import (
 )
 from retorno.ui_textual.app import RetornoTextualApp
 from retorno.ui_textual import presenter
+from retorno.worldgen.generator import pin_universe
 
 
 def _state():
     state = create_initial_state_sandbox()
     state.meta.rng_seed = state.world.rng_seed = 314159
+    pin_universe(state)
     state.meta.rng_counter = 0
     world = state.world
     positions = {
@@ -62,7 +64,8 @@ def _state():
     world.dead_nodes = {}
     world.sector_states = {}
     world.exploration_recovery = ExplorationRecoveryState()
-    # Controlled, already generated sectors: no worldgen or probability patches.
+    # Controlled compatibility markers, without a historical-completeness claim:
+    # this navigation fixture does not represent a sampled historical inventory.
     world.generated_sectors = {
         f"S{x:+04d}_{y:+04d}_{z:+04d}"
         for x in range(-1, 2) for y in range(-1, 2) for z in range(-1, 2)

@@ -19,7 +19,7 @@ Purpose
 Operational behavior
 - `debug on|off` toggles debug mode and auto-tick control.
 - `debug scenario ...` resets world state to preset.
-- `debug seed <n>` sets RNG seed.
+- `debug seed <n>` sets RNG seed before the historical universe is fixed by generation or saving. Later changes require a new scenario.
 - listing commands expose internal debug registries.
 - `debug galaxy` prints galactic position, sector-neighborhood coherence, and procedural-radiation distribution.
 - `debug galaxy map <scale>` renders the galaxy ASCII map at selected scale using all loaded nodes.

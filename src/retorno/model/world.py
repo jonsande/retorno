@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import MISSING, dataclass, field, fields
-from typing import Optional, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 from retorno.config.balance import Balance
 from retorno.model.galaxy import galactic_region_for_op_pos
+
+if TYPE_CHECKING:
+    from retorno.worldgen.manifest import ManifestDefinition
 
 
 @dataclass(slots=True)
@@ -24,6 +27,8 @@ class SpaceNode:
     links: set[str] = field(default_factory=set)
     is_hub: bool = False
     is_topology_hub: bool = False
+    historical_key: str | None = None
+    generation_sector_id: str | None = None
 
     def __setstate__(self, state) -> None:
         """Backward-compatible unpickle for slot additions."""
@@ -86,6 +91,8 @@ class SectorGenState:
     internal_link_count: int = 0
     intersector_link_count: int = 0
     internal_links_built: bool = False
+    generation_node_ids: list[str] = field(default_factory=list)
+    physical_inventory_complete: bool = False
 
 
 @dataclass(slots=True)
@@ -123,6 +130,9 @@ class WorldState:
     sector_states: dict[str, SectorGenState] = field(default_factory=dict)
     intersector_link_pairs: set[str] = field(default_factory=set)
     sparse_guardrail_done: bool = False
+    universe_version: str = "historical-world-v1"
+    universe_rules_key: str = ""
+    manifest_definition: ManifestDefinition | None = None
 
     def __setstate__(self, state) -> None:
         """Backward-compatible unpickle for slot additions."""

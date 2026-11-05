@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from retorno.config.balance import Balance
 from retorno.worldgen import catalog, generator as gen, manifest_prototype as manifest
+from retorno.worldgen import manifest as manifest_kernel
 from retorno.worldgen.manifest_prototype import (
     AuthoredSite, EvidenceStatus as Status, SiteIdentity, authored_base,
     define_manifest, lookup_site, query_manifest,
@@ -242,7 +243,8 @@ def test_12_certified_invalid_conditional_and_not_evaluated_are_distinct():
     assert lookup_site(definition,SiteIdentity(definition.scope,"special","dynamic")).assessment.status == Status.NOT_EVALUATED
     assert lookup_site(definition,SiteIdentity(definition.scope,"authored","absent")).assessment.status == Status.INVALID
     # A legacy conditional key is not a manifest address or certification.
-    old = catalog.catalog_sector(_state(),FAMILY[0]).sites[0]
+    from tests.fixtures.worldgen_catalog_5cdde28 import catalog_sector as legacy_catalog
+    old = legacy_catalog(_state(),FAMILY[0]).sites[0]
     assert old.status == catalog.SiteStatus.CONDITIONAL
     assert lookup_site(definition,SiteIdentity(definition.scope,"procedural",old.key)).assessment.status == Status.INVALID
 
@@ -319,7 +321,7 @@ def test_17_forced_procedural_short_id_collisions_do_not_change_identity_uniquen
     def collide(*args):
         position,_=sample(*args)
         return position,Bits()
-    with patch.object(manifest,'_sample_sector_node',side_effect=collide):
+    with patch.object(manifest_kernel,'_sample_sector_node',side_effect=collide):
         result=_checked(define_manifest(271828))
     sites=[s for c in result.sectors for s in c.sites]
     assert len({s.legacy_id_hint for s in sites}) < len(sites)

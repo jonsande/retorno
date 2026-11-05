@@ -179,6 +179,8 @@ def create_initial_state_prologue() -> GameState:
     modules = load_modules()
     module_ids = list(modules.keys())
     _bootstrap_locations(state, rng, module_ids)
+    from retorno.worldgen.manifest import physical_rules_key
+    state.world.universe_rules_key = physical_rules_key()
     # Sync known_nodes for compatibility
     if state.world.known_contacts:
         state.world.known_nodes.update(state.world.known_contacts)

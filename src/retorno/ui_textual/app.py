@@ -2100,6 +2100,10 @@ class RetornoTextualApp(App):
                     self._log_line("debug seed: available only in DEBUG mode. Use: debug on")
                     return
                 seed = parsed[1]
+                reason = repl.debug_seed_block_reason(state, seed)
+                if reason:
+                    self._log_line(reason)
+                    return
                 state.meta.rng_seed = seed
                 state.meta.rng_counter = 0
                 self.loop._rng = random.Random(seed)

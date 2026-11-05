@@ -1,5 +1,11 @@
 # Procedural preexistence — Phase 4D-3e1
 
+**4D-3e2 update:** this document retains historical evidence from its phase.
+The current productive contract is [Historical worldgen integration](historical-worldgen-integration.md).
+The prototype now uses the shared core and distinguishes certification by scope/reasons;
+the conditional legacy catalog lives in test fixtures. Productive limitations below
+describe the earlier state, not the current runtime.
+
 Spanish version: [procedural-preexistence.es.md](procedural-preexistence.es.md).
 
 Status: **safe partial implementation and reproducible audit**, on `main` at

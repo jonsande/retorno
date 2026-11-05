@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import copy
+from unittest.mock import patch
+
 import retorno.core.lore as lore_mod
+from retorno.runtime.data_loader import load_locations
 from retorno.bootstrap import create_initial_state_sandbox
 from retorno.config.balance import Balance
 from retorno.core.lore import run_lore_scheduler_tick, sync_node_pools_for_known_nodes
@@ -161,84 +165,90 @@ def _run_hard_force_case() -> None:
 
 
 def _run_hard_force_constraints_and_no_relax_case() -> None:
-    state = create_initial_state_sandbox()
-    start_node = state.world.space.nodes.get("UNKNOWN")
-    assert start_node is not None
-    # Move start reference away from origin to verify dist constraints are evaluated from start-node.
-    start_node.x_ly = 100.0
-    start_node.y_ly = 0.0
-    start_node.z_ly = 0.0
-    arcs = [
-        {
-            "arc_id": "smoke_hard_force_strict",
-            "primary_intel": {
-                "id": "hard_strict_primary",
-                "kind": "link",
-                "line": "LINK: ECHO_7 -> STRICT_TARGET",
-                "force": True,
-                "force_policy": "hard",
-                "allowed_channels": ["salvage_data"],
-                "constraints": {
-                    "min_dist_ly": 20.0,
-                    "max_dist_ly": 22.0,
-                    "regions_any": ["disk"],
+    locations = copy.deepcopy(load_locations())
+    for location in locations:
+        if location.get('node',{}).get('node_id') == 'UNKNOWN':
+            location['node'].update(x_ly=100.0,y_ly=0.0,z_ly=0.0)
+    with patch('retorno.bootstrap.load_locations',return_value=locations), \
+         patch('retorno.worldgen.manifest.load_locations',return_value=locations), \
+         patch('retorno.worldgen.generator.load_locations',return_value=locations):
+        state = create_initial_state_sandbox()
+        start_node = state.world.space.nodes.get("UNKNOWN")
+        assert start_node is not None
+        # The fixture declares its distant start before universe definition; it
+        # cannot move an authored historical site after bootstrap.
+        assert (start_node.x_ly,start_node.y_ly,start_node.z_ly) == (100.0,0.0,0.0)
+        arcs = [
+            {
+                "arc_id": "smoke_hard_force_strict",
+                "primary_intel": {
+                    "id": "hard_strict_primary",
+                    "kind": "link",
+                    "line": "LINK: ECHO_7 -> STRICT_TARGET",
+                    "force": True,
+                    "force_policy": "hard",
+                    "allowed_channels": ["salvage_data"],
+                    "constraints": {
+                        "min_dist_ly": 20.0,
+                        "max_dist_ly": 22.0,
+                        "regions_any": ["disk"],
+                    },
                 },
-            },
-            "secondary_lore_docs": [],
-            "placement_rules": {
-                "primary": {
-                    "candidates": ["procedural_station"],
-                    "require_kind_any": ["station"],
-                }
-            },
-        }
-    ]
-    lore_mod.load_arcs = lambda: arcs
-    lore_mod.load_singles = lambda: []
-    run_lore_scheduler_tick(state)
-    piece_key = "arc:smoke_hard_force_strict:hard_strict_primary"
-    assert piece_key in state.world.lore_placements.piece_to_node, "strict hard piece should still place via legal ad-hoc"
-    node_id = state.world.lore_placements.piece_to_node[piece_key]
-    node = state.world.space.nodes.get(node_id)
-    assert node is not None, "strict hard piece node should exist"
-    dx = node.x_ly - start_node.x_ly
-    dy = node.y_ly - start_node.y_ly
-    dz = node.z_ly - start_node.z_ly
-    dist = (dx * dx + dy * dy + dz * dz) ** 0.5
-    assert 20.0 <= dist <= 22.0, f"ad-hoc node must respect dist constraints, got dist={dist}"
-    assert region_for_pos(node.x_ly, node.y_ly, node.z_ly) == "disk", "ad-hoc node must respect region constraints"
+                "secondary_lore_docs": [],
+                "placement_rules": {
+                    "primary": {
+                        "candidates": ["procedural_station"],
+                        "require_kind_any": ["station"],
+                    }
+                },
+            }
+        ]
+        lore_mod.load_arcs = lambda: arcs
+        lore_mod.load_singles = lambda: []
+        run_lore_scheduler_tick(state)
+        piece_key = "arc:smoke_hard_force_strict:hard_strict_primary"
+        assert piece_key in state.world.lore_placements.piece_to_node, "strict hard piece should still place via legal ad-hoc"
+        node_id = state.world.lore_placements.piece_to_node[piece_key]
+        node = state.world.space.nodes.get(node_id)
+        assert node is not None, "strict hard piece node should exist"
+        dx = node.x_ly - start_node.x_ly
+        dy = node.y_ly - start_node.y_ly
+        dz = node.z_ly - start_node.z_ly
+        dist = (dx * dx + dy * dy + dz * dz) ** 0.5
+        assert 20.0 <= dist <= 22.0, f"ad-hoc node must respect dist constraints, got dist={dist}"
+        assert region_for_pos(node.x_ly, node.y_ly, node.z_ly) == "disk", "ad-hoc node must respect region constraints"
 
-    # No-relax guard: when only explicit non-procedural candidates are configured and no
-    # candidate is available, strict ad-hoc generation must not override those rules.
-    state_no_relax = create_initial_state_sandbox()
-    arcs_no_relax = [
-        {
-            "arc_id": "smoke_hard_force_no_relax",
-            "primary_intel": {
-                "id": "hard_no_relax_primary",
-                "kind": "link",
-                "line": "LINK: ECHO_7 -> NO_RELAX_TARGET",
-                "force": True,
-                "force_policy": "hard",
-                "allowed_channels": ["salvage_data"],
-                "constraints": {},
-            },
-            "secondary_lore_docs": [],
-            "placement_rules": {
-                "primary": {
-                    "candidates": ["NON_EXISTENT_EXPLICIT_ID"],
-                    "require_kind_any": [],
-                }
-            },
-        }
-    ]
-    lore_mod.load_arcs = lambda: arcs_no_relax
-    lore_mod.load_singles = lambda: []
-    run_lore_scheduler_tick(state_no_relax)
-    no_relax_key = "arc:smoke_hard_force_no_relax:hard_no_relax_primary"
-    assert no_relax_key not in state_no_relax.world.lore_placements.piece_to_node, (
-        "ad-hoc fallback should not relax explicit non-procedural candidates"
-    )
+        # No-relax guard: when only explicit non-procedural candidates are configured and no
+        # candidate is available, strict ad-hoc generation must not override those rules.
+        state_no_relax = create_initial_state_sandbox()
+        arcs_no_relax = [
+            {
+                "arc_id": "smoke_hard_force_no_relax",
+                "primary_intel": {
+                    "id": "hard_no_relax_primary",
+                    "kind": "link",
+                    "line": "LINK: ECHO_7 -> NO_RELAX_TARGET",
+                    "force": True,
+                    "force_policy": "hard",
+                    "allowed_channels": ["salvage_data"],
+                    "constraints": {},
+                },
+                "secondary_lore_docs": [],
+                "placement_rules": {
+                    "primary": {
+                        "candidates": ["NON_EXISTENT_EXPLICIT_ID"],
+                        "require_kind_any": [],
+                    }
+                },
+            }
+        ]
+        lore_mod.load_arcs = lambda: arcs_no_relax
+        lore_mod.load_singles = lambda: []
+        run_lore_scheduler_tick(state_no_relax)
+        no_relax_key = "arc:smoke_hard_force_no_relax:hard_no_relax_primary"
+        assert no_relax_key not in state_no_relax.world.lore_placements.piece_to_node, (
+            "ad-hoc fallback should not relax explicit non-procedural candidates"
+        )
 
 
 def main() -> None:

@@ -6,7 +6,7 @@ import random
 from retorno.config.balance import Balance
 from retorno.core.gamestate import GameState
 from retorno.model.world import SECTOR_SIZE_LY, SectorGenState, SpaceNode, region_for_pos, sector_id_for_pos
-from retorno.runtime.data_loader import load_modules, load_worldgen_archetypes, load_worldgen_templates
+from retorno.runtime.data_loader import load_modules, load_worldgen_archetypes, load_worldgen_templates, load_locations
 
 _PLAYABLE_HUB_KINDS = {"relay", "station", "waystation"}
 _EARLY_PROGRESS_ARCHETYPES = {"relay_corridor", "isolated_station"}
@@ -368,159 +368,6 @@ def _apply_salvage_profile(
     )
 
 
-def _ensure_fixed_origin_hub(state: GameState, sector_id: str) -> None:
-    origin_sector = sector_id_for_pos(0.0, 0.0, 0.0)
-    if sector_id != origin_sector or "ECHO_7" in state.world.space.nodes:
-        return
-    hub_region = region_for_pos(0.0, 0.0, 0.0)
-    hub = SpaceNode(
-        node_id="ECHO_7",
-        name="ECHO-7 Relay Station",
-        kind="station",
-        radiation_rad_per_s=procedural_radiation_for_node(state.meta.rng_seed, "ECHO_7", "station", hub_region),
-        radiation_base=_radiation_for_region(hub_region),
-        region=hub_region,
-        x_ly=0.0,
-        y_ly=0.0,
-        z_ly=0.0,
-        is_hub=True,
-        is_topology_hub=True,
-    )
-    state.world.space.nodes[hub.node_id] = hub
-
-
-def _pick_topology_hub(nodes: list[SpaceNode]) -> SpaceNode | None:
-    if not nodes:
-        return None
-    playable = [node for node in nodes if node.is_hub]
-    if playable:
-        return sorted(playable, key=lambda item: item.node_id)[0]
-    return sorted(nodes, key=lambda item: item.node_id)[0]
-
-
-def _refresh_sector_metadata(state: GameState, sector_id: str) -> None:
-    sector_state = _sector_state(state, sector_id)
-    nodes = sorted(_sector_nodes(state, sector_id), key=lambda node: node.node_id)
-    sector_state.node_ids = [node.node_id for node in nodes]
-    if not sector_state.region and nodes:
-        sector_state.region = nodes[0].region or region_for_pos(nodes[0].x_ly, nodes[0].y_ly, nodes[0].z_ly)
-    sector_state.playable_hub_node_id = next((node.node_id for node in nodes if node.is_hub), None)
-    sector_state.topology_hub_node_id = next((node.node_id for node in nodes if node.is_topology_hub), None)
-
-
-def _build_internal_links_for_sector(state: GameState, sector_id: str, archetype_cfg: dict) -> None:
-    sector_state = _sector_state(state, sector_id)
-    if sector_state.internal_links_built:
-        return
-    nodes = sorted(_sector_nodes(state, sector_id), key=lambda node: node.node_id)
-    if not nodes:
-        sector_state.internal_links_built = True
-        sector_state.internal_link_count = 0
-        return
-    hub = _pick_topology_hub(nodes)
-    if not hub:
-        sector_state.internal_links_built = True
-        sector_state.internal_link_count = 0
-        return
-    hub.is_topology_hub = True
-    if hub.kind in _PLAYABLE_HUB_KINDS:
-        hub.is_hub = True
-    sector_state.topology_hub_node_id = hub.node_id
-    if hub.is_hub:
-        sector_state.playable_hub_node_id = hub.node_id
-
-    internal_added = 0
-    for node in nodes:
-        if node.node_id == hub.node_id:
-            continue
-        if _link_with_cap(node, hub):
-            internal_added += 1
-
-    extra_prob = max(0.0, min(1.0, float(archetype_cfg.get("extra_internal_link_prob", 0.0) or 0.0)))
-    extra_rng = random.Random(_hash64(state.meta.rng_seed, f"sector_internal_links:{sector_id}:{sector_state.archetype}"))
-    for node in nodes:
-        if node.node_id == hub.node_id:
-            continue
-        if extra_rng.random() > extra_prob:
-            continue
-        candidates = [item for item in nodes if item.node_id not in {node.node_id, hub.node_id}]
-        if not candidates:
-            continue
-        target = candidates[extra_rng.randrange(len(candidates))]
-        if _link_with_cap(node, target):
-            internal_added += 1
-
-    sector_state.internal_links_built = True
-    sector_state.internal_link_count = internal_added
-    _refresh_sector_metadata(state, sector_id)
-
-
-def _evaluate_intersector_pair(
-    state: GameState,
-    left_sector_id: str,
-    right_sector_id: str,
-    archetypes: dict[str, dict],
-) -> None:
-    # Sparse topology is intentional: most sectors should expose 0-1 exits and
-    # local dead ends are valid outcomes. This pass only links already
-    # materialized neighbors when both archetype budgets allow it.
-    key = _pair_key(left_sector_id, right_sector_id)
-    if key in state.world.intersector_link_pairs:
-        return
-    state.world.intersector_link_pairs.add(key)
-
-    left_state = state.world.sector_states.get(left_sector_id)
-    right_state = state.world.sector_states.get(right_sector_id)
-    if not left_state or not right_state:
-        return
-    left_cfg = archetypes.get(left_state.archetype, {})
-    right_cfg = archetypes.get(right_state.archetype, {})
-    left_max = int(left_cfg.get("intersector_link_max", 0) or 0)
-    right_max = int(right_cfg.get("intersector_link_max", 0) or 0)
-    if left_state.intersector_link_count >= left_max or right_state.intersector_link_count >= right_max:
-        return
-
-    left_hub = state.world.space.nodes.get(left_state.topology_hub_node_id or "")
-    right_hub = state.world.space.nodes.get(right_state.topology_hub_node_id or "")
-    if not left_hub or not right_hub:
-        return
-
-    prob = min(
-        max(0.0, min(1.0, float(left_cfg.get("intersector_link_prob", 0.0) or 0.0))),
-        max(0.0, min(1.0, float(right_cfg.get("intersector_link_prob", 0.0) or 0.0))),
-    )
-    if prob <= 0.0:
-        return
-    rng = random.Random(
-        _hash64(
-            state.meta.rng_seed,
-            f"sector_pair:{key}:{left_state.archetype}:{right_state.archetype}",
-        )
-    )
-    if rng.random() > prob:
-        return
-    if _link_with_cap(left_hub, right_hub):
-        left_state.intersector_link_count += 1
-        right_state.intersector_link_count += 1
-
-
-def _ensure_intersector_links_for_new_sectors(
-    state: GameState,
-    new_sector_ids: list[str],
-    archetypes: dict[str, dict],
-) -> None:
-    candidate_pairs: set[str] = set()
-    for sector_id in new_sector_ids:
-        for neighbor_id in _neighbor_sector_ids_2d(sector_id, radius=1, include_self=False):
-            if neighbor_id not in state.world.generated_sectors:
-                continue
-            candidate_pairs.add(_pair_key(sector_id, neighbor_id))
-
-    for key in sorted(candidate_pairs):
-        left_sector_id, right_sector_id = key.split("|", 1)
-        _evaluate_intersector_pair(state, left_sector_id, right_sector_id, archetypes)
-
-
 def _has_early_progression_neighbor(
     state: GameState,
     cluster_sector_ids: list[str],
@@ -575,106 +422,6 @@ def _maybe_apply_sparse_guardrail(
 
     state.world.sparse_guardrail_done = True
     return overrides, force_playable_hub
-
-
-def _ensure_sector_generated_core(
-    state: GameState,
-    sector_id: str,
-    templates: dict[str, dict],
-    archetypes: dict[str, dict],
-    overrides: dict[str, str] | None = None,
-    force_playable_hub: set[str] | None = None,
-) -> bool:
-    if sector_id in state.world.generated_sectors:
-        return False
-
-    _ensure_fixed_origin_hub(state, sector_id)
-    force_playable_hub = force_playable_hub or set()
-    sector_region = region_for_pos(*_sector_center(sector_id))
-    region_template = templates.get(sector_region) or templates.get("disk") or {}
-    archetype = _select_archetype(state, sector_id, sector_region, templates, overrides)
-    archetype_cfg = archetypes.get(archetype) or archetypes.get("empty") or {}
-    sector_state = _sector_state(state, sector_id)
-    sector_state.region = sector_region
-    sector_state.archetype = archetype
-    sector_state.internal_link_count = 0
-    sector_state.intersector_link_count = 0
-
-    modules = load_modules()
-    module_ids = list(modules.keys())
-    planned_kinds, playable_hub_kind = _plan_sector_kinds(
-        state,
-        sector_id,
-        archetype,
-        sector_region,
-        region_template,
-        archetype_cfg,
-        force_playable_hub=sector_id in force_playable_hub,
-    )
-    z_sigma = float(region_template.get("z_sigma", 0.3) or 0.3)
-    salvage_cfg = dict(region_template.get("salvage", {}) or {})
-
-    for index, kind in enumerate(planned_kinds):
-        (x, y, z), rng = _sample_sector_node(
-            state.meta.rng_seed, sector_id, archetype, index, kind, z_sigma,
-        )
-        node_region = region_for_pos(x, y, z)
-        node_id = _generate_node_id(state, kind, rng)
-        node = SpaceNode(
-            node_id=node_id,
-            name=_name_from_node_id(node_id, kind),
-            kind=kind,
-            radiation_rad_per_s=procedural_radiation_for_node(state.meta.rng_seed, node_id, kind, node_region),
-            radiation_base=_radiation_for_region(node_region),
-            region=node_region,
-            x_ly=x,
-            y_ly=y,
-            z_ly=z,
-            is_hub=kind == playable_hub_kind and kind in _PLAYABLE_HUB_KINDS,
-            is_topology_hub=False,
-        )
-        _apply_salvage_profile(state, node, salvage_cfg, module_ids)
-        state.world.space.nodes[node_id] = node
-
-    _refresh_sector_metadata(state, sector_id)
-    state.world.generated_sectors.add(sector_id)
-    return True
-
-
-def _ensure_sector_cluster_generated(state: GameState, sector_ids: list[str]) -> None:
-    templates = load_worldgen_templates()
-    archetypes = load_worldgen_archetypes()
-    cluster_ids: set[str] = set()
-    for sector_id in sector_ids:
-        cluster_ids.update(_neighbor_sector_ids_2d(sector_id, radius=1, include_self=True))
-    ordered_cluster = sorted(cluster_ids)
-    overrides, force_playable_hub = _maybe_apply_sparse_guardrail(state, ordered_cluster, templates)
-
-    newly_generated: list[str] = []
-    for sector_id in ordered_cluster:
-        if _ensure_sector_generated_core(
-            state,
-            sector_id,
-            templates,
-            archetypes,
-            overrides,
-            force_playable_hub,
-        ):
-            newly_generated.append(sector_id)
-
-    for sector_id in ordered_cluster:
-        sector_state = state.world.sector_states.get(sector_id)
-        if not sector_state:
-            continue
-        archetype_cfg = archetypes.get(sector_state.archetype, {})
-        _build_internal_links_for_sector(state, sector_id, archetype_cfg)
-
-    _ensure_intersector_links_for_new_sectors(state, newly_generated, archetypes)
-
-
-def ensure_sector_generated(state: GameState, sector_id: str) -> None:
-    _parse_sector_id(sector_id)
-    _ensure_sector_cluster_generated(state, [sector_id])
 
 
 _GREEK_SUFFIXES = [
@@ -752,3 +499,244 @@ def _generate_name(rng: random.Random, kind: str) -> str:
     if kind == "ship":
         return f"Wreck-{rng.randint(1, 99)}"
     return f"Node-{rng.randint(1, 999)}"
+
+
+def universe_definition(state: GameState):
+    """Read-only resolution; a new game's rules are pinned before first use."""
+    from retorno.worldgen.manifest import ALGORITHM_VERSION, define_manifest, physical_rules_key
+    if state.world.universe_version != ALGORITHM_VERSION:
+        raise ValueError("Incompatible historical universe version")
+    definition = state.world.manifest_definition
+    if definition is not None:
+        if definition.seed != state.meta.rng_seed or definition.algorithm_version != ALGORITHM_VERSION:
+            raise ValueError("Historical universe seed/version changed")
+        if (definition.rules_key != physical_rules_key()
+            or definition.rules_key != state.world.universe_rules_key):
+            raise ValueError("Historical universe configuration changed")
+        return definition
+    rules = physical_rules_key()
+    if state.world.universe_rules_key and state.world.universe_rules_key != rules:
+        raise ValueError("Historical universe configuration changed before materialization")
+    return define_manifest(state.meta.rng_seed)
+
+
+def pin_universe(state: GameState):
+    definition = universe_definition(state)
+    state.world.manifest_definition = definition
+    state.world.universe_rules_key = definition.rules_key
+    return definition
+
+
+def _ensure_sector_generated_core(state, physical_sector_ids):
+    """Prepare all nodes/edges before a bounded, idempotent in-memory commit."""
+    from dataclasses import replace
+    from retorno.worldgen.manifest import new_session, _physical_inventory, _query_session, operative_id
+    definition = universe_definition(state)
+    import math
+    if any(not all(math.isfinite(v) for v in (n.x_ly,n.y_ly,n.z_ly)) for n in state.world.space.nodes.values()):
+        raise ValueError("Nonfinite materialized coordinate")
+    targets = tuple(sorted(set(physical_sector_ids)))
+    if not targets or all(sid in state.world.generated_sectors and
+        state.world.sector_states.get(sid) and state.world.sector_states[sid].physical_inventory_complete
+        for sid in targets):
+        return
+    session = new_session(definition)
+    inventory = _physical_inventory(session, targets, max_sectors=576)
+    sources = tuple(sorted({site.generation_sector_id for site in inventory.sites}))
+    topology = _query_session(session, sources)
+    nodes = state.world.space.nodes
+    staged = {}
+    historical = {}
+    module_ids = list(load_modules())
+    for site in inventory.sites:
+        nid = operative_id(definition, site)
+        historical[nid] = site
+        if nid == "UNKNOWN" and nid not in nodes:
+            continue  # The disposable bootstrap marker is never resurrected.
+        if nid in nodes:
+            node = nodes[nid]
+            if (node.kind != site.kind or (node.x_ly,node.y_ly,node.z_ly) != site.position_ly
+                or (node.historical_key is not None and node.historical_key != site.identity.encoded)):
+                raise ValueError("Historical id occupied by a different physical node")
+            continue
+        node = SpaceNode(nid, _name_from_node_id(site.legacy_id_hint,site.kind), site.kind,
+                         region=site.region, x_ly=site.position_ly[0], y_ly=site.position_ly[1], z_ly=site.position_ly[2],
+                         is_hub=site.is_hub, is_topology_hub=site.is_topology_hub,
+                         historical_key=site.identity.encoded, generation_sector_id=site.generation_sector_id)
+        if site.identity.namespace == "authored":
+            # Normally present from bootstrap. A physically declared authored
+            # site remains distinct from prose/content references.
+            cfg = next(loc for loc in load_locations()
+                       if loc.get('node',{}).get('node_id') == nid)
+            raw = cfg['node']
+            node.name = raw.get('name',nid)
+            node.radiation_rad_per_s = float(raw.get('radiation_rad_per_s',0))
+            node.radiation_base = float(raw.get('radiation_base',0))
+        else:
+            # Reuse the existing profiles/functions with a full historical seed
+            # key, independent of operative ids and registry collisions.
+            resource_node = replace(node,node_id=site.identity.encoded)
+            resource_node.radiation_rad_per_s = procedural_radiation_for_node(
+                definition.seed, resource_node.node_id,site.kind,site.region)
+            resource_node.radiation_base = _radiation_for_region(site.region)
+            template = session.templates[session.sector(site.generation_sector_id).template_region]
+            _apply_salvage_profile(state,resource_node,template.get('salvage',{}),module_ids)
+            node.radiation_rad_per_s = resource_node.radiation_rad_per_s
+            node.radiation_base = resource_node.radiation_base
+            node.salvage_scrap_available = resource_node.salvage_scrap_available
+            node.salvage_modules_available = resource_node.salvage_modules_available
+            node.recoverable_drones_count = resource_node.recoverable_drones_count
+        staged[nid] = node
+    if len(staged) > 2048:
+        raise ValueError("Materialization node budget exhausted; no world changes applied")
+    available = set(nodes) | set(staged)
+    site_ids = {site.identity: operative_id(definition,site)
+                for sector in topology.sectors for site in sector.sites}
+    site_ids.update((site.identity,operative_id(definition,site)) for site in topology.boundary_sites)
+    edges = [(site_ids[e.left],site_ids[e.right]) for e in topology.edges
+             if site_ids[e.left] in available and site_ids[e.right] in available]
+
+    # All fallible sampling/collision/budget checks precede this commit.
+    nodes.update(staged)
+    state.world.manifest_definition = definition
+    state.world.universe_rules_key = definition.rules_key
+    for nid,site in historical.items():
+        if nid in nodes:
+            node = nodes[nid]
+            node.historical_key = site.identity.encoded
+            node.generation_sector_id = site.generation_sector_id
+            node.is_hub, node.is_topology_hub = site.is_hub, site.is_topology_hub
+    for a,b in edges:
+        nodes[a].links.add(b)
+        nodes[b].links.add(a)
+    state.world.generated_sectors.update(targets)
+    state.world.sparse_guardrail_done = True
+    affected = set(targets)
+    affected.update(site.generation_sector_id for site in inventory.sites
+                    if site.generation_sector_id in state.world.sector_states)
+    for a,b in edges:
+        for nid in (a,b):
+            if nodes[nid].generation_sector_id in state.world.sector_states:
+                affected.add(nodes[nid].generation_sector_id)
+    physical, generation = {}, {}
+    for nid,node in nodes.items():
+        physical.setdefault(sector_id_for_pos(node.x_ly,node.y_ly,node.z_ly),[]).append(nid)
+        if node.historical_key:
+            generation.setdefault(node.generation_sector_id,[]).append(nid)
+    for sid in sorted(affected):
+        info = _sector_state(state,sid)
+        cohort = session.sector(sid)
+        info.region, info.archetype = cohort.template_region, cohort.archetype
+        info.node_ids = sorted(physical.get(sid,()))
+        info.generation_node_ids = sorted(generation.get(sid,()))
+        hub = next((site for site in cohort.sites if site.is_topology_hub),None)
+        hub_id = operative_id(definition,hub) if hub else None
+        info.topology_hub_node_id = hub_id if hub_id in nodes else None
+        info.playable_hub_node_id = next((nid for nid in info.generation_node_ids if nodes[nid].is_hub),None)
+        internal = {tuple(sorted((nid,d))) for nid in info.generation_node_ids for d in nodes[nid].links
+                    if d in nodes and nodes[d].historical_key and nodes[d].generation_sector_id == sid}
+        info.internal_link_count = len(internal)
+        info.intersector_link_count = sum(d in nodes and bool(nodes[d].historical_key) and
+            nodes[d].generation_sector_id != sid for d in nodes[hub_id].links) if hub_id in nodes else 0
+        info.internal_links_built = True
+        info.physical_inventory_complete = sid in state.world.generated_sectors
+
+
+def _ensure_sector_cluster_generated(state: GameState, sector_ids: list[str]) -> None:
+    if len(sector_ids) > 64:
+        raise ValueError("Sector request exceeds technical materialization budget")
+    for sid in sector_ids:
+        _parse_sector_id(sid)
+    targets = {neighbor for sid in sector_ids for neighbor in _neighbor_sector_ids_2d(sid)}
+    _ensure_sector_generated_core(state,targets)
+
+
+def ensure_sector_generated(state: GameState, sector_id: str) -> None:
+    _parse_sector_id(sector_id)
+    _ensure_sector_cluster_generated(state,[sector_id])
+
+
+def ensure_historical_node(state: GameState, node_id: str) -> bool:
+    """Compatibility resolution for exact manifest ids; never publishes intel."""
+    from retorno.worldgen.manifest import resolve_operative_id
+    site = resolve_operative_id(universe_definition(state),node_id)
+    if site is None:
+        return False
+    ensure_sector_generated(state,site.physical_sector_id)
+    return node_id in state.world.space.nodes
+
+
+def validate_universe_state(state):
+    """Read-only save validation; consumed resources and knowledge are untouched."""
+    import math
+    from retorno.worldgen.manifest import new_session, operative_id, _physical_inventory
+    definition = universe_definition(state)
+    if state.world.manifest_definition is None:
+        raise ValueError("Historical universe is not pinned in the save")
+    session = new_session(definition)
+    nodes = state.world.space.nodes
+    for authored in definition.authored:
+        node = nodes.get(authored.raw_id)
+        if node and (node.kind != authored.kind or
+            (node.x_ly,node.y_ly,node.z_ly) != authored.position_ly):
+            raise ValueError("Authored physical definition changed")
+    for nid,node in state.world.space.nodes.items():
+        if not all(math.isfinite(v) for v in (node.x_ly,node.y_ly,node.z_ly)):
+            raise ValueError("Nonfinite physical coordinate")
+        if not node.historical_key:
+            if ":WG1_" in nid or ":WG1C" in nid:
+                raise ValueError("Historical operative id lost its provenance")
+            continue
+        if len(session.sectors) > 16000:
+            session = new_session(definition)
+        if not node.generation_sector_id:
+            raise ValueError("Historical node has no generation provenance")
+        cohort = session.sector(node.generation_sector_id)
+        site = next((s for s in cohort.sites if s.identity.encoded == node.historical_key),None)
+        if (not site or operative_id(definition,site) != nid or site.kind != node.kind
+            or site.position_ly != (node.x_ly,node.y_ly,node.z_ly)
+            or (node.is_hub,node.is_topology_hub,node.region) !=
+               (site.is_hub,site.is_topology_hub,site.region)):
+            raise ValueError("Materialized node contradicts the historical manifest")
+        for dest in node.links:
+            other = state.world.space.nodes.get(dest)
+            if other and other.historical_key:
+                if nid not in other.links or not is_historical_edge(session,site,other):
+                    raise ValueError("Physical edge contradicts the historical manifest")
+        expected = [e for e in cohort.internal_edges if site.identity in (e.left,e.right)]
+        if site.is_topology_hub:
+            for sid in session.ranked(site.generation_sector_id):
+                hub = session.hub(sid)
+                dest = operative_id(definition,hub)
+                if dest in nodes and dest not in node.links:
+                    raise ValueError("Missing materialized historical edge")
+        for edge in expected:
+            other_identity = edge.right if edge.left == site.identity else edge.left
+            other_site = next(s for s in cohort.sites if s.identity == other_identity)
+            dest = operative_id(definition,other_site)
+            if dest in nodes and dest not in node.links:
+                raise ValueError("Missing materialized historical internal edge")
+    # A complete physical-sector marker must actually contain its inventory.
+    ids = sorted(sid for sid in state.world.generated_sectors
+                 if state.world.sector_states.get(sid) and
+                 state.world.sector_states[sid].physical_inventory_complete)
+    for offset in range(0,len(ids),64):
+        inventory = _physical_inventory(new_session(definition),ids[offset:offset+64])
+        for site in inventory.sites:
+            nid = operative_id(definition,site)
+            if nid == "UNKNOWN" and nid not in nodes:
+                continue
+            if nid not in nodes or nodes[nid].historical_key != site.identity.encoded:
+                raise ValueError("Complete physical inventory is missing a historical site")
+
+
+def is_historical_edge(session,site,other):
+    if other.generation_sector_id == site.generation_sector_id:
+        return any(site.identity in (e.left,e.right) and other.historical_key in (e.left.encoded,e.right.encoded)
+                   for e in session.sector(site.generation_sector_id).internal_edges)
+    if not site.is_topology_hub or not other.is_topology_hub:
+        return False
+    cohort = session.sector(other.generation_sector_id)
+    hub = next((s for s in cohort.sites if s.is_topology_hub),None)
+    return bool(hub and hub.identity.encoded == other.historical_key and
+                other.generation_sector_id in session.ranked(site.generation_sector_id))

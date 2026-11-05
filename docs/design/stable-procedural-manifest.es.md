@@ -1,5 +1,11 @@
 # Manifiesto procedural estable — contrato y prototipo 4D-3e1b
 
+**Actualización 4D-3e2:** este documento conserva la evidencia histórica de su fase.
+El contrato productivo vigente está en [Integración del worldgen histórico](historical-worldgen-integration.es.md).
+El prototipo usa ahora el núcleo compartido y distingue su certificación por ámbito/razones;
+el catálogo condicional legacy queda en fixtures de pruebas. Las limitaciones productivas
+descritas aquí se leen como estado anterior, no como descripción del runtime actual.
+
 Versión inglesa: [stable-procedural-manifest.md](stable-procedural-manifest.md).
 Coordinación: [hoja de ruta vigente](roadmap-worldgen-lore-f-dead01.es.md).
 

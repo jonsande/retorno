@@ -3429,6 +3429,17 @@ def _next_debug_drone_id(state) -> str:
     return f"D{candidate}"
 
 
+def debug_seed_block_reason(state, seed: int) -> str | None:
+    definition = state.world.manifest_definition
+    if definition is None or definition.seed == seed:
+        return None
+    messages = {
+        "en": "Seed change blocked: the historical universe is already fixed. Start a new scenario to change its seed.",
+        "es": "Cambio de semilla bloqueado: el universo histórico ya está fijado. Inicia otro escenario para cambiar su semilla.",
+    }
+    return messages.get(state.os.locale.value, messages["en"])
+
+
 def debug_add_scrap(state, amount: int) -> None:
     amount = int(amount)
     if amount <= 0:
@@ -4268,6 +4279,10 @@ def _spawn_corrupt_intel_contact(state, source_path: str) -> str | None:
 
 
 def _ensure_sector_for_procedural_node_id(state, node_id: str) -> None:
+    if ":WG1" in node_id:
+        from retorno.worldgen.generator import ensure_historical_node
+        ensure_historical_node(state,node_id)
+        return
     if not (node_id.startswith("S") and ":" in node_id):
         return
     sector_id = node_id.split(":", 1)[0]
@@ -7558,6 +7573,10 @@ def main() -> None:
                     print("debug seed: available only in DEBUG mode. Use: debug on")
                     continue
                 seed = parsed[1]
+                reason = debug_seed_block_reason(locked_state, seed)
+                if reason:
+                    print(reason)
+                    continue
                 locked_state.meta.rng_seed = seed
                 locked_state.meta.rng_counter = 0
                 loop._rng = random.Random(seed)

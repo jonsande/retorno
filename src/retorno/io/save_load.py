@@ -120,6 +120,14 @@ def load_single_slot(save_path: str | Path | None = None, user: str | None = Non
 
 
 def _pack_state(state: GameState) -> bytes:
+    try:
+        if state.meta.save_version != 3:
+            raise ValueError("save schema")
+        from retorno.worldgen.generator import pin_universe, validate_universe_state
+        pin_universe(state)
+        validate_universe_state(state)
+    except (ValueError,TypeError,AttributeError) as exc:
+        raise SaveLoadError(_universe_error(state)) from exc
     state_blob = pickle.dumps(state, protocol=pickle.HIGHEST_PROTOCOL)
     checksum = hashlib.sha256(state_blob).hexdigest().encode("ascii")
     return _SAVE_MAGIC + b"\n" + checksum + b"\n" + state_blob
@@ -158,12 +166,26 @@ def _load_from_file(path: Path) -> GameState:
 
     if not isinstance(loaded, GameState):
         raise SaveLoadError(f"Save file {path} does not contain a GameState")
-    if int(getattr(loaded.meta, "save_version", 0)) < 2:
+    if int(getattr(loaded.meta, "save_version", 0)) != 3:
         raise SaveLoadError(
-            "Save incompatible with data-pool refactor; start a new game."
+            _universe_error(loaded)
         )
 
+    try:
+        from retorno.worldgen.generator import validate_universe_state
+        validate_universe_state(loaded)
+    except (ValueError,TypeError,AttributeError) as exc:
+        raise SaveLoadError(_universe_error(loaded)) from exc
+
     return loaded
+
+
+def _universe_error(state):
+    locale = getattr(getattr(state.os,"locale",None),"value","en")
+    return {
+        "en":"Save incompatible with the historical universe version, rules or physical state. Start a new game; the existing file has been preserved.",
+        "es":"Partida incompatible con la versión, reglas o estado físico del universo histórico. Inicia una partida nueva; el archivo existente se ha conservado.",
+    }.get(locale,"Save incompatible / Partida incompatible: historical universe / universo histórico.")
 
 
 def _backup_path(path: Path) -> Path:
