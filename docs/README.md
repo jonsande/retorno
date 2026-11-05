@@ -39,7 +39,13 @@ Phase 4D-3e2: [Historical worldgen integration](design/historical-worldgen-integ
 [ES](design/historical-worldgen-integration.es.md) documents productive implementation,
 identity, complete inverse physical inventory in the certified domain, topology, saves,
 comparison and limits. See the [review report](testing/manifest-integration-review.md).
-The e1/e1b documents below retain historical evidence; e3/e4/e5 remain pending.
+The e1/e1b documents below retain historical evidence; e4/e5 remain pending; e3 memory is documented below.
+
+Phase 4D-3e3: [Scan observation memory](systems/discovery-navigation-intel.md#observation-memory-4d-3e3) /
+[ES](systems/discovery-navigation-intel.es.md#memoria-de-observaciones-4d-3e3): persistent
+128-sweep history, inconclusive negative evidence and unchanged detection/RNG.
+[Review report](testing/scan-observation-review.md). This does not implement F-DEAD-01
+or D21–D24 narrative compilation, which remains e4.
 
 ## Existing guides
 

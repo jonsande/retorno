@@ -14,6 +14,10 @@ Operational behavior
 - On completion, updates local contact awareness and may reveal detection events.
 - If new contacts are discovered, it emits `signal_detected` and its mapped cue.
 - If operating context changes before completion, the job may be interrupted.
+- A completed sweep records its position, conditions and detections; the latest 128 observations are retained without forgetting contacts.
+- A no-signals result applies to that observation and does not confirm that space is empty.
+- Detecting only known contacts is reported separately from detecting no signals.
+- An interrupted or cancelled sweep records no completed result; memory adds no requirement to repeat scans to unlock exploration.
 
 Related commands
 - `boot sensord`, `diag sensors`, `jobs`, `nav map contacts`, `route solve <node_id>`

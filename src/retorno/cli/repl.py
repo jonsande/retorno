@@ -1211,6 +1211,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Scan interrupted: location changed during scan ({node_id})",
             "es": "Scan interrumpido: la ubicación cambió durante el scan ({node_id})",
         },
+        "job_failed_scan_incomplete": {
+            "en": "Scan interrupted: observation incomplete; no result recorded",
+            "es": "Scan interrumpido: observación incompleta; no se registró un resultado",
+        },
         "job_failed_repair_attempt": {
             "en": (
                 "Repair failed for {target_id}. "
@@ -1487,6 +1491,12 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                         print(f"[INFO] (scan) distancia fina fijada: {node_id} ({dist_txt})")
                 if new_ids:
                     print(f"(scan) new: {', '.join(sorted(new_ids))}")
+                elif seen_ids:
+                    messages = {
+                        "en": "(scan) signals detected; all contacts were already known. No new contacts.",
+                        "es": "(scan) señales detectadas; todos los contactos ya eran conocidos. Sin contactos nuevos.",
+                    }
+                    print(messages.get(locale, messages["en"]))
             if key == "job_completed_drone_survey":
                 scrap = int(e.data.get("scrap_available", 0) or 0)
                 modules_detected = bool(e.data.get("modules_detected", False))
@@ -3658,7 +3668,11 @@ def render_contacts(state) -> None:
 def render_scan_results(state, node_ids: list[str]) -> None:
     print("\n=== SCAN ===")
     if not node_ids:
-        print("(no signals detected)")
+        messages = {
+            "en": "No signals detected in this observation. This does not confirm that space is empty.",
+            "es": "No se detectaron señales en esta observación. Esto no confirma que el espacio esté vacío.",
+        }
+        print(messages.get(state.os.locale.value, messages["en"]))
         return
     for cid in sorted(node_ids):
         node = state.world.space.nodes.get(cid)

@@ -5,7 +5,8 @@
 including Z spill. `SECTOR:`, `COORD:`, intel blocks and authored references keep
 their contracts; COORD remains a navigation point, not a historical station. Physical
 declaration, prose and revelation are distinct (D18–D20). Full authored/arc/single/forced
-regression remains e4; scan and lore are not claimed to implement new mechanics.
+regression remains e4. Scan observation memory from 4D-3e3 is described in §4.1;
+lore retains its previous mechanisms.
 
 Status: **canonical documentation of implemented behavior**. Production code
 was reviewed at commit `3658577`; tests were run later on the Phase 3B working
@@ -209,6 +210,8 @@ On completion it:
 5. Records `IntelItem(kind="node", source_kind="scan", confidence=0.6)` for a
    new detection.
 6. May set `fine_ranges_km` for selected kinds inside local radius.
+7. After the entire sweep succeeds, records an immutable observation of actual
+   execution conditions and results, without another RNG draw.
 
 The effective detection factors are `UPGRADED=1.00`, `NOMINAL=1.00`,
 `LIMITED=0.85`, `DAMAGED=0.60`, and `CRITICAL=0.35`; `OFFLINE` uses the 0.35
@@ -218,12 +221,96 @@ factor as the conservative 4C-2a correction: any additional upgrade bonus
 remains a future balance study. The final probability is clamped to `[0, 1]`.
 
 The active exploration-recovery entry is an exception: detection is guaranteed
-once it exists. `scan` does not publish `known_links`, inspect
+when it exists and is not yet in `known_nodes`. Already-known entries use the
+normal roll. `scan` does not publish `known_links`, inspect
 `SpaceNode.links`, or filter `locked_primary_targets`.
 
 Completing the job also evaluates deadnodes and the exploration-recovery
 failsafe. `scan` is therefore not read-only: it may materialize sectors and
 activate recovery nodes or files.
+
+#### Observation memory (4D-3e3)
+
+Implemented on `590a3e8`, pending external review. Historical existence,
+materialized nodes, observed contacts and known routes remain separate.
+An observation records what a sweep detected; it is neither another universe
+inventory nor certification of an empty volume.
+
+`ScanObservation` in [`model/world.py`](../../src/retorno/model/world.py) is a
+typed, frozen, serializable dataclass. Fields:
+
+| Fields | Meaning |
+| --- | --- |
+| `observation_id`, `t` | Monotonic `SCAN00001…` ID and exact `ClockState.t`, seconds since start. No new time model. |
+| `position_ly`, `origin_node_id` | Position actually used by scan; origin ID if its physical node existed, otherwise `None` for `current_pos_ly` fallback. |
+| `radius_ly` | Effective range at completion, not range copied at enqueue time. |
+| `sensors_state`, `sensors_forced_offline`, `sensord_running` | Execution snapshot of sensors/service. |
+| `detection_factor`, `near_probability`, `far_probability` | Actual parameters of the existing formula; no history-based adjustment. |
+| `detected_ids`, `new_ids` | Sorted tuples of actual detections and their newly discovered subset. Other detected contacts were already known. |
+| `guaranteed_ids` | Actually detected subset using the existing recovery-entry exception; no undetected candidate disclosure. |
+| `outcome` | `no_signals`, `known_contacts_only` or `new_contacts`. |
+| `rng_counter`, `job_key` | RNG counter used and stable internal job key; `None` for direct calls without a job. |
+
+`_perform_scan` is the sole recording point and keeps its former return tuple.
+It appends only after materialization, evaluation, intel and fine ranges finish.
+The timed `SCAN` job calls that same helper without adding another record.
+Its persisted `params['scan_observation_id']` marker and terminal state prevent
+reapplying effects even after retention prunes the entry. Repeated ticks do not
+repeat results. Each successful new direct invocation is another sweep, not a
+replay of a previous job.
+
+Existing gates remain: `_perform_scan` is a private kernel that does not check
+them itself, including the tested sensor-factor fallback. Public jobs and
+`_scan_and_discover` apply their existing gates; the compatibility helper records
+once without changing its return shape. Blocked scans, context/sensor
+interruptions and cancellations do not record. A materialization/evaluation
+exception makes the job `FAILED` with EN/ES incomplete-observation feedback,
+not a successful empty result. Direct calls propagate errors. Previously
+materialized historical sectors may remain, but are not absence evidence.
+Memory does not promise global rollback of arbitrary engine exceptions.
+
+`WorldState.scan_observations` retains the most recent **128** observations,
+oldest to newest in execution order; insertion order resolves equal timestamps.
+`next_scan_observation_seq` persists and is not reset by retention. Pruning does
+not touch contacts, intel, routes or pools. Frozen dataclass/tuple values retain
+no mutable node references, preventing retrospective edits. A removed waypoint
+ID may remain as historical provenance.
+
+`scan_observation_history(world)` returns an immutable history tuple without
+materialization or state changes. This is the read API; no command or panel was
+added. Old sweeps are not reconstructed from intel. Existing
+`WorldState.__setstate__` defaults added slots safely: old schema-3 games load
+empty history and sequence 1, without a version bump, complex migration or file
+deletion. Previously queued jobs can resume. New saves preserve history, order,
+IDs and job markers.
+
+EN/ES presentation is shared by CLI and Textual:
+
+- `no_signals`: “No signals detected in this observation. This does not confirm
+  that space is empty.” It invalidates no intel, sector or historical site.
+- `known_contacts_only`: signals were detected, all contacts were already known,
+  and the report explicitly says there are no new contacts.
+- `new_contacts`: new discoveries retain existing events, `record_intel`, fine
+  ranges and sound behavior.
+
+Records contain no omitted-site lists, manifest-query secrets, exhaustive
+coverage or sector absence certificates. A hidden node enters only through an
+actual detection; the deliberate natural-scan exception for protected primaries
+remains. Reading manifest/history reveals nothing. A negative can precede a
+legitimate later discovery, without repetition thresholds, cumulative probability,
+mandatory rescanning or free routes.
+
+`historical-world-v1` materialization/inverse queries are unchanged: a Z spill
+is observed at its actual physical position despite different generation
+provenance. Tests: [`scan_observation_memory_smoke.py`](../../tests/scan_observation_memory_smoke.py),
+20 groups, exact comparison with the `590a3e8` kernel, retention, save/load,
+former pickle slots, completion conditions, failures and presentation.
+[Report and results](../testing/scan-observation-review.md).
+
+Memory does not solve F-DEAD-01 or structural exploration blocks. No new sensor
+simulation, Bayesian model, triangulation, recovery planner or narrative compiler.
+D21–D24 and installed-story physical requirements remain e4; planner integration
+is e5. No `narrative/amanecer/`, arc, single or authoring-guide changes.
 
 ### 4.2 `route solve`
 

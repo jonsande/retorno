@@ -78,6 +78,9 @@ from retorno.model.jobs import (
 from retorno.model.ship_layout import canonical_ship_sector_id, drone_bay_sector_id_for_ship
 from retorno.model.world import (
     SECTOR_SIZE_LY,
+    SCAN_OBSERVATION_LIMIT,
+    ScanObservation,
+    ScanOutcome,
     SpaceNode,
     add_known_link,
     distance_between_nodes_ly,
@@ -3779,7 +3782,7 @@ class Engine:
         severity = Severity.WARN if source.kind == "ship_system" else Severity.INFO
         return self._make_event(state, EventType.BOOT_BLOCKED, severity, source, message, data=data)
 
-    def _perform_scan(self, state: GameState) -> tuple[list[str], list[str], list[dict[str, object]]]:
+    def _perform_scan(self, state: GameState, *, job: Job | None = None) -> tuple[list[str], list[str], list[dict[str, object]]]:
         current_id = state.world.current_node_id
         node = state.world.space.nodes.get(current_id)
         if node:
@@ -3800,6 +3803,9 @@ class Engine:
                     ensure_sector_generated(state, f"S{sx:+04d}_{sy:+04d}_{sz:+04d}")
 
         system = state.ship.systems.get("sensors")
+        sensors_state = system.state if system else None
+        sensors_forced_offline = bool(system and system.forced_offline)
+        sensord_running = bool(system and system.service and system.service.is_running)
         state_p = {
             SystemState.UPGRADED: Balance.SENSORS_DETECT_P_NOMINAL,
             SystemState.NOMINAL: Balance.SENSORS_DETECT_P_NOMINAL,
@@ -3817,6 +3823,7 @@ class Engine:
         seen: list[str] = []
         discovered: list[str] = []
         fine_range_updates: list[dict[str, object]] = []
+        guaranteed_ids: list[str] = []
         recovery_entry_id = getattr(state.world.exploration_recovery, "entry_node_id", None)
         state.meta.rng_counter += 1
 
@@ -3838,6 +3845,8 @@ class Engine:
                     continue
 
             seen.append(node_id)
+            if guaranteed_recovery_detect:
+                guaranteed_ids.append(node_id)
             is_new = node_id not in state.world.known_nodes
             if is_new:
                 discovered.append(node_id)
@@ -3867,6 +3876,28 @@ class Engine:
         seen.sort()
         discovered.sort()
         fine_range_updates.sort(key=lambda item: str(item.get("node_id", "")))
+        # Commit memory only after the full sweep succeeds. No new RNG draws,
+        # manifest inventory or undetected contacts enter this record.
+        observation = ScanObservation(
+            observation_id=f"SCAN{state.world.next_scan_observation_seq:05d}",
+            t=float(state.clock.t), position_ly=(x, y, z),
+            origin_node_id=current_id if node else None, radius_ly=radius_ly,
+            sensors_state=sensors_state, sensors_forced_offline=sensors_forced_offline,
+            sensord_running=sensord_running, detection_factor=state_p,
+            near_probability=float(Balance.SENSORS_DETECT_P_NEAR),
+            far_probability=float(Balance.SENSORS_DETECT_P_FAR),
+            detected_ids=tuple(seen), new_ids=tuple(discovered),
+            guaranteed_ids=tuple(sorted(guaranteed_ids)),
+            outcome=(ScanOutcome.NEW_CONTACTS if discovered else
+                     ScanOutcome.KNOWN_CONTACTS_ONLY if seen else ScanOutcome.NO_SIGNALS),
+            rng_counter=state.meta.rng_counter,
+            job_key=str(job.internal_id or job.job_id) if job else None,
+        )
+        state.world.scan_observations.append(observation)
+        state.world.next_scan_observation_seq += 1
+        del state.world.scan_observations[:-SCAN_OBSERVATION_LIMIT]
+        if job is not None:
+            job.params["scan_observation_id"] = observation.observation_id
         return seen, discovered, fine_range_updates
 
     def _build_lore_context(self, state: GameState, node_id: str) -> LoreContext:
@@ -4582,8 +4613,25 @@ class Engine:
             return events
 
         if job.job_type == JobType.SCAN:
+            # Terminal jobs and already-applied effects cannot replay a sweep,
+            # even after its record has aged out of the bounded history.
+            if (job.params.get("scan_observation_id") or job.terminal_seq is not None
+                or job.status in {JobStatus.FAILED, JobStatus.CANCELLED}):
+                return events
             origin_node_id = str(job.params.get("origin_node_id", job.target.id if job.target else state.world.current_node_id) or "")
-            seen, discovered, fine_range_updates = self._perform_scan(state)
+            try:
+                seen, discovered, fine_range_updates = self._perform_scan(state, job=job)
+            except Exception as exc:
+                # A failed materialization/evaluation is not a negative sweep.
+                events.append(self._make_job_outcome_event(
+                    state, job, EventType.JOB_FAILED, Severity.WARN,
+                    SourceRef(kind="world", id=origin_node_id),
+                    "Scan interrupted: observation incomplete; no result recorded",
+                    data={"job_type": job.job_type.value, "node_id": origin_node_id,
+                          "message_key": "job_failed_scan_incomplete",
+                          "reason": "scan_evaluation_incomplete", "error_type": type(exc).__name__},
+                ))
+                return events
             for node_id in discovered:
                 events.append(
                     self._make_event(
@@ -4609,6 +4657,8 @@ class Engine:
                         "seen_ids": seen,
                         "new_ids": discovered,
                         "fine_range_updates": fine_range_updates,
+                        "observation_id": job.params["scan_observation_id"],
+                        "scan_outcome": state.world.scan_observations[-1].outcome.value,
                         "message_key": "job_completed_scan",
                     },
                 )

@@ -5,8 +5,8 @@
 incluido desbordamiento Z. `SECTOR:`, `COORD:`, bloques de intel y referencias authored
 conservan sus contratos; COORD sigue creando un punto de navegación, no una estación
 histórica. Declaración física, prosa y revelación son distintas (D18–D20). La regresión
-completa authored/arcos/singles/forzado sigue reservada para e4; scan y lore no se
-declaran adaptados a nuevas mecánicas.
+completa authored/arcos/singles/forzado sigue reservada para e4. La memoria de scan
+4D-3e3 se describe en §4.1; lore conserva sus mecanismos anteriores.
 
 Estado: **documentación canónica del comportamiento implementado**. El código
 productivo se revisó en el commit `3658577`; las pruebas se ejecutaron después
@@ -217,6 +217,8 @@ Al completarse:
 5. Para una detección nueva registra `IntelItem(kind="node", source_kind="scan",
    confidence=0.6)`.
 6. Para ciertos tipos dentro del radio local puede fijar `fine_ranges_km`.
+7. Al terminar todo el barrido registra una observación inmutable con las
+   condiciones efectivamente usadas y los resultados, sin otra tirada RNG.
 
 Los factores efectivos de detección son `UPGRADED=1.00`, `NOMINAL=1.00`,
 `LIMITED=0.85`, `DAMAGED=0.60` y `CRITICAL=0.35`; internamente `OFFLINE` usa el
@@ -227,12 +229,98 @@ queda para un estudio futuro de balance. La probabilidad final se limita a
 `[0, 1]`.
 
 La entrada activa de recuperación de exploración es una excepción: se detecta
-con garantía una vez que existe. `scan` no publica `known_links`, no consulta
+con garantía cuando existe y todavía no está en `known_nodes`. Si ya era conocida
+se aplica la tirada normal. `scan` no publica `known_links`, no consulta
 `SpaceNode.links` y no filtra `locked_primary_targets`.
 
 Completar el trabajo también evalúa deadnodes y el failsafe de recuperación de
 exploración. Por tanto, `scan` no es una operación de sólo lectura: puede
 materializar sectores y activar nodos o archivos de recuperación.
+
+#### Memoria de observaciones (4D-3e3)
+
+Implementado sobre `590a3e8`, pendiente de revisión externa. Se conserva la
+separación entre existencia histórica, nodo materializado, contacto observado y
+ruta conocida. Una observación es un registro de lo que el barrido detectó,
+no otro inventario del universo ni una certificación de volumen vacío.
+
+`ScanObservation`, en [`model/world.py`](../../src/retorno/model/world.py), es una
+dataclass tipada, congelada y serializable. Campos:
+
+| Campos | Significado |
+| --- | --- |
+| `observation_id`, `t` | ID `SCAN00001…` monotónico y `ClockState.t` exacto en segundos desde inicio. No introduce otro modelo temporal. |
+| `position_ly`, `origin_node_id` | Posición realmente usada por scan; ID del origen si el nodo existía, `None` al usar sólo `current_pos_ly`. |
+| `radius_ly` | Alcance efectivo usado al completar, no una copia del radio al encolar. |
+| `sensors_state`, `sensors_forced_offline`, `sensord_running` | Snapshot del sensor/servicio durante ejecución. |
+| `detection_factor`, `near_probability`, `far_probability` | Parámetros reales de la fórmula vigente; sin ajuste por historial. |
+| `detected_ids`, `new_ids` | Tuplas ordenadas de detecciones reales y su subconjunto descubierto en ese barrido. Los otros detectados ya eran conocidos. |
+| `guaranteed_ids` | Subconjunto realmente detectado mediante la excepción existente de entrada de recuperación, sin publicar candidatos no detectados. |
+| `outcome` | `no_signals`, `known_contacts_only` o `new_contacts`. |
+| `rng_counter`, `job_key` | Contador RNG usado y clave interna estable del trabajo; `None` en llamadas directas sin trabajo. |
+
+`_perform_scan` es el único punto de registro y conserva su tupla de retorno
+anterior. Añade memoria sólo después de completar materialización, evaluación,
+intel y distancias finas. El trabajo `SCAN` pasa por ese mismo helper; no añade
+un segundo registro. Su marcador persistido `params['scan_observation_id']`
+y estado terminal impiden reaplicar efectos, incluso después de podar la entrada.
+Ticks repetidos no repiten resultados. Cada nueva invocación directa exitosa es
+otro barrido, no el replay de un trabajo anterior.
+
+Se conservan los gates previos: `_perform_scan` es un kernel privado que no los
+comprueba por sí mismo (incluido el fallback de factores que prueban los tests).
+El trabajo público y `_scan_and_discover` aplican sus gates existentes; el helper
+de compatibilidad registra una sola observación, sin cambiar su retorno.
+Bloqueo, interrupción por contexto/sensores y cancelación no registran observación.
+Si materialización/evaluación lanza una excepción, el trabajo queda `FAILED` con
+feedback EN/ES de observación incompleta; no emite resultados vacíos exitosos.
+La llamada directa propaga el error. Pueden quedar sectores históricos previamente
+materializados, pero no se registran como evidencia de ausencia. La memoria no
+promete rollback global de cualquier excepción dentro del motor.
+
+La lista `WorldState.scan_observations` conserva las últimas **128** observaciones,
+en orden de ejecución del más antiguo al más reciente; a igualdad de tiempo,
+el orden de inserción permanece. `next_scan_observation_seq` persiste y no se
+reinicia por retención. Podar no toca contactos, intel, rutas ni pools. Las tuplas
+sin referencias a nodos mutables y la dataclass congelada evitan cambios
+retroactivos; el ID de un waypoint retirado puede permanecer como procedencia histórica.
+
+`scan_observation_history(world)` devuelve una tupla inmutable del historial y
+no materializa ni muta nada. Es la API de consulta; no se añade comando ni panel.
+No se reconstruyen escaneos pasados a partir de intel. `WorldState.__setstate__`
+ya admite campos añadidos con defaults: las partidas existentes de esquema 3
+cargan historial vacío y secuencia 1, sin bump de versión, migración compleja ni
+borrado. También se reanudan trabajos encolados antes de añadir esos campos.
+Los guardados nuevos conservan historial, orden, IDs y marcadores de trabajos.
+
+Resultados y presentación EN/ES, compartida por CLI y Textual:
+
+- `no_signals`: «No se detectaron señales en esta observación. Esto no confirma
+  que el espacio esté vacío». No invalida intel, sectores ni emplazamientos.
+- `known_contacts_only`: hay señales realmente detectadas y todos sus contactos
+  ya eran conocidos; se indica que no hay contactos nuevos.
+- `new_contacts`: contiene descubrimientos nuevos, conservando eventos,
+  `record_intel`, distancias finas y comportamiento de sonido actuales.
+
+No se guardan listas de lugares omitidos, secretos consultados del manifiesto,
+cobertura exhaustiva ni certificados negativos por sector. Un nodo oculto sólo
+entra si la detección real lo observa; sigue vigente la excepción deliberada de
+scan natural para primaries protegidos. Consultar manifiesto o memoria no revela
+nada. Un negativo puede ir seguido de un descubrimiento legítimo, sin umbral de
+repeticiones, probabilidad acumulada, obligación de escanear otra vez ni rutas gratis.
+
+La materialización y consulta inversa `historical-world-v1` no cambian; un outlier
+Z se observa desde su posición física aunque su procedencia generadora sea otra.
+Pruebas: [`scan_observation_memory_smoke.py`](../../tests/scan_observation_memory_smoke.py),
+20 grupos, comparación exacta con kernel `590a3e8`, retención, save/load,
+representación anterior de slots, condiciones al completar, fallos y presentación.
+[Informe y resultados](../testing/scan-observation-review.es.md).
+
+La memoria no resuelve F-DEAD-01 ni sus bloqueos estructurales; no implementa
+nuevos sensores, bayesianismo, triangulación, planificación de recuperación ni
+compilación narrativa. D21–D24 y los requisitos físicos de historias instaladas
+siguen reservados para e4, con integración del planificador en e5. No se modifica
+`narrative/amanecer/`, arcos, singles ni guías de autoría.
 
 ### 4.2 `route solve`
 

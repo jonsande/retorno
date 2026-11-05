@@ -14,6 +14,10 @@ Comportamiento operativo
 - Al completarse, actualiza conciencia local de contactos y puede revelar eventos de detección.
 - Si descubre contactos nuevos, dispara el evento `signal_detected` y su cue asociado.
 - Si cambia el contexto operativo antes de completar, el job puede interrumpirse.
+- Un barrido completo conserva un registro de su posición, condiciones y detecciones; se retienen las últimas 128 observaciones sin olvidar contactos.
+- Un resultado sin señales corresponde a esa observación y no confirma que el espacio esté vacío.
+- Detectar sólo contactos ya conocidos se informa por separado de no detectar señales.
+- Un barrido interrumpido o cancelado no registra un resultado completo; no exige repetir scans para desbloquear exploración.
 
 Comandos relacionados
 - `boot sensord`, `diag sensors`, `jobs`, `nav map contacts`, `route solve <node_id>`

@@ -39,7 +39,13 @@ Fase 4D-3e2: [Integración del worldgen histórico](design/historical-worldgen-i
 [EN](design/historical-worldgen-integration.md) documenta la implementación productiva,
 identidades, consulta física inversa completa en dominio certificado, topología, saves,
 comparación y límites. Véase el [informe de revisión](testing/manifest-integration-review.es.md).
-Los documentos e1/e1b siguientes conservan evidencia histórica; e3/e4/e5 siguen pendientes.
+Los documentos e1/e1b siguientes conservan evidencia histórica; e4/e5 siguen pendientes; la memoria e3 se documenta a continuación.
+
+Fase 4D-3e3: [Memoria de observaciones de scan](systems/discovery-navigation-intel.es.md#memoria-de-observaciones-4d-3e3) /
+[EN](systems/discovery-navigation-intel.md#observation-memory-4d-3e3): historial persistente
+de 128 barridos, evidencia negativa no concluyente y detección/RNG vigentes conservados.
+[Informe para revisión](testing/scan-observation-review.es.md). No implementa F-DEAD-01
+ni la compilación narrativa D21–D24, que sigue en e4.
 
 ## Guías existentes
 

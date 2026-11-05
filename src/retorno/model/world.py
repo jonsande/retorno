@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import MISSING, dataclass, field, fields
+from enum import Enum
 from typing import TYPE_CHECKING, Optional, Tuple
 from retorno.config.balance import Balance
 from retorno.model.galaxy import galactic_region_for_op_pos
+from retorno.model.systems import SystemState
 
 if TYPE_CHECKING:
     from retorno.worldgen.manifest import ManifestDefinition
@@ -80,6 +82,37 @@ class IntelItem:
     note: Optional[str] = None
 
 
+SCAN_OBSERVATION_LIMIT = 128
+
+
+class ScanOutcome(str, Enum):
+    NO_SIGNALS = "no_signals"
+    KNOWN_CONTACTS_ONLY = "known_contacts_only"
+    NEW_CONTACTS = "new_contacts"
+
+
+@dataclass(frozen=True, slots=True)
+class ScanObservation:
+    """One completed sweep; non-detection never certifies physical absence."""
+    observation_id: str
+    t: float
+    position_ly: tuple[float, float, float]
+    origin_node_id: str | None
+    radius_ly: float
+    sensors_state: SystemState | None
+    sensors_forced_offline: bool
+    sensord_running: bool
+    detection_factor: float
+    near_probability: float
+    far_probability: float
+    detected_ids: tuple[str, ...]
+    new_ids: tuple[str, ...]
+    guaranteed_ids: tuple[str, ...]
+    outcome: ScanOutcome
+    rng_counter: int
+    job_key: str | None = None
+
+
 @dataclass(slots=True)
 class SectorGenState:
     sector_id: str = ""
@@ -133,6 +166,8 @@ class WorldState:
     universe_version: str = "historical-world-v1"
     universe_rules_key: str = ""
     manifest_definition: ManifestDefinition | None = None
+    scan_observations: list[ScanObservation] = field(default_factory=list)
+    next_scan_observation_seq: int = 1
 
     def __setstate__(self, state) -> None:
         """Backward-compatible unpickle for slot additions."""
@@ -165,6 +200,11 @@ class WorldState:
             else:
                 continue
             object.__setattr__(self, f.name, value)
+
+
+def scan_observation_history(world: WorldState) -> tuple[ScanObservation, ...]:
+    """Oldest to newest, immutable snapshot; no generation or knowledge writes."""
+    return tuple(world.scan_observations)
 
 
 @dataclass(slots=True)
