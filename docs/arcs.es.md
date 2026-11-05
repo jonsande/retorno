@@ -1,3 +1,5 @@
+> **Guía histórica, no normativa.** Las afirmaciones siguientes sobre creación ad hoc, arcos activos, pesos relativos, métodos de engine y entrega garantizada han quedado superadas. Para autoría vigente, formatos optativos probados y ejemplos ejecutables, usa [Requisitos narrativos físicos](narrative-world-contract.es.md) y [Scheduler](systems/lore-scheduler.es.md). No actives las plantillas por seguir los ejemplos antiguos.
+
 # Arcos y corridor_01.json
 
 Este documento explica cómo funcionan los **arcos** y cómo añadir nuevos arcos de contenido a Retorno.

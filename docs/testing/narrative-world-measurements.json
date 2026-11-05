@@ -1,0 +1,523 @@
+{
+  "test_03_seed_variability_and_bound_clues": [
+    {
+      "seed": 0,
+      "station": [
+        150031.24131196077,
+        5.543180847638558,
+        2.646261082342277
+      ],
+      "wreck": [
+        150032.08387641082,
+        5.543180847638558,
+        2.646261082342277
+      ],
+      "distance_ly": 0.8425644500530325,
+      "sector": "S+15003_+000_+000",
+      "region": "halo"
+    },
+    {
+      "seed": 1,
+      "station": [
+        150018.6216986468,
+        2.2695623804488645,
+        2.1316234847752824
+      ],
+      "wreck": [
+        150019.37767038465,
+        2.2695623804488645,
+        2.1316234847752824
+      ],
+      "distance_ly": 0.7559717378462665,
+      "sector": "S+15001_+000_+000",
+      "region": "halo"
+    },
+    {
+      "seed": 2,
+      "station": [
+        149990.661432997,
+        7.404138380706016,
+        3.8349675401491634
+      ],
+      "wreck": [
+        149991.19786088789,
+        7.404138380706016,
+        3.8349675401491634
+      ],
+      "distance_ly": 0.536427890881896,
+      "sector": "S+14999_+000_+000",
+      "region": "disk"
+    },
+    {
+      "seed": 3,
+      "station": [
+        150045.29544616555,
+        5.964927161461027,
+        7.9175736444944995
+      ],
+      "wreck": [
+        150046.43771226105,
+        5.964927161461027,
+        7.9175736444944995
+      ],
+      "distance_ly": 1.142266095499508,
+      "sector": "S+15004_+000_+000",
+      "region": "halo"
+    },
+    {
+      "seed": 4,
+      "station": [
+        150026.52288790233,
+        6.520924673241701,
+        6.5357232969290795
+      ],
+      "wreck": [
+        150027.6825032847,
+        6.520924673241701,
+        6.5357232969290795
+      ],
+      "distance_ly": 1.159615382377524,
+      "sector": "S+15002_+000_+000",
+      "region": "halo"
+    },
+    {
+      "seed": 5,
+      "station": [
+        150049.6455489545,
+        2.3075339900635528,
+        4.35068655044668
+      ],
+      "wreck": [
+        150050.4151459711,
+        2.3075339900635528,
+        4.35068655044668
+      ],
+      "distance_ly": 0.769597016624175,
+      "sector": "S+15004_+000_+000",
+      "region": "halo"
+    },
+    {
+      "seed": 6,
+      "station": [
+        150017.4591138311,
+        5.158521855007798,
+        7.532469231700087
+      ],
+      "wreck": [
+        150018.60283282096,
+        5.158521855007798,
+        7.532469231700087
+      ],
+      "distance_ly": 1.1437189898570068,
+      "sector": "S+15001_+000_+000",
+      "region": "halo"
+    },
+    {
+      "seed": 7,
+      "station": [
+        150027.14781966992,
+        5.931494631279405,
+        2.663212127373207
+      ],
+      "wreck": [
+        150028.3056596491,
+        5.931494631279405,
+        2.663212127373207
+      ],
+      "distance_ly": 1.1578399791906122,
+      "sector": "S+15002_+000_+000",
+      "region": "halo"
+    }
+  ],
+  "test_09_negative_declarations": [
+    "invalid: singles:synthetic_beta (lore/singles/index.json) :: TEST_HOST :: id: duplicate physical declaration; use references (arcs:synthetic_alpha (arcs/a_alpha.json))",
+    "invalid: singles:synthetic_beta (lore/singles/index.json) :: TEST_WRECK :: aliases: ambiguous 'Horizon': TEST_STATION",
+    "invalid: arcs:synthetic_alpha (arcs/a_alpha.json) :: MISSING_ENTITY :: references: missing physical entity",
+    "invalid: singles:synthetic_beta (lore/singles/index.json) :: TEST_RELAY :: to_kind: incompatible endpoint type",
+    "unsatisfiable: singles:synthetic_beta (lore/singles/index.json) :: TEST_STATION :: near: impossible distance interval",
+    "not_evaluated: catalog :: ARCHIVE_01,ECHO_7,HARBOR_12,RETORNO_SHIP,TEST_HOST,TEST_RELAY,TEST_STATION,TEST_WRECK,UNKNOWN :: position/relations: no verified placement in finite candidate domain",
+    "unsatisfiable: arcs/a_alpha.json :: arc:synthetic_alpha:primary :: host/channels: no verified legitimate essential opportunity (including file paths)",
+    "unsatisfiable: arcs/a_alpha.json :: arc:synthetic_alpha:primary :: host/channels: no verified legitimate essential opportunity (including file paths)",
+    "invalid: arcs/a_alpha.json :: synthetic_alpha :: .primary_intel.content_ref_en: missing resource lore/missing.txt",
+    "not_evaluated: locations:ARCHIVE_01 (locations/archive_01.json) :: ARCHIVE_01 :: position/relations: search budget exhausted; mandatory verification incomplete"
+  ],
+  "test_10_current_catalogue_and_impact_measurement": [
+    {
+      "seed": 0,
+      "baseline": {
+        "sites": 4,
+        "procedural": 4,
+        "hubs": 0,
+        "edges": 3,
+        "sectors": 2,
+        "components_induced": 2,
+        "isolated_sites_induced": 1,
+        "edges_induced": 2
+      },
+      "installed": {
+        "sites": 5,
+        "procedural": 1,
+        "hubs": 3,
+        "edges": 4,
+        "sectors": 2,
+        "components_induced": 2,
+        "isolated_sites_induced": 0,
+        "edges_induced": 3
+      }
+    },
+    {
+      "seed": 1,
+      "baseline": {
+        "sites": 5,
+        "procedural": 5,
+        "hubs": 0,
+        "edges": 4,
+        "sectors": 2,
+        "components_induced": 2,
+        "isolated_sites_induced": 0,
+        "edges_induced": 3
+      },
+      "installed": {
+        "sites": 5,
+        "procedural": 1,
+        "hubs": 3,
+        "edges": 4,
+        "sectors": 2,
+        "components_induced": 2,
+        "isolated_sites_induced": 0,
+        "edges_induced": 3
+      }
+    },
+    {
+      "seed": 2,
+      "baseline": {
+        "sites": 1,
+        "procedural": 1,
+        "hubs": 0,
+        "edges": 0,
+        "sectors": 2,
+        "components_induced": 1,
+        "isolated_sites_induced": 1,
+        "edges_induced": 0
+      },
+      "installed": {
+        "sites": 4,
+        "procedural": 0,
+        "hubs": 3,
+        "edges": 2,
+        "sectors": 2,
+        "components_induced": 2,
+        "isolated_sites_induced": 0,
+        "edges_induced": 2
+      }
+    },
+    {
+      "seed": 3,
+      "baseline": {
+        "sites": 5,
+        "procedural": 5,
+        "hubs": 1,
+        "edges": 5,
+        "sectors": 2,
+        "components_induced": 2,
+        "isolated_sites_induced": 0,
+        "edges_induced": 4
+      },
+      "installed": {
+        "sites": 5,
+        "procedural": 1,
+        "hubs": 3,
+        "edges": 5,
+        "sectors": 2,
+        "components_induced": 2,
+        "isolated_sites_induced": 0,
+        "edges_induced": 4
+      }
+    }
+  ],
+  "unchanged_production_comparison": {
+    "aggregate": true,
+    "algorithm_version": true,
+    "configuration_key": true,
+    "ideal_gaussian_outflow_probability": true,
+    "method": true,
+    "patches": true,
+    "python_implementation": true,
+    "python_version": true,
+    "resource_totals": true,
+    "rows": true,
+    "seeds": true
+  },
+  "comparison_seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    29,
+    271828
+  ],
+  "comparison_patches": {
+    "bulge": [
+      "S-25004_-002_+000",
+      "S-25004_-001_+000",
+      "S-25004_+000_+000",
+      "S-25004_+001_+000",
+      "S-25003_-002_+000",
+      "S-25003_-001_+000",
+      "S-25003_+000_+000",
+      "S-25003_+001_+000",
+      "S-25002_-002_+000",
+      "S-25002_-001_+000",
+      "S-25002_+000_+000",
+      "S-25002_+001_+000",
+      "S-25001_-002_+000",
+      "S-25001_-001_+000",
+      "S-25001_+000_+000",
+      "S-25001_+001_+000",
+      "S-25000_-002_+000",
+      "S-25000_-001_+000",
+      "S-25000_+000_+000",
+      "S-25000_+001_+000",
+      "S-24999_-002_+000",
+      "S-24999_-001_+000",
+      "S-24999_+000_+000",
+      "S-24999_+001_+000",
+      "S-24998_-002_+000",
+      "S-24998_-001_+000",
+      "S-24998_+000_+000",
+      "S-24998_+001_+000",
+      "S-24997_-002_+000",
+      "S-24997_-001_+000",
+      "S-24997_+000_+000",
+      "S-24997_+001_+000",
+      "S-25004_-002_+001",
+      "S-25004_-001_+001",
+      "S-25004_+000_+001",
+      "S-25004_+001_+001",
+      "S-25003_-002_+001",
+      "S-25003_-001_+001",
+      "S-25003_+000_+001",
+      "S-25003_+001_+001",
+      "S-25002_-002_+001",
+      "S-25002_-001_+001",
+      "S-25002_+000_+001",
+      "S-25002_+001_+001",
+      "S-25001_-002_+001",
+      "S-25001_-001_+001",
+      "S-25001_+000_+001",
+      "S-25001_+001_+001",
+      "S-25000_-002_+001",
+      "S-25000_-001_+001",
+      "S-25000_+000_+001",
+      "S-25000_+001_+001",
+      "S-24999_-002_+001",
+      "S-24999_-001_+001",
+      "S-24999_+000_+001",
+      "S-24999_+001_+001",
+      "S-24998_-002_+001",
+      "S-24998_-001_+001",
+      "S-24998_+000_+001",
+      "S-24998_+001_+001",
+      "S-24997_-002_+001",
+      "S-24997_-001_+001",
+      "S-24997_+000_+001",
+      "S-24997_+001_+001"
+    ],
+    "disk": [
+      "S+020_+020_+000",
+      "S+020_+021_+000",
+      "S+020_+022_+000",
+      "S+020_+023_+000",
+      "S+021_+020_+000",
+      "S+021_+021_+000",
+      "S+021_+022_+000",
+      "S+021_+023_+000",
+      "S+022_+020_+000",
+      "S+022_+021_+000",
+      "S+022_+022_+000",
+      "S+022_+023_+000",
+      "S+023_+020_+000",
+      "S+023_+021_+000",
+      "S+023_+022_+000",
+      "S+023_+023_+000",
+      "S+024_+020_+000",
+      "S+024_+021_+000",
+      "S+024_+022_+000",
+      "S+024_+023_+000",
+      "S+025_+020_+000",
+      "S+025_+021_+000",
+      "S+025_+022_+000",
+      "S+025_+023_+000",
+      "S+026_+020_+000",
+      "S+026_+021_+000",
+      "S+026_+022_+000",
+      "S+026_+023_+000",
+      "S+027_+020_+000",
+      "S+027_+021_+000",
+      "S+027_+022_+000",
+      "S+027_+023_+000",
+      "S+020_+020_+001",
+      "S+020_+021_+001",
+      "S+020_+022_+001",
+      "S+020_+023_+001",
+      "S+021_+020_+001",
+      "S+021_+021_+001",
+      "S+021_+022_+001",
+      "S+021_+023_+001",
+      "S+022_+020_+001",
+      "S+022_+021_+001",
+      "S+022_+022_+001",
+      "S+022_+023_+001",
+      "S+023_+020_+001",
+      "S+023_+021_+001",
+      "S+023_+022_+001",
+      "S+023_+023_+001",
+      "S+024_+020_+001",
+      "S+024_+021_+001",
+      "S+024_+022_+001",
+      "S+024_+023_+001",
+      "S+025_+020_+001",
+      "S+025_+021_+001",
+      "S+025_+022_+001",
+      "S+025_+023_+001",
+      "S+026_+020_+001",
+      "S+026_+021_+001",
+      "S+026_+022_+001",
+      "S+026_+023_+001",
+      "S+027_+020_+001",
+      "S+027_+021_+001",
+      "S+027_+022_+001",
+      "S+027_+023_+001"
+    ],
+    "halo": [
+      "S+15123_-001_+000",
+      "S+15123_+000_+000",
+      "S+15123_+001_+000",
+      "S+15123_+002_+000",
+      "S+15124_-001_+000",
+      "S+15124_+000_+000",
+      "S+15124_+001_+000",
+      "S+15124_+002_+000",
+      "S+15125_-001_+000",
+      "S+15125_+000_+000",
+      "S+15125_+001_+000",
+      "S+15125_+002_+000",
+      "S+15126_-001_+000",
+      "S+15126_+000_+000",
+      "S+15126_+001_+000",
+      "S+15126_+002_+000",
+      "S+15127_-001_+000",
+      "S+15127_+000_+000",
+      "S+15127_+001_+000",
+      "S+15127_+002_+000",
+      "S+15128_-001_+000",
+      "S+15128_+000_+000",
+      "S+15128_+001_+000",
+      "S+15128_+002_+000",
+      "S+15129_-001_+000",
+      "S+15129_+000_+000",
+      "S+15129_+001_+000",
+      "S+15129_+002_+000",
+      "S+15130_-001_+000",
+      "S+15130_+000_+000",
+      "S+15130_+001_+000",
+      "S+15130_+002_+000",
+      "S+15123_-001_+001",
+      "S+15123_+000_+001",
+      "S+15123_+001_+001",
+      "S+15123_+002_+001",
+      "S+15124_-001_+001",
+      "S+15124_+000_+001",
+      "S+15124_+001_+001",
+      "S+15124_+002_+001",
+      "S+15125_-001_+001",
+      "S+15125_+000_+001",
+      "S+15125_+001_+001",
+      "S+15125_+002_+001",
+      "S+15126_-001_+001",
+      "S+15126_+000_+001",
+      "S+15126_+001_+001",
+      "S+15126_+002_+001",
+      "S+15127_-001_+001",
+      "S+15127_+000_+001",
+      "S+15127_+001_+001",
+      "S+15127_+002_+001",
+      "S+15128_-001_+001",
+      "S+15128_+000_+001",
+      "S+15128_+001_+001",
+      "S+15128_+002_+001",
+      "S+15129_-001_+001",
+      "S+15129_+000_+001",
+      "S+15129_+001_+001",
+      "S+15129_+002_+001",
+      "S+15130_-001_+001",
+      "S+15130_+000_+001",
+      "S+15130_+001_+001",
+      "S+15130_+002_+001"
+    ],
+    "initial": [
+      "S+000_+000_+000",
+      "S+000_+001_+000",
+      "S+000_-001_+000",
+      "S+001_+000_+000",
+      "S+001_+001_+000",
+      "S+001_-001_+000",
+      "S-001_+000_+000",
+      "S-001_+001_+000",
+      "S-001_-001_+000"
+    ]
+  },
+  "production_benchmark": [
+    {
+      "evaluated_generation_sectors": 29,
+      "max_ms": 12.226,
+      "median_ms": 8.077,
+      "peak_kib": 52.5,
+      "requested_sectors": 1
+    },
+    {
+      "evaluated_generation_sectors": 46,
+      "max_ms": 12.841,
+      "median_ms": 12.336,
+      "peak_kib": 80.0,
+      "requested_sectors": 9
+    },
+    {
+      "evaluated_generation_sectors": 182,
+      "max_ms": 43.128,
+      "median_ms": 41.494,
+      "peak_kib": 258.0,
+      "requested_sectors": 64
+    }
+  ],
+  "physical_materialization_benchmark": [
+    {
+      "inverse_generation_sectors": 4,
+      "inverse_ms": 5.085,
+      "materialize_ms": 22.366,
+      "materialized_nodes": 19,
+      "materialized_physical_sectors": 9,
+      "requested_sectors": 1
+    },
+    {
+      "inverse_generation_sectors": 17,
+      "inverse_ms": 7.974,
+      "materialize_ms": 37.851,
+      "materialized_nodes": 51,
+      "materialized_physical_sectors": 27,
+      "requested_sectors": 9
+    },
+    {
+      "inverse_generation_sectors": 90,
+      "inverse_ms": 23.237,
+      "materialize_ms": 111.865,
+      "materialized_nodes": 197,
+      "materialized_physical_sectors": 120,
+      "requested_sectors": 64
+    }
+  ]
+}

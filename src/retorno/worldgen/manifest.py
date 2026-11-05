@@ -78,6 +78,7 @@ class ManifestDefinition:
     hop_cap_ly: float
     scope: str
     rules_key: str = ""
+    narrative_key: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -150,11 +151,13 @@ def authored_base(locations: Sequence[dict]) -> tuple[AuthoredSite, ...]:
     return tuple(sites)
 
 
-def _scope(seed, version, configuration, authored, cap, rules_key=""):
+def _scope(seed, version, configuration, authored, cap, rules_key="", narrative_key=""):
     payload = (seed, version, configuration, cap,
                tuple((a.raw_id, a.kind, a.position_ly, a.is_hub) for a in authored))
     if rules_key:
         payload += (rules_key,)
+    if narrative_key:
+        payload += (narrative_key,)
     return hashlib.sha256(json.dumps(payload, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
 
 
@@ -179,6 +182,7 @@ def physical_rules_key():
 def define_manifest(
     seed: int, *, templates: dict | None = None, archetypes: dict | None = None,
     authored: Sequence[AuthoredSite] | None = None, algorithm_version: str = ALGORITHM_VERSION,
+    narrative_key: str = "",
 ) -> ManifestDefinition:
     """Capture a fixed definition; all subsequent queries use this snapshot.
 
@@ -237,7 +241,7 @@ def define_manifest(
     if rules_key and any(float(t.get("z_sigma", .3) or .3) > 2 for t in templates.values()):
         raise ValueError("Z dispersion outside certified historical kernel domain")
     return ManifestDefinition(seed, algorithm_version, frozen, base, configuration, cap,
-                              _scope(seed, algorithm_version, configuration, base, cap, rules_key), rules_key)
+                              _scope(seed, algorithm_version, configuration, base, cap, rules_key, narrative_key), rules_key, narrative_key)
 
 
 class _Session:
@@ -249,7 +253,7 @@ class _Session:
             or _configuration_key(self.templates, self.archetypes) != definition.configuration_key
             or float(Balance.MAX_ROUTE_HOP_LY) != definition.hop_cap_ly
             or _scope(definition.seed, definition.algorithm_version, definition.configuration_key,
-                      definition.authored, definition.hop_cap_ly, definition.rules_key) != definition.scope
+                      definition.authored, definition.hop_cap_ly, definition.rules_key, definition.narrative_key) != definition.scope
             or (definition.algorithm_version == ALGORITHM_VERSION and definition.rules_key != physical_rules_key())):
             raise ValueError("Definition/environment changed; define a new manifest explicitly")
         self.view = SimpleNamespace(meta=SimpleNamespace(rng_seed=definition.seed),

@@ -10,6 +10,18 @@ def _node_to_filename(node_id: str) -> str:
     return node_id.lower().replace("-", "_") + ".json"
 
 
+def load_definition_records(directory: str) -> list[tuple[str, dict]]:
+    """Shared nonrecursive boundary, with provenance for content validation."""
+    records = []
+    for file in sorted((_DATA_ROOT / directory).glob("*.json")):
+        try:
+            value = json.loads(file.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise ValueError(f"{file}: {exc}") from exc
+        records.append((file.relative_to(_DATA_ROOT).as_posix(), value))
+    return records
+
+
 def load_loot(node_id: str) -> dict:
     path = _DATA_ROOT / "loot" / _node_to_filename(node_id)
     with path.open("r", encoding="utf-8") as fh:
@@ -44,10 +56,7 @@ def load_locations() -> list[dict]:
     path = _DATA_ROOT / "locations"
     if not path.exists():
         return []
-    locations: list[dict] = []
-    for file in sorted(path.glob("*.json")):
-        with file.open("r", encoding="utf-8") as fh:
-            locations.append(json.load(fh))
+    locations = [value for _, value in load_definition_records("locations")]
     for loc in locations:
         files = loc.get("fs_files") or []
         for entry in files:
@@ -94,11 +103,7 @@ def load_arcs() -> list[dict]:
     path = _DATA_ROOT / "arcs"
     if not path.exists():
         return []
-    arcs: list[dict] = []
-    for file in sorted(path.glob("*.json")):
-        with file.open("r", encoding="utf-8") as fh:
-            arcs.append(json.load(fh))
-    return arcs
+    return [value for _, value in load_definition_records("arcs")]
 
 
 def load_singles() -> list[dict]:
@@ -109,4 +114,4 @@ def load_singles() -> list[dict]:
         data = json.load(fh)
     if isinstance(data, list):
         return data
-    return []
+    raise ValueError(f"{path}: singles index must be a list / el índice de singles debe ser una lista")

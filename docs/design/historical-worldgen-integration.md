@@ -1,3 +1,5 @@
+> **Implemented 4D-3e4 update (2026-11-05).** For catalogues with new physical requirements, bootstrap pins the manifest with catalogue identity and compiled results. Without additional declarations, the previous physical scope and pre-materialization seed selection remain. Schema 3 saves a required narrative snapshot; older saves without it and changed catalogues are rejected. Roadmap v1.2 applies. The body below documents e2 in its historical context. The current contract and executable examples are [Physical narrative requirements](../narrative-world-contract.md). The earlier body retained below is historical wherever it contradicts this update.
+
 # Historical worldgen integration — 4D-3e2
 
 Spanish: [historical-worldgen-integration.es.md](historical-worldgen-integration.es.md).

@@ -1,3 +1,5 @@
+> **Actualización implementada 4D-3e4 (2026-11-05).** Los requisitos estructurados optativos del catálogo activo se compilan antes de jugar y se incorporan al manifiesto productivo. Las posiciones variables dependen de semilla/ID y las relaciones deben certificarse. Los sitios nuevos son lazy y secretos. No se ajustan densidades, cupos, hubs, cap ni topología. La creación ad hoc de lore descrita en el cuerpo anterior se ha retirado; recovery estructural sigue pendiente de e5. La referencia vigente y sus ejemplos ejecutables son [Requisitos narrativos físicos](../narrative-world-contract.es.md). El cuerpo anterior conservado a continuación es histórico donde contradiga esta actualización.
+
 # Universo físico y generación procedural
 
 Estado: referencia canónica implementada, actualizada en **4D-3e2**, árbol

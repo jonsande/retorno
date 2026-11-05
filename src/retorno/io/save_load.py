@@ -124,10 +124,12 @@ def _pack_state(state: GameState) -> bytes:
         if state.meta.save_version != 3:
             raise ValueError("save schema")
         from retorno.worldgen.generator import pin_universe, validate_universe_state
+        from retorno.worldgen.narrative import validate_catalog
+        validate_catalog(state)
         pin_universe(state)
         validate_universe_state(state)
     except (ValueError,TypeError,AttributeError) as exc:
-        raise SaveLoadError(_universe_error(state)) from exc
+        raise SaveLoadError(f"{_universe_error(state)} ({exc})") from exc
     state_blob = pickle.dumps(state, protocol=pickle.HIGHEST_PROTOCOL)
     checksum = hashlib.sha256(state_blob).hexdigest().encode("ascii")
     return _SAVE_MAGIC + b"\n" + checksum + b"\n" + state_blob
@@ -173,9 +175,13 @@ def _load_from_file(path: Path) -> GameState:
 
     try:
         from retorno.worldgen.generator import validate_universe_state
+        from retorno.worldgen.narrative import validate_catalog
+        if not loaded.world.narrative_snapshot:
+            raise ValueError("Narrative catalog snapshot missing / Falta el snapshot del catálogo narrativo")
+        validate_catalog(loaded)
         validate_universe_state(loaded)
     except (ValueError,TypeError,AttributeError) as exc:
-        raise SaveLoadError(_universe_error(loaded)) from exc
+        raise SaveLoadError(f"{_universe_error(loaded)} ({exc})") from exc
 
     return loaded
 

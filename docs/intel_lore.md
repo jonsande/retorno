@@ -1,3 +1,5 @@
+> **Historical, non-normative guide.** Statements below about ad hoc creation, active arcs, relative weights, engine methods and guaranteed delivery are superseded. For current authoring, tested optional formats and executable examples, use [Physical narrative requirements](narrative-world-contract.md) and [Scheduler](systems/lore-scheduler.md). Do not activate templates by following old examples.
+
 # How Intel and Lore Are Acquired
 
 This document summarizes the current ways players can obtain **intel** (navigation knowledge) and **lore** (narrative text) in Retorno.

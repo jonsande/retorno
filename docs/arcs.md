@@ -1,3 +1,5 @@
+> **Historical, non-normative guide.** Statements below about ad hoc creation, active arcs, relative weights, engine methods and guaranteed delivery are superseded. For current authoring, tested optional formats and executable examples, use [Physical narrative requirements](narrative-world-contract.md) and [Scheduler](systems/lore-scheduler.md). Do not activate templates by following old examples.
+
 # Arcs and corridor_01.json
 
 This document explains how **arcs** work and how to add new content arcs to Retorno.

@@ -1,0 +1,1020 @@
+{
+  "interpreter": "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+  "initial_head": "d851d441b0548eb67035d5aa8cdb298db0499800",
+  "branch": "main",
+  "baseline": [
+    {
+      "file": "audio_config_smoke.py",
+      "code": 0,
+      "seconds": 1.63
+    },
+    {
+      "file": "audio_runtime_notice_smoke.py",
+      "code": 0,
+      "seconds": 0.09
+    },
+    {
+      "file": "config_audio_smoke.py",
+      "code": 0,
+      "seconds": 0.33
+    },
+    {
+      "file": "contacts_sector_smoke.py",
+      "code": 0,
+      "seconds": 0.24
+    },
+    {
+      "file": "contacts_smoke.py",
+      "code": 0,
+      "seconds": 0.32
+    },
+    {
+      "file": "deadnode_chain_detours_smoke.py",
+      "code": 0,
+      "seconds": 2.74
+    },
+    {
+      "file": "deadnode_chain_planner_smoke.py",
+      "code": 0,
+      "seconds": 2.82
+    },
+    {
+      "file": "deadnode_cooldown_zero_smoke.py",
+      "code": 0,
+      "seconds": 0.38
+    },
+    {
+      "file": "deadnode_opportunity_selection_smoke.py",
+      "code": 0,
+      "seconds": 3.58
+    },
+    {
+      "file": "debug_add_commands_smoke.py",
+      "code": 0,
+      "seconds": 0.2
+    },
+    {
+      "file": "debug_galaxy_smoke.py",
+      "code": 0,
+      "seconds": 0.25
+    },
+    {
+      "file": "debug_lore_arcs_smoke.py",
+      "code": 0,
+      "seconds": 0.23
+    },
+    {
+      "file": "debug_worldgen_graph_smoke.py",
+      "code": 0,
+      "seconds": 0.23
+    },
+    {
+      "file": "drone_completion_context_smoke.py",
+      "code": 0,
+      "seconds": 0.21
+    },
+    {
+      "file": "drone_modular_v1_smoke.py",
+      "code": 0,
+      "seconds": 0.55
+    },
+    {
+      "file": "drone_recall_all_smoke.py",
+      "code": 0,
+      "seconds": 0.26
+    },
+    {
+      "file": "drone_salvage_survey_smoke.py",
+      "code": 0,
+      "seconds": 0.43
+    },
+    {
+      "file": "energy_policy_smoke.py",
+      "code": 0,
+      "seconds": 1.36
+    },
+    {
+      "file": "exploration_recovery_smoke.py",
+      "code": 0,
+      "seconds": 0.36
+    },
+    {
+      "file": "forced_hidden_ad_hoc_smoke.py",
+      "code": 0,
+      "seconds": 0.2
+    },
+    {
+      "file": "galaxy_physical_model_smoke.py",
+      "code": 0,
+      "seconds": 0.19
+    },
+    {
+      "file": "hibernate_radiation_wake_smoke.py",
+      "code": 0,
+      "seconds": 0.27
+    },
+    {
+      "file": "hibernate_sequence_assets_smoke.py",
+      "code": 0,
+      "seconds": 0.03
+    },
+    {
+      "file": "intel_recent_order_smoke.py",
+      "code": 0,
+      "seconds": 0.29
+    },
+    {
+      "file": "job_id_numbering_smoke.py",
+      "code": 0,
+      "seconds": 0.17
+    },
+    {
+      "file": "known_routes_integrity_smoke.py",
+      "code": 0,
+      "seconds": 1.33
+    },
+    {
+      "file": "lore_channel_preference_and_unlock_smoke.py",
+      "code": 0,
+      "seconds": 0.17
+    },
+    {
+      "file": "lore_distance_from_start_smoke.py",
+      "code": 0,
+      "seconds": 0.14
+    },
+    {
+      "file": "lore_secondary_count_weights_hard_smoke.py",
+      "code": 0,
+      "seconds": 0.46
+    },
+    {
+      "file": "lore_smoke.py",
+      "code": 0,
+      "seconds": 0.14
+    },
+    {
+      "file": "mail_metadata_and_log_header_smoke.py",
+      "code": 0,
+      "seconds": 0.2
+    },
+    {
+      "file": "nav_abort_waypoint_cleanup_smoke.py",
+      "code": 0,
+      "seconds": 2.67
+    },
+    {
+      "file": "nav_map_galaxy_dependencies_smoke.py",
+      "code": 0,
+      "seconds": 0.21
+    },
+    {
+      "file": "nav_map_galaxy_determinism_smoke.py",
+      "code": 0,
+      "seconds": 0.23
+    },
+    {
+      "file": "nav_map_galaxy_smoke.py",
+      "code": 0,
+      "seconds": 0.26
+    },
+    {
+      "file": "procedural_radiation_smoke.py",
+      "code": 0,
+      "seconds": 0.15
+    },
+    {
+      "file": "radiation_hull_smoke.py",
+      "code": 1,
+      "seconds": 0.83
+    },
+    {
+      "file": "route_hop_cap_smoke.py",
+      "code": 0,
+      "seconds": 0.46
+    },
+    {
+      "file": "route_solve_out_of_range_origins_smoke.py",
+      "code": 0,
+      "seconds": 0.42
+    },
+    {
+      "file": "save_load_smoke.py",
+      "code": 0,
+      "seconds": 0.32
+    },
+    {
+      "file": "scan_job_smoke.py",
+      "code": 0,
+      "seconds": 0.37
+    },
+    {
+      "file": "scan_observation_memory_smoke.py",
+      "code": 0,
+      "seconds": 8.71
+    },
+    {
+      "file": "sector_intel_validation_smoke.py",
+      "code": 0,
+      "seconds": 0.5
+    },
+    {
+      "file": "sensor_detection_factor_smoke.py",
+      "code": 0,
+      "seconds": 3.01
+    },
+    {
+      "file": "ship_layout_output_smoke.py",
+      "code": 0,
+      "seconds": 0.2
+    },
+    {
+      "file": "ship_survey_radiation_smoke.py",
+      "code": 0,
+      "seconds": 0.2
+    },
+    {
+      "file": "smoke_test.py",
+      "code": 0,
+      "seconds": 0.18
+    },
+    {
+      "file": "textual_active_jobs_job_id_smoke.py",
+      "code": 0,
+      "seconds": 0.21
+    },
+    {
+      "file": "textual_command_spacing_smoke.py",
+      "code": 0,
+      "seconds": 3.96
+    },
+    {
+      "file": "textual_completion_context_smoke.py",
+      "code": 0,
+      "seconds": 2.16
+    },
+    {
+      "file": "textual_theme_smoke.py",
+      "code": 0,
+      "seconds": 4.08
+    },
+    {
+      "file": "transit_radiation_progression_smoke.py",
+      "code": 0,
+      "seconds": 0.14
+    },
+    {
+      "file": "uplink_authored_and_failsafe_smoke.py",
+      "code": 0,
+      "seconds": 0.34
+    },
+    {
+      "file": "uplink_once_per_node_smoke.py",
+      "code": 0,
+      "seconds": 0.25
+    },
+    {
+      "file": "uplink_only_delivery_retry_smoke.py",
+      "code": 0,
+      "seconds": 0.85
+    },
+    {
+      "file": "worldgen_manifest_integration_smoke.py",
+      "code": 0,
+      "seconds": 4.78
+    },
+    {
+      "file": "worldgen_manifest_prototype_smoke.py",
+      "code": 0,
+      "seconds": 3.08
+    },
+    {
+      "file": "worldgen_modules_pool_smoke.py",
+      "code": 0,
+      "seconds": 1.71
+    },
+    {
+      "file": "worldgen_preexistence_catalog_smoke.py",
+      "code": 0,
+      "seconds": 1.67
+    },
+    {
+      "file": "worldgen_preexistence_characterization_smoke.py",
+      "code": 0,
+      "seconds": 0.56
+    },
+    {
+      "file": "worldgen_sparse_archetypes_smoke.py",
+      "code": 0,
+      "seconds": 9.98
+    }
+  ],
+  "release_serial": [
+    {
+      "file": "audio_config_smoke.py",
+      "code": 0,
+      "seconds": 1.26
+    },
+    {
+      "file": "audio_runtime_notice_smoke.py",
+      "code": 0,
+      "seconds": 0.07
+    },
+    {
+      "file": "config_audio_smoke.py",
+      "code": 0,
+      "seconds": 0.17
+    },
+    {
+      "file": "contacts_sector_smoke.py",
+      "code": 0,
+      "seconds": 0.16
+    },
+    {
+      "file": "contacts_smoke.py",
+      "code": 0,
+      "seconds": 0.23
+    },
+    {
+      "file": "deadnode_chain_detours_smoke.py",
+      "code": 0,
+      "seconds": 3.46
+    },
+    {
+      "file": "deadnode_chain_planner_smoke.py",
+      "code": 0,
+      "seconds": 4.24
+    },
+    {
+      "file": "deadnode_cooldown_zero_smoke.py",
+      "code": 0,
+      "seconds": 0.37
+    },
+    {
+      "file": "deadnode_opportunity_selection_smoke.py",
+      "code": 0,
+      "seconds": 5.04
+    },
+    {
+      "file": "debug_add_commands_smoke.py",
+      "code": 0,
+      "seconds": 0.22
+    },
+    {
+      "file": "debug_galaxy_smoke.py",
+      "code": 0,
+      "seconds": 0.27
+    },
+    {
+      "file": "debug_lore_arcs_smoke.py",
+      "code": 0,
+      "seconds": 0.26
+    },
+    {
+      "file": "debug_worldgen_graph_smoke.py",
+      "code": 0,
+      "seconds": 0.26
+    },
+    {
+      "file": "drone_completion_context_smoke.py",
+      "code": 0,
+      "seconds": 0.22
+    },
+    {
+      "file": "drone_modular_v1_smoke.py",
+      "code": 0,
+      "seconds": 1.04
+    },
+    {
+      "file": "drone_recall_all_smoke.py",
+      "code": 0,
+      "seconds": 0.26
+    },
+    {
+      "file": "drone_salvage_survey_smoke.py",
+      "code": 0,
+      "seconds": 0.7
+    },
+    {
+      "file": "energy_policy_smoke.py",
+      "code": 0,
+      "seconds": 3.2
+    },
+    {
+      "file": "exploration_recovery_smoke.py",
+      "code": 0,
+      "seconds": 0.6
+    },
+    {
+      "file": "forced_hidden_ad_hoc_smoke.py",
+      "code": 0,
+      "seconds": 0.31
+    },
+    {
+      "file": "galaxy_physical_model_smoke.py",
+      "code": 0,
+      "seconds": 0.18
+    },
+    {
+      "file": "hibernate_radiation_wake_smoke.py",
+      "code": 0,
+      "seconds": 0.32
+    },
+    {
+      "file": "hibernate_sequence_assets_smoke.py",
+      "code": 0,
+      "seconds": 0.03
+    },
+    {
+      "file": "intel_recent_order_smoke.py",
+      "code": 0,
+      "seconds": 0.47
+    },
+    {
+      "file": "job_id_numbering_smoke.py",
+      "code": 0,
+      "seconds": 0.24
+    },
+    {
+      "file": "known_routes_integrity_smoke.py",
+      "code": 0,
+      "seconds": 2.48
+    },
+    {
+      "file": "lore_channel_preference_and_unlock_smoke.py",
+      "code": 0,
+      "seconds": 0.2
+    },
+    {
+      "file": "lore_distance_from_start_smoke.py",
+      "code": 0,
+      "seconds": 0.15
+    },
+    {
+      "file": "lore_secondary_count_weights_hard_smoke.py",
+      "code": 0,
+      "seconds": 1.07
+    },
+    {
+      "file": "lore_smoke.py",
+      "code": 0,
+      "seconds": 0.16
+    },
+    {
+      "file": "mail_metadata_and_log_header_smoke.py",
+      "code": 0,
+      "seconds": 0.23
+    },
+    {
+      "file": "narrative_world_integration_smoke.py",
+      "code": 0,
+      "seconds": 19.16
+    },
+    {
+      "file": "nav_abort_waypoint_cleanup_smoke.py",
+      "code": 0,
+      "seconds": 3.62
+    },
+    {
+      "file": "nav_map_galaxy_dependencies_smoke.py",
+      "code": 0,
+      "seconds": 0.22
+    },
+    {
+      "file": "nav_map_galaxy_determinism_smoke.py",
+      "code": 0,
+      "seconds": 0.27
+    },
+    {
+      "file": "nav_map_galaxy_smoke.py",
+      "code": 0,
+      "seconds": 0.25
+    },
+    {
+      "file": "procedural_radiation_smoke.py",
+      "code": 0,
+      "seconds": 0.16
+    },
+    {
+      "file": "radiation_hull_smoke.py",
+      "code": 1,
+      "seconds": 1.14
+    },
+    {
+      "file": "route_hop_cap_smoke.py",
+      "code": 0,
+      "seconds": 0.25
+    },
+    {
+      "file": "route_solve_out_of_range_origins_smoke.py",
+      "code": 0,
+      "seconds": 0.37
+    },
+    {
+      "file": "save_load_smoke.py",
+      "code": 0,
+      "seconds": 0.35
+    },
+    {
+      "file": "scan_job_smoke.py",
+      "code": 0,
+      "seconds": 0.47
+    },
+    {
+      "file": "scan_observation_memory_smoke.py",
+      "code": 0,
+      "seconds": 10.41
+    },
+    {
+      "file": "sector_intel_validation_smoke.py",
+      "code": 0,
+      "seconds": 0.76
+    },
+    {
+      "file": "sensor_detection_factor_smoke.py",
+      "code": 0,
+      "seconds": 3.49
+    },
+    {
+      "file": "ship_layout_output_smoke.py",
+      "code": 0,
+      "seconds": 0.22
+    },
+    {
+      "file": "ship_survey_radiation_smoke.py",
+      "code": 0,
+      "seconds": 0.22
+    },
+    {
+      "file": "smoke_test.py",
+      "code": 0,
+      "seconds": 0.34
+    },
+    {
+      "file": "textual_active_jobs_job_id_smoke.py",
+      "code": 0,
+      "seconds": 0.24
+    },
+    {
+      "file": "textual_command_spacing_smoke.py",
+      "code": 0,
+      "seconds": 3.74
+    },
+    {
+      "file": "textual_completion_context_smoke.py",
+      "code": 0,
+      "seconds": 1.91
+    },
+    {
+      "file": "textual_theme_smoke.py",
+      "code": 0,
+      "seconds": 3.79
+    },
+    {
+      "file": "transit_radiation_progression_smoke.py",
+      "code": 0,
+      "seconds": 0.16
+    },
+    {
+      "file": "uplink_authored_and_failsafe_smoke.py",
+      "code": 0,
+      "seconds": 0.57
+    },
+    {
+      "file": "uplink_once_per_node_smoke.py",
+      "code": 0,
+      "seconds": 0.36
+    },
+    {
+      "file": "uplink_only_delivery_retry_smoke.py",
+      "code": 0,
+      "seconds": 1.68
+    },
+    {
+      "file": "worldgen_manifest_integration_smoke.py",
+      "code": 0,
+      "seconds": 5.05
+    },
+    {
+      "file": "worldgen_manifest_prototype_smoke.py",
+      "code": 0,
+      "seconds": 2.81
+    },
+    {
+      "file": "worldgen_modules_pool_smoke.py",
+      "code": 0,
+      "seconds": 1.66
+    },
+    {
+      "file": "worldgen_preexistence_catalog_smoke.py",
+      "code": 0,
+      "seconds": 1.99
+    },
+    {
+      "file": "worldgen_preexistence_characterization_smoke.py",
+      "code": 0,
+      "seconds": 0.69
+    },
+    {
+      "file": "worldgen_sparse_archetypes_smoke.py",
+      "code": 0,
+      "seconds": 10.2
+    }
+  ],
+  "narrative_groups_passed": [
+    "test_01_bootstrap_identity_and_no_secret_revelation",
+    "test_02_order_and_pure_queries",
+    "test_03_seed_variability_and_bound_clues",
+    "test_04_forced_host_delivery_salvage_and_reading",
+    "test_05_optional_probability_delivery_and_no_physical_dependency",
+    "test_06_pool_exhaustion_and_deadline_never_reopen",
+    "test_07_intel_public_formats_and_pending_references",
+    "test_08_repeated_saves_and_catalog_changes",
+    "test_09_negative_declarations",
+    "test_10_current_catalogue_and_impact_measurement",
+    "test_11_near_is_not_a_connection_and_required_link_rejected",
+    "test_12_corrupt_intel_is_uncertain_and_never_fabricates",
+    "test_13_local_file_bindings_and_compilation_failures",
+    "test_14_all_existing_push_channels_keep_reading_separate",
+    "test_15_essential_document_reserved_on_empty_wreck",
+    "test_16_protected_alias_and_natural_discovery_exceptions",
+    "test_17_unbound_tokens_and_legacy_save_rejection",
+    "test_18_essential_file_path_must_be_recoverable",
+    "test_19_reserved_tokens_are_validated_without_bindings",
+    "test_20_essential_payload_matches_real_delivery_and_language_fallback"
+  ],
+  "baseline_theme_concurrent_reproduction": [
+    {
+      "iteration": 0,
+      "code": 0,
+      "no_matches": false
+    },
+    {
+      "iteration": 1,
+      "code": 0,
+      "no_matches": false
+    },
+    {
+      "iteration": 2,
+      "code": 0,
+      "no_matches": false
+    },
+    {
+      "iteration": 3,
+      "code": 1,
+      "no_matches": true
+    }
+  ],
+  "diff_check": "passed",
+  "active_editorial_data_unchanged": true,
+  "pytest_available": false,
+  "final_focused_validation": "20 groups passed: original 18 unchanged, plus reserved tokens and effective essential payload",
+  "pre_focus_release_serial": [
+    {
+      "file": "audio_config_smoke.py",
+      "code": 0,
+      "seconds": 1.27
+    },
+    {
+      "file": "audio_runtime_notice_smoke.py",
+      "code": 0,
+      "seconds": 0.07
+    },
+    {
+      "file": "config_audio_smoke.py",
+      "code": 0,
+      "seconds": 0.16
+    },
+    {
+      "file": "contacts_sector_smoke.py",
+      "code": 0,
+      "seconds": 0.17
+    },
+    {
+      "file": "contacts_smoke.py",
+      "code": 0,
+      "seconds": 0.23
+    },
+    {
+      "file": "deadnode_chain_detours_smoke.py",
+      "code": 0,
+      "seconds": 3.51
+    },
+    {
+      "file": "deadnode_chain_planner_smoke.py",
+      "code": 0,
+      "seconds": 4.35
+    },
+    {
+      "file": "deadnode_cooldown_zero_smoke.py",
+      "code": 0,
+      "seconds": 0.34
+    },
+    {
+      "file": "deadnode_opportunity_selection_smoke.py",
+      "code": 0,
+      "seconds": 5.2
+    },
+    {
+      "file": "debug_add_commands_smoke.py",
+      "code": 0,
+      "seconds": 0.23
+    },
+    {
+      "file": "debug_galaxy_smoke.py",
+      "code": 0,
+      "seconds": 0.29
+    },
+    {
+      "file": "debug_lore_arcs_smoke.py",
+      "code": 0,
+      "seconds": 0.27
+    },
+    {
+      "file": "debug_worldgen_graph_smoke.py",
+      "code": 0,
+      "seconds": 0.26
+    },
+    {
+      "file": "drone_completion_context_smoke.py",
+      "code": 0,
+      "seconds": 0.24
+    },
+    {
+      "file": "drone_modular_v1_smoke.py",
+      "code": 0,
+      "seconds": 1.01
+    },
+    {
+      "file": "drone_recall_all_smoke.py",
+      "code": 0,
+      "seconds": 0.25
+    },
+    {
+      "file": "drone_salvage_survey_smoke.py",
+      "code": 0,
+      "seconds": 0.73
+    },
+    {
+      "file": "energy_policy_smoke.py",
+      "code": 0,
+      "seconds": 3.15
+    },
+    {
+      "file": "exploration_recovery_smoke.py",
+      "code": 0,
+      "seconds": 0.57
+    },
+    {
+      "file": "forced_hidden_ad_hoc_smoke.py",
+      "code": 0,
+      "seconds": 0.31
+    },
+    {
+      "file": "galaxy_physical_model_smoke.py",
+      "code": 0,
+      "seconds": 0.16
+    },
+    {
+      "file": "hibernate_radiation_wake_smoke.py",
+      "code": 0,
+      "seconds": 0.3
+    },
+    {
+      "file": "hibernate_sequence_assets_smoke.py",
+      "code": 0,
+      "seconds": 0.03
+    },
+    {
+      "file": "intel_recent_order_smoke.py",
+      "code": 0,
+      "seconds": 0.43
+    },
+    {
+      "file": "job_id_numbering_smoke.py",
+      "code": 0,
+      "seconds": 0.21
+    },
+    {
+      "file": "known_routes_integrity_smoke.py",
+      "code": 0,
+      "seconds": 2.42
+    },
+    {
+      "file": "lore_channel_preference_and_unlock_smoke.py",
+      "code": 0,
+      "seconds": 0.2
+    },
+    {
+      "file": "lore_distance_from_start_smoke.py",
+      "code": 0,
+      "seconds": 0.15
+    },
+    {
+      "file": "lore_secondary_count_weights_hard_smoke.py",
+      "code": 0,
+      "seconds": 1.06
+    },
+    {
+      "file": "lore_smoke.py",
+      "code": 0,
+      "seconds": 0.17
+    },
+    {
+      "file": "mail_metadata_and_log_header_smoke.py",
+      "code": 0,
+      "seconds": 0.24
+    },
+    {
+      "file": "narrative_world_integration_smoke.py",
+      "code": 0,
+      "seconds": 12.94
+    },
+    {
+      "file": "nav_abort_waypoint_cleanup_smoke.py",
+      "code": 0,
+      "seconds": 3.63
+    },
+    {
+      "file": "nav_map_galaxy_dependencies_smoke.py",
+      "code": 0,
+      "seconds": 0.22
+    },
+    {
+      "file": "nav_map_galaxy_determinism_smoke.py",
+      "code": 0,
+      "seconds": 0.26
+    },
+    {
+      "file": "nav_map_galaxy_smoke.py",
+      "code": 0,
+      "seconds": 0.28
+    },
+    {
+      "file": "procedural_radiation_smoke.py",
+      "code": 0,
+      "seconds": 0.16
+    },
+    {
+      "file": "radiation_hull_smoke.py",
+      "code": 1,
+      "seconds": 1.13
+    },
+    {
+      "file": "route_hop_cap_smoke.py",
+      "code": 0,
+      "seconds": 0.22
+    },
+    {
+      "file": "route_solve_out_of_range_origins_smoke.py",
+      "code": 0,
+      "seconds": 0.34
+    },
+    {
+      "file": "save_load_smoke.py",
+      "code": 0,
+      "seconds": 0.3
+    },
+    {
+      "file": "scan_job_smoke.py",
+      "code": 0,
+      "seconds": 0.45
+    },
+    {
+      "file": "scan_observation_memory_smoke.py",
+      "code": 0,
+      "seconds": 10.76
+    },
+    {
+      "file": "sector_intel_validation_smoke.py",
+      "code": 0,
+      "seconds": 0.8
+    },
+    {
+      "file": "sensor_detection_factor_smoke.py",
+      "code": 0,
+      "seconds": 3.55
+    },
+    {
+      "file": "ship_layout_output_smoke.py",
+      "code": 0,
+      "seconds": 0.22
+    },
+    {
+      "file": "ship_survey_radiation_smoke.py",
+      "code": 0,
+      "seconds": 0.22
+    },
+    {
+      "file": "smoke_test.py",
+      "code": 0,
+      "seconds": 0.35
+    },
+    {
+      "file": "textual_active_jobs_job_id_smoke.py",
+      "code": 0,
+      "seconds": 0.24
+    },
+    {
+      "file": "textual_command_spacing_smoke.py",
+      "code": 0,
+      "seconds": 3.71
+    },
+    {
+      "file": "textual_completion_context_smoke.py",
+      "code": 0,
+      "seconds": 1.95
+    },
+    {
+      "file": "textual_theme_smoke.py",
+      "code": 0,
+      "seconds": 3.89
+    },
+    {
+      "file": "transit_radiation_progression_smoke.py",
+      "code": 0,
+      "seconds": 0.16
+    },
+    {
+      "file": "uplink_authored_and_failsafe_smoke.py",
+      "code": 0,
+      "seconds": 0.57
+    },
+    {
+      "file": "uplink_once_per_node_smoke.py",
+      "code": 0,
+      "seconds": 0.36
+    },
+    {
+      "file": "uplink_only_delivery_retry_smoke.py",
+      "code": 0,
+      "seconds": 1.7
+    },
+    {
+      "file": "worldgen_manifest_integration_smoke.py",
+      "code": 0,
+      "seconds": 5.24
+    },
+    {
+      "file": "worldgen_manifest_prototype_smoke.py",
+      "code": 0,
+      "seconds": 2.87
+    },
+    {
+      "file": "worldgen_modules_pool_smoke.py",
+      "code": 0,
+      "seconds": 1.67
+    },
+    {
+      "file": "worldgen_preexistence_catalog_smoke.py",
+      "code": 0,
+      "seconds": 2.02
+    },
+    {
+      "file": "worldgen_preexistence_characterization_smoke.py",
+      "code": 0,
+      "seconds": 0.71
+    },
+    {
+      "file": "worldgen_sparse_archetypes_smoke.py",
+      "code": 0,
+      "seconds": 10.5
+    }
+  ],
+  "focus_correction": {
+    "head": "d851d441b0548eb67035d5aa8cdb298db0499800",
+    "reproduced_before_fix": [
+      "unbound line token accepted without spatial_bindings",
+      "empty essential salvage document accepted"
+    ],
+    "original_18_test_groups_unchanged": true,
+    "token_cases": [
+      "line",
+      "inline content",
+      "EN/ES referenced text",
+      "files inline/ref",
+      "authored inline/ref",
+      "unknown bound token",
+      "resolved token",
+      "literal braces",
+      "legacy catalogue without declarations"
+    ],
+    "essential_channel_scenario_combinations": 48,
+    "essential_extra_cases": [
+      "files EN fallback",
+      "optional empty document remains allowed"
+    ],
+    "changed_files": [
+      "src/retorno/worldgen/narrative.py",
+      "src/retorno/core/lore.py",
+      "tests/narrative_world_integration_smoke.py",
+      "docs/narrative-world-contract.es.md",
+      "docs/narrative-world-contract.md",
+      "docs/testing/narrative-world-review.es.md",
+      "docs/testing/narrative-world-review.md",
+      "docs/testing/narrative-world-test-results.json"
+    ],
+    "zip": "RETORNO-4D-3e4-correction-review.zip",
+    "full_delivery_files": 38
+  }
+}

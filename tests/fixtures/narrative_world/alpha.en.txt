@@ -1,0 +1,5 @@
+An imaginary port NEVER_EXISTED is mentioned only in prose.
+Wreck archive: {{wreck_sector}} at {{wreck_coord}}.
+NODE: {{wreck_id}}
+SECTOR: {{wreck_sector}}
+LINK: TEST_HOST -> TEST_RELAY

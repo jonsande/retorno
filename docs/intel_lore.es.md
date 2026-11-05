@@ -1,3 +1,5 @@
+> **Guía histórica, no normativa.** Las afirmaciones siguientes sobre creación ad hoc, arcos activos, pesos relativos, métodos de engine y entrega garantizada han quedado superadas. Para autoría vigente, formatos optativos probados y ejemplos ejecutables, usa [Requisitos narrativos físicos](narrative-world-contract.es.md) y [Scheduler](systems/lore-scheduler.es.md). No actives las plantillas por seguir los ejemplos antiguos.
+
 # Cómo se obtiene intel y lore
 
 Este documento resume las formas actuales de obtener **intel** (conocimiento de navegación) y **lore** (contenido narrativo) en Retorno.

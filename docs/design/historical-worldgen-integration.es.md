@@ -1,3 +1,5 @@
+> **Actualización implementada 4D-3e4 (2026-11-05).** Para catálogos con requisitos físicos nuevos, el manifiesto se fija en bootstrap, con identidad de catálogo y resultados compilados. Sin declaraciones adicionales se conserva el ámbito físico previo y la selección de semilla anterior a materialización. El esquema 3 guarda snapshot narrativo obligatorio; se rechazan saves anteriores sin él y catálogos modificados. Rige la hoja de ruta v1.2. El cuerpo siguiente documenta e2 y conserva su contexto histórico. La referencia vigente y sus ejemplos ejecutables son [Requisitos narrativos físicos](../narrative-world-contract.es.md). El cuerpo anterior conservado a continuación es histórico donde contradiga esta actualización.
+
 # Integración del worldgen histórico — 4D-3e2
 
 Inglés: [historical-worldgen-integration.md](historical-worldgen-integration.md).

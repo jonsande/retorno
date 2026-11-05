@@ -46,6 +46,7 @@ from retorno.model.ship_layout import (
     drone_bay_sector_id_for_ship,
     ship_sector_name_for_locale,
 )
+from retorno.worldgen.narrative import records_for
 from retorno.runtime.data_loader import load_modules, load_arcs, load_locations, load_worldgen_archetypes, load_worldgen_templates
 from retorno.runtime.startup import (
     clear_terminal_screen,
@@ -625,7 +626,7 @@ def _build_event_payload(e) -> dict:
 
 
 def _mark_arc_discovered(state, left: str, right: str) -> None:
-    for arc in load_arcs():
+    for arc in records_for(state, "arcs", load_arcs):
         primary = arc.get("primary_intel", {})
         line = primary.get("line", "")
         if "->" not in line:
@@ -634,6 +635,8 @@ def _mark_arc_discovered(state, left: str, right: str) -> None:
             expected_left, expected_right = [p.strip() for p in line.split(":", 1)[1].split("->", 1)]
         except Exception:
             continue
+        aliases = state.world.narrative_snapshot.get("aliases", {})
+        expected_left, expected_right = (aliases.get(ident.casefold(), ident) for ident in (expected_left, expected_right))
         if left == expected_left and right == expected_right:
             arc_id = arc.get("arc_id", "")
             if not arc_id:
@@ -684,7 +687,7 @@ def _primary_target_node_id(primary: dict) -> str | None:
 
 def _locked_primary_targets(state) -> set[str]:
     locked: set[str] = set()
-    for arc in load_arcs():
+    for arc in records_for(state, "arcs", load_arcs):
         arc_id = arc.get("arc_id", "")
         if not arc_id:
             continue
@@ -692,6 +695,7 @@ def _locked_primary_targets(state) -> set[str]:
         target = _primary_target_node_id(primary)
         if not target:
             continue
+        target = state.world.narrative_snapshot.get("aliases", {}).get(target.casefold(), target)
         pid = primary.get("id", "primary")
         arc_state = state.world.arc_placements.get(arc_id) or {}
         discovered = arc_state.get("discovered")
@@ -2965,7 +2969,7 @@ def render_debug_galaxy(state) -> None:
         if margin_bulge < 100000.0 or margin_halo < 100000.0:
             print("! warning: prologue start node UNKNOWN is too close to physical bulge/halo edge (<100k ly)")
 
-    authored_ids = _authored_node_ids()
+    authored_ids = _authored_node_ids(state)
     proc_values: list[float] = []
     authored_count = 0
     procedural_count = 0
@@ -3150,7 +3154,7 @@ def render_debug_worldgen_sector(state, sector_id: str) -> None:
     phys_region = _sector_region_physical(sector_id)
     sector_state = state.world.sector_states.get(sector_id)
     archetypes = load_worldgen_archetypes()
-    authored_ids = _authored_node_ids()
+    authored_ids = _authored_node_ids(state)
     node_ids = _loaded_sector_node_ids(state, sector_id)
     nodes = [state.world.space.nodes[node_id] for node_id in node_ids if node_id in state.world.space.nodes]
     authored_count = sum(1 for node_id in node_ids if node_id in authored_ids)
@@ -3296,7 +3300,7 @@ def render_debug_worldgen_sector(state, sector_id: str) -> None:
 def render_debug_graph_all(state) -> None:
     print("\n=== DEBUG GRAPH ALL ===")
     ship_id = getattr(state.ship, "ship_id", "RETORNO_SHIP")
-    authored_ids = _authored_node_ids()
+    authored_ids = _authored_node_ids(state)
     all_nodes = sorted(
         [node for node in state.world.space.nodes.values() if node.node_id != ship_id],
         key=lambda node: (sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly), node.node_id),
@@ -3762,9 +3766,9 @@ def _state_rank(state: SystemState) -> int:
     return order[state]
 
 
-def _authored_node_ids() -> set[str]:
+def _authored_node_ids(state=None) -> set[str]:
     node_ids: set[str] = set()
-    for loc in load_locations():
+    for loc in records_for(state, "locations", load_locations) if state is not None else load_locations():
         node_cfg = loc.get("node", {})
         node_id = node_cfg.get("node_id")
         if node_id:
@@ -4191,57 +4195,26 @@ def _extract_intel_blocks(text: str) -> list[str]:
 
 
 def _resolve_authored_matches(state, token: str) -> list[str]:
-    token_norm = token.strip()
-    if not token_norm:
-        return []
-    authored_ids = _authored_node_ids()
-    node_id_matches: list[str] = []
-    name_matches: list[str] = []
-    sector_matches: list[str] = []
-    for loc in load_locations():
-        node_cfg = loc.get("node", {})
-        node_id = node_cfg.get("node_id")
-        if not node_id or node_id not in authored_ids:
-            continue
-        if node_id == token_norm:
-            node_id_matches.append(node_id)
-            continue
-        name = node_cfg.get("name", "")
-        if name and name.lower() == token_norm.lower():
-            name_matches.append(node_id)
-            continue
-        try:
-            x = float(node_cfg.get("x_ly", 0.0))
-            y = float(node_cfg.get("y_ly", 0.0))
-            z = float(node_cfg.get("z_ly", 0.0))
-        except Exception:
-            x = y = z = 0.0
-        sector_id = sector_id_for_pos(x, y, z)
-        if sector_id == token_norm:
-            sector_matches.append(node_id)
-            continue
-    if node_id_matches:
-        return node_id_matches[:1]
-    if sector_matches:
-        return sector_matches
-    if name_matches:
-        if len(name_matches) > 1 and state.os.debug_enabled:
-            print(f"[DEBUG] intel name collision for '{token_norm}': {', '.join(name_matches)}")
-        if len(name_matches) == 1:
-            return name_matches
-        current = state.world.space.nodes.get(state.world.current_node_id)
-        if current:
-            name_matches.sort(
-                key=lambda nid: (
-                    (state.world.space.nodes.get(nid).x_ly - current.x_ly) ** 2
-                    + (state.world.space.nodes.get(nid).y_ly - current.y_ly) ** 2
-                    + (state.world.space.nodes.get(nid).z_ly - current.z_ly) ** 2
-                )
-                if state.world.space.nodes.get(nid)
-                else float("inf")
-            )
-        return name_matches[:1]
-    return []
+    token = token.strip()
+    aliases = state.world.narrative_snapshot.get("aliases", {})
+    ident = aliases.get(token.casefold())
+    if ident and ident != state.ship.ship_id:
+        from retorno.worldgen.generator import ensure_historical_node
+        if ident not in state.world.space.nodes:
+            ensure_historical_node(state, ident)
+        return [ident]
+    # Preserve the legacy bare-sector authored selector inside an INTEL block.
+    return [loc["node"]["node_id"] for loc in records_for(state, "locations", load_locations)
+            if loc["node"]["node_id"] != state.ship.ship_id
+            and sector_id_for_pos(*(float(loc["node"].get(a + "_ly", 0)) for a in "xyz")) == token]
+
+
+def _resolve_intel_node_id(state, token):
+    ident = state.world.narrative_snapshot.get("aliases", {}).get(token.casefold(), token)
+    if ident not in state.world.space.nodes:
+        from retorno.worldgen.generator import ensure_historical_node
+        ensure_historical_node(state, ident)
+    return ident
 
 
 def _spawn_corrupt_intel_contact(state, source_path: str) -> str | None:
@@ -4268,6 +4241,7 @@ def _spawn_corrupt_intel_contact(state, source_path: str) -> str | None:
             n
             for n in state.world.space.nodes.values()
             if n.is_hub and sector_id_for_pos(n.x_ly, n.y_ly, n.z_ly) == sector_id
+            and math.dist((n.x_ly, n.y_ly, n.z_ly), (current.x_ly, current.y_ly, current.z_ly)) <= radius
         ]
         hubs = [h for h in hubs if h.node_id not in state.world.known_contacts and h.node_id not in locked_primary_targets]
         if not hubs:
@@ -4320,6 +4294,7 @@ def _import_link_intel(state, payload: str, source_path: str, messages: list[str
         left, right = state.world.current_node_id, payload.strip()
     if not left or not right or left == right:
         return False
+    left, right = (_resolve_intel_node_id(state, ident) for ident in (left, right))
     for node_id in (left, right):
         _ensure_sector_for_procedural_node_id(state, node_id)
     added, rejected, distance = _try_add_known_link_with_cap(state, left, right, bidirectional=True)
@@ -4358,7 +4333,7 @@ def _process_intel_token(state, token: str, source_path: str, messages: list[str
     if not token:
         return
     token_lines = [line.strip() for line in token.splitlines() if line.strip()]
-    if token_lines and all(line.upper().startswith("SECTOR:") for line in token_lines):
+    if token_lines and all(line.upper().startswith(("SECTOR:", "NODE:", "COORD:", "LINK:")) for line in token_lines):
         # Explicit SECTOR lines are validated by the line parser below. They
         # are not unknown narrative tokens and must not trigger corrupt intel.
         return
@@ -4390,6 +4365,10 @@ def _process_intel_token(state, token: str, source_path: str, messages: list[str
         return
 
     # Corrupt intel handling.
+    source_kind, _, source_ref = _infer_intel_source(source_path)
+    record_intel(state.world, t=state.clock.t, kind="node", to_id=token,
+        confidence=0.0, source_kind=source_kind, source_ref=source_ref,
+        note={"en": "Unresolved intel token", "es": "Referencia de intel sin resolver"}.get(state.os.locale.value, "Unresolved intel token"))
     rng = random.Random(_hash64(state.meta.rng_seed + state.meta.rng_counter, f"intel_corrupt_roll:{source_path}:{token}"))
     state.meta.rng_counter += 1
     if rng.random() < Balance.INTEL_CORRUPT_P_FAIL:
@@ -4465,107 +4444,11 @@ def _handle_intel_import(state, path: str) -> None:
         print("intel import: file not found")
         return
 
-    source_kind, confidence, source_ref = _infer_intel_source(path)
-    added_msgs: list[str] = []
-    discarded_by_cap = 0
-    blocks = _extract_intel_blocks(content)
-    for block in blocks:
-        _process_intel_token(state, block, path, added_msgs)
-    for raw in content.splitlines():
-        line = raw.strip()
-        if not line:
-            continue
-        if blocks:
-            # Skip legacy parsing when INTEL blocks are present, except for explicit LINK/NODE/SECTOR/COORD lines.
-            if not (line.upper().startswith("LINK:") or line.upper().startswith("NODE:") or line.upper().startswith("SECTOR:") or line.upper().startswith("COORD:")):
-                continue
-        if line.upper().startswith("NODE:"):
-            node_id = line.split(":", 1)[1].strip()
-            if not node_id:
-                continue
-            _ensure_sector_for_procedural_node_id(state, node_id)
-            if node_id not in state.world.known_nodes:
-                state.world.known_intel[node_id] = {"source": path}
-                state.world.known_nodes.add(node_id)
-                state.world.known_contacts.add(node_id)
-                record_intel(
-                    state.world,
-                    t=state.clock.t,
-                    kind="node",
-                    to_id=node_id,
-                    confidence=confidence,
-                    source_kind=source_kind,
-                    source_ref=source_ref,
-                )
-                added_msgs.append(f"(intel) node known: {node_id}")
-        if line.upper().startswith("SECTOR:"):
-            sector_id = line.split(":", 1)[1].strip()
-            _import_sector_intel(
-                state,
-                sector_id,
-                path,
-                source_kind,
-                source_ref,
-                confidence,
-                added_msgs,
-            )
-        if line.upper().startswith("LINK:"):
-            discarded_by_cap += int(_import_link_intel(
-                state, line.split(":", 1)[1].strip(), path, added_msgs,
-            ))
-        if line.upper().startswith("COORD:"):
-            coord_txt = line.split(":", 1)[1].strip()
-            try:
-                x_s, y_s, z_s = [p.strip() for p in coord_txt.split(",")]
-                x, y, z = float(x_s), float(y_s), float(z_s)
-            except Exception:
-                continue
-            import hashlib
-            h = hashlib.blake2b(digest_size=4)
-            h.update(coord_txt.encode("utf-8"))
-            nid = f"NAV_{int.from_bytes(h.digest(), 'big'):08x}"
-            if nid not in state.world.space.nodes:
-                region = region_for_pos(x, y, z)
-                node = SpaceNode(
-                    node_id=nid,
-                    name="Nav Point",
-                    kind="nav_point",
-                    radiation_rad_per_s=procedural_radiation_for_node(
-                        state.meta.rng_seed, nid, "nav_point", region
-                    ),
-                    x_ly=x,
-                    y_ly=y,
-                    z_ly=z,
-                )
-                node.region = region
-                state.world.space.nodes[nid] = node
-                sync_sector_state_for_node(state, nid)
-            if nid not in state.world.known_nodes:
-                state.world.known_intel[nid] = {"source": path, "coord": [x, y, z]}
-                state.world.known_nodes.add(nid)
-                state.world.known_contacts.add(nid)
-                record_intel(
-                    state.world,
-                    t=state.clock.t,
-                    kind="coord",
-                    coord=(x, y, z),
-                    confidence=confidence,
-                    source_kind=source_kind,
-                    source_ref=source_ref,
-                )
-                added_msgs.append(f"(intel) node known: {nid}")
-    if added_msgs:
-        for msg in sorted(set(added_msgs)):
-            print(msg)
-    else:
-        print("(intel) no usable intel found")
-    if discarded_by_cap > 0:
-        locale = state.os.locale.value
-        msg = {
-            "en": f"(intel) links skipped by hop cap: {discarded_by_cap} (>{Balance.MAX_ROUTE_HOP_LY:.1f}ly)",
-            "es": f"(intel) enlaces descartados por cap de salto: {discarded_by_cap} (>{Balance.MAX_ROUTE_HOP_LY:.1f}ly)",
-        }
-        print(msg.get(locale, msg["en"]))
+    messages = _auto_import_intel_from_text(state, content, path)
+    for message in sorted(set(messages)):
+        print(message)
+    if not messages:
+        print({"en": "(intel) no usable intel found", "es": "(intel) no se encontró intel utilizable"}.get(state.os.locale.value, "(intel) no usable intel found"))
 
 
 def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str]:
@@ -4585,6 +4468,8 @@ def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str
         if line.upper().startswith("NODE:"):
             node_id = line.split(":", 1)[1].strip()
             if node_id:
+                node_id = _resolve_intel_node_id(state, node_id)
+                _ensure_sector_for_procedural_node_id(state, node_id)
                 if node_id not in state.world.known_nodes:
                     state.world.known_intel[node_id] = {"source": source_path}
                     state.world.known_nodes.add(node_id)
@@ -4619,6 +4504,8 @@ def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str
             try:
                 x_s, y_s, z_s = [p.strip() for p in coord_txt.split(",")]
                 x, y, z = float(x_s), float(y_s), float(z_s)
+                if not all(math.isfinite(v) for v in (x, y, z)):
+                    continue
             except Exception:
                 continue
             import hashlib
@@ -5102,7 +4989,7 @@ def render_nav_map_galaxy(state, scale: str | None = None, *, include_all_loaded
         _draw_ring(float(Balance.GALAXY_PHYSICAL_DISK_OUTER_RADIUS_LY), ".")
         _draw_ring(float(Balance.GALAXY_PHYSICAL_BULGE_RADIUS_LY), "o")
 
-    authored_ids = _authored_node_ids()
+    authored_ids = _authored_node_ids(state)
     nodes = _iter_nodes_for_galaxy_map(state, include_all_loaded=include_all_loaded)
     buckets: dict[tuple[int, int], list[SpaceNode]] = {}
     visible_nodes = 0

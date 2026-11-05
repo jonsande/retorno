@@ -22,6 +22,7 @@ from retorno.model.world import (
     sector_id_for_pos,
 )
 from retorno.runtime.data_loader import load_arcs, load_locations, load_singles
+from retorno.worldgen.narrative import records_for, content_for
 from retorno.worldgen.generator import (
     _generate_node_id,
     _name_from_node_id,
@@ -60,9 +61,13 @@ def _lore_seed(*parts: object) -> int:
     return hash(tuple(parts))
 
 
-def _content_from_ref(content_ref: str | None) -> str:
+def _content_from_ref(content_ref: str | None, state=None) -> str:
     if not content_ref:
         return ""
+    if state is not None:
+        frozen = content_for(state, content_ref)
+        if frozen is not None:
+            return frozen
     path = Path(__file__).resolve().parents[3] / "data" / content_ref
     try:
         return path.read_text(encoding="utf-8")
@@ -116,7 +121,7 @@ def deliver_ship_mail(
     _ensure_dir(state.os.fs, "/mail/inbox")
     seq = state.events.next_event_seq
     path = normalize_path(f"/mail/inbox/{seq:04d}.{lang}.txt")
-    content = _content_from_ref(content_ref)
+    content = _content_from_ref(content_ref, state)
     content = _mail_envelope_content(
         content,
         mail_from=mail_from,
@@ -132,7 +137,7 @@ def deliver_captured_signal(state, content_ref: str, lang: str) -> str:
     _ensure_dir(state.os.fs, "/logs/signals")
     seq = state.events.next_event_seq
     path = normalize_path(f"/logs/signals/{seq:04d}.{lang}.txt")
-    content = _content_from_ref(content_ref)
+    content = _content_from_ref(content_ref, state)
     state.os.fs[path] = FSNode(path=path, node_type=FSNodeType.FILE, content=content, access=AccessLevel.GUEST)
     return path
 
@@ -142,7 +147,7 @@ def deliver_station_broadcast(state, node_id: str, content_ref: str, lang: str) 
     _ensure_dir(state.os.fs, "/logs/broadcasts")
     seq = state.events.next_event_seq
     path = normalize_path(f"/logs/broadcasts/{node_id}_{seq:04d}.{lang}.txt")
-    content = _content_from_ref(content_ref)
+    content = _content_from_ref(content_ref, state)
     state.os.fs[path] = FSNode(path=path, node_type=FSNodeType.FILE, content=content, access=AccessLevel.GUEST)
     return path
 
@@ -274,9 +279,9 @@ def _is_hidden_origin_placeholder(node_id: str) -> bool:
     return node_id == "UNKNOWN" or node_id.startswith("UNKNOWN_")
 
 
-def _location_node_ids() -> set[str]:
+def _location_node_ids(state=None) -> set[str]:
     out: set[str] = set()
-    for loc in load_locations():
+    for loc in records_for(state, "locations", load_locations) if state is not None else load_locations():
         node_cfg = loc.get("node", {})
         nid = str(node_cfg.get("node_id", "")).strip()
         if nid:
@@ -284,8 +289,8 @@ def _location_node_ids() -> set[str]:
     return out
 
 
-def _location_uplink_table(node_id: str) -> dict | None:
-    for loc in load_locations():
+def _location_uplink_table(node_id: str, state=None) -> dict | None:
+    for loc in records_for(state, "locations", load_locations) if state is not None else load_locations():
         node_cfg = loc.get("node", {})
         if str(node_cfg.get("node_id", "")).strip() != node_id:
             continue
@@ -296,8 +301,8 @@ def _location_uplink_table(node_id: str) -> dict | None:
     return None
 
 
-def _location_fs_files(node_id: str) -> list[dict]:
-    for loc in load_locations():
+def _location_fs_files(node_id: str, state=None) -> list[dict]:
+    for loc in records_for(state, "locations", load_locations) if state is not None else load_locations():
         node_cfg = loc.get("node", {})
         if node_cfg.get("node_id") == node_id:
             return list(loc.get("fs_files") or [])
@@ -340,7 +345,7 @@ def _primary_target_node_id(primary: dict) -> str | None:
 
 def _locked_primary_targets(state) -> set[str]:
     locked: set[str] = set()
-    for arc in load_arcs():
+    for arc in records_for(state, "arcs", load_arcs):
         arc_id = arc.get("arc_id", "")
         if not arc_id:
             continue
@@ -348,6 +353,7 @@ def _locked_primary_targets(state) -> set[str]:
         target = _primary_target_node_id(primary)
         if not target:
             continue
+        target = state.world.narrative_snapshot.get("aliases", {}).get(target.casefold(), target)
         pid = primary.get("id", "primary")
         arc_state = state.world.arc_placements.get(arc_id) or {}
         discovered = arc_state.get("discovered")
@@ -383,12 +389,12 @@ def _precompute_uplink_route_pool_for_node(state, node_id: str, max_new: int = 3
 
     routes = reachable_from(state.world, node_id)
     locked_primary_targets = _locked_primary_targets(state)
-    authored_ids = _location_node_ids()
+    authored_ids = _location_node_ids(state)
     hub_kinds = {"relay", "station", "waystation"}
     deterministic = Balance.DETERMINISTIC_LORE_INTEL
     candidates: dict[str, int] = {}
     selected: list[str] = []
-    uplink_cfg = _location_uplink_table(node_id) or {}
+    uplink_cfg = _location_uplink_table(node_id, state) or {}
     authored_pool = uplink_cfg.get("authored_candidates") or []
     try:
         min_authored = int(uplink_cfg.get("min_authored", 0) or 0)
@@ -782,7 +788,7 @@ def build_lore_context(state, node_id: str) -> LoreContext:
 
 
 def _collect_base_files_for_node(state, node_id: str, node: SpaceNode | None) -> list[dict]:
-    base = _location_fs_files(node_id)
+    base = _location_fs_files(node_id, state)
     if base:
         return list(base)
     if node is None:
@@ -877,6 +883,15 @@ def sync_node_pools_for_known_nodes(state) -> None:
         pool.base_files = _collect_base_files_for_node(state, node_id, node)
         pool.uplink_route_pool = _precompute_uplink_route_pool_for_node(state, node_id, max_new=3)
         state.world.node_pools[node_id] = pool
+        # Finalize a reserved opportunity before the first inspection closes
+        # its window. A deadline that has not fired may legitimately expire.
+        reservations = state.world.narrative_snapshot.get("reservations", {})
+        if reservations:
+            for entry in _iter_all_pieces(state):
+                reservation = reservations.get(entry["piece_key"], {})
+                if reservation.get("node_id") == node_id and _force_ready(state, entry["piece"]):
+                    if piece_constraints_ok(entry["piece"], build_lore_context(state, node_id)):
+                        _assign_piece_to_node(state, entry, node_id)
         recompute_node_completion(state, node_id)
         if node_id in state.world.visited_nodes:
             close_window_on_orbit_entry(state, node_id, reason="already_visited")
@@ -1012,6 +1027,17 @@ def _hard_force_ready(state, piece: dict) -> bool:
     return True
 
 
+def _force_ready(state, piece):
+    policy = piece.get("force_policy", "none")
+    if policy == "hard":
+        return _hard_force_ready(state, piece)
+    if policy == "deadline":
+        return _deadline_reached(state, piece)
+    if policy == "soft":
+        return _soft_force_roll(state, piece, state.world.lore_placements.eval_seq)
+    return False
+
+
 def _secondary_count_limit(piece_entry: dict) -> int | None:
     if piece_entry.get("role") != "secondary":
         return None
@@ -1051,9 +1077,9 @@ def _default_channels_for_piece(piece: dict, *, single: bool) -> list[str]:
     return list(allowed)
 
 
-def _iter_all_pieces() -> list[dict]:
+def _iter_all_pieces(state=None) -> list[dict]:
     pieces: list[dict] = []
-    for arc in load_arcs():
+    for arc in records_for(state, "arcs", load_arcs) if state is not None else load_arcs():
         arc_id = str(arc.get("arc_id", "")).strip()
         if not arc_id:
             continue
@@ -1087,7 +1113,7 @@ def _iter_all_pieces() -> list[dict]:
                 }
             )
 
-    for single in load_singles() or []:
+    for single in (records_for(state, "singles", load_singles) if state is not None else load_singles()) or []:
         sid = str(single.get("single_id", "")).strip()
         if not sid:
             continue
@@ -1115,8 +1141,8 @@ def list_lore_piece_entries() -> list[dict]:
     return _iter_all_pieces()
 
 
-def _piece_index() -> dict[str, dict]:
-    return {entry["piece_key"]: entry for entry in _iter_all_pieces()}
+def _piece_index(state=None) -> dict[str, dict]:
+    return {entry["piece_key"]: entry for entry in _iter_all_pieces(state)}
 
 
 def _start_node_for_hops(state) -> str:
@@ -1207,7 +1233,7 @@ def _trigger_matches_channel(trigger: str, channel: str) -> bool:
 
 
 def _candidate_nodes_for_piece(state, piece_entry: dict) -> list[str]:
-    authored = _location_node_ids()
+    authored = _location_node_ids(state)
     piece = piece_entry["piece"]
     rules = piece_entry.get("placement_rules") or {}
     avoid_ids = set(str(x) for x in (rules.get("avoid_node_ids") or []))
@@ -1224,6 +1250,8 @@ def _candidate_nodes_for_piece(state, piece_entry: dict) -> list[str]:
             continue
         if node is None:
             continue
+        if node.kind not in {"station", "relay", "waystation", "ship", "derelict"}:
+            continue
         if require_kinds and node.kind not in require_kinds:
             continue
         if not _node_matches_candidates(node_id, node, candidates_cfg, authored):
@@ -1239,6 +1267,158 @@ def _candidate_nodes_for_piece(state, piece_entry: dict) -> list[str]:
             continue
         out.append(node_id)
     return out
+
+
+def _historical_candidates(state, piece_entry, definition=None, max_sectors=64):
+    """Certified finite witnesses, including sites not yet materialized.
+
+    A successful candidate is a proof of opportunity; an empty bounded query
+    is not a proof of galactic absence. This view never changes player state.
+    """
+    from copy import copy
+    from retorno.worldgen.generator import universe_definition, _neighbor_sector_ids_2d
+    from retorno.worldgen.manifest import new_session, _query_session, operative_id
+    from retorno.model.world import SpaceGraph
+    definition = definition or universe_definition(state)
+    session = new_session(definition)
+    sectors = set(_neighbor_sector_ids_2d(sector_id_for_pos(0, 0, 0)))
+    sectors.update(sector_id_for_pos(*a.position_ly) for a in definition.authored)
+    cons = piece_entry.get("piece", {}).get("constraints", {})
+    lo = max(0.0, float(cons.get("min_dist_ly", 0)))
+    start = _start_node_for_distance(state)
+    origin = (start.x_ly, start.y_ly, start.z_ly) if start else (0, 0, 0)
+    hi = float(cons.get("max_dist_ly", lo + 20))
+    # Include a finite planar box for narrow, explicitly bounded distance
+    # windows. A mere axial sample can miss every legitimate host in a shell.
+    if "max_dist_ly" in cons and 0 <= hi <= 30:
+        from retorno.worldgen.generator import _parse_sector_id
+        x0, y0, z0 = _parse_sector_id(sector_id_for_pos(origin[0]-hi, origin[1]-hi, origin[2]))
+        x1, y1, _ = _parse_sector_id(sector_id_for_pos(origin[0]+hi, origin[1]+hi, origin[2]))
+        box = {f"S{x:+04d}_{y:+04d}_{z0:+04d}" for x in range(x0, x1+1) for y in range(y0, y1+1)}
+        if len(sectors | box) <= max_sectors:
+            sectors.update(box)
+    for distance in (lo, hi):
+        for x, y, z in ((distance, 0, 0), (-distance, 0, 0), (0, distance, 0), (0, -distance, 0), (0, 0, distance)):
+            sectors.add(sector_id_for_pos(x+origin[0], y+origin[1], z+origin[2]))
+    if len(sectors) > max_sectors:
+        from retorno.worldgen.narrative import ContentError
+        raise ContentError("catalog", piece_entry["piece_key"], "host", "sector query budget exhausted", "not_evaluated")
+    try:
+        topology = _query_session(session, sorted(sectors))
+    except ValueError as exc:
+        if "budget" not in str(exc).lower():
+            raise
+        from retorno.worldgen.narrative import ContentError
+        raise ContentError("catalog", piece_entry["piece_key"], "host", str(exc), "not_evaluated") from exc
+    sites = {s.identity: s for c in topology.sectors for s in c.sites}
+    sites.update((s.identity, s) for s in topology.boundary_sites)
+    nodes = {}
+    for site in sites.values():
+        nid = operative_id(definition, site)
+        nodes[nid] = SpaceNode(nid, nid, site.kind, region=site.region,
+            x_ly=site.position_ly[0], y_ly=site.position_ly[1], z_ly=site.position_ly[2],
+            is_hub=site.is_hub, historical_key=site.identity.encoded,
+            generation_sector_id=site.generation_sector_id)
+    for edge in topology.edges:
+        a, b = (operative_id(definition, sites[i]) for i in (edge.left, edge.right))
+        nodes[a].links.add(b)
+        nodes[b].links.add(a)
+    view = copy(state)
+    view.world = copy(state.world)
+    view.world.space = SpaceGraph(nodes=nodes)
+    view.world.node_pools = {nid: NodePoolState() for nid in nodes if nid not in state.world.visited_nodes}
+    # Preserve actual source exhaustion in runtime views.
+    for nid, pool in state.world.node_pools.items():
+        if nid in view.world.node_pools:
+            view.world.node_pools[nid] = pool
+    return _candidate_nodes_for_piece(view, piece_entry), nodes
+
+
+def validate_essential_opportunities(state, definition):
+    """Reserve witnesses before any source can be consumed; never grant intel."""
+    from copy import copy
+    from retorno.worldgen.narrative import ContentError
+    from retorno.worldgen.manifest import resolve_operative_id
+    seen = set()
+    reserved_paths = set()
+    for entry in _iter_all_pieces(state):
+        key, piece = entry["piece_key"], entry["piece"]
+        package_key = key if entry["role"] == "single" else key.rsplit(":", 1)[0]
+        source = state.world.narrative_snapshot.get("sources", {}).get(package_key, "catalog")
+        if key in seen:
+            raise ContentError(source, key, "id", "duplicate piece identity")
+        seen.add(key)
+        if not entry["force"] and not piece.get("essential", False):
+            continue
+        policy = piece.get("force_policy", "none")
+        if not entry["force"] or policy not in {"hard", "soft", "deadline"}:
+            raise ContentError(source, key, "force_policy", "essential opportunity needs a valid force policy")
+        deadlines = piece.get("force_deadline", {})
+        if policy == "deadline" and not set(deadlines) & {"max_year", "max_events", "max_docks", "max_uplinks", "max_salvage_data"}:
+            raise ContentError(source, key, "force_deadline", "deadline has no trigger")
+        cons = piece.get("constraints", {})
+        from retorno.worldgen.narrative import _number
+        for field in ("min_year", "max_year", "min_dist_ly", "max_dist_ly"):
+            if field in cons:
+                _number(cons[field], source, key, "constraints." + field)
+        low, high = max(0.0, float(cons.get("min_year", 0))), float(cons.get("max_year", math.inf))
+        if high < low:
+            raise ContentError(source, key, "constraints", "empty time window", "unsatisfiable")
+        if policy == "deadline" and set(deadlines) == {"max_year"} and 0.9 * float(deadlines["max_year"]) > high:
+            raise ContentError(source, key, "force_deadline", "deadline lies outside the delivery window", "unsatisfiable")
+        probe = copy(state)
+        probe.clock = copy(state.clock)
+        probe.clock.t = low * Balance.YEAR_S
+        candidates, nodes = _historical_candidates(probe, entry, definition)
+        # uplink_only can only deliver a physically valid LINK. Other existing
+        # channels deliver the document, including false/uncertain statements.
+        viable = []
+        empty_content = set()
+        for nid in candidates:
+            channel = _pick_channel_for_node(entry, nodes[nid])
+            if channel in {"salvage_data", "ship_os_mail", "captured_signal", "station_broadcast"}:
+                missing = []
+                for lang in ("en", "es"):
+                    content = (_content_for_salvage_piece(piece, lang, state) if channel == "salvage_data"
+                               else _content_from_ref(_content_ref_for_piece(piece, lang), state))
+                    if not content.strip():
+                        missing.append(lang)
+                if missing:
+                    empty_content.update((channel, lang) for lang in missing)
+                    continue
+            if channel == "salvage_data":
+                paths = [normalize_path(_file_for_salvage_piece(entry, lang, state)["path"]) for lang in ("en", "es")]
+                base_paths = {normalize_path(f.get("path", "")) for f in _location_fs_files(nid, state)}
+                if any(not p.startswith(("/logs/", "/data/", "/mail/")) or p in base_paths or (nid, p) in reserved_paths for p in paths):
+                    continue
+            if channel == "uplink_only":
+                pair = _primary_link_pair(piece)
+                aliases = state.world.narrative_snapshot.get("aliases", {})
+                endpoints = [resolve_operative_id(definition, aliases.get(ident.casefold(), ident)) for ident in pair] if pair else []
+                if len(endpoints) != 2 or any(s is None for s in endpoints):
+                    continue
+                if math.dist(*(s.position_ly for s in endpoints)) > definition.hop_cap_ly:
+                    continue
+            viable.append((nid, channel))
+        if not viable:
+            if empty_content:
+                detail = ", ".join(f"{channel}:{lang}" for channel, lang in sorted(empty_content))
+                raise ContentError(source, key, "content", f"empty effective document content ({detail})")
+            rules = entry.get("placement_rules", {})
+            explicit = rules.get("candidates", [])
+            closed = bool(explicit) and not any(str(c).startswith("procedural_") for c in explicit)
+            if int(rules.get("max_hops_from_start", 0) or 0) > 0:
+                closed = False  # A bounded induced graph cannot disprove an external path.
+            channels = entry.get("channels", [])
+            status = "unsatisfiable" if closed or not any(c in {"salvage_data", "ship_os_mail", "captured_signal", "station_broadcast", "uplink_only"} for c in channels) else "not_evaluated"
+            raise ContentError(source, key, "host/channels", "no verified legitimate essential opportunity (including file paths)", status)
+        nid, channel = sorted(viable)[0]
+        if channel == "salvage_data":
+            for lang in ("en", "es"):
+                reserved_paths.add((nid, normalize_path(_file_for_salvage_piece(entry, lang, state)["path"])))
+        node = nodes[nid]
+        state.world.narrative_snapshot["reservations"][key] = dict(node_id=nid, channel=channel,
+            sector_id=sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly), historical_key=node.historical_key)
 
 
 def _pick_channel_for_node(piece_entry: dict, node: SpaceNode | None) -> str | None:
@@ -1298,7 +1478,15 @@ def _path_template_for_piece(piece: dict) -> str:
     return ""
 
 
-def _file_for_salvage_piece(piece_entry: dict, lang: str) -> dict | None:
+def _content_for_salvage_piece(piece: dict, lang: str, state=None) -> str:
+    """The actual salvage body, before log headers, shared with validation."""
+    content = _content_from_ref(_content_ref_for_piece(piece, lang), state)
+    if not content and piece.get("line"):
+        content = str(piece["line"]) + "\n"
+    return content
+
+
+def _file_for_salvage_piece(piece_entry: dict, lang: str, state=None) -> dict | None:
     piece_key = piece_entry["piece_key"]
     piece = piece_entry["piece"]
     path_template = _path_template_for_piece(piece)
@@ -1310,10 +1498,7 @@ def _file_for_salvage_piece(piece_entry: dict, lang: str) -> dict | None:
         safe = _sanitize_piece_path_id(piece_key)
         path = f"/logs/records/{safe}.{lang}.txt"
 
-    content_ref = _content_ref_for_piece(piece, lang)
-    content = _content_from_ref(content_ref)
-    if not content and piece.get("line"):
-        content = str(piece.get("line")) + "\n"
+    content = _content_for_salvage_piece(piece, lang, state)
     log_header = str(piece.get("log_header", "") or "").strip()
     if log_header and normalize_path(path).startswith("/logs/"):
         first_lines = [ln.strip() for ln in content.splitlines()[:8]]
@@ -1331,7 +1516,9 @@ def _seed_hidden_forced_breadcrumb(state, hidden_node_id: str, piece_key: str) -
         nid
         for nid in known
         if nid in state.world.node_pools
+        and state.world.node_pools[nid].window_open
         and not bool(state.world.node_pools[nid].node_cleaned)
+        and is_hop_within_cap(state.world, nid, hidden_node_id)
     ]
     if not candidates:
         return
@@ -1363,89 +1550,6 @@ def _seed_hidden_forced_breadcrumb(state, hidden_node_id: str, piece_key: str) -
         }
     )
     recompute_node_completion(state, reveal_node_id)
-
-
-def _float_constraint(value, default: float | None = None) -> float | None:
-    if value is None:
-        return default
-    try:
-        return float(value)
-    except Exception:
-        return default
-
-
-def _sample_ad_hoc_coords(
-    state,
-    rng: random.Random,
-    piece: dict,
-    anchor: SpaceNode,
-) -> tuple[float, float, float] | None:
-    cons = piece.get("constraints") or {}
-    min_dist = max(0.0, _float_constraint(cons.get("min_dist_ly"), 0.0) or 0.0)
-    max_dist = _float_constraint(cons.get("max_dist_ly"))
-    regions_any = [str(r).strip() for r in (cons.get("regions_any") or []) if str(r).strip()]
-
-    if max_dist is not None and max_dist < min_dist:
-        return None
-
-    # If piece declares spatial constraints, sample around start-node reference so
-    # min/max lore distances remain semantically tied to run start.
-    has_global_constraints = bool(regions_any) or (cons.get("min_dist_ly") is not None) or (cons.get("max_dist_ly") is not None)
-    if has_global_constraints:
-        hi = max_dist if max_dist is not None else max(min_dist + 20.0, 40.0)
-        if hi < min_dist:
-            return None
-        start = _start_node_for_distance(state)
-        sx = start.x_ly if start else 0.0
-        sy = start.y_ly if start else 0.0
-        sz = start.z_ly if start else 0.0
-        for _ in range(128):
-            dist = rng.uniform(min_dist, hi)
-            theta = rng.uniform(0.0, math.tau)
-            z_span = max(0.2, min(5.0, dist * 0.2))
-            dz = rng.uniform(-z_span, z_span)
-            z = sz + dz
-            planar_sq = max(0.0, dist * dist - dz * dz)
-            planar = math.sqrt(planar_sq)
-            x = sx + math.cos(theta) * planar
-            y = sy + math.sin(theta) * planar
-            region = region_for_pos(x, y, z)
-            if regions_any and region not in regions_any:
-                continue
-            return (x, y, z)
-        return None
-
-    # No global constraints: keep ad-hoc node near the selected anchor.
-    theta = rng.uniform(0.0, math.tau)
-    dist = rng.uniform(0.4, 2.0)
-    dx = math.cos(theta) * dist
-    dy = math.sin(theta) * dist
-    dz = rng.uniform(-0.1, 0.1)
-    return (anchor.x_ly + dx, anchor.y_ly + dy, anchor.z_ly + dz)
-
-
-def _eligible_ad_hoc_anchors(state, max_hops: int) -> list[SpaceNode]:
-    out: list[SpaceNode] = []
-    for node_id in sorted(state.world.space.nodes.keys()):
-        node = state.world.space.nodes.get(node_id)
-        if not node:
-            continue
-        if max_hops > 0:
-            hop = _hop_distance_from_start(state, node_id, max_hops)
-            if hop is None or (hop + 1) > max_hops:
-                continue
-        out.append(node)
-    return out
-
-
-def _pick_anchor_for_coords(anchors: list[SpaceNode], x: float, y: float, z: float) -> SpaceNode | None:
-    if not anchors:
-        return None
-    ranked = sorted(
-        anchors,
-        key=lambda a: ((a.x_ly - x) ** 2 + (a.y_ly - y) ** 2 + (a.z_ly - z) ** 2, a.node_id),
-    )
-    return ranked[0] if ranked else None
 
 
 def register_hidden_anchored_node(
@@ -1496,91 +1600,35 @@ def register_hidden_anchored_node(
     return node_id
 
 
-def _spawn_ad_hoc_candidate_for_forced_piece(state, piece_entry: dict) -> str | None:
-    if not state.world.space.nodes:
+def _select_historical_host_for_forced_piece(state, piece_entry: dict) -> str | None:
+    """Select a certified historical host, never invent one."""
+    key = piece_entry["piece_key"]
+    piece_entry = dict(piece_entry)
+    piece_entry.setdefault("piece", {})
+    piece_entry.setdefault("channels", ["salvage_data"])
+    reservation = state.world.narrative_snapshot.get("reservations", {}).get(key)
+    candidates, _ = _historical_candidates(state, piece_entry)
+    if reservation:
+        candidates = [nid for nid in candidates if nid == reservation["node_id"]]
+    if not candidates:
         return None
-
-    piece = piece_entry.get("piece") or {}
-    rules = piece_entry.get("placement_rules") or {}
-    candidates_cfg = set(str(x) for x in (rules.get("candidates") or []))
-    max_hops = int(rules.get("max_hops_from_start", 0) or 0)
-    require_kinds = [str(x) for x in (rules.get("require_kind_any") or []) if str(x)]
-    allowed_kinds = [k for k in require_kinds if k in {"station", "relay", "derelict", "ship", "waystation"}]
-    if not allowed_kinds:
-        token_to_kind = {
-            "procedural_station": "station",
-            "procedural_relay": "relay",
-            "procedural_derelict": "derelict",
-            "procedural_ship": "ship",
-        }
-        derived = [token_to_kind[tok] for tok in sorted(candidates_cfg) if tok in token_to_kind]
-        allowed_kinds = sorted(set(derived)) if derived else ["station"]
-
-    anchors = _eligible_ad_hoc_anchors(state, max_hops)
-    if not anchors:
+    from retorno.worldgen.generator import ensure_historical_node
+    node_id = sorted(candidates)[0]
+    if not ensure_historical_node(state, node_id):
         return None
-    default_anchor = state.world.space.nodes.get(state.world.current_node_id) or anchors[0]
-
-    seed = _stable_seed64(
-        state.meta.rng_seed,
-        "forced_ad_hoc",
-        piece_entry["piece_key"],
-        state.world.lore_placements.eval_seq,
-    )
-    rng = random.Random(seed)
-
-    authored = _location_node_ids()
-    kind = allowed_kinds[int(seed % len(allowed_kinds))]
-    x_y_z = _sample_ad_hoc_coords(state, rng, piece, default_anchor)
-    if not x_y_z:
+    state.world.forced_hidden_nodes.add(node_id)
+    sync_node_pools_for_known_nodes(state)
+    pool = state.world.node_pools.get(node_id)
+    if not pool or not pool.window_open or pool.node_cleaned:
         return None
-    x, y, z = x_y_z
-    region = region_for_pos(x, y, z)
-    dist_from_origin = _distance_from_start_ly(state, x, y, z)
-    year = state.clock.t / Balance.YEAR_S if Balance.YEAR_S else 0.0
-    temp_node = SpaceNode(
-        node_id="__ADHOC_CANDIDATE__",
-        name="",
-        kind=kind,
-        radiation_rad_per_s=procedural_radiation_for_node(
-            state.meta.rng_seed, "__ADHOC_CANDIDATE__", kind, region
-        ),
-        radiation_base=0.0,
-        region=region,
-        x_ly=x,
-        y_ly=y,
-        z_ly=z,
-    )
-    if not _node_matches_candidates(temp_node.node_id, temp_node, candidates_cfg, authored):
-        return None
-    if not piece_constraints_ok(
-        piece,
-        LoreContext(
-            node_id=temp_node.node_id,
-            region=region,
-            dist_from_origin_ly=dist_from_origin,
-            year_since_wake=year,
-        ),
-    ):
-        return None
-
-    anchor = _pick_anchor_for_coords(anchors, x, y, z)
-    if not anchor:
-        return None
-
-    node_id = register_hidden_anchored_node(
-        state,
-        seed_key=piece_entry["piece_key"],
-        kind=kind,
-        anchor_node_id=anchor.node_id,
-        x_ly=x,
-        y_ly=y,
-        z_ly=z,
-    )
-    if not node_id:
-        return None
-    _seed_hidden_forced_breadcrumb(state, node_id, piece_entry["piece_key"])
+    if not reservation:
+        _seed_hidden_forced_breadcrumb(state, node_id, key)
     return node_id
+
+
+def _spawn_ad_hoc_candidate_for_forced_piece(state, piece_entry: dict) -> str | None:
+    """Legacy private entrypoint; the name no longer implies fabrication."""
+    return _select_historical_host_for_forced_piece(state, piece_entry)
 
 
 def _register_arc_placement(state, piece_entry: dict, node_id: str, file_path: str | None) -> None:
@@ -1623,19 +1671,27 @@ def _assign_piece_to_node(state, piece_entry: dict, node_id: str) -> bool:
 
     pool = state.world.node_pools.get(node_id)
     node = state.world.space.nodes.get(node_id)
-    if not pool or not node:
+    if not pool or not node or pool.node_cleaned:
         return False
 
     channel = _pick_channel_for_node(piece_entry, node)
     if not channel:
         return False
 
+    salvage_file = _file_for_salvage_piece(piece_entry, state.os.locale.value, state) if channel == "salvage_data" else None
+    if salvage_file:
+        path = normalize_path(salvage_file["path"])
+        if not path.startswith(("/logs/", "/data/", "/mail/")) or any(
+            normalize_path(f.get("path", "")) == path for f in pool.base_files + pool.injected_files
+        ):
+            return False
+
     state.world.lore_placements.piece_to_node[piece_key] = node_id
     state.world.lore_placements.piece_channel_bindings[piece_key] = channel
 
     file_path: str | None = None
     if channel == "salvage_data":
-        entry = _file_for_salvage_piece(piece_entry, state.os.locale.value)
+        entry = salvage_file
         if entry:
             pool.injected_files.append(entry)
             file_path = str(entry.get("path", ""))
@@ -1679,6 +1735,12 @@ def _deliver_piece(
         if pair is None:
             return LoreDelivery(delivered_files, events, applied=False)
         left, right = pair
+        aliases = state.world.narrative_snapshot.get("aliases", {})
+        left, right = (aliases.get(ident.casefold(), ident) for ident in (left, right))
+        from retorno.worldgen.generator import ensure_historical_node
+        for ident in (left, right):
+            if ident not in state.world.space.nodes:
+                ensure_historical_node(state, ident)
         if left not in state.world.space.nodes or right not in state.world.space.nodes:
             return LoreDelivery(delivered_files, events, applied=False)
         if not is_hop_within_cap(state.world, left, right, float(Balance.MAX_ROUTE_HOP_LY)):
@@ -1779,7 +1841,7 @@ def _deliver_piece(
         return LoreDelivery(delivered_files, events, applied=True)
 
     if channel == "salvage_data":
-        entry = _file_for_salvage_piece({"piece_key": piece_id, "piece": piece}, lang)
+        entry = _file_for_salvage_piece({"piece_key": piece_id, "piece": piece}, lang, state)
         if entry:
             delivered_files.append(entry)
         return LoreDelivery(delivered_files, events, applied=bool(entry))
@@ -1798,7 +1860,7 @@ def _deliver_assigned_for_trigger(
     events: list[Event] = []
     applied = False
     node_id = ctx.node_id
-    piece_by_key = _piece_index()
+    piece_by_key = _piece_index(state)
     pool = state.world.node_pools.get(node_id)
 
     for piece_key, placed_node in sorted(state.world.lore_placements.piece_to_node.items()):
@@ -1871,7 +1933,7 @@ def _evaluate_forced_pieces(state, piece_entries: list[dict]) -> None:
 
         candidates = _candidate_nodes_for_piece(state, piece_entry)
         if not candidates:
-            generated_id = _spawn_ad_hoc_candidate_for_forced_piece(state, piece_entry)
+            generated_id = _select_historical_host_for_forced_piece(state, piece_entry)
             if generated_id:
                 candidates = [generated_id]
 
@@ -1944,7 +2006,7 @@ def run_lore_scheduler_tick(state) -> None:
     close_windows_for_visited_nodes(state)
     recompute_all_node_completion(state)
 
-    pieces = _iter_all_pieces()
+    pieces = _iter_all_pieces(state)
     _evaluate_forced_pieces(state, pieces)
 
     if not getattr(Balance, "LORE_SCHEDULER_ENABLED", True):

@@ -16,7 +16,7 @@ Usage: intel | intel <amount> | intel all
   source: origin of the intel (may include @ref).
   age: time since recorded.
 - Intel kinds:
-  node: a specific known node/contact (e.g., HARBOR_12).
+  node: a known contact or an unresolved reference (e.g., HARBOR_12).
   sector: a known sector identifier (e.g., S+001_-002_+000).
   link: a reported connection between two nodes (A -> B); the record alone does not authorize travel.
   coord: exact coordinates (x,y,z) that point to a nav point.
@@ -27,13 +27,15 @@ intel show <intel_id>
 intel import <path>
 - Imports navigation intel from a file.
 - Supported markers: NODE:, LINK:, SECTOR:, COORD:
+- NODE resolves a registered ID, name or alias. An absent destination remains a clue; it does not become a station.
+- SECTOR provides regional information without identifying every contact. COORD identifies a navigation point, not a station.
 - Optional blocks:
   [INTEL] ... [/INTEL]
   - A LINK becomes an operational route only when both endpoints are resolved and the hop is at most 45 ly.
   - An unresolved or longer LINK remains a contact and historical record; it does not authorize travel.
   - Import a canonical SECTOR first when its destinations still need to be materialized, then reimport the LINK.
-  - If it contains a node_id, name, or sector id, the matching navigation record is added as a known contact.
-  - Corrupt intel may fail to resolve or yield a new (unknown) hub contact.
+  - If it contains a registered node_id, name, alias or sector id, the matching contact can be identified.
+  - Unresolved tokens remain uncertain records. Corrupt intel may fail or identify a preexisting hub within range.
 - Files under /data/nav, /mail or /logs may auto-import on cat.
 
 intel export <path>

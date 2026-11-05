@@ -1,3 +1,5 @@
+> **Implemented 4D-3e4 update (2026-11-05).** The scheduler uses certified preexisting hosts and reservations validated before play. It no longer fabricates nodes for forced pieces or reopens closed/exhausted pools. Policies still force attempts, not discovery or guaranteed delivery. Definitions and texts are tied to the saved catalogue. The current contract and executable examples are [Physical narrative requirements](../narrative-world-contract.md). The earlier body retained below is historical wherever it contradicts this update.
+
 # Lore scheduler, arcs, and singles
 
 > Canonical English technical reference. It describes the implementation

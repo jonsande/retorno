@@ -166,6 +166,7 @@ class WorldState:
     universe_version: str = "historical-world-v1"
     universe_rules_key: str = ""
     manifest_definition: ManifestDefinition | None = None
+    narrative_snapshot: dict = field(default_factory=dict)
     scan_observations: list[ScanObservation] = field(default_factory=list)
     next_scan_observation_seq: int = 1
 

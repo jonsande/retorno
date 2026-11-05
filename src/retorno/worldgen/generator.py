@@ -507,6 +507,10 @@ def universe_definition(state: GameState):
     if state.world.universe_version != ALGORITHM_VERSION:
         raise ValueError("Incompatible historical universe version")
     definition = state.world.manifest_definition
+    snapshot = state.world.narrative_snapshot
+    if snapshot and snapshot.get("declarations"):
+        if definition is None or definition.narrative_key != snapshot["catalog_key"]:
+            raise ValueError("Historical narrative definition missing or changed")
     if definition is not None:
         if definition.seed != state.meta.rng_seed or definition.algorithm_version != ALGORITHM_VERSION:
             raise ValueError("Historical universe seed/version changed")
@@ -566,7 +570,8 @@ def _ensure_sector_generated_core(state, physical_sector_ids):
         if site.identity.namespace == "authored":
             # Normally present from bootstrap. A physically declared authored
             # site remains distinct from prose/content references.
-            cfg = next(loc for loc in load_locations()
+            from retorno.worldgen.narrative import records_for
+            cfg = next(loc for loc in records_for(state, "locations", load_locations)
                        if loc.get('node',{}).get('node_id') == nid)
             raw = cfg['node']
             node.name = raw.get('name',nid)

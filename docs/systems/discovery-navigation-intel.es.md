@@ -1,3 +1,5 @@
+> **Actualización implementada 4D-3e4 (2026-11-05).** NODE y bloques authored resuelven también alias declarados y sitios históricos lazy. Lectura e importación explícita comparten parser. Los bloques formados solo por instrucciones explícitas no sortean corrupción. Tokens no resueltos quedan como intel incierta; la recuperación corrupta solo descubre hubs preexistentes dentro de su radio. LINK conserva extremos físicos y cap sin exigir arista histórica; SECTOR no revela inventario y COORD sigue siendo nav_point. No cambian las excepciones de scan y solve manual. La referencia vigente y sus ejemplos ejecutables son [Requisitos narrativos físicos](../narrative-world-contract.es.md). El cuerpo anterior conservado a continuación es histórico donde contradiga esta actualización.
+
 # Descubrimiento, navegación e intel
 
 **Compatibilidad 4D-3e2:** el worldgen productivo usa ahora [historia estable versionada](../design/historical-worldgen-integration.es.md).

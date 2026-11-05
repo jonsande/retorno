@@ -1,3 +1,5 @@
+> **Implemented 4D-3e4 update (2026-11-05).** Optional structured requirements from the active catalogue compile before play into the productive manifest. Variable positions depend on seed/ID and relations must be certified. New sites are lazy and secret. Density, quotas, hubs, cap and topology are not retuned. Ad hoc lore creation described in the older body has been removed; structural recovery still awaits e5. The current contract and executable examples are [Physical narrative requirements](../narrative-world-contract.md). The earlier body retained below is historical wherever it contradicts this update.
+
 # Physical universe and procedural generation
 
 Status: canonical implemented reference, updated for **4D-3e2**, working tree

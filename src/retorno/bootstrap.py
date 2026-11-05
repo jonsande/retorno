@@ -16,8 +16,12 @@ import hashlib
 from pathlib import Path
 
 
-def create_initial_state_prologue() -> GameState:
+def create_initial_state_prologue(*, seed: int | None = None) -> GameState:
     state = GameState()
+    if seed is not None:
+        state.meta.rng_seed = seed
+    from retorno.worldgen.narrative import prepare_new_world
+    prepare_new_world(state)
 
     state.ship.power = PowerNetworkState(
         p_gen_kw=3.2,
@@ -258,7 +262,9 @@ def create_initial_state_sandbox() -> GameState:
     return state
 
 def _bootstrap_locations(state: GameState, rng: random.Random, module_ids: list[str]) -> None:
-    locations = load_locations()
+    from retorno.worldgen.narrative import records_for
+    locations = records_for(state, "locations", load_locations)
+    base_ids = {loc["node"]["node_id"] for loc in load_locations()}
     if not locations:
         return
 
@@ -335,6 +341,8 @@ def _bootstrap_locations(state: GameState, rng: random.Random, module_ids: list[
     for loc in locations:
         node_cfg = loc.get("node", {})
         node_id = node_cfg.get("node_id")
+        if node_id not in base_ids:
+            continue  # Requirement sites are historical, but materialize lazily.
         if node_id == state.ship.ship_id:
             node_id = None
         if node_id and node_id not in state.world.space.nodes:

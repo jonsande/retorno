@@ -1,3 +1,5 @@
+> **Actualización implementada 4D-3e4 (2026-11-05).** La frontera de activación sigue siendo no recursiva. El arranque recopila también requisitos optativos de arcos y singles, comprueba recursos obligatorios y conserva una huella y snapshot; guardar/cargar rechaza cambios del catálogo. Las descripciones anteriores de lectura tardía y recursos vacíos corresponden al loader aislado, no a la validación de partidas nuevas. La referencia vigente y sus ejemplos ejecutables son [Requisitos narrativos físicos](narrative-world-contract.es.md). El cuerpo anterior conservado a continuación es histórico donde contradiga esta actualización.
+
 # Contrato de carga de contenido
 
 Estado: **comportamiento implementado, verificado en el commit `2ffb1ab`**.

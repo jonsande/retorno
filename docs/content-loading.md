@@ -1,3 +1,5 @@
+> **Implemented 4D-3e4 update (2026-11-05).** Activation remains nonrecursive. Bootstrap also collects optional arc/single requirements, checks required resources and keeps a fingerprint and snapshot; save/load rejects catalogue changes. Older statements about late reading and empty resources describe the isolated loader, not new-game validation. The current contract and executable examples are [Physical narrative requirements](narrative-world-contract.md). The earlier body retained below is historical wherever it contradicts this update.
+
 # Content loading contract
 
 Status: **implemented behavior, verified at commit `2ffb1ab`**.

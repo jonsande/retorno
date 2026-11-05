@@ -1,3 +1,5 @@
+> **Actualización implementada 4D-3e4 (2026-11-05).** El scheduler usa hosts preexistentes certificados y reservas validadas antes de jugar. Ya no fabrica nodos para una pieza forzosa; no reabre pools cerrados o agotados. Las políticas siguen forzando intentos, no descubrimiento ni entrega garantizada. Las definiciones y textos quedan ligados al catálogo de la partida. La referencia vigente y sus ejemplos ejecutables son [Requisitos narrativos físicos](../narrative-world-contract.es.md). El cuerpo anterior conservado a continuación es histórico donde contradiga esta actualización.
+
 # Scheduler de lore, arcos y singles
 
 > Referencia técnica canónica en español. Describe la implementación observada

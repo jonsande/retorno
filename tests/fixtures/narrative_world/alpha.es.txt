@@ -1,0 +1,5 @@
+El puerto imaginario NEVER_EXISTED solo se menciona en prosa.
+Archivo del pecio: {{wreck_sector}} en {{wreck_coord}}.
+NODE: {{wreck_id}}
+SECTOR: {{wreck_sector}}
+LINK: TEST_HOST -> TEST_RELAY

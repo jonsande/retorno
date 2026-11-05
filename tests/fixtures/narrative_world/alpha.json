@@ -1,0 +1,33 @@
+{
+  "arc_id": "synthetic_alpha",
+  "world_requirements": {
+    "version": "narrative-world-v1",
+    "entities": [
+      {"id": "TEST_HOST", "name": "Test Host", "kind": "station", "position": {"fixed_ly": [26, 27, 1]}},
+      {"id": "TEST_STATION", "name": "Test Horizon", "aliases": ["Horizon"], "kind": "station", "position": {"box_ly": [[149950, 150050], [1, 8], [1, 8]], "regions_any": ["disk", "halo"]}}
+    ],
+    "references": ["TEST_WRECK", "ECHO_7"],
+    "relations": [{"type": "historical_association", "from": "TEST_HOST", "to": "TEST_WRECK", "to_kind": "ship"}],
+    "claims": [{"text": "The imaginary port NEVER_EXISTED is inhabited.", "status": "rumor"}]
+  },
+  "primary_intel": {
+    "id": "primary",
+    "kind": "link",
+    "line": "LINK: TEST_HOST -> TEST_RELAY",
+    "force": true,
+    "force_policy": "hard",
+    "allowed_channels": ["salvage_data"],
+    "path_template": "/logs/records/synthetic_alpha.{lang}.txt",
+    "content_ref_en": "lore/synthetic_alpha.en.txt",
+    "content_ref_es": "lore/synthetic_alpha.es.txt",
+    "spatial_bindings": {
+      "version": "narrative-world-v1",
+      "values": {
+        "wreck_id": {"entity": "TEST_WRECK", "field": "id"},
+        "wreck_sector": {"entity": "TEST_WRECK", "field": "sector"},
+        "wreck_coord": {"entity": "TEST_WRECK", "field": "coord"}
+      }
+    }
+  },
+  "placement_rules": {"primary": {"candidates": ["TEST_HOST"], "require_kind_any": ["station"]}}
+}

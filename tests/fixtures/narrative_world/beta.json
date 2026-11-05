@@ -1,0 +1,21 @@
+{
+  "single_id": "synthetic_beta",
+  "world_requirements": {
+    "version": "narrative-world-v1",
+    "entities": [
+      {"id": "TEST_WRECK", "name": "Test Wreck", "aliases": ["Lost Test Ship"], "kind": "ship", "position": {"offset_from": "Horizon", "offset_box_ly": [[0.5, 1.2], [0, 0], [0, 0]]}},
+      {"id": "TEST_RELAY", "name": "Test Relay", "kind": "relay", "position": {"fixed_ly": [27, 27, 1], "sector": "S+002_+002_+000"}}
+    ],
+    "references": ["TEST_HOST", "TEST_STATION"],
+    "relations": [
+      {"type": "near", "from": "TEST_STATION", "to": "TEST_WRECK", "min_ly": 0.5, "max_ly": 1.2},
+      {"type": "physical_link", "from": "TEST_HOST", "to": "TEST_RELAY", "from_kind": "station", "to_kind": "relay"}
+    ]
+  },
+  "weight": 0.4,
+  "channels": ["captured_signal"],
+  "constraints": {},
+  "content_ref_en": "lore/synthetic_beta.en.txt",
+  "content_ref_es": "lore/synthetic_beta.es.txt",
+  "spatial_bindings": {"version": "narrative-world-v1", "values": {"station_sector": {"entity": "TEST_STATION", "field": "sector"}}}
+}

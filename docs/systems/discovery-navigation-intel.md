@@ -1,3 +1,5 @@
+> **Implemented 4D-3e4 update (2026-11-05).** NODE and authored blocks also resolve declared aliases and lazy historical sites. Reading and explicit import share a parser. Blocks containing only explicit instructions do not roll corruption. Unresolved tokens remain uncertain intel; corrupt recovery only discovers preexisting hubs within its radius. LINK retains physical endpoints and cap without requiring a historical edge; SECTOR does not reveal inventory and COORD remains a nav_point. Scan and manual solve exceptions are unchanged. The current contract and executable examples are [Physical narrative requirements](../narrative-world-contract.md). The earlier body retained below is historical wherever it contradicts this update.
+
 # Discovery, navigation, and intel
 
 **4D-3e2 compatibility:** productive worldgen now uses [versioned stable history](../design/historical-worldgen-integration.md).
