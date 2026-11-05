@@ -303,6 +303,15 @@ def _hint(state: GameState, left: ProposedNode, right: ProposedNode, first: bool
     return Hint(Mechanism.UNAVAILABLE, a, b, restrictions=("no_eligible_information_source",))
 
 
+def _chain_cost_rank(cost, objective: str):
+    new, hops, distance, ids = cost
+    if objective == "distance":
+        return distance, hops, new, ids
+    if objective == "hops":
+        return hops, distance, new, ids
+    return cost
+
+
 class _Planner:
     """Call-local queries, caches and reservations; writes no persistent state."""
 
@@ -346,6 +355,8 @@ class _Planner:
         self.archetypes = load_worldgen_archetypes()
         self.slots: dict[str, tuple[str, str, tuple[str, ...]]] = {}
         self.hints: dict[tuple[ProposedNode, ProposedNode, bool], Hint] = {}
+        self.spatial_indexes: dict[int, dict[tuple[int, int, int], list[str]]] = {}
+        self.physical_components: dict[tuple[int, str], set[str]] = {}
 
     def proposed_id(self, prefix: str, edge_key: tuple[str, str], index: int,
                     pos: tuple[float, float, float], reserved_ids: set[str]) -> str:
@@ -548,45 +559,69 @@ class _Planner:
         return tuple(math.floor(v / Balance.MAX_ROUTE_HOP_LY) for v in pos)
 
     def search(self, nodes: dict[str, ProposedNode], origins: tuple[str, ...], target: str,
-               allow_new: bool, geometry_only: bool = False):
+               allow_new: bool, geometry_only: bool = False,
+               access_paths: dict[str, tuple[str, ...]] | None = None,
+               objective: str = "geometry",
+               access_distances: dict[str, float] | None = None):
+        # The geometric API retains its original ranking. Contextual callers
+        # seed real access costs and sample two additional practical objectives.
+        def rank(cost):
+            return _chain_cost_rank(cost, objective)
         graph = dict(nodes)
         if allow_new and not geometry_only:
             graph.update(self.corridor_candidates(nodes, origins, target))
-        index: dict[tuple[int, int, int], list[str]] = {}
-        for nid, node in sorted(graph.items()):
-            index.setdefault(self.cell(node.position_ly), []).append(nid)
+        graph_key = id(nodes)  # session-owned immutable input, never a global cache
+        if graph_key not in self.spatial_indexes:
+            physical_index: dict[tuple[int, int, int], list[str]] = {}
+            for nid, node in sorted(nodes.items()):
+                physical_index.setdefault(self.cell(node.position_ly), []).append(nid)
+            self.spatial_indexes[graph_key] = physical_index
+        index = self.spatial_indexes[graph_key]
+        if allow_new and not geometry_only:
+            index = {cell: list(ids) for cell, ids in index.items()}
+            for nid in sorted(set(graph)-set(nodes)):
+                index.setdefault(self.cell(graph[nid].position_ly), []).append(nid)
         # Reverse physical component gives an admissible lower bound on new
         # intermediaries: outside one hop, at least one new stop is needed.
         # Do not use ceil(gap/cap)-1: another existing component can carry the
         # ship much closer at no new-node cost. Ignore information only here.
-        component = {target}
-        todo = [target]
-        for nid in todo:
-            if len(component) > self.budget.expansions:
-                component = set(nodes)  # conservative bound when prepass is large
-                break
-            cell = self.cell(nodes[nid].position_ly)
-            for offset in product(range(-1, 2), repeat=3):
-                for other in index.get(tuple(a+b for a, b in zip(cell, offset)), ()):
-                    if other in nodes and other not in component and _distance(nodes[nid], nodes[other]) <= Balance.MAX_ROUTE_HOP_LY:
-                        component.add(other)
-                        todo.append(other)
+        component_key = graph_key, target
+        if component_key not in self.physical_components:
+            component = {target}
+            todo = [target]
+            for nid in todo:
+                if len(component) > self.budget.expansions:
+                    component = set(nodes)  # conservative bound when prepass is large
+                    break
+                cell = self.cell(nodes[nid].position_ly)
+                for offset in product(range(-1, 2), repeat=3):
+                    for other in index.get(tuple(a+b for a, b in zip(cell, offset)), ()):
+                        if other in nodes and other not in component and _distance(nodes[nid], nodes[other]) <= Balance.MAX_ROUTE_HOP_LY:
+                            component.add(other)
+                            todo.append(other)
+            self.physical_components[component_key] = component
+        component = self.physical_components[component_key]
         lower_bounds = {}
         def priority(cost, node):
             if node.node_id not in lower_bounds:
-                gap = min(_distance(node, nodes[n]) for n in component)
+                gap = 0.0 if node.node_id in component else min(_distance(node, nodes[n]) for n in component)
                 direct = _distance(node, nodes[target])
                 lower_bounds[node.node_id] = (
                     int(gap > Balance.MAX_ROUTE_HOP_LY) if math.isfinite(gap) else 0,
                     math.ceil(direct / Balance.MAX_ROUTE_HOP_LY) if math.isfinite(direct) else 0, direct)
             extra, hop_bound, distance_bound = lower_bounds[node.node_id]
-            return (cost[0]+extra, cost[1]+hop_bound, cost[2]+distance_bound, cost[3])
+            return rank((cost[0]+extra, cost[1]+hop_bound, cost[2]+distance_bound, cost[3]))
         queue = []
         serial = count()
         best = {}
         endpoint_best = {}
         for origin in origins:
-            cost = (0, 0, 0.0, (origin,))
+            access = access_paths[origin] if access_paths is not None else (origin,)
+            access_distance = (access_distances[origin] if access_distances is not None else
+                               math.fsum(math.dist(_position(self.state.world.space.nodes[a]),
+                                                   _position(self.state.world.space.nodes[b]))
+                                         for a, b in zip(access, access[1:])))
+            cost = (0, len(access)-1, access_distance, access if access_paths is not None else (origin,))
             heapq.heappush(queue, (priority(cost, nodes[origin]), next(serial), cost, origin, (), (nodes[origin],), ()))
             best[origin, ()] = cost
             endpoint_best.setdefault(origin, {})[()] = cost
@@ -649,16 +684,16 @@ class _Planner:
                             cost[1] + len(added_hops),
                             cost[2] + sum(h.distance_ly for h in added_hops),
                             cost[3] + tuple(n.node_id for n in added_nodes))
-                if dest == target and (incumbent_cost is None or new_cost < incumbent_cost):
+                if dest == target and (incumbent_cost is None or rank(new_cost) < rank(incumbent_cost)):
                     incumbent = path + added_nodes, hops + added_hops
                     incumbent_cost = new_cost
                 key = dest, reservations
                 # Subset reservations dominate supersets at the same endpoint:
                 # lower cost with more free slots cannot reduce continuation options.
-                if any(set(slots).issubset(reservations) and old <= new_cost
+                if any(set(slots).issubset(reservations) and rank(old) <= rank(new_cost)
                        for slots, old in endpoint_best.get(dest, {}).items()):
                     continue
-                if len(best) >= self.budget.labels and key not in best:
+                if len(best)-len(origins) >= self.budget.labels and key not in best:
                     self.exhausted.add("labels")
                     return incumbent
                 best[key] = new_cost
@@ -668,106 +703,162 @@ class _Planner:
         return None
 
 
+class _ChainSession:
+    """One read-only planning call; catalogs, indexes and hint/slot caches shared.
+
+    Results contain copied immutable values. This session must never outlive the
+    coherent snapshot supplied by its caller or be kept as a global cache.
+    """
+
+    def __init__(self, state: GameState, context: PlanningContext):
+        self.state, self.context = state, context
+        self.origin_paths = _origin_paths(state)
+        self.protected = lore._locked_primary_targets(state)
+        self.protection_incomplete = False
+        for arc in lore.load_arcs():
+            primary = arc.get("primary_intel") or {}
+            placement = state.world.arc_placements.get(arc.get("arc_id", ""), {})
+            primary_state = placement.get("primary")
+            discovered = placement.get("discovered") or ()
+            unlocked = (isinstance(primary_state, dict) and primary_state.get("unlocked")) or primary.get("id", "primary") in discovered
+            if primary and not unlocked and lore._primary_target_node_id(primary) is None:
+                self.protection_incomplete = True
+        origins = self.origin_paths
+        self.nodes = {nid: _existing(node, state) for nid, node in sorted(state.world.space.nodes.items())
+                      if nid not in self.protected and all(math.isfinite(v) for v in _position(node))
+                      and (node.kind not in {"origin", "transit"} or nid in origins)}
+        self.planner: _Planner | None = None
+
+    def propose(self, target_id: str, *, access_paths: dict[str, tuple[str, ...]] | None = None,
+                objective: str = "geometry", augmented: bool = False,
+                access_distances: dict[str, float] | None = None) -> RecoveryProposal:
+        state, context = self.state, self.context
+        target = state.world.space.nodes.get(target_id)
+        attempts = state.world.dead_nodes.get(target_id)
+        identity = "DEADNODE_" + _digest(state.meta.rng_seed, context.key,
+                                        state.world.current_node_id, target_id,
+                                        _position(target) if target else None,
+                                        attempts.attempts if attempts else 0)
+        limitations = ("proposal_only_no_activation", "no_exhaustive_spatial_search",
+                       "future_materializer_must_revalidate_state")
+
+        def reject(reason: str) -> RecoveryProposal:
+            return RecoveryProposal(identity, target_id, None, (), (), False, False,
+                                    InformationStatus.UNAVAILABLE, Materialization.UNAVAILABLE,
+                                    Viability.REJECTED, (reason,), limitations)
+
+        if target is None or not all(math.isfinite(v) for v in _position(target)):
+            return reject("target_missing_or_nonfinite")
+        if state.ship.in_transit:
+            return reject("ship_in_transit")
+        origin_paths = access_paths if access_paths is not None else self.origin_paths
+        origins = tuple(sorted(origin_paths))
+        if not origins:
+            return reject("no_operational_origin")
+        protected = self.protected
+        if self.protection_incomplete:
+            return reject("primary_protection_query_incomplete")
+        if target_id in protected:
+            return reject("protected_primary_target")
+        if target_id not in state.world.known_contacts | state.world.forced_hidden_nodes:
+            return reject("not_a_deadnode_contact")
+        current_pool = state.world.node_pools.get(state.world.current_node_id)
+        target_pool = state.world.node_pools.get(target_id)
+        if (current_pool and current_pool.node_cleaned) or (target_pool and target_pool.node_cleaned):
+            return reject("deadnode_clean_pool_gate")
+        if target_id in self.origin_paths or any(math.dist(_position(state.world.space.nodes[n]), _position(target))
+                                       <= Balance.SENSORS_RANGE_LY for n in self.origin_paths):
+            return reject("already_connected_or_in_deadnode_sensor_range")
+        nodes = self.nodes
+        if target_id not in nodes:
+            return reject("target_kind_ineligible")
+        origins = tuple(nid for nid in origins if nid in nodes)
+        if not origins:
+            return reject("no_eligible_origin")
+        if self.planner is None:
+            self.planner = _Planner(state, identity, context.budget)
+            self.planner.claimed_ids.update(protected)
+        planner = self.planner
+        planner.opportunity_id = identity
+        planner.expansions = planner.edges = 0
+        planner.exhausted.clear()
+        planner.candidate_sectors.clear()
+        # Existing-only behavior remains the geometric API's first choice. A
+        # contextual witness may also test nearer new/mixed paths in one graph.
+        costs = origin_paths if objective != "geometry" else None
+        result = planner.search(nodes, origins, target_id, False,
+                                access_paths=costs, objective=objective, access_distances=access_distances)
+        need_augmented = result is None
+        if augmented and result is not None and context.allow_new_nodes:
+            path, hops = result
+            access = origin_paths[path[0].node_id]
+            distance = math.fsum(h.distance_ly for h in hops) + math.fsum(
+                math.dist(_position(state.world.space.nodes[a]), _position(state.world.space.nodes[b]))
+                for a, b in zip(access, access[1:]))
+            direct = math.dist(_position(state.world.space.nodes[state.world.current_node_id]), _position(target))
+            # Only skip a contextual mixed/new witness when the existing result
+            # attains both physical lower bounds. No backtracking policy cutoff.
+            need_augmented = not (distance == direct and len(access)-1+len(hops) == math.ceil(direct / Balance.MAX_ROUTE_HOP_LY))
+        if need_augmented and context.allow_new_nodes:
+            alternative = planner.search(nodes, origins, target_id, True,
+                                         access_paths=costs, objective=objective, access_distances=access_distances)
+            if alternative is not None:
+                def quality(witness):
+                    chain, chain_hops = witness
+                    access = origin_paths[chain[0].node_id]
+                    access_distance = math.fsum(math.dist(_position(state.world.space.nodes[a]), _position(state.world.space.nodes[b]))
+                                                for a, b in zip(access, access[1:]))
+                    return _chain_cost_rank((sum(not n.existing for n in chain), len(access)-1+len(chain_hops),
+                        access_distance+math.fsum(h.distance_ly for h in chain_hops),
+                        access+tuple(n.node_id for n in chain[1:])), objective)
+                if result is None or quality(alternative) < quality(result):
+                    result = alternative
+        if result is None:
+            # Preserve a geometric witness without mislabelling missing information
+            # or undefined procedural placement as an operational opportunity.
+            if not planner.exhausted:
+                result = planner.search(nodes, origins, target_id, False, True,
+                                        access_paths=costs, objective=objective, access_distances=access_distances)
+            if result is None and context.allow_new_nodes:
+                origin = min(origins, key=lambda nid: (math.dist(nodes[nid].position_ly, _position(target)), nid))
+                edge = planner.connector(nodes[origin], nodes[target_id], True, (), (nodes[origin],), True, True)
+                if edge:
+                    result = (nodes[origin],) + edge[0], edge[1]
+        if result is None:
+            return RecoveryProposal(identity, target_id, None, (), (), False, False,
+                                    InformationStatus.UNAVAILABLE, Materialization.UNAVAILABLE,
+                                    Viability.INCOMPLETE, ("no_chain_in_sampled_domain",) + (("search_budget_exhausted",) if planner.exhausted else ()),
+                                    limitations, search=planner.report())
+        path, hops = result
+        physical = all(n.procedural_eligible for n in path)
+        unavailable = any(h.hint.mechanism == Mechanism.UNAVAILABLE for h in hops)
+        future = any(not d.implemented for h in hops for d in h.hint.dependencies)
+        information = (InformationStatus.UNAVAILABLE if unavailable else
+                       InformationStatus.FUTURE_REQUIRED if future else InformationStatus.VERIFIED)
+        materialization = (Materialization.UNAVAILABLE if not physical else
+                           Materialization.CONDITIONAL if any(not n.existing for n in path) else Materialization.EXISTING)
+        unavailable_now = any(d.available_now is not True for h in hops for d in h.hint.dependencies)
+        viability = (Viability.INCOMPLETE if unavailable or not physical else
+                     Viability.CONDITIONAL if future or unavailable_now or materialization == Materialization.CONDITIONAL
+                     or any(h.hint.requires_preparation for h in hops) else Viability.VERIFIED)
+        stages = tuple(Stage(node, Role.BOTH if index < len(hops) and hops[index].hint.requires_preparation
+                             and hops[index].hint.mechanism != Mechanism.RECOVERY_SIGNAL else Role.NAVIGATION,
+                             hops[index].hint if index < len(hops) else None)
+                       for index, node in enumerate(path))
+        reasons = tuple(sorted({"information_source_unavailable" for h in hops if h.hint.mechanism == Mechanism.UNAVAILABLE}
+                               | {reason for n in path if not n.procedural_eligible for reason in n.selection_reasons}
+                               | ({"search_budget_exhausted"} if planner.exhausted else set())
+                               | ({"future_reception_required"} if future else set())
+                               | ({"materialization_not_guaranteed"} if materialization != Materialization.EXISTING else set())))
+        return RecoveryProposal(identity, target_id, path[0].node_id, stages, hops, True, physical,
+                                information, materialization, viability, reasons, limitations,
+                                origin_paths[path[0].node_id], planner.report())
+
+
 def propose_deadnode_chain(state: GameState, target_id: str,
                            context: PlanningContext = PlanningContext()) -> RecoveryProposal:
-    """Calculate a proposal without changing state, RNG, catalogs or persistence.
+    """Geometric proposal API; contextual comparison lives in deadnode_opportunities.
 
-    This is not called by evaluate_dead_nodes. Candidate eligibility is retained;
-    the caller owns threshold timing and any future confirmation transaction.
+    Candidate timing is owned by the caller. This never activates deadnodes.
     """
-    target = state.world.space.nodes.get(target_id)
-    attempts = state.world.dead_nodes.get(target_id)
-    identity = "DEADNODE_" + _digest(state.meta.rng_seed, context.key,
-                                    state.world.current_node_id, target_id,
-                                    _position(target) if target else None,
-                                    attempts.attempts if attempts else 0)
-    limitations = ("proposal_only_no_activation", "no_exhaustive_spatial_search",
-                   "future_materializer_must_revalidate_state")
-
-    def reject(reason: str) -> RecoveryProposal:
-        return RecoveryProposal(identity, target_id, None, (), (), False, False,
-                                InformationStatus.UNAVAILABLE, Materialization.UNAVAILABLE,
-                                Viability.REJECTED, (reason,), limitations)
-
-    if target is None or not all(math.isfinite(v) for v in _position(target)):
-        return reject("target_missing_or_nonfinite")
-    if state.ship.in_transit:
-        return reject("ship_in_transit")
-    origin_paths = _origin_paths(state)
-    origins = tuple(sorted(origin_paths))
-    if not origins:
-        return reject("no_operational_origin")
-    protected = lore._locked_primary_targets(state)
-    # The canonical query cannot resolve every possible primary format. Fail
-    # closed for unresolved locked primaries, without inventing narrative rules.
-    for arc in lore.load_arcs():
-        primary = arc.get("primary_intel") or {}
-        placement = state.world.arc_placements.get(arc.get("arc_id", ""), {})
-        primary_state = placement.get("primary")
-        discovered = placement.get("discovered") or ()
-        unlocked = (isinstance(primary_state, dict) and primary_state.get("unlocked")) or primary.get("id", "primary") in discovered
-        if primary and not unlocked and lore._primary_target_node_id(primary) is None:
-            return reject("primary_protection_query_incomplete")
-    if target_id in protected:
-        return reject("protected_primary_target")
-    if target_id not in state.world.known_contacts | state.world.forced_hidden_nodes:
-        return reject("not_a_deadnode_contact")
-    current_pool = state.world.node_pools.get(state.world.current_node_id)
-    target_pool = state.world.node_pools.get(target_id)
-    if (current_pool and current_pool.node_cleaned) or (target_pool and target_pool.node_cleaned):
-        return reject("deadnode_clean_pool_gate")
-    if target_id in origins or any(math.dist(_position(state.world.space.nodes[n]), _position(target))
-                                   <= Balance.SENSORS_RANGE_LY for n in origins):
-        return reject("already_connected_or_in_deadnode_sensor_range")
-    nodes = {nid: _existing(node, state) for nid, node in sorted(state.world.space.nodes.items())
-             if nid not in protected and all(math.isfinite(v) for v in _position(node))
-             and (node.kind not in {"origin", "transit"} or nid in origins)}
-    if target_id not in nodes:
-        return reject("target_kind_ineligible")
-    origins = tuple(nid for nid in origins if nid in nodes)
-    if not origins:
-        return reject("no_eligible_origin")
-    planner = _Planner(state, identity, context.budget)
-    planner.claimed_ids.update(protected)
-    result = planner.search(nodes, origins, target_id, False)
-    if result is None and context.allow_new_nodes:
-        result = planner.search(nodes, origins, target_id, True)
-    if result is None:
-        # Preserve a geometric witness without mislabelling missing information
-        # or undefined procedural placement as an operational opportunity.
-        if not planner.exhausted:
-            result = planner.search(nodes, origins, target_id, False, True)
-        if result is None and context.allow_new_nodes:
-            origin = min(origins, key=lambda nid: (math.dist(nodes[nid].position_ly, _position(target)), nid))
-            edge = planner.connector(nodes[origin], nodes[target_id], True, (), (nodes[origin],), True, True)
-            if edge:
-                result = (nodes[origin],) + edge[0], edge[1]
-    if result is None:
-        return RecoveryProposal(identity, target_id, None, (), (), False, False,
-                                InformationStatus.UNAVAILABLE, Materialization.UNAVAILABLE,
-                                Viability.INCOMPLETE, ("no_chain_in_sampled_domain",) + (("search_budget_exhausted",) if planner.exhausted else ()),
-                                limitations, search=planner.report())
-    path, hops = result
-    physical = all(n.procedural_eligible for n in path)
-    unavailable = any(h.hint.mechanism == Mechanism.UNAVAILABLE for h in hops)
-    future = any(not d.implemented for h in hops for d in h.hint.dependencies)
-    information = (InformationStatus.UNAVAILABLE if unavailable else
-                   InformationStatus.FUTURE_REQUIRED if future else InformationStatus.VERIFIED)
-    materialization = (Materialization.UNAVAILABLE if not physical else
-                       Materialization.CONDITIONAL if any(not n.existing for n in path) else Materialization.EXISTING)
-    unavailable_now = any(d.available_now is not True for h in hops for d in h.hint.dependencies)
-    viability = (Viability.INCOMPLETE if unavailable or not physical else
-                 Viability.CONDITIONAL if future or unavailable_now or materialization == Materialization.CONDITIONAL
-                 or any(h.hint.requires_preparation for h in hops) else Viability.VERIFIED)
-    stages = tuple(Stage(node, Role.BOTH if index < len(hops) and hops[index].hint.requires_preparation
-                         and hops[index].hint.mechanism != Mechanism.RECOVERY_SIGNAL else Role.NAVIGATION,
-                         hops[index].hint if index < len(hops) else None)
-                   for index, node in enumerate(path))
-    reasons = tuple(sorted({"information_source_unavailable" for h in hops if h.hint.mechanism == Mechanism.UNAVAILABLE}
-                           | {reason for n in path if not n.procedural_eligible for reason in n.selection_reasons}
-                           | ({"search_budget_exhausted"} if planner.exhausted else set())
-                           | ({"future_reception_required"} if future else set())
-                           | ({"materialization_not_guaranteed"} if materialization != Materialization.EXISTING else set())))
-    return RecoveryProposal(identity, target_id, path[0].node_id, stages, hops, True, physical,
-                            information, materialization, viability, reasons, limitations,
-                            origin_paths[path[0].node_id], planner.report())
+    return _ChainSession(state, context).propose(target_id)

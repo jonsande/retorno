@@ -1,4 +1,4 @@
-# Núcleo de propuestas de cadenas deadnode — Fases 4D-3b/3c
+# Núcleo de propuestas de cadenas deadnode — Fases 4D-3b/3c/3d
 
 Versión inglesa: [deadnode-chain-planner.md](deadnode-chain-planner.md).
 
@@ -298,3 +298,207 @@ no cambia ningún comando del jugador.
 
 La regla de rodeos aprobada no requiere otra aprobación. No se propone tipo,
 peso, probabilidad, límite jugable de saltos ni garantía de supervivencia universal.
+
+## Oportunidades contextuales — Fase 4D-3d
+
+**Aprobado:** preferir oportunidades failsafe razonablemente cercanas, incluyendo
+el trayecto de la nave al origen. La evidencia de frontera es secundaria frente
+a la accesibilidad práctica; un territorio conocido cercano puede ser preferible
+a otro desconocido lejano. Evitar retrocesos desproporcionados sin imponer un
+nuevo límite fijo de distancia/saltos. Estos criterios se aplican a recuperación
+deadnode, no a worldgen, lore, arcos o singles generales. Escaneo normal,
+documentos, salvage, uplink cuando corresponda y futuras comunicaciones capturadas
+siguen siendo vías legítimas. No se exige volver indiscriminadamente a nodos
+antiguos para repetir escaneos. Localizaciones/pools completados siguen completos.
+La recuperación no concede recursos ni garantiza supervivencia o éxito, y puede
+no encontrar opción razonable. Sigue vigente la regla aprobada de rodeos regionales.
+
+### API y compatibilidad
+
+[`core/deadnode_opportunities.py`](../../src/retorno/core/deadnode_opportunities.py)
+ofrece `evaluate_deadnode_opportunity(state, proposal)`,
+`compare_opportunities(left, right)` y
+`compare_deadnode_opportunities(state, target_ids, context, budget)`.
+Los valores congelados tipados `OpportunityEvaluation`, `AccessRoute`,
+`TerritoryEvidence`, `TravelCosts`, `Estimate`, `OpportunityComparison`,
+`OpportunitySelection` y `OpportunityBudget` describen acceso, recorrido entero,
+evidencia, incertidumbre y comparación parcial. No son planes activos ni añaden
+esquema de guardado.
+
+La API geométrica `propose_deadnode_chain` conserva comportamiento 4D-3c por
+compatibilidad. Por sí sola no selecciona failsafes contextuales: sus orígenes
+siguen empezando con coste geométrico de cadena cero. Su `origin_access_path`
+por anchura favorece saltos e ids estables; un camino empatado en saltos puede
+ser más largo. Una rama larga lexicográficamente anterior demuestra el límite
+en la regresión 05.
+
+La API contextual usa tres testigos Dijkstra dirigidos por origen alcanzable:
+menor distancia de red, menos saltos y menor tiempo nominal. Sólo admite aristas
+operativas F-ROUTE-01 y conocimiento normal del destino; contactos por sí solos,
+aristas colgantes/inversas/fuera del cap/de longitud cero no conceden acceso.
+Conserva alternativas de acceso, sin sustituirlas implícitamente en una propuesta
+recibida. El evaluador independiente informa de entrada obsoleta/inaccesible,
+sin mover la nave ni reparar conocimiento.
+
+Una `_ChainSession` local comparte descriptores canónicos, catálogos, cupos,
+intel legible, índices espaciales físicos, componentes relajadas del objetivo
+y cachés de pistas entre objetivos/criterios. Muestrea la cadena geométrica
+y dos objetivos prácticos A* con distancia/saltos reales de acceso en el coste
+inicial. Conservan testigos sólo de existentes y pueden probar corredores mixtos/
+nuevos cuando los caminos existentes no alcanzan ambas cotas geométricas de
+distancia/saltos. Se pasan los resúmenes de acceso directamente, sin recalcularlos
+para cada origen/objetivo. La heurística usa diferencia cero inmediatamente si
+el nodo ya está en su componente relajada. Las etiquetas de origen son entrada
+indexada; `SearchBudget.labels` acota etiquetas adicionales a esos orígenes.
+
+Cada cadena se evalúa con las alternativas de acceso muestreadas para su origen.
+Se eliminan testigos cadena/acceso duplicados. No se afirma cubrir todos los
+caminos Pareto, pares origen-cadena ni optimalidad espacial global. La elegibilidad/
+protección sigue en el núcleo de cadenas; umbrales, tiempos y
+`evaluate_dead_nodes` permanecen sin cambios.
+
+### Recorrido completo y economía condicionada
+
+El trayecto registrado es nodo actual → acceso dirigido → origen → etapas →
+objetivo. Se separan métricas de acceso y cadena y los totales incluyen ambas
+distancias y saltos. La distancia euclidiana nave-objetivo es otro campo. Elegir
+otro origen nunca recoloca gratis la nave. Quedan explícitos ids reutilizados/
+nuevos, saltos con rutas conocidas, territorio por nodo y dependencias de
+información/materialización/recepción.
+
+| Evidencia/estimación | Autoridad canónica y límites |
+| --- | --- |
+| Segundos nominales de tránsito | `Engine.Travel`: distancia dividida por `max(0.001, cruise_speed_ly_per_year)` por `Balance.YEAR_S`; viaje local usa km finos divididos por `max(0.1, LOCAL_TRAVEL_SPEED_KM_S)`. `_compute_fine_range_km` de sólo lectura aporta un rango local ausente. |
+| Energía CRUISE condicionada | `Engine._compute_load_kw` y `Engine._compute_p_gen` de sólo lectura sobre vista independiente de sistemas auto-CRUISE, excluyendo jobs. kW constantes × segundos nominales / 3600 dan kWh brutos de demanda/generación. |
+| Evolución real de batería/red | Desconocida: `Engine._update_battery` limita carga/descarga y aplica eficiencias; calidad, shedding, cambios de estado y jobs futuros afectan el viaje. No se ejecutan esos helpers mutantes. |
+| Scrap directo de tránsito | Cero calculable: `Travel` no cobra scrap por salto. Excluye reparaciones, mantenimiento y trabajo informativo. |
+| Desgaste de sistemas/casco | `Engine._apply_degradation` depende de duración, deterioro base, calidad, radiación y brownout; tránsito normal sin CRUISE usa `TRANSIT_WEAR_MULT_NORMAL`. El casco también depende de exposición/tránsito. Daño y decisiones de reparación futuros no están cuantificados. |
+| Scrap de reparación/salvage | Desconocido. `_repair_scrap_cost` tasa un importe/perfil concreto; los fallos pueden consumir/devolver reservas. Salvage depende de disponibilidad real, drones, batería y jobs exitosos; no se gana antes de ejecutarlo. |
+
+`EstimateStatus` separa `calculable`, `conditional` y `unknown`; los desconocidos
+son `None`, nunca cero ni penalización inventada. El tiempo nominal supone
+velocidad actual, tránsito normal y ausencia de escalas/jobs. La energía CRUISE
+supone sistemas constantes con los objetivos normales de apagado automático;
+no es descarga de batería ni promesa de suministro sostenido. El tiempo local
+puede favorecer un camino geométricamente más largo. La acción Travel real del
+Engine comprueba las estimaciones en la regresión 17.
+
+`economic_feasibility` permanece `unknown`, incluso con `verified_mechanics`.
+Este estado verifica la valoración actual de mecánicas/fuentes, no una expedición
+asequible ni supervivencia. Se revalidarán gates normales de nave/operador y todas
+las condiciones. El posible módulo futuro de canibalización de drones podría
+cambiar oportunidades de recursos al regresar, pero no está implementado,
+no aporta scrap aquí ni es requisito de planificación.
+
+### Evidencia territorial y aparición tardía
+
+La evidencia persistida es distinta: generación física (`generated_sectors` y
+`sector_states`), intel sectorial explícita del jugador (`known_intel`/`IntelItem`
+de sector), nodos conocidos, contactos detectados, `visited_nodes` y
+`node_cleaned` del pool. `TerritoryEvidence` también indica si un sector tiene
+nodos detectados/visitados o si una región galáctica física tiene algún visitado.
+Nada significa cobertura exhaustiva. Sin pool, completitud desconocida, sin
+suponer que el lugar esté completado o disponible.
+
+El modelo no persiste un registro durable de cobertura volumétrica de sensores.
+Eventos recientes de scan, contactos, datos de jobs y rangos finos no prueban que
+se haya examinado todo el espacio ni que un sector sin nodos visitados nunca se
+haya escaneado. Cada evidencia declara `sensor_coverage=not_recorded`; no se
+inventa mapa de escaneo.
+
+Las señales de frontera son sólo evidencia: etapa no visitada, etapa sin
+identificar y ausencia de intel sectorial explícita (expresamente no ausencia de
+escaneo previo). No se infiere territorio virgen de generación interna ni falta
+de visitas. Las zonas conocidas siguen elegibles y no se reabren fuentes
+completadas. Las escalas nuevas en sectores generados/explorados conservan todas
+las dependencias 4D-3c de inserción, aparición, topología y pools. El evaluador
+recomprueba identidad/posición física, reservas canónicas actuales y estado de
+fuentes; los cambios requieren replanificar. No se introduce explicación de
+invisibilidad, permiso de aparición retroactiva ni mecánica de cobertura nueva.
+
+### Comparación parcial, presupuesto y límite de integración
+
+1. Priorizar legitimidad mecánica: `verified_mechanics`, después `conditional`;
+   conservar `unusable` como diagnóstico y excluirlo de ids preferidos.
+2. Dentro de un estado comparable, comparar Pareto de distancia/saltos de acceso,
+   distancia/saltos totales y segundos nominales. Los conjuntos de dependencias
+   pendientes/no disponibles no deben aumentar para dominar otra propuesta.
+   Requisitos distintos o conflictos menor distancia/más saltos conservan alternativas.
+3. Sólo con métricas prácticas y dependencias equivalentes usar un superconjunto
+   estricto de evidencia de frontera. Evidencia igual/incomparable conserva empates.
+
+No hay puntuación económica ponderada, porcentaje inventado, penalización por
+coste desconocido, prohibición fija de retroceso ni ganador por id arbitrario.
+Los ids sólo ordenan la salida. Las razones por pares explican dominancia o
+conflicto; todas las evaluaciones se pueden inspeccionar. `preferred_ids` es el
+conjunto no dominado muestreado, no una orden de activación ni prueba de mejor
+viaje económico.
+
+`OpportunityBudget` predeterminado: 8 objetivos, 16384 expansiones de acceso,
+65536 aristas de acceso entre las tres pasadas y 4096 comparaciones. Cada testigo
+de cadena conserva su `SearchBudget`. Con hasta tres testigos de cadena y tres
+de acceso por objetivo, la familia predeterminada tiene hasta 72 evaluaciones.
+Ordenar ids reproduce el muestreo técnico, sin establecer prioridad de producto.
+Los objetivos sobrantes quedan sin valorar y se registran en `omitted_targets`; agotar presupuesto
+hace falso `complete_within_sampled_family`. Ese campo nunca afirma búsqueda
+espacial completa. Indexar mundo/conocimiento escala con la entrada; las copias
+de caminos en componentes conocidas largas añaden trabajo/memoria polinómicos.
+No hay caché global ni enumeración combinatoria de todos los caminos.
+
+La integración Textual futura capturará instantánea coherente inmutable,
+calculará fuera del hilo UI, comprobará vigencia y revalidará antes de confirmar.
+Los resultados obsoletos se descartarán sin tocar la partida. Un worker nunca
+mutará estado vivo. No se implementan worker, entrega, persistencia de planes ni
+materialización. **F-DEAD-01 continúa abierto.**
+
+### Ejemplos reproducibles, rendimiento y pruebas
+
+Seed `271828`, todo aislado:
+
+- Veinte saltos conocidos de acceso de 30 ly más cadena de 30 ly son 630 ly y
+  21 saltos, no 30 ly. Una oportunidad de 40 ly desde el nodo actual domina ese
+  retroceso.
+- Una oportunidad cercana en zona visitada puede ganar a otra desconocida lejana.
+  Con viajes iguales de 40 ly y dependencias iguales, una alternativa sin
+  identificar/no visitada gana por frontera; dos conocidas equivalentes empatan.
+- Tiempo local real: acceso de 0,009 ly tarda nominalmente 2479,871 s y la
+  alternativa de 0,0117062814 ly tarda 847,178 s. Se conserva el conflicto distancia/tiempo.
+
+Ejecutar `tests/deadnode_opportunity_selection_smoke.py --benchmark` con Python
+canónico. Tres llamadas por celda excluyen construir fixtures. La primera matriz
+usa 0/1000/3000 nodos físicos de fondo lejanos y 1/4/8 objetivos cercanos; los casos
+adicionales tienen 1000/3000 aristas reales de red dirigida conocida y cuatro
+objetivos. Son mediciones sintéticas, no frecuencias jugables ni garantías de
+latencia. El acceso compartido se calcula una vez por llamada, independientemente
+de cuántos objetivos haya. Una futura invocación UI seguirá necesitando worker.
+
+Mediana / máximo, ms; nodos físicos de fondo:
+
+| Fondo | 1 objetivo | 4 objetivos | 8 objetivos |
+| --- | --- | --- | --- |
+| 0 | 3.79 / 4.22 | 7.82 / 7.98 | 14.72 / 15.55 |
+| 1000 | 17.75 / 19.34 | 27.32 / 28.93 | 33.42 / 34.14 |
+| 3000 | 52.47 / 56.06 | 79.30 / 83.73 | 67.36 / 74.96 |
+
+| Aristas dirigidas conocidas | Objetivos | Mediana / máximo, ms | Aristas de acceso evaluadas |
+| --- | --- | --- | --- |
+| 1000 | 4 | 190.54 / 198.84 | 3000 |
+| 3000 | 4 | 674.55 / 760.22 | 9000 |
+
+[`deadnode_opportunity_selection_smoke.py`](../../tests/deadnode_opportunity_selection_smoke.py)
+contiene 40 grupos numerados según la solicitud 4D-3d:
+
+| Grupos | Cobertura |
+| --- | --- |
+| 01–08 | Orígenes actual/multihop/dirigidos, alternativas mínimas de acceso, retroceso y coste completo sin movimiento gratis. |
+| 09–16 | Territorio desconocido/visitado/antiguo/generado, nodos incompletos/completados, cobertura desconocida e inserción condicionada con rechazo de capacidad obsoleta. |
+| 17–22 | Tiempo largo/local y energía CRUISE del Engine real, acceso local más largo y rápido, scrap directo cero distinto de reparación/salvage desconocidos, sin canibalización ni recursos concedidos. |
+| 23–32 | Cercanía frente a retroceso, conocido frente a desconocido lejano, frontera secundaria, fuentes imposibles frente a rodeos utilizables, primaries, recepción futura, ejemplo verificado de mecánicas, empates/conflictos y orden estable. |
+| 33–40 | Pureza de estado/RNG/contadores/conocimiento, escritores/acciones vivos prohibidos, seeds hash, tres ciclos temporales save/load, miles de nodos, comparación compartida acotada y waypoint detenido real. |
+
+Siguen aplicándose los 49 grupos 4D-3c y controles generales anteriores.
+Manuales/help no requieren actualización: son APIs puras internas, sin cambios
+de comandos ni UI localizada. Aún deben decidirse política de retroceso aceptable
+(si se desea exclusión dura), resolución de conflictos/economía desconocida y
+las políticas existentes de inserción/topología/fuentes/recepción. No se aprueba
+ni implementa umbral nuevo de distancia, mecánica de cobertura ni rescate garantizado.

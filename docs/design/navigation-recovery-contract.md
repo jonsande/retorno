@@ -87,6 +87,17 @@ coherent alternatives and detours before giving up. Prefer suitable physical
 locations; do not guarantee escape or invent exceptions to procedural rules.
 A longer usable journey can take precedence over a shorter unusable one.
 
+**Approved in 4D-3d:** prefer reasonably nearby recovery opportunities using
+the complete directed trip from the ship, including access to the chain origin.
+Frontier evidence is secondary; nearby known regions remain legitimate and can
+beat distant unknown ones. Avoid disproportionate backtracking without adding a
+fixed rejection threshold. These failsafe criteria do not constrain general
+worldgen, lore, arcs or singles. Scan, documents, salvage, applicable uplink and
+future captured communications remain discovery channels; indiscriminate returns
+to old nodes for rescans are not required. Completed sources stay completed and
+no resources or successful journey are guaranteed. Sensor coverage is not
+recorded well enough to authorize retroactive appearances.
+
 **Partially implemented:** global recovery creates an entry within range,
 reuses a suitable existing gateway or creates one under the cap, and prepares a
 later clue in the entry pool. It neither grants the routes directly nor forces
@@ -108,6 +119,13 @@ exhaustion reports incomplete search, never universal impossibility. New nodes
 in generated/explored sectors remain conditional on an approved appearance and
 insertion policy; no such policy or production activation is introduced here.
 See the kernel design for the domain, measurements and future atomic write set.
+
+**Phase 4D-3d:** the pure contextual API compares complete journeys and retains
+practical conflicts as alternatives. Nominal travel time and steady-profile
+energy are conditional; future repair/salvage costs and economic feasibility
+remain unknown. Generated/visited sectors still need an approved insertion and
+appearance policy. This assessment neither activates recovery nor changes the
+save schema, detector, resources, reception or UI; F-DEAD-01 remains open.
 
 This contract does not change thresholds, probabilities, or balance limits.
 Those require a separate evaluation.

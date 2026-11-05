@@ -88,6 +88,18 @@ regionalmente coherentes y rodeos antes de desistir. Preferir localizaciones
 físicas adecuadas; no garantizar salida ni inventar excepciones procedurales.
 Un viaje utilizable más largo puede prevalecer sobre otro corto inutilizable.
 
+**Aprobado en 4D-3d:** preferir oportunidades razonablemente próximas mediante
+el trayecto dirigido completo desde la nave, incluido acceso al origen.
+La evidencia de frontera es secundaria; las regiones conocidas cercanas siguen
+siendo legítimas y pueden ganar a otras desconocidas lejanas. Evitar retrocesos
+desproporcionados sin añadir umbral fijo de rechazo. Estos criterios failsafe no
+restringen worldgen, lore, arcos ni singles generales. Scan, documentos, salvage,
+uplink aplicable y comunicaciones capturadas futuras siguen siendo canales;
+no se exige volver indiscriminadamente a nodos antiguos para reescanear. Las
+fuentes completadas siguen completas y no se garantizan recursos ni viaje exitoso.
+La cobertura de sensores no está registrada con suficiente precisión para
+autorizar apariciones retroactivas.
+
 **Implementado parcialmente:** la recuperación global crea una entrada dentro
 del alcance, reutiliza un gateway existente apropiado o crea uno bajo el cap, y
 prepara una pista posterior en el pool de la entrada. No concede por sí sola
@@ -109,6 +121,13 @@ Agotar presupuesto informa de búsqueda incompleta, nunca imposibilidad universa
 Los nodos nuevos en sectores generados/explorados quedan condicionados a política
 aprobada de aparición e inserción; aquí no se establece ni se activa producción.
 El diseño del núcleo detalla dominio, mediciones y escrituras atómicas futuras.
+
+**Fase 4D-3d:** la API contextual pura compara trayectos completos y conserva
+conflictos prácticos como alternativas. Tiempo nominal y energía a perfil
+constante son condicionados; costes futuros de reparación/salvage y viabilidad
+económica siguen desconocidos. Sectores generados/visitados aún necesitan política
+aprobada de inserción y aparición. La valoración no activa recuperación ni cambia
+esquema de guardado, detector, recursos, recepción o UI; F-DEAD-01 sigue abierto.
 
 Los umbrales, probabilidades y límites de balance no se cambian por este
 contrato. Su ajuste requiere una evaluación separada.

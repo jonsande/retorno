@@ -1,4 +1,4 @@
-# Deadnode chain proposal kernel — Phases 4D-3b/3c
+# Deadnode chain proposal kernel — Phases 4D-3b/3c/3d
 
 Spanish version: [deadnode-chain-planner.es.md](deadnode-chain-planner.es.md).
 
@@ -284,3 +284,201 @@ in dedicated tests. Manuals/help need no changes: no player command changes.
 
 The approved detour rule needs no further approval. No new type, weight,
 probability, gameplay hop limit or universal survival guarantee is proposed.
+
+## Contextual opportunities — Phase 4D-3d
+
+**Approved:** prefer reasonably nearby failsafe opportunities, including the trip
+from the ship to the chain's origin. Exploration-frontier evidence is secondary
+to practical accessibility; nearby known territory can be preferable to distant
+unknown territory. Avoid disproportionate backtracking without imposing a new
+fixed rejection distance/hop limit. These criteria apply to deadnode recovery,
+not to general worldgen, lore, arcs or singles. Ordinary scan, documents, salvage,
+uplink where applicable and future captured communications remain legitimate
+discovery channels. No indiscriminate return to old nodes to repeat scans is
+required. Completed locations/pools remain completed. Recovery offers neither
+resources nor guaranteed survival or success, and can find no reasonable option.
+The approved regional-detour rule remains in force.
+
+### API and compatibility
+
+[`core/deadnode_opportunities.py`](../../src/retorno/core/deadnode_opportunities.py)
+provides `evaluate_deadnode_opportunity(state, proposal)`,
+`compare_opportunities(left, right)` and
+`compare_deadnode_opportunities(state, target_ids, context, budget)`.
+Frozen typed values `OpportunityEvaluation`, `AccessRoute`, `TerritoryEvidence`,
+`TravelCosts`, `Estimate`, `OpportunityComparison`, `OpportunitySelection` and
+`OpportunityBudget` describe access, complete journey, evidence, uncertainty and
+partial comparison. They are not active plans or save-schema additions.
+
+The geometric `propose_deadnode_chain` API retains 4D-3c behavior for compatibility.
+It alone is not a contextual failsafe selector: its sources still begin with
+zero geometric-chain cost. Its breadth-first `origin_access_path` favors hops
+and stable ids; an equally short hop path can be longer in distance. A synthetic
+lexically earlier long branch demonstrates that limitation in regression 05.
+
+The contextual API uses three directed Dijkstra witnesses per reachable origin:
+minimum network distance, fewest hops and minimum nominal transit time. It
+admits only operational F-ROUTE-01 edges and normal travel destination knowledge;
+contacts alone, dangling/reversed/over-cap/zero-length edges grant no access.
+Access alternatives are retained, not silently exchanged in a supplied proposal.
+The standalone evaluator reports stale/inaccessible input instead of moving the
+ship or repairing its knowledge.
+
+A call-local `_ChainSession` shares canonical descriptors, catalogs, slots,
+readable intel, physical spatial indexes, relaxed target components and hint
+caches across targets/objectives. It samples the geometric chain
+and two practical A* objectives with actual access distance/hops in their initial
+costs. These retain existing-only witnesses and may test mixed/new corridors
+when existing paths do not attain both geometric distance/hop lower bounds.
+Access summaries are passed directly to search; they are not recomputed for
+every origin/target. The heuristic immediately uses zero gap for a node already
+inside its relaxed component. Existing source labels are indexed input;
+`SearchBudget.labels` bounds additional labels beyond those sources.
+
+Each chain is evaluated with the sampled access alternatives for its selected
+origin. The result deduplicates equal chain/access witnesses. This does not
+claim every Pareto path, every origin-chain pairing or global spatial optimality.
+Candidate eligibility/protection remains owned by the chain kernel; detector
+thresholds, timing and `evaluate_dead_nodes` are unchanged.
+
+### Complete journey and conditional economics
+
+The recorded trip is current node → directed access path → chain origin →
+proposed stages → target. Access and chain metrics remain separate, and totals
+include both distances and hop counts. Euclidean ship-target distance is a
+separate field. Selecting another origin never relocates the ship for free.
+Reused/new node ids, known-route hop counts, per-node territory and information/
+materialization/reception dependencies are explicit.
+
+| Evidence/estimate | Canonical owner and limits |
+| --- | --- |
+| Nominal transit seconds | `Engine.Travel`: distance divided by `max(0.001, cruise_speed_ly_per_year)` times `Balance.YEAR_S`; local travel uses fine km divided by `max(0.1, LOCAL_TRAVEL_SPEED_KM_S)`. The read-only `_compute_fine_range_km` supplies a missing local range. |
+| Conditional cruise energy | Read-only `Engine._compute_load_kw` and `Engine._compute_p_gen` on a detached auto-CRUISE system view, excluding jobs. Constant kW × nominal seconds / 3600 gives gross load/generation kWh. |
+| Actual battery and grid evolution | Unknown: `Engine._update_battery` clamps charge/discharge and applies efficiencies; quality, shedding, state changes and future jobs affect the trip. The evaluator does not run those mutating helpers. |
+| Direct transit scrap | Calculable zero: `Travel` charges no scrap per hop. This excludes repairs, maintenance and information work. |
+| System/hull wear | `Engine._apply_degradation` depends on duration, base decay, power quality, radiation and brownout; normal non-CRUISE transit uses `TRANSIT_WEAR_MULT_NORMAL`. Hull decay also depends on exposure/transit. Future damage/repair decisions are unquantified. |
+| Repair/salvage scrap | Unknown. `_repair_scrap_cost` prices a specific repair amount/profile; failures can consume/refund reservations. Salvage depends on real availability, drones, battery and successful jobs; it is not earned before execution. |
+
+`EstimateStatus` separates `calculable`, `conditional` and `unknown`; unknown
+values are `None`, never zero or a guessed penalty. Nominal time assumes current
+speed, normal transit timing and no stops/jobs. Cruise energy assumes constant
+system state with the normal auto-shed targets; it is neither battery depletion
+nor a promise of long-term supply. Local timing can favor a geometrically longer
+path. The actual Engine travel action checks the estimates in regression 17.
+
+`economic_feasibility` remains `unknown`, even for `verified_mechanics`.
+This status verifies the current mechanics/source assessment, not an affordable
+expedition or survival guarantee. Normal ship/operator gates and every condition
+must be revalidated. The possible future cannibalization drone module could
+change return-trip resource opportunities, but is unimplemented, supplies no
+scrap here and is not a planning prerequisite.
+
+### Territory evidence and late appearance
+
+Persisted evidence is distinct: physical generation (`generated_sectors` and
+`sector_states`), explicit player sector intel (`known_intel`/sector `IntelItem`),
+known nodes, detected contacts, `visited_nodes` and pool `node_cleaned`.
+`TerritoryEvidence` also reports whether a sector has detected/visited nodes or
+a physical galactic region has any visited node. None means exhaustive coverage.
+Missing pools mean completion unknown, not completed or fresh by assumption.
+
+The model persists no durable sensor-volume coverage ledger. Recent scan events,
+contacts, job data and fine ranges do not prove that all space was examined, or
+that a sector without a visited node was never scanned. Every evidence record
+therefore states `sensor_coverage=not_recorded`; no fictitious scan map is added.
+
+Frontier signals are evidence only: an unvisited stage, an unidentified stage,
+and absence of explicit sector intel (expressly not absence of prior scanning).
+No positive "virgin territory" claim is inferred from internal generation or
+lack of visits. Known areas remain eligible, and completed sources are not
+reopened. New stops in generated/explored sectors retain all 4D-3c insertion,
+appearance, topology and pool dependencies. The evaluator also rechecks physical
+identity/position, current canonical slot reservations and information-source
+snapshots; changed evidence requires replanning. No invisibility explanation,
+retroactive appearance permission or new coverage mechanic is introduced.
+
+### Partial comparison, budget and integration boundary
+
+1. Prefer mechanical legitimacy: `verified_mechanics`, then `conditional`;
+   `unusable` proposals are retained diagnostically and excluded from preferred ids.
+2. Within a comparable status use Pareto comparison of access distance/hops,
+   total distance/hops and nominal transit seconds. Outstanding/unavailable
+   dependency sets must not increase for one proposal to dominate another.
+   Different requirements or shorter-distance/more-hop tradeoffs remain alternatives.
+3. Only with equivalent practical metrics and dependency sets use a strict
+   superset of frontier evidence. Equal/incomparable evidence retains ties.
+
+There is no weighted economic score, invented percentage, unknown-cost penalty,
+fixed backtracking ban or arbitrary id-based winning tie. Stable ids only order
+the output. Pairwise reasons explain dominance or conflict; all evaluations
+remain inspectable. `preferred_ids` is the nondominated sampled set, not an
+instruction to activate one plan or proof of an economically best journey.
+
+`OpportunityBudget` defaults to 8 targets, 16384 access expansions, 65536 access
+edges across all three access passes, and 4096 pair comparisons. Each chain
+witness retains its `SearchBudget`. With at most three chain witnesses and three
+access witnesses per target, the default family has at most 72 evaluations.
+Sorted ids make target-budget sampling reproducible, not a product priority.
+Extra targets are unassessed and recorded in `omitted_targets`; budget exhaustion makes
+`complete_within_sampled_family` false. This field never claims complete spatial
+search. Normal world/knowledge indexing is proportional to input size; path
+copies in long known components add polynomial memory/work. No global cache or
+combinatorial enumeration of all possible paths is introduced.
+
+Future Textual integration must capture a coherent immutable snapshot, calculate
+outside the UI thread, check snapshot validity and revalidate before confirming.
+Stale results must be discarded without touching the game. A worker must never
+mutate live state. No worker, delivery, active-plan persistence or materialization
+is implemented in this phase. **F-DEAD-01 remains open.**
+
+### Reproducible examples, performance and tests
+
+Seed `271828`, all isolated:
+
+- Twenty known 30 ly access hops plus a 30 ly chain mean 630 ly and 21 hops,
+  not 30 ly. A current-origin 40 ly opportunity dominates that backtrack.
+- A nearby visited-area opportunity can beat a far unknown one. With equal
+  40 ly journeys and matching dependencies, an unidentified/unvisited alternative
+  wins by frontier evidence; two equivalent known alternatives remain tied.
+- Real local timing: a 0.009 ly access route takes nominally 2479.871 s, while
+  the 0.0117062814 ly alternative takes 847.178 s. Distance/time conflict is retained.
+
+Run `tests/deadnode_opportunity_selection_smoke.py --benchmark` with canonical
+Python. Three calls per cell exclude fixture construction. The first matrix
+uses 0/1000/3000 remote physical background nodes and 1/4/8 nearby targets; the
+additional cases contain 1000/3000 actual directed known-network edges and four
+targets. These are synthetic measurements, not gameplay frequencies or latency
+guarantees. Shared access computation occurs once per call, independent of the
+number of targets. Future UI invocation still needs a worker.
+
+Median / maximum, ms; physical background nodes:
+
+| Background | 1 target | 4 targets | 8 targets |
+| --- | --- | --- | --- |
+| 0 | 3.79 / 4.22 | 7.82 / 7.98 | 14.72 / 15.55 |
+| 1000 | 17.75 / 19.34 | 27.32 / 28.93 | 33.42 / 34.14 |
+| 3000 | 52.47 / 56.06 | 79.30 / 83.73 | 67.36 / 74.96 |
+
+| Known directed edges | Targets | Median / maximum, ms | Evaluated access edges |
+| --- | --- | --- | --- |
+| 1000 | 4 | 190.54 / 198.84 | 3000 |
+| 3000 | 4 | 674.55 / 760.22 | 9000 |
+
+[`deadnode_opportunity_selection_smoke.py`](../../tests/deadnode_opportunity_selection_smoke.py)
+contains 40 numbered groups matching the 4D-3d request:
+
+| Groups | Coverage |
+| --- | --- |
+| 01–08 | Current/multihop/directed origins, shortest access alternatives, backtracking and full cost without free movement. |
+| 09–16 | Unknown/visited/old/generated territory, incomplete/completed nodes, unknown sensor coverage and conditional insertion with stale-capacity rejection. |
+| 17–22 | Actual Engine long/local time and cruise power, longer-but-faster local access, direct zero scrap distinct from unknown repair/salvage, no cannibalization or resource grants. |
+| 23–32 | Nearby versus backtrack, known versus far unknown, secondary frontier, impossible sources versus usable detours, protected targets, future reception, verified-mechanics example, ties/tradeoffs and stable order. |
+| 33–40 | Full-state/RNG/counter/knowledge purity, forbidden live writers/actions, hash seeds, three temporary save/load cycles, thousands of nodes, bounded shared multi-target calls and a real stopped waypoint. |
+
+The 49 groups from 4D-3c and the prior general controls remain applicable.
+Manuals/help need no update: these are internal pure APIs with no player command
+or localized UI changes. Product decisions still needed include the acceptable
+backtracking policy (if a hard exclusion is desired), how to resolve practical
+conflicts/unknown economics, and the existing insertion/topology/source/reception
+policies. No new distance threshold, coverage mechanic or survival guarantee is
+approved or implemented here.

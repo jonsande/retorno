@@ -543,3 +543,77 @@ reservation, active-plan/reception schema and the precise attempt/cooldown bound
 Only the planner, its original/companion regressions and three EN/ES document
 pairs change. Manuals/help require no update because no player command changes.
 No commit, push, staging, live materialization or Phase 4D-3d was performed.
+
+### Phase 4D-3d: pure contextual opportunity comparison
+
+Initial clean `main`, empty staging, HEAD/tracking ref and verified remote
+`refs/heads/main` at `847bb311dccca7fa201715b76d929219a81f8343`; 4D-3c was committed
+and published. During work the developer added `docs/canon/universo.md` and
+`docs/canon/guia_coherencia.md`. Work stopped for the unexpected files, then
+resumed after the developer explicitly confirmed their ownership and requested
+that they be preserved separately. Neither canon file is part of this change.
+
+The [owning design](../design/deadnode-chain-planner.md#contextual-opportunities--phase-4d-3d)
+records the approved nearby-opportunity preference, complete directed access,
+secondary frontier evidence, reuse of known areas, multiple discovery channels,
+completed-source integrity, separation from general worldgen/lore and absence of
+rescue/resource guarantees. **F-DEAD-01 remains open.** Production detector,
+engine, navigation rules, worldgen, lore, resources, communications, UI and save
+schema remain unchanged.
+
+The geometric API formerly treated reachable origins as free starts and its
+breadth-first access path did not minimize distance/time. The new pure companion
+provides typed evaluations and pairwise/multi-target comparison. Three directed
+access witnesses (distance, hops, nominal time), contextual chain objectives,
+shared call-local descriptors/indexes/relaxed components/catalogs/intel/slot caches
+and explicit technical budgets avoid unbounded path enumeration. Legitimacy
+precedes Pareto practical burden; frontier evidence breaks only comparable ties.
+Conflicts/unknown data retain alternatives, without invented weights, a distance
+ban or an economic feasibility claim.
+
+At seed `271828`, 20 known 30 ly access hops plus a 30 ly chain correctly mean
+630 ly/21 hops; a 40 ly current-origin opportunity is preferred. An equal-hop
+lexical BFS branch can be longer than the new distance witness. Real Engine
+local timing demonstrates that 0.0117062814 ly can take 847.178 s versus
+2479.871 s for 0.009 ly. These criteria can conflict and are preserved.
+
+Nominal transit duration and steady auto-CRUISE gross energy are conditional
+estimates using existing Engine rules/read-only helpers. Direct `Travel` scrap
+is calculable zero; future repairs/salvage and economic feasibility remain unknown,
+never zero-cost assumptions. No cannibalization is assumed. Generated sectors,
+explicit sector intel, detected/known nodes, visits and completion are separate
+facts. Durable sensor-volume coverage is absent and reported unknown. New nodes
+in generated/explored sectors remain conditional; no retroactive appearance
+policy or completed-pool reopening was introduced.
+
+Validation on 2026-11-05: **40/40 new groups**, **49/49 prior planner groups**
+and **31/31 general controls** pass, covering all **40 requested cases** and
+**34 control modules/scripts**. Actual Engine long/local timing and cruise power,
+state/resource/RNG/counter/knowledge purity, forbidden live actions/writers,
+protected primaries, stale identity/slot/source assessments, ties/tradeoffs,
+unknown cost data, hash-seed subprocesses, three temporary save/load cycles and
+stopped waypoints are covered. No real saves are opened. Python compilation,
+`git diff --check`, new-file whitespace, local documentation links and technical
+EN/ES parity pass. Ruff is unavailable; no dependencies were installed.
+
+The reproducible benchmark has eleven cells, three calls per cell and seed
+`271828`. With 3000 physical background nodes and eight targets, median/maximum
+were 67.36 / 74.96 ms (eight evaluations, 28 comparisons). With 3000
+known directed edges and four targets they were 674.55 / 760.22 ms;
+the three shared access passes evaluated 9000 edges, not 9000 per target. The
+design contains the full matrix. These are measurements, not latency guarantees;
+long path copies still add polynomial cost and future integration needs a worker.
+Exhaustion reports incomplete search, never universal impossibility. No weights
+or gameplay hop limits were added.
+
+Future Textual use requires an immutable coherent snapshot, worker computation,
+staleness detection and engine-owned revalidation; a worker must not mutate live
+state. No integration is implemented. Remaining decisions concern any definitive
+backtracking exclusion, resolution of practical/economic conflicts and the prior
+insertion, topology, source reservation, active-plan and reception policies.
+
+The intervention changes the planner, adds its pure opportunity companion and
+one regression, and updates three EN/ES documentation pairs: nine owned files.
+Manuals/help require no changes because no player command changes. The two
+separate developer canon files are preserved. No commit, push or staging was
+performed; no materialization or later integration was started.

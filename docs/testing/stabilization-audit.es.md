@@ -559,3 +559,80 @@ Sólo cambian planificador, regresiones original/complementaria y tres pares
 documentales EN/ES. Manuales/help no requieren cambios porque ningún comando
 del jugador cambia. No se hicieron commit, push, staging, materialización viva
 ni Fase 4D-3d.
+
+### Fase 4D-3d: comparación pura de oportunidades contextuales
+
+`main` inicialmente limpia, staging vacío y HEAD/referencia local/remoto
+`refs/heads/main` verificados en `847bb311dccca7fa201715b76d929219a81f8343`;
+4D-3c estaba confirmada y publicada. Durante el trabajo el desarrollador añadió
+`docs/canon/universo.md` y `docs/canon/guia_coherencia.md`. Se detuvo la intervención
+ante esos archivos inesperados y se reanudó tras confirmar expresamente su
+autoría y pedir conservarlos aparte. Ningún archivo de canon forma parte del cambio.
+
+El [diseño propietario](../design/deadnode-chain-planner.es.md#oportunidades-contextuales--fase-4d-3d)
+recoge la preferencia aprobada de proximidad, acceso dirigido completo, frontera
+secundaria, reutilización de áreas conocidas, múltiples canales de descubrimiento,
+integridad de fuentes completadas, separación de worldgen/lore generales y
+ausencia de garantías de rescate/recursos. **F-DEAD-01 sigue abierto.** Detector
+productivo, motor, navegación, worldgen, lore, recursos, comunicaciones, UI y
+esquema de guardado permanecen sin cambios.
+
+La API geométrica trataba orígenes alcanzables como comienzos gratuitos y su
+acceso por anchura no minimizaba distancia/tiempo. El complemento puro ofrece
+evaluaciones tipadas y comparación por pares/varios objetivos. Tres testigos
+dirigidos de acceso (distancia, saltos y tiempo nominal), criterios contextuales
+de cadena, descriptores/índices/componentes relajadas/catálogos/intel/cupos
+compartidos por llamada y presupuestos explícitos evitan enumeración ilimitada.
+La legitimidad precede a la carga práctica Pareto; la frontera sólo desempata
+situaciones comparables. Conflictos/datos desconocidos conservan alternativas,
+sin pesos inventados, prohibición por distancia ni promesa de viabilidad económica.
+
+Con seed `271828`, 20 saltos conocidos de acceso de 30 ly más cadena de 30 ly
+son correctamente 630 ly/21 saltos; se prefiere una oportunidad de 40 ly desde
+el origen actual. Una rama BFS lexicográfica empatada en saltos puede ser más
+larga que el nuevo testigo de distancia. El tiempo local real del Engine muestra
+0,0117062814 ly en 847,178 s frente a 2479,871 s para 0,009 ly. Los criterios
+pueden entrar en conflicto y se conservan.
+
+Duración nominal y energía bruta auto-CRUISE constante son estimaciones
+condicionadas basadas en reglas/helpers de sólo lectura del Engine. El scrap
+directo de `Travel` es cero calculable; reparación/salvage futuros y viabilidad
+económica siguen desconocidos, nunca supuestos gratuitos. No se supone
+canibalización. Generación, intel sectorial explícita, nodos detectados/conocidos,
+visitas y completitud son hechos distintos. No hay cobertura volumétrica durable
+de sensores y se informa desconocida. Los nodos nuevos en sectores generados/
+explorados siguen condicionados; no se inventó aparición retroactiva ni se
+reabrieron pools completados.
+
+Validación del 2026-11-05: pasan **40/40 grupos nuevos**, **49/49 del planificador
+anterior** y **31/31 controles generales**, cubriendo los **40 casos pedidos**
+y **34 módulos/scripts de control**. Se cubren tiempo largo/local y energía
+CRUISE del Engine real, pureza de estado/recursos/RNG/contadores/conocimiento,
+acciones/escritores vivos prohibidos, primaries, valoración obsoleta de ids/cupos/
+fuentes, empates/conflictos, datos de coste desconocidos, subprocesos hash, tres
+ciclos temporales save/load y waypoints detenidos. No se abren partidas reales.
+Pasan compilación, `git diff --check`, espacios del archivo nuevo, enlaces locales
+y paridad técnica EN/ES. Ruff no está disponible; no se instalaron dependencias.
+
+El benchmark reproducible tiene once celdas, tres llamadas por celda y seed
+`271828`. Con 3000 nodos físicos de fondo y ocho objetivos, mediana/máximo fueron
+67,36 / 74,96 ms (ocho evaluaciones, 28 comparaciones). Con 3000 aristas
+dirigidas conocidas y cuatro objetivos fueron 674,55 / 760,22 ms;
+las tres pasadas compartidas evaluaron 9000 aristas, no 9000 por objetivo. El
+diseño contiene la matriz completa. Son mediciones, no garantías de latencia;
+las copias de caminos largos aún añaden coste polinómico y la integración futura
+requiere worker. Agotar presupuesto sólo informa de búsqueda incompleta, nunca
+imposibilidad universal. No se añadieron pesos ni límites jugables de saltos.
+
+La integración futura en Textual necesita instantánea coherente inmutable,
+cálculo en worker, detección de obsolescencia y revalidación en el motor; el
+worker no debe mutar estado vivo. No se implementa integración. Quedan por
+decidir exclusión definitiva por retroceso, resolución de conflictos prácticos/
+económicos y las políticas previas de inserción, topología, reserva de fuentes,
+plan activo y recepción.
+
+La intervención cambia el planificador, añade complemento puro de oportunidades
+y una regresión, y actualiza tres pares documentales EN/ES: nueve archivos
+propios. Manuales/help no necesitan cambios porque no cambian comandos. Los dos
+archivos de canon ajenos se conservan. No se hicieron commit, push ni staging;
+no se inició materialización ni integración posterior.
