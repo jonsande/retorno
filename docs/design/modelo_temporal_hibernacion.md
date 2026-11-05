@@ -1,0 +1,152 @@
+# RETORNO — Modelo temporal, hibernación y edad biológica
+
+**ID:** `RET-DESIGN-TIME`  
+**Versión:** `0.1.0` (borrador de diseño, sin implementación)  
+**Fecha:** 2026-11-05  
+**Estado:** propuesta técnica para discusión y validación  
+**Referencia canónica:** [`../canon/universo.md`](../canon/universo.md)  
+**Guía operativa:** [`../canon/guia_coherencia.md`](../canon/guia_coherencia.md)
+
+> Este archivo organiza requisitos, fórmulas candidatas y pruebas para un desarrollo posterior. **No modifica el comportamiento actual del juego ni aprueba automáticamente nombres de comandos o fórmulas no decididas.**
+
+## 1. Separar decisiones firmes, valores de balance e incógnitas
+
+| Aspecto | Estado | Valor o requisito |
+|---|---|---|
+| Viaje de naves masivas | Establecido | Siempre sublumínico. |
+| Tres magnitudes temporales | Establecido | Tiempo galáctico, tiempo propio de nave, envejecimiento biológico acumulado. |
+| Inicio del tiempo galáctico | Establecido | `T=0` al crear partida. |
+| Hibernación | Establecido | Conservación química avanzada, ralentiza sin detener completamente envejecimiento. |
+| Dependencia de `life_support` | Establecido | Un sistema degradado puede empeorar eficacia; tasa efectiva consultable. |
+| Edad biológica | Establecido | Recurso finito, sin límite/muerte mecánica definidos. |
+| Agujeros negros y dilatación gravitatoria | Establecido como objetivo futuro | Necesidad de compatibilidad arquitectónica, no de implementación inmediata. |
+| Crucero | Provisional | `0.5 c` (0,5 años luz por año galáctico, sin aceleración). |
+| Tasa nominal de hibernación | Provisional | `0.005` (0,5 % del tiempo propio). |
+| Tasa despierto | Provisional / referencia natural | `1.0` año biológico por año propio. |
+| Grandes hitos narrativos | Provisional | Orden de 200 años galácticos, no frecuencia obligatoria. |
+| Fórmula `life_support` → eficiencia | Abierto | Determinar tras pruebas de equilibrio y viabilidad. |
+| Químicos: inventario, dosis, agotamiento | Abierto | Necesitan contrato independiente si se vuelven recursos jugables. |
+| Edad de inicio, vida máxima, efectos de salud | Abierto | No inferir un límite mortal ni una mecánica médica automática. |
+| Gravedad intensa, órbitas, radiación | Abierto | Modelo relativista y peligros físicos en una fase futura. |
+
+## 2. Estado técnico verificado como punto de partida
+
+A la fecha de redacción, según inspección de la rama `main` del repositorio `jonsande/retorno`:
+
+- `src/retorno/core/gamestate.py`: `ClockState.t` cuenta segundos desde inicio; no hay tres magnitudes temporales separadas.
+- `src/retorno/model/ship.py`: `cruise_speed_ly_per_year` vale `1.0` en la clase de estado; hay `is_hibernating`, `life_support_offline_s` y estados de sistemas.
+- `src/retorno/core/engine.py`: calcula años de tránsito `distance_ly / cruise_speed_ly_per_year`; la degradación de subsistemas utiliza un `dt` sin corrección explícita del tiempo propio.
+- `src/retorno/config/balance.py`: contiene `HIBERNATE_CHUNK_S`, los umbrales de salud de sistemas y parámetros de desgaste, pero no la nueva ratio nominal de edad biológica.
+- `life_support` ya participa en la supervivencia técnica y puede estar `OFFLINE`. Eso **no** constituye aún una fórmula de envejecimiento del personaje.
+
+La auditoría deberá repetirse antes de escribir cambios: el código puede haber evolucionado.
+
+## 3. Contrato conceptual de los tres relojes
+
+### A. Tiempo galáctico transcurrido
+
+- Recurso de simulación para cronología externa; inicia en `0` por partida y avanza monótonamente.
+- Debe servir como referencia de eventos históricos, antigüedad de documentos y procesos externos.
+- No constituye un «presente simultáneo absoluto» en relatividad general; se trata de una convención de coordenadas para el mundo jugable.
+- **Propuesta de compatibilidad:** mantener `state.clock.t` como tiempo galáctico, siempre que una auditoría de consumidores confirme que la semántica es compatible.
+
+### B. Tiempo propio de la nave
+
+- Acumula el tiempo que transcurre físicamente a bordo durante reposo, movimiento y, en el futuro, regiones de gravedad intensa.
+- Debe alimentar desgastes, ciclos y temporizadores **locales** que tengan significado físico a bordo.
+- Debe avanzar monótonamente, sin superar el intervalo galáctico en el caso sencillo de un marco de referencia inercial elegido y velocidades sublumínicas, y sin depender de la hibernación de la persona.
+- Se necesita resolver qué temporizadores actuales son **galácticos** y cuáles son **propios**; no sustituir `dt` por otro valor de forma indiscriminada.
+
+### C. Envejecimiento biológico acumulado
+
+- Acumula una cantidad de edad fisiológica desde el comienzo de la partida (no presupone una edad inicial de personaje todavía indeterminada).
+- Avanza según el **tiempo propio**, el estado de vigilia/hibernación y la eficacia de la conservación.
+- La edad biológica no sustituye al tiempo de experiencia consciente ni se identifica con las horas que el jugador ha pasado despierto.
+- No retrocede automáticamente por reparaciones del sarcófago; la posibilidad de tratamientos rejuvenecedores **no** está decidida.
+
+## 4. Fórmulas candidatas y ejemplo numérico
+
+### Cinemática simple para el primer modelo
+
+En un marco galáctico aproximado, sin campo gravitatorio fuerte y sin aceleración:
+
+```text
+v_c = velocidad_de_nave / velocidad_de_la_luz
+factor_propio = sqrt(1 - v_c**2)
+dt_nave = dt_galactico * factor_propio
+```
+
+A `0.5c`: `factor_propio = sqrt(0.75) ≈ 0.8660254`.
+
+Para un tramo de **200 años galácticos** con crucero constante a `0.5c`:
+
+- Tiempo galáctico: `200 años`.
+- Tiempo propio a bordo: `173.205 años`.
+- Envejecimiento en hibernación nominal: `173.205 × 0.005 = 0.866 años biológicos`.
+
+El envejecimiento nominal acumulado es distinto de la edad total de una persona. Si el personaje está despierto parte del viaje, sus intervalos deben integrarse con la tasa correspondiente.
+
+### Envejecimiento nominal y efectivo
+
+```text
+si despierto:
+    factor_envejecimiento ≈ 1.0       # candidato inicial
+si hibernando:
+    factor_envejecimiento = tasa_efectiva_hibernacion
+
+dt_biologico = dt_nave * factor_envejecimiento
+```
+
+La **tasa efectiva** no se ha decidido matemáticamente. Debe derivarse de la nominal, el estado de `life_support` y, si se aprueba, los recursos químicos y demás condiciones del sarcófago. El cumplimiento nominal **no** debería asumirse cuando `life_support` esté degradado.
+
+### Relatividad gravitatoria futura
+
+Debe quedar un punto de extensión conceptual para calcular tiempo propio a partir de la **trayectoria y del entorno gravitatorio**, sin alterar la semántica de los relojes ni mezclar envejecimiento biológico con dilatación física. **No** añadir un factor arbitrario de agujero negro ni asumir que la corrección especial y la gravitatoria se multiplican siempre sin precisar el sistema de referencia.
+
+## 5. Parámetros propuestos para `Balance` (NO EXISTEN AÚN)
+
+| Parámetro propuesto | Valor inicial | Función |
+|---|---:|---|
+| `SHIP_CRUISE_SPEED_C` | `0.5` | Velocidad candidata como fracción de `c`; requiere migrar/conectar el campo actual de nave. |
+| `HIBERNATION_BIO_AGE_RATE_NOMINAL` | `0.005` | Tasa de envejecimiento biológico nominal durante hibernación. |
+| `AWAKE_BIO_AGE_RATE` | `1.0` | Valor base del envejecimiento en vigilia. |
+| `HIBERNATION_EFFICIENCY_*` | pendiente | Configuración de respuesta a salud, disponibilidad y degradación de `life_support`. |
+
+**Regla:** no introducir simultáneamente estos nombres junto con parámetros equivalentes sin definir la fuente de verdad. El prototipo ya almacena velocidad en `ShipState`; la especificación debe resolver su relación con el balance global y con partidas guardadas.
+
+## 6. Requisito de consulta operativa
+
+El jugador necesita consultar cómo está funcionando su hibernación **en este instante**. El contrato propuesto para una consulta, por ejemplo `hibernate status` (nombre sin aprobar), es:
+
+- Estado de hibernación: activo/inactivo, o preparado/no disponible según el futuro diseño.
+- Estado y salud de `life_support`.
+- Tasa nominal configurada (por ejemplo, 0,5 %).
+- Tasa **efectiva** que se aplicaría ahora y de qué condiciones depende.
+- Una equivalencia comprensible (por ejemplo, envejecimiento biológico estimado por 100 años propios de nave), claramente identificada como proyección condicionada.
+- Advertencias útiles sobre degradación, falta de químicos, anomalías o fallo, únicamente cuando esas mecánicas estén definidas e implementadas.
+
+No inventar un valor efectivo cuando hay datos insuficientes; distinguir «sin modelo todavía», «estimación» y «tasa aplicada» en prototipos y diagnósticos.
+
+## 7. Riesgos y decisiones pendientes de implementación
+
+1. **Temporalidad de procesos:** inventariar todos los usos de `state.clock.t`, `dt`, vencimientos de jobs, energía, desgaste, radiación y eventos de lore. Clasificarlos por tiempo galáctico o propio, documentando excepciones.
+2. **Integración por fases:** el viaje tendrá aceleración/frenado si se decide incorporarlos; no simular todo a velocidad de crucero sin indicar la simplificación.
+3. **Balance acumulado:** aumentar la duración de un viaje no solo altera edad del personaje; modifica la viabilidad del `power_core`, la batería, `life_support`, drones y casco. Ensayar recorridos de siglos.
+4. **Estado de `life_support`:** distinguir salud continua y estados categóricos; acordar la tasa de hibernación con daños y la política de fallo/alerta sin contradecir las salvaguardas actuales de soporte vital.
+5. **Sustancias de hibernación:** la existencia diegética de agentes químicos es canónica; inventario, recarga, consumo y degradación son decisiones abiertas.
+6. **Guardados y migración:** serializar correctamente las nuevas magnitudes e inicializar de forma coherente las partidas antiguas.
+7. **Determinismo:** una misma seed y una misma secuencia de acciones/tiempos deben producir los mismos resultados; evitar diferencias acumulativas según tamaño de tick.
+8. **Interfaz:** presentar magnitudes con unidades y distinguir inequívocamente tasa nominal de tasa efectiva.
+9. **Revelación narrativa:** no ligar automáticamente un reloj biológico a un contador de desaparición total de la humanidad; el misterio central sigue abierto.
+10. **Agujeros negros futuros:** fase independiente con relatividad gravitatoria, fuerzas de marea, radiación, navegación y posibilidad de escape.
+
+## 8. Secuencia de trabajo recomendada
+
+1. **Auditoría de tiempos y supervivencia técnica (sin mutaciones):** mapa de usos actuales, invariantes, riesgos y comportamiento en viajes de 10/100/1000 años.
+2. **Contrato aprobado de tres magnitudes:** nombres, unidades, reglas para tiempo propio, cálculo numérico, guardados y tests.
+3. **Edad biológica e hibernación nominal:** incorporar tasa configurada, acumulación y consulta mínima, sin forzar aún una penalización de `life_support` no acordada.
+4. **Eficacia y `life_support`:** acordar fórmula, eventos de alerta, dependencias y fallos; añadir consulta de tasa efectiva y pruebas.
+5. **Crucero sublumínico:** aplicar el `0.5c` candidato y recalibrar consumo, desgaste, duraciones y recuperación de recursos tras evaluar resultados.
+6. **Gravedad intensa (etapa posterior):** implementar objetos compactos y tiempos propios en gravedad fuerte con modelo físico explícito.
+
+**Criterio de cierre:** no declarar finalizado el sistema temporal hasta que las duraciones, el envejecimiento y el desgaste sean coherentes entre sí, los jugadores puedan inspeccionar las tres magnitudes y la eficacia de la hibernación, y las partidas guardadas sigan funcionando.

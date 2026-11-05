@@ -1,11 +1,12 @@
 # RETORNO — Canon del universo
 
 **ID:** `RET-CAN`  
-**Versión:** `0.2.0`  
+**Versión:** `0.3.0`  
 **Fecha:** 2026-11-05  
 **Estado:** base canónica inicial, revisable mediante decisión explícita  
 **Destinatarios:** diseño narrativo, sistemas, programación, pruebas y asistentes de desarrollo  
-**Documento complementario:** [`guia_coherencia.md`](guia_coherencia.md)
+**Documento complementario:** [`guia_coherencia.md`](guia_coherencia.md)  
+**Especificación de diseño relacionada:** [`modelo_temporal_hibernacion.md`](../design/modelo_temporal_hibernacion.md)
 
 > **Uso interno.** Este documento describe la verdad de diseño del universo, no la información que necesariamente conoce el jugador. No es un texto de ficción destinado a aparecer en el juego.
 
@@ -59,8 +60,57 @@ En la experiencia de RETORNO, los desplazamientos interestelares duran periodos 
 
 - Un **año luz** es una medida de distancia, no de tiempo.
 - Deben distinguirse **distancia recorrida**, **tiempo exterior transcurrido** y, cuando resulte pertinente, **tiempo experimentado por el viajero**.
-- No se fija todavía una velocidad efectiva, un modelo de propulsión, una regla de dilatación temporal jugable ni la duración exacta de trayectos concretos.
-- No debe deducirse automáticamente que existen viajes o comunicaciones instantáneos; tampoco se cierra aquí una hipótesis física sin discutirla.
+- Las naves con masa se desplazan a velocidades **inferiores a la de la luz** (`C-TIME-002`). Se contempla una velocidad de crucero **provisional** de `0,5c` (`P-TIME-005`).
+- Se distinguen tres magnitudes temporales: tiempo galáctico, tiempo propio de la nave y envejecimiento biológico (`C-TIME-003`).
+- No se deducen viajes o comunicaciones instantáneos; el sistema de propulsión, las fases de aceleración/frenado y el cálculo relativista definitivo siguen pendientes.
+
+### C-TIME-002 — Viaje estrictamente sublumínico [C]
+
+Una nave con masa **no alcanza ni supera la velocidad de la luz**. La duración de los trayectos debe ser compatible con esta restricción. La existencia de rutas de navegación no implica un atajo superlumínico ni una alteración arbitraria de la causalidad. La propulsión concreta y sus perfiles de aceleración, frenado y consumo energético permanecen abiertos.
+
+### C-TIME-003 — Tres magnitudes temporales diferenciadas [C]
+
+RETORNO distinguirá:
+
+1. **Tiempo galáctico transcurrido:** referencia convencional para la cronología de la partida; comienza en cero con cada nueva partida. Sirve para historia, mensajes y evolución de lugares exteriores a la nave.
+2. **Tiempo propio de la nave:** tiempo medido por los relojes que viajan con ella; puede diferir del galáctico por velocidad y, en el futuro, por condiciones gravitatorias. Rige los procesos físicos y el envejecimiento de sus componentes.
+3. **Envejecimiento biológico acumulado del protagonista:** una **magnitud fisiológica**, no un tercer reloj físico independiente. Depende del tiempo propio y de su estado de hibernación o vigilia.
+
+No se presupone un «tiempo universal absoluto» de toda la galaxia: el reloj galáctico es una **convención útil de simulación** que deberá concretarse al modelar efectos relativistas intensos. Los tres valores deberán poder consultarse y persistirse sin confundir sus unidades o responsabilidades. El canon no afirma que esa separación ya esté implementada.
+
+### C-BIO-001 — Hibernación química avanzada, ralentización no nula [C]
+
+La civilización desarrolló una tecnología de hibernación extraordinariamente eficaz apoyada en **sistemas de conservación y agentes químicos adecuados**. Durante su aplicación correcta, el envejecimiento biológico del protagonista se reduce enormemente, **pero no se detiene por completo**. Esta capacidad constituye una concesión tecnológica de la ciencia ficción de RETORNO: no exige demostrar su plausibilidad con la medicina contemporánea ni establecer todavía sus mecanismos moleculares.
+
+### C-BIO-002 — Eficacia dependiente de `life_support` y consultable [C]
+
+La eficacia de la hibernación no será constante ante cualquier condición de la nave. Dependerá, como mínimo, del **estado de `life_support`**: el deterioro de este sistema puede empeorar la conservación biológica. El jugador debe disponer de una **consulta explícita** que muestre la eficacia o tasa de envejecimiento efectiva **en el estado actual de la nave**; el nombre y formato definitivo del comando siguen pendientes de diseño.
+
+No se establece todavía la función matemática de degradación, cómo intervienen los agentes químicos, ni qué sucede exactamente en cada fallo crítico. La tasa nominal y la tasa efectiva deben distinguirse.
+
+### C-BIO-003 — Edad biológica como recurso finito [C]
+
+El personaje **acumula edad biológica incluso cuando hiberna**. Este envejecimiento constituye un recurso de supervivencia y una presión dramática de la búsqueda. No se fija todavía una edad de muerte automática, una esperanza de vida exacta, penalizaciones por edad ni una interfaz concreta. Tampoco se asume que sea posible rejuvenecer o restaurar la edad consumida.
+
+### P-TIME-005 — Velocidad de crucero candidata: `0,5c` [P]
+
+La candidata principal para el equilibrio interestelar es **la mitad de la velocidad de la luz**, aproximadamente `0,5 años luz/año` en el marco galáctico de referencia, durante la fase de crucero. El valor exacto, la aceleración, la desaceleración y su relación con el balance general **se verificarán antes de implementarse**. La velocidad actual del prototipo no se redefine por el hecho de documentar esta preferencia.
+
+### P-BIO-001 — Tasa nominal de envejecimiento en hibernación: `0,5 %` [P]
+
+Se adopta como referencia inicial una tasa de **`0,5 %` del tiempo propio de la nave** (`0.005` como multiplicador decimal), con hibernación efectiva y `life_support` en condiciones nominales. Expresado de otro modo: **200 años propios de la nave producen un año de envejecimiento biológico**. Es una cifra de **balance configurable**, explícitamente revisable, no una ley física ni una constante inmutable del lore.
+
+En vigilia se toma como referencia provisional una relación biológica de `1:1` con el tiempo propio. El envejecimiento efectivo dependerá de los estados operativos y de la hibernación; no se ha acordado una fórmula de penalización por daños.
+
+### P-NAR-007 — Escala de grandes descubrimientos [P]
+
+Una separación del orden de **200 años galácticos** entre *grandes hitos de investigación* es una referencia tentativa para estudiar el ritmo dramático, **no** una frecuencia del scheduler ni un intervalo obligatorio entre arcos, singles o hallazgos ordinarios.
+
+### C-GRAV-001 — Objetos compactos y dilatación gravitatoria futura [C]
+
+El universo jugable contará, en una **fase futura**, con **agujeros negros y regiones cercanas a objetos compactos** donde puedan producirse dilataciones gravitatorias intensas. Sus efectos temporales serán distintos de la reducción metabólica de la hibernación: primero condicionan el **tiempo propio físico**, y solo después el proceso de envejecimiento biológico utiliza ese tiempo propio.
+
+No se consideran implementados por esta decisión. Quedan abiertos los perfiles gravitatorios, órbitas, efectos de marea, radiación, navegación, costes y riesgos. No se introduce por defecto un mecanismo seguro para acelerar el futuro ni viajes al pasado.
 
 ### C-HIST-001 — Colapso desigual y abandono escalonado [C]
 
@@ -177,8 +227,12 @@ Esta misma lectura debe aplicarse al contenido narrativo asignado durante la par
 
 | ID | Cuestión | Decisión pendiente |
 |---|---|---|
-| **A-TIME-002** | Velocidad efectiva y sistema de propulsión | Cuánto tiempo tarda un desplazamiento concreto y cómo se calcula. |
-| **A-TIME-003** | Relatividad y relojes | Diferencia jugable, si la hay, entre tiempo exterior y tiempo propio. |
+| **A-TIME-002** | Propulsión y perfil real de velocidad | Aceleración/frenado, velocidad efectiva en cada fase, energía y velocidad definitiva (candidata `0,5c`). |
+| **A-TIME-003** | Modelo matemático de los relojes | Convención del tiempo galáctico, integración del tiempo propio y tratamiento coherente de la relatividad. |
+| **A-BIO-001** | Químicos y condiciones de hibernación | Existencias, consumo, suministro, carencias y sus efectos mecánicos. |
+| **A-BIO-002** | Daño y eficacia de `life_support` | Fórmula efectiva, umbrales, comportamiento en fallos y consulta al jugador. |
+| **A-BIO-003** | Longevidad y salud del protagonista | Edad inicial, límites, deterioro fisiológico, enfermedades y consecuencias de envejecer. |
+| **A-GRAV-001** | Implementación futura de gravedad fuerte | Entornos, parámetros de objetos compactos, peligros y cálculo de dilatación. |
 | **A-COM-001** | Comunicaciones a larga distancia | Alcance, latencia, repetidores, disponibilidad y excepciones. |
 | **A-HIST-003** | Cronología galáctica | Fechas e hitos de expansión, fases regionales del colapso milenario y época presente del jugador. |
 | **A-AUTO-001** | Naturaleza de los automatismos | Autonomía, capacidad de autorreparación, límites energéticos y posibles objetivos. |
@@ -206,9 +260,16 @@ Una historia o implementación puede trabajar con una de estas incógnitas, pero
 | **0.2** | `C-NAR-005` | El viaje tiene una estructura trágica: investigar y viajar consumen el tiempo de la esperanza. | Establecido |
 | **0.2** | `C-DATA-003` | Los mensajes de emisores muertos hace mucho son un motivo recurrente. | Establecido |
 | **0.2** | `A-SOC-001` | Existencia presente de sociedades supervivientes: desconocida también para el diseño. | Abierto |
-| 0.1–0.2 | `A-TIME-002` | Velocidad efectiva pendiente. | Abierto |
+| 0.1–0.2 | `A-TIME-002` | Velocidad efectiva y propulsión inicialmente sin fijar. | Abierto |
+| **0.3** | `C-TIME-002` | Viajes necesariamente sublumínicos. | Establecido |
+| **0.3** | `C-TIME-003` | Tres magnitudes: tiempo galáctico, propio de la nave y edad biológica acumulada. | Establecido |
+| **0.3** | `C-BIO-001`–`003` | Hibernación química avanzada; envejecimiento no nulo, dependiente de `life_support` y recurso finito. | Establecido |
+| **0.3** | `P-TIME-005` | Velocidad de crucero candidata `0,5c`; aún no implementada. | Provisional |
+| **0.3** | `P-BIO-001` | Tasa nominal en hibernación `0,5 %` (`0.005`); configurable y pendiente de balance. | Provisional |
+| **0.3** | `P-NAR-007` | Escala orientativa de 200 años galácticos entre grandes hitos. | Provisional |
+| **0.3** | `C-GRAV-001` | Agujeros negros y dilatación gravitatoria intensa previstos para una fase futura. | Establecido como objetivo de mundo |
 
-Las referencias narrativas a miles de años son compatibles con el **colapso milenario** establecido; **ninguna fecha exacta, porcentaje de supervivencia, duración de viaje o final posible** se vuelve canónico por figurar en un ejemplo de lore.
+Las referencias narrativas a miles de años son compatibles con el **colapso milenario** establecido; **ninguna fecha exacta, porcentaje de supervivencia, duración de viaje o final posible** se vuelve canónico por figurar en un ejemplo de lore. Las tasas `0,5c` y `0,5 %` son **hipótesis de balance** hasta su validación.
 
 ## 10. Mantenimiento del documento
 

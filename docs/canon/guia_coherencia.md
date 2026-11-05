@@ -1,11 +1,12 @@
 # RETORNO — Guía de coherencia narrativa y de diseño
 
 **ID:** `RET-GUIA-COHERENCIA`  
-**Versión:** `0.2.0`  
+**Versión:** `0.3.0`  
 **Fecha:** 2026-11-05  
 **Estado:** protocolo de trabajo inicial  
 **Destinatarios:** desarrollo, Codex, diseño de sistemas, generación de arcos y singles, revisión de contenido  
-**Fuente normativa del mundo:** [`universo.md`](universo.md)
+**Fuente normativa del mundo:** [`universo.md`](universo.md)  
+**Diseño técnico pendiente de implementación:** [`modelo_temporal_hibernacion.md`](../design/modelo_temporal_hibernacion.md)
 
 > **Objeto:** traducir el canon a decisiones comprobables sin confundir la verdad del universo con las restricciones del motor ni convertir hipótesis creativas en hechos establecidos.
 
@@ -20,6 +21,7 @@
 | ¿Qué ocurrió realmente en una historia todavía no cerrada? | **No presumirlo**: revisar canon o proponer una decisión pendiente. |
 | ¿Sigue existiendo alguna sociedad humana? | **Es una incógnita abierta para jugador y autores** (`A-SOC-001`); ningún relato aislado prueba su existencia actual. |
 | ¿Qué debería significar la investigación para el jugador? | La búsqueda de un posible retorno a la humanidad y la tensión entre averiguar y llegar a tiempo (`C-NAR-003`–`005`). |
+| ¿Cómo se miden tiempo, envejecimiento y hibernación? | Principios `C-TIME-002`–`003` y `C-BIO-001`–`003` en el canon; propuesta de implementación en `docs/design/modelo_temporal_hibernacion.md`. |
 
 **Regla de precedencia:** el canon guía la intención del mundo; el código determina lo que existe actualmente en el producto. Si chocan, **abrir una discrepancia de diseño**. Nunca dar por implementada una mecánica solo porque está en el canon ni degradar el canon silenciosamente para justificar el comportamiento vigente.
 
@@ -68,6 +70,14 @@ No hace falta cumplimentar esta ficha para correcciones puramente internas sin i
 | `C-DATA-002` | Justificar la procedencia/antigüedad de mensajes relevantes. | Inferir presencia de interlocutor vivo de cualquier correo recibido. |
 | `C-DATA-003` | Introducir mensajes de emisores ya muertos con naturalidad, incluidos registros cotidianos. | Convertir todos los documentos en monólogos trágicos o confundir recepción con contemporaneidad. |
 | `C-WORLD-001` | Interpretar la generación bajo demanda como descubrimiento/materialización técnica. | Narrar que un nodo surge físicamente al dispararse un failsafe. |
+| `C-TIME-002` | Mantener velocidades de naves con masa por debajo de `c`. | Tratar `1 año luz/año` como velocidad convencional válida de una nave masiva. |
+| `C-TIME-003` | Distinguir el reloj galáctico, el propio de la nave y el envejecimiento biológico; persistirlos de forma consistente. | Aplicar indiscriminadamente `dt` galáctico a desgaste de la nave, edad del personaje y sucesos externos. |
+| `C-BIO-001` | La hibernación química reduce mucho el envejecimiento sin anularlo; diferencia vigilia e hibernación. | Confundir hibernación con detener el tiempo físico de la nave. |
+| `C-BIO-002` | Calcular y mostrar la tasa *efectiva* según `life_support`; conservar la distinción frente a la nominal. | Afirmar eficacia plena con `life_support` dañado o inventar una fórmula definitiva sin aprobarla. |
+| `C-BIO-003` | Contabilizar edad biológica acumulada como recurso de largo plazo. | Fijar automáticamente muerte por edad o rejuvenecimiento sin diseño expreso. |
+| `P-TIME-005` y `P-BIO-001` | Conservar `0,5c` y `0,005` como valores iniciales configurables de balance. | Codificarlos como constantes inmutables o confundir `0,005` con `0,5`. |
+| `C-GRAV-001` | Reservar una arquitectura capaz de admitir efectos gravitatorios sobre tiempo propio. | Introducir una fórmula gravitatoria improvisada o afirmar que ya existen agujeros negros jugables. |
+
 
 ### Aplicación orientativa de E1–E4
 
@@ -84,11 +94,34 @@ La tensión entre **investigar para saber adónde ir** y **emplear tiempo en lle
 
 Si se plantea una mecánica basada en el tiempo, especificar **qué cambia materialmente**, qué sabe el jugador, qué señales de advertencia recibe y cómo se evitan situaciones irresolubles por falta de información. La incertidumbre puede ser profunda sin convertir cada decisión en una trampa opaca.
 
+### Decisiones sobre tiempo, hibernación y vida biológica
+
+- **Tres magnitudes, dos dominios:** el reloj galáctico es una referencia de simulación; el de la nave registra tiempo físico propio y la edad biológica acumula desgaste fisiológico. Una fase de hibernación no «congela» los sistemas técnicos.
+- **Unidades y escala:** `0,5 %` equivale a `0.005` unidades biológicas por unidad de tiempo **propio** bajo condiciones nominales. No multiplicar directamente por el tiempo galáctico cuando existe dilatación relativista.
+- **Valores revisables:** `0,5c`, tasa de hibernación `0.005` y posible pauta de 200 años galácticos entre grandes descubrimientos son orientaciones de balance, no obligaciones narrativas por escena.
+- **Dependencia real del soporte vital:** la degradación de `life_support` debe empeorar la eficacia de conservación, con comportamiento de fallos definido en especificación y pruebas. La dependencia de agentes químicos forma parte de la explicación diegética; consumo, inventario y estados todavía están abiertos.
+- **Información legible para el jugador:** ofrecer una acción de consulta que informe, como mínimo, del estado de `life_support`, tasa nominal, tasa efectiva y el significado temporal de ambas; el nombre `hibernate status` se propone **solo como ejemplo**, no como comando ya implementado.
+- **Relatividad gravitatoria futura:** considerar agujeros negros y zonas de gravedad fuerte una capacidad futura del universo, pero no simularlas ni usarlas como atajo temporal hasta establecer su física, sus peligros y las reglas de navegación.
+- **Evitar sorpresas irreversibles:** cualquier reducción súbita de eficacia, despertares forzosos o consumo de vida biológica debe ser detectable de forma razonable y compatible con guardado/carga y progresión.
+
+La ficha técnica desarrollada para preparar estas implementaciones es [`modelo_temporal_hibernacion.md`](../design/modelo_temporal_hibernacion.md). Su contenido no concede permiso para introducir mecánicas nuevas sin una tarea posterior de implementación.
+
 ## 4. Puentes con el motor actual: qué no se debe confundir
 
 La documentación técnica de RETORNO describe `station`, `relay`, `waystation`, `derelict` y `ship` como tipos de localización; los cuatro estados E1–E4 propuestos **no son hoy otros cuatro tipos de nodo**. Los tipos `origin`, `transit` y `nav_point` tienen papeles técnicos propios.
 
 La arquitectura también separa mundo físico (`space.nodes` y sus `links`), conocimiento de rutas (`known_links`) y contenido recuperable (`node_pools`/`lore_placements`). La generación de sectores es bajo demanda y determinista. El scheduler asigna piezas a localizaciones y canales; acciones como `dock`, `uplink` y `salvage_data` activan entregas.
+
+### Auditoría mínima del estado actual (rama `main`, 2026-11-05)
+
+La inspección del repositorio mostró los siguientes puntos de partida, **no** funcionalidades ya resueltas:
+
+- `src/retorno/core/gamestate.py`: `ClockState.t` es un contador de segundos desde inicio, sin reloj propio adicional ni edad biológica acumulada.
+- `src/retorno/model/ship.py`: `cruise_speed_ly_per_year = 1.0` en el prototipo; `is_hibernating` existe como estado, pero no implementa todavía el modelo de tres magnitudes aquí acordado.
+- `src/retorno/core/engine.py`: los trayectos interestelares se calculan con `distancia / velocidad` y el desgaste de sistemas se aplica a un incremento `dt` sin separación relativista explícita.
+- `src/retorno/config/balance.py`: ya agrupa parámetros de velocidad local, hibernación y envejecimiento técnico, pero **no** contiene todavía una tasa de edad biológica de hibernación.
+
+En una implementación posterior se tendrá que contrastar esta auditoría con el código vigente y realizar migración de partidas guardadas, integración con energía, mantenimiento, `life_support`, cronología de eventos y pruebas.
 
 Distinciones de especial importancia:
 
@@ -208,6 +241,8 @@ Una señal de socorro **auténtica** demuestra que alguien estuvo en peligro cua
 - [ ] Los datos de navegación no crean imposibles técnicos ni bloqueos de progresión.
 - [ ] Respeta tono e incertidumbre sin explicar de más; no exige que cada single contenga una pista principal.
 - [ ] Si introduce la urgencia temporal, no impone arbitrariamente un reloj mecánico o final garantizado.
+- [ ] Si menciona décadas/siglos de viaje, distingue tiempo de la galaxia, tiempo propio y edad biológica; no confunde hibernación con suspensión del tiempo físico.
+- [ ] No convierte el `0,5c`, el `0,5 %` o los 200 años orientativos en constantes históricas canónicas inevitables.
 - [ ] Cumple los requisitos de JSON, textos bilingües y canales soportados.
 
 ### Checklist técnico (mecánica o cambio del generador)
@@ -222,6 +257,10 @@ Una señal de socorro **auténtica** demuestra que alguien estuvo en peligro cua
 - [ ] No se ha asumido una simulación de supervivientes, un final determinado ni una cuenta atrás sin diseño aprobado.
 - [ ] Se añadieron/actualizaron pruebas cuando el cambio alteró lógica existente.
 - [ ] Cualquier conflicto con un principio canónico se hizo visible para decidirlo.
+- [ ] Para cambios temporales: se revisan los tres dominios de tiempo, las unidades, el estado de hibernación, el estado de `life_support` y la persistencia.
+- [ ] La tasa de envejecimiento nominal es configurable, y la tasa efectiva se comunica sin confundirlas.
+- [ ] La degradación temporal de la nave usa tiempo propio cuando corresponda y no aplica el tiempo galáctico por duplicado.
+- [ ] Se verifica que `0.5c` y `0.005` son parámetros **provisionales** hasta una calibración completa, y que no se presupone dilatación gravitatoria ya implementada.
 
 ## 8. Protocolo de cambios de canon
 
@@ -244,6 +283,8 @@ Este bloque está **listo para copiar**, adaptándolo a la organización real de
 - Antes de crear o modificar mecánicas del mundo, navegación, ruinas,
   deterioro, información, generación procedural o contenido narrativo,
   consulta `docs/canon/universo.md` y `docs/canon/guia_coherencia.md`.
+- Para implementar relojes, hibernación, relatividad o balance temporal,
+  consulta también `docs/design/modelo_temporal_hibernacion.md`.
 - Trata los principios marcados [C] como restricciones de diseño;
   los [P] como hipótesis y los [A] como preguntas sin resolver.
 - No conviertas una hipótesis narrativa, un ejemplo ni un hecho contado
@@ -253,6 +294,14 @@ Este bloque está **listo para copiar**, adaptándolo a la organización real de
   ambas conclusiones siguen abiertas para autores y jugador.
 - Respeta el horizonte oculto del retorno a la humanidad y el papel
   del tiempo como tensión trágica, sin inventar desenlaces ni temporizadores.
+- Distingue tiempo galáctico, tiempo propio de la nave y edad biológica.
+  La hibernación no detiene el tiempo físico: ralentiza el envejecimiento.
+- El 0,5c de crucero y el 0,5 % biológico (`0.005` de multiplicador)
+  son hipótesis de balance configurables, no constantes irrevocables.
+- La eficacia de hibernación debe depender de `life_support` y poder
+  consultarse; su fórmula concreta sigue abierta.
+- Los agujeros negros y las dilataciones gravitatorias intensas están
+  previstos para una fase futura; no se consideran implementados.
 - Distingue siempre el canon deseado del comportamiento actual del motor.
   Verifica este último en código y pruebas.
 - Para arcos y singles consulta además las guías técnicas vigentes.
@@ -263,8 +312,8 @@ Este bloque está **listo para copiar**, adaptándolo a la organización real de
   nuevas solo porque el canon contempla su posibilidad.
 ```
 
-## 10. Registro de revisión 0.2 y próximas decisiones
+## 10. Registro de revisión 0.3 y próximas decisiones
 
-**Versión 0.2.0:** se incorpora el colapso humano milenario y desigual, la esperanza del personaje de encontrar una comunidad viva, la lectura investigadora de la arqueología, el antagonismo dramático del tiempo y el motivo recurrente de mensajes cuyos emisores murieron. Se añade una regla explícita contra confirmar por accidente la supervivencia o extinción total y una comprobación temporal para arcos y singles. **No se modifica el contrato JSON ni el comportamiento del motor.**
+**Versión 0.3.0:** se incorpora el viaje sublumínico, la distinción entre tres magnitudes temporales, la tecnología de hibernación química avanzada, la edad biológica como recurso finito, la dependencia de la eficacia respecto de `life_support` y la necesidad de consulta al jugador. Se mantienen como propuestas ajustables `0,5c` para el crucero y `0,5 %` (`0.005`) para el envejecimiento nominal en hibernación. Queda establecido como objetivo de mundo futuro incorporar agujeros negros y dilatación gravitatoria intensa, **sin afirmar implementación presente**.
 
-Una revisión posterior puede tratar **velocidad efectiva de viaje**, distinción entre tiempos de referencia y duración de la hibernación, y límites de comunicación. Solo cuando esas decisiones estén fijadas convendrá decidir duraciones concretas, edades típicas y mecanismos de degradación temporal. La secuencia exacta de descubrimiento de la esperanza, el desenlace y cualquier cuenta atrás siguen abiertos; no se decidirán indirectamente al ajustar el balance.
+La siguiente tarea recomendada es estudiar y aprobar el **contrato técnico** de tres relojes y su impacto en motor, guardados, vida biológica, hibernación, energía y mantenimiento. Se ha preparado [`modelo_temporal_hibernacion.md`](../design/modelo_temporal_hibernacion.md) como borrador de ese contrato, sin modificar código ni parámetros del juego.
