@@ -43,6 +43,13 @@ characterized worldgen order dependencies and pending e2/e3/e4 work. This is a
 safe partial implementation: conditional sample identity is not verified latent
 existence and does not activate F-DEAD-01.
 
+Phase 4D-3e1b: [Stable procedural manifest](design/stable-procedural-manifest.md)
+/ [ES](design/stable-procedural-manifest.es.md) provides the contract and pure
+prototype of order-independent identity/topology, a ten-seed comparison and e2
+decisions. Certification applies to experimental rules; it does not replace
+worldgen or activate lore, intel or F-DEAD-01. The current roadmap defines the
+integration sequence, superseding e1's provisional subphase allocation.
+
 | Document | Purpose | Status and limitations |
 | --- | --- | --- |
 | [Arcs and `corridor_01.json`](arcs.md) / [ES](arcs.es.md) | Arc and single authoring guide. | **Pending review.** It contains reusable schema examples, but currently points to inactive template content and describes obsolete placement paths, force guarantees, protection scope, and single weighting. Do not treat it as current runtime architecture. |

@@ -43,6 +43,13 @@ dependencias del orden de worldgen demostradas y trabajo pendiente e2/e3/e4.
 Es una implementación parcial segura: identidad muestral condicional no significa
 existencia latente verificada ni activa F-DEAD-01.
 
+Fase 4D-3e1b: [Manifiesto procedural estable](design/stable-procedural-manifest.es.md)
+/ [EN](design/stable-procedural-manifest.md) contiene el contrato y prototipo
+puro de identidad/topología independiente del orden, comparación de diez semillas
+y decisiones pendientes para e2. La certificación pertenece a las reglas
+experimentales; no sustituye worldgen ni activa lore, intel o F-DEAD-01. El orden
+de integración vigente lo fija la hoja de ruta, no el reparto provisional de e1.
+
 | Documento | Finalidad | Estado y limitaciones |
 | --- | --- | --- |
 | [Arcos y `corridor_01.json`](arcs.es.md) / [EN](arcs.md) | Guía de autoría de arcos y singles. | **Pendiente de revisión.** Conserva ejemplos de esquema reutilizables, pero apunta a contenido inactivo y describe rutas de colocación, garantías de `force`, alcance de protección y pesos de singles obsoletos. No debe tratarse como arquitectura vigente. |
