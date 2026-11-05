@@ -77,10 +77,11 @@ opportunity, not guarantee that the player notices, reads, or understands it.
 
 When deadnodes declares successful recovery for a remote target, a complete
 plan of navigable hops must exist. Stages are revealed progressively. Existing
-physical locations are preferred when suitable, and new ones are created only
-when needed. If no valid chain exists, the target remains pending: no impossible
-route is published and no attempt, cooldown, or other state is consumed as if a
-rescue had occurred.
+physical locations are preferred when suitable. Under the 4D-3e1 clarification,
+lazy materialization must refer to universe-determined preexisting sites;
+recovery need alone never establishes historical existence. If no valid chain
+exists, the target remains pending: no impossible route is published and no
+attempt, cooldown, or other state is consumed as if a rescue had occurred.
 
 **Approved in 4D-3c:** when the direct chain is infeasible, search regionally
 coherent alternatives and detours before giving up. Prefer suitable physical
@@ -129,6 +130,26 @@ save schema, detector, resources, reception or UI; F-DEAD-01 remains open.
 
 This contract does not change thresholds, probabilities, or balance limits.
 Those require a separate evaluation.
+
+### 2.2.1 Procedural preexistence and structural eligibility — 4D-3e1
+
+**Approved:** distinguish a universe-determined site, its physical node, player
+knowledge and an operational route. Negative scans do not prove absence;
+observation reliability and persistent history belong to 4D-3e2. Recovery must
+not accept/reject candidates by scrap, energy, damage, repairs, fuel availability
+or survival. Economic estimates may remain independent advisory tools. Prioritize
+complete directed access from the ship and widen regional search progressively,
+without a permanent distance cutoff or treating exhausted budgets as absence.
+No rescue or universal connectivity is guaranteed.
+
+**Implemented safely in part:** the [preexistence catalog](procedural-preexistence.md)
+returns physical evidence and explicitly conditional canonical samples with stable
+sample keys. It certifies **no latent site**: guardrails, quota occupancy, Z
+outflow and id allocation prevent the stronger guarantee. Pure queries change no
+world, resources, knowledge, RNG or counters. Current 4D-3d capability/dependency
+ranking differs from the approved structural contract and remains unchanged.
+Worldgen redesign/density decisions, planner integration and atomic materialization
+are pending; the evidence and alternatives are documented in the catalog design.
 
 ### 2.3 Visited locations
 

@@ -11,6 +11,15 @@ es vinculante; worldgen sigue regido por [su referencia canónica](../systems/wo
 
 ## Decisión aprobada y limitaciones anteriores
 
+**Precisión 4D-3e1:** el [contrato y auditoría de preexistencia](procedural-preexistence.es.md)
+prevalece sobre interpretar cupos o centros geométricos como localizaciones
+históricas verificadas. El catálogo no certifica latentes con el generador actual.
+Este planificador sigue igual y sin integrar. El estado por capacidad/dependencias
+de 4D-3d y la comparación de tiempo nominal no son la elegibilidad estructural
+recién aprobada; daños, energía, scrap y reparaciones no deben decidir aceptación
+de F-DEAD-01. La auditoría registra la separación necesaria y la futura búsqueda
+progresiva acotada; las herramientas económicas pueden seguir como información.
+
 **Buscar alternativas regionalmente coherentes y rodeos antes de desistir; no
 garantizar salida ni crear excepciones a las reglas del universo.** Un viaje
 más largo por otra región puede ser apropiado. Una rama sin recuperación también

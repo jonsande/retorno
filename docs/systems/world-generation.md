@@ -106,6 +106,12 @@ The operational origin is therefore in `disk`. The model also declares a
 The generator selects the regional template from the sector center's region. It
 then recalculates every node's region from its actual coordinates.
 
+Phase 4D-3e1 adds a separate [read-only preexistence catalog](../design/procedural-preexistence.md).
+It never calls sector generation, expands neighborhoods or grants discovery.
+Its canonical slot samples are conditional, not verified preexisting locations;
+the audit and regression witnesses explain why legacy generation cannot certify
+latent existence independently of materialization order.
+
 ## 4. When the universe is generated
 
 The public entry point is `ensure_sector_generated(state, sector_id)`.
@@ -214,8 +220,8 @@ For every procedural slot:
 - salvage and radiation use node-specific derived seeds.
 
 The Z normal distribution is not truncated. An extreme result can physically
-place a node outside the requested Z index. No bounds test currently covers
-this possibility.
+place a node outside the requested Z index. Phase 4D-3e1 characterizes this
+explicitly, including its effect on another sector's quota; it does not clamp Z.
 
 ## 7. Physical links
 
@@ -364,9 +370,15 @@ Determinism is **not action-order independent**:
 - the guardrail runs for the first cluster containing the origin;
 - existing ids and authored nodes affect slots and collisions.
 
-A diagnostic with seed `2` and the same three requests in reverse order produced
-the same nodes but one different intersector edge. There is no regression test
-or documented design decision for this behavior yet.
+The 4D-3e1 [characterization regression](../../tests/worldgen_preexistence_characterization_smoke.py)
+now fixes concrete witnesses, not a new intended policy: seed `2`, requests
+`(20,20,0)`, `(22,20,0)`, `(20,22,0)` versus reverse, gives identical nodes but
+two different undirected edges. Seed `29`, `(1,0,0)` then `(-1,0,0)` versus
+reverse, changes a shared sector's archetype and nodes through the initial
+guardrail. Seed `271828` at `(15126,0,0)` has an outlier above Z=10 which changes
+the later `(15126,0,1)` quota; reversing generation produces different nodes.
+The [catalog design](../design/procedural-preexistence.md) documents stable
+sample addresses separately from conditional existence and final allocated ids.
 
 Authored salvage uses one RNG across sorted location files, so adding an active
 definition can shift later rolls. Procedural salvage uses per-node seeds and is
@@ -469,8 +481,8 @@ repeated generation requests.
 
 Verification gaps:
 
-- no test accepts or rejects generation-order dependence;
-- no test asserts Z remains within its requested sector;
+- generation-order dependence and Z outflow now have 4D-3e1 regression witnesses;
+  changing those behaviors still needs an approved worldgen design;
 - authored duplicates and already-over-cap sectors are untested;
 - there is no physical galaxy-boundary test;
 - regional `radiation_base` configuration semantics remain unresolved;

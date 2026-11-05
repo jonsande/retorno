@@ -37,6 +37,12 @@ Spanish version: [README.es.md](README.es.md)
 
 ## Existing guides
 
+Phase 4D-3e1: [Procedural preexistence](design/procedural-preexistence.md) /
+[ES](design/procedural-preexistence.es.md) documents the bounded read-only catalog,
+characterized worldgen order dependencies and pending e2/e3/e4 work. This is a
+safe partial implementation: conditional sample identity is not verified latent
+existence and does not activate F-DEAD-01.
+
 | Document | Purpose | Status and limitations |
 | --- | --- | --- |
 | [Arcs and `corridor_01.json`](arcs.md) / [ES](arcs.es.md) | Arc and single authoring guide. | **Pending review.** It contains reusable schema examples, but currently points to inactive template content and describes obsolete placement paths, force guarantees, protection scope, and single weighting. Do not treat it as current runtime architecture. |

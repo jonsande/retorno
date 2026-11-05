@@ -85,6 +85,22 @@ def _sector_center(sector_id: str) -> tuple[float, float, float]:
     )
 
 
+def _sample_sector_node(
+    seed: int, sector_id: str, archetype: str, index: int, kind: str, z_sigma: float,
+) -> tuple[tuple[float, float, float], random.Random]:
+    """Canonical slot sample and its local RNG, continued by id allocation.
+
+    Sampling alone establishes no slot existence or insertion permission.
+    Keep the draw order identical for catalog inspection and materialization.
+    """
+    rng = random.Random(_hash64(seed, f"sector_node:{sector_id}:{archetype}:{index}:{kind}"))
+    x0, y0, z0 = _sector_bounds(sector_id)
+    position = (x0 + rng.random() * SECTOR_SIZE_LY,
+                y0 + rng.random() * SECTOR_SIZE_LY,
+                rng.gauss(z0 + SECTOR_SIZE_LY / 2.0, z_sigma))
+    return position, rng
+
+
 def _roll_recoverable_drones_for_node(seed: int, node_id: str, node_kind: str) -> int:
     cfg = Balance.SALVAGE_DRONES_BY_KIND.get(node_kind or "", {"prob": 0.0, "min": 0, "max": 0})
     min_count = int(cfg.get("min", 0) or 0)
@@ -595,16 +611,13 @@ def _ensure_sector_generated_core(
         archetype_cfg,
         force_playable_hub=sector_id in force_playable_hub,
     )
-    x0, y0, z0 = _sector_bounds(sector_id)
-    z_center = z0 + SECTOR_SIZE_LY / 2.0
     z_sigma = float(region_template.get("z_sigma", 0.3) or 0.3)
     salvage_cfg = dict(region_template.get("salvage", {}) or {})
 
     for index, kind in enumerate(planned_kinds):
-        rng = random.Random(_hash64(state.meta.rng_seed, f"sector_node:{sector_id}:{archetype}:{index}:{kind}"))
-        x = x0 + rng.random() * SECTOR_SIZE_LY
-        y = y0 + rng.random() * SECTOR_SIZE_LY
-        z = rng.gauss(z_center, z_sigma)
+        (x, y, z), rng = _sample_sector_node(
+            state.meta.rng_seed, sector_id, archetype, index, kind, z_sigma,
+        )
         node_region = region_for_pos(x, y, z)
         node_id = _generate_node_id(state, kind, rng)
         node = SpaceNode(

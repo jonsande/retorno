@@ -37,6 +37,12 @@ Versión inglesa: [README.md](README.md)
 
 ## Guías existentes
 
+Fase 4D-3e1: [Preexistencia procedural](design/procedural-preexistence.es.md) /
+[EN](design/procedural-preexistence.md) documenta el catálogo acotado de sólo lectura,
+dependencias del orden de worldgen demostradas y trabajo pendiente e2/e3/e4.
+Es una implementación parcial segura: identidad muestral condicional no significa
+existencia latente verificada ni activa F-DEAD-01.
+
 | Documento | Finalidad | Estado y limitaciones |
 | --- | --- | --- |
 | [Arcos y `corridor_01.json`](arcs.es.md) / [EN](arcs.md) | Guía de autoría de arcos y singles. | **Pendiente de revisión.** Conserva ejemplos de esquema reutilizables, pero apunta a contenido inactivo y describe rutas de colocación, garantías de `force`, alcance de protección y pesos de singles obsoletos. No debe tratarse como arquitectura vigente. |

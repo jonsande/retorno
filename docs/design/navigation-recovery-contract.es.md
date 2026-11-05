@@ -78,8 +78,10 @@ lea o interprete.
 
 Cuando deadnodes declare éxito para un objetivo lejano, debe existir un plan
 completo de saltos navegables. Las etapas se revelarán progresivamente. Se
-reutilizarán localizaciones físicas existentes cuando sean adecuadas y sólo se
-crearán nuevas cuando sea necesario. Si no existe una cadena válida, el
+reutilizarán localizaciones físicas existentes cuando sean adecuadas. Según la
+precisión 4D-3e1, la materialización lazy debe referirse a emplazamientos
+preexistentes determinados por el universo; la necesidad de recuperación nunca
+establece su existencia histórica. Si no existe una cadena válida, el
 objetivo queda pendiente: no se publica una ruta imposible ni se consumen
 intentos, cooldowns u otros estados como si hubiese habido rescate.
 
@@ -131,6 +133,27 @@ esquema de guardado, detector, recursos, recepción o UI; F-DEAD-01 sigue abiert
 
 Los umbrales, probabilidades y límites de balance no se cambian por este
 contrato. Su ajuste requiere una evaluación separada.
+
+### 2.2.1 Preexistencia procedural y elegibilidad estructural — 4D-3e1
+
+**Aprobado:** distinguir emplazamiento determinado por el universo, nodo físico,
+conocimiento del jugador y ruta operativa. Un scan negativo no demuestra ausencia;
+fiabilidad e historial persistente pertenecen a 4D-3e2. La recuperación no debe
+aceptar/rechazar por scrap, energía, daños, reparaciones, combustible disponible
+ni supervivencia. Las estimaciones económicas pueden seguir como información
+independiente. Priorizar acceso dirigido completo desde la nave y ampliar búsqueda
+regional progresivamente, sin corte permanente de distancia ni interpretar
+presupuesto agotado como ausencia. No se garantizan rescate ni conectividad universal.
+
+**Implementación parcial segura:** el [catálogo de preexistencia](procedural-preexistence.es.md)
+devuelve evidencia física y muestras canónicas explícitamente condicionales con
+claves muestrales estables. No certifica **ningún emplazamiento latente**:
+guardrails, ocupación de cupos, desbordamiento Z y asignación de ids impiden la
+garantía mayor. Las consultas puras no cambian mundo, recursos, conocimiento,
+RNG ni contadores. El ranking actual 4D-3d por capacidad/dependencias difiere del
+contrato estructural aprobado y sigue igual. Rediseño/densidad de worldgen,
+integración y materialización atómica quedan pendientes; el diseño del catálogo
+documenta evidencias y alternativas.
 
 ### 2.3 Localizaciones visitadas
 

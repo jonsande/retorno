@@ -223,8 +223,8 @@ Para cada slot procedural:
 - salvage y radiación usan semillas derivadas específicas del nodo.
 
 La normal Z no está truncada. Un resultado extremo puede colocar físicamente un
-nodo fuera del índice Z solicitado. Esta posibilidad no está cubierta por una
-prueba de límites.
+nodo fuera del índice Z solicitado. La Fase 4D-3e1 caracteriza explícitamente
+esta posibilidad y su efecto sobre el cupo de otro sector; no acota Z.
 
 ## 7. Enlaces físicos
 
@@ -369,6 +369,12 @@ resultado. Esto está cubierto parcialmente por pruebas.
 El campo `WorldState.rng_seed` no es la fuente usada por el generador; la fuente
 efectiva es `MetaState.rng_seed`.
 
+La Fase 4D-3e1 añade un [catálogo de preexistencia de sólo lectura](../design/procedural-preexistence.es.md).
+Nunca llama a generación sectorial, amplía vecindarios ni concede descubrimiento.
+Sus muestras canónicas de slots son condicionales, no emplazamientos preexistentes
+verificados; auditoría y regresiones explican por qué la generación vigente no
+certifica existencia latente con independencia del orden de materialización.
+
 El determinismo **no es independiente del orden de acciones**:
 
 - los presupuestos intersectoriales se consumen cuando se evalúan parejas;
@@ -376,10 +382,15 @@ El determinismo **no es independiente del orden de acciones**:
 - el guardrail se ejecuta en el primer cluster que contiene el origen;
 - ids existentes y nodos authored influyen en slots y colisiones.
 
-Una comprobación diagnóstica con semilla `2` y el mismo conjunto de tres
-solicitudes en orden inverso produjo los mismos nodos pero una arista
-intersectorial distinta. Este comportamiento no tiene todavía una prueba de
-regresión ni una decisión de diseño documentada.
+La [regresión de caracterización](../../tests/worldgen_preexistence_characterization_smoke.py)
+4D-3e1 fija ahora testigos concretos, no una nueva política deseada: semilla `2`,
+solicitudes `(20,20,0)`, `(22,20,0)`, `(20,22,0)` frente al inverso producen
+nodos iguales pero dos enlaces no dirigidos distintos. Semilla `29`, `(1,0,0)`
+y `(-1,0,0)` frente al inverso cambia arquetipo y nodos de un sector compartido
+por el guardrail. Semilla `271828` en `(15126,0,0)` tiene un outlier sobre Z=10
+que modifica el cupo posterior de `(15126,0,1)`; invertir genera nodos distintos.
+El [diseño del catálogo](../design/procedural-preexistence.es.md) separa
+direcciones muestrales estables de existencia condicional e ids finales asignados.
 
 El salvage authored usa un único RNG durante el recorrido ordenado de archivos;
 añadir una definición authored activa puede desplazar tiradas de las siguientes.
@@ -484,8 +495,8 @@ conserva módulos restantes y cargo sin reponer loot al repetir solicitudes de g
 
 Lagunas de verificación:
 
-- no hay una prueba que fije o rechace la dependencia del orden de generación;
-- no se comprueba que Z permanezca dentro del sector;
+- la dependencia del orden y el desbordamiento Z tienen ahora testigos de
+  regresión 4D-3e1; cambiarlos sigue requiriendo un diseño de worldgen aprobado;
 - no se prueban duplicados authored ni sectores que ya excedan caps;
 - no hay una prueba de frontera física de la galaxia;
 - la semántica de configuración de `radiation_base` regional sigue sin resolver;

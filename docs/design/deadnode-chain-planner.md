@@ -11,6 +11,15 @@ is authoritative; worldgen remains governed by [its canonical reference](../syst
 
 ## Approved decision and previous limitations
 
+**4D-3e1 clarification:** the [preexistence contract and audit](procedural-preexistence.md)
+supersede any interpretation of slot capacity or geometric sector centers as
+verified historical locations. The catalog certifies no latent sites under the
+current generator. This planner remains unchanged and unintegrated. Current
+4D-3d capability/dependency status and nominal-time comparison are not the newly
+approved structural eligibility policy; damage, energy, scrap and repairs must
+not decide F-DEAD-01 acceptance. The audit records the required separation and
+future progressive bounded search; economic tools may remain advisory.
+
 **Search regionally coherent alternatives and detours before giving up; do not
 guarantee escape or create exceptions to the universe's rules.** A longer trip
 through another region can be appropriate. An unrecoverable branch can also be
