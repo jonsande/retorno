@@ -1,3 +1,11 @@
+> **4D-3e5b — contrato vigente de radio.** Cobertura espacial y temporal
+> sustituye coincidencia de nodo solo para emisores/emisiones declarados. La primera
+> pista remota de F-DEAD-01 exige aviso preexistente, certificado, intensidad y
+> llegada efectiva; una ruta o preparación reciente no bastan. Legacy conserva
+> recepción local. [Modelo](../systems/radio-spacetime.es.md) y
+> [recuperación](../systems/structural-recovery.es.md) prevalecen sobre la auditoría
+> histórica siguiente. Sin cambios en navegación, tres relojes o worldgen.
+
 > **4D-3e5 — estado vigente (2026-11-06).** Implementado el selector histórico, confirmación transaccional y recepción/progresión mediante el ledger común. El [contrato productivo](../systems/structural-recovery.es.md) y su informe prevalecen sobre las auditorías históricas de este documento: no se fabrican puentes, entradas ni gateways. El núcleo 3b/3c/3d sigue siendo diagnóstico; no autoriza materialización. Sin garantía de salida universal.
 
 # Contrato de diseño de navegación y recuperación
@@ -9,8 +17,8 @@ radio/recuperación independientes de oportunidades y planes ocultos, también e
 debug; `debug radio` y `debug recovery` protegidos, compartidos por CLI/Textual.
 `ship survey` requiere conocimiento previo. Sin cambios de simulación o guardado.
 Véanse los contratos vigentes de comunicaciones, recuperación y descubrimiento,
-y [pruebas/informe](../testing/knowledge-boundary-review.es.md). 4D-3e5b mantiene
-su alcance físico futuro separado; `A-COM-001` sigue abierto.
+y [pruebas/informe](../testing/knowledge-boundary-review.es.md). La ampliación
+posterior e5b figura arriba; `A-COM-001` queda parcialmente resuelta.
 
 
 Versión inglesa: [navigation-recovery-contract.md](navigation-recovery-contract.md)

@@ -21,7 +21,7 @@ class MetaState:
 
 @dataclass(slots=True)
 class ClockState:
-    t: float = 0.0          # segundos desde inicio
+    t: float = 0.0          # seconds since game start; provisional radio coordinate time
     last_dt: float = 1.0
 
 

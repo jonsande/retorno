@@ -15,9 +15,9 @@ captured/consumed stages and version. Default technical budgets are shown as
 current configuration, not historical measurements. It neither invents a rejected
 candidate history nor reruns selection to reconstruct it: only already retained
 reasons and evidence are available. `debug radio` relates plans to deliveries and
-current blocking reasons. `debug off` blocks both queries again. No persisted
-state, logging or simulation mutations are added. Coverage, reception conditions,
-selector and sources are unchanged; physical range remains reserved for 4D-3e5b.
+current blocking reasons. `debug off` blocks both queries again. Queries add no
+logging or simulation mutations. The e5a C-DATA-004 boundary remains as 4D-3e5b
+extends range and propagation; the new physical metadata does persist.
 Test: `tests/knowledge_boundary_smoke.py`.
 
 
@@ -78,43 +78,52 @@ Search is not exhaustive. Manifest closure/materialization/domain limits still
 apply and are not balance rules. Each query has finite work and no mutable global
 cache.
 
-## Focused correction: first-clue accessibility
+## First-clue coverage — 4D-3e5b
 
-`communications.radio_spatial_block_reason` is the reusable physical coverage/context
-predicate used by selection, confirmation and capture. Current node comparisons
-belong to communications, not F-DEAD-01. Today it requires a physical source at
-the current node, an admissible kind and docking when required. It checks neither
-health, power nor comms/radiod operation; those gates remain in `radio_block_reason`
-and are reevaluated on capture. An off or damaged receiver in the correct location
-still allows a `receipt_pending` plan.
+`radio_spatial_block_reason` and `radio_temporal_block_reason` are shared selection,
+confirmation and capture boundaries. New local and remote plans need a
+certified transmitter, specific emission, enough power/sensitivity and an arrived
+wave. Local compatibility only preserves previously persisted legacy opportunities
+and authorized narrative interactions.
+A known route to its host or newly prepared message is insufficient.
 
-When spatially eligible emitters exist, only those originate confirmable proposals;
-directed distance and detours still rank chains within that set. Otherwise search
-may return the best examined remote chain as `conditional`, with reason
-`first_reception_outside_coverage`. A `proposal` is not confirmation authority.
-`request_recovery` confirms only `validated`; `confirm_recovery` checks coverage
-again before copying/materializing. Conditional search creates no plan, radio
-opportunity, file, route or counter, and cannot act as an active-plan frontier
-blocking later selection. Its cursor can continue; a new location permits a new
-selection.
+Every new plan starts only with `navigation_link_to` declared before blockage detection,
+with fixed content for that LINK. Open-ended continuous emission is required,
+allowing later capture after repair/power activation. Historical activity,
+corrective relays and stations are not manufactured. Recovery declaration evaluation is
+bounded to 4096 emissions; exhaustion is not absence.
 
-Since 4D-3e5a, player diagnostics show no internal states, even generic ones,
-and reveal neither remote source nor destination. No internal mail, local transmitter, omniscient guidance, second
-queue or new range rules are added. Future physical coverage replaces the shared
-predicate; power, attenuation and latency remain 4D-3e5b. Pending-count presentation
-is separated in implemented 4D-3e5a. Saving/loading an uncaptured plan also validates its original
-preparation context (`access.path[0]`) through the same spatial predicate. A player
-can leave a legitimate source and return later with pending reception intact.
-An earlier save with invalid remote-first reception is explicitly rejected without
-deleting or rewriting it; no migration or invented guidance makes it valid. Tests 28–36 reproduce and cover this correction; group 5 retains
-remote directed comparison with a conditional rather than confirmable result.
+Selection retains directed access, detours, budgets, widening, protected primaries
+and reservations. Only spatially/temporally eligible first sources can confirm;
+otherwise the result remains conditional without a plan, opportunity, file,
+route or consumed attempt. Current useful sensitivity determines coverage;
+unavailable equipment uses NOMINAL reference without resource/survival filters.
+Receiver off can legitimately leave receipt_pending.
+
+Proposals persist first_emission_id, first_reception_sensitivity and
+stage_sources: the identity and payload fingerprint of every informative stage. Confirmation
+rechecks current arrival/coverage before chain materialization. The sole ledger
+uses radio:<emission_id>, optionally binding an independent pending opportunity
+without duplication. Received emissions cannot produce another capture. Saving
+validates original position/context (access.path[0]), sensitivity and preparation
+time without requiring current health/location; capture revalidates current state.
+New plans use historical-recovery-v2 and reject missing source evidence.
+Compatible v1 saves preserve already prepared opportunities without fictional
+transmitters. Advancing v1 cannot create an unprepared radio stage; that continuation
+becomes invalid so alternatives can be evaluated. Invalid remote saves fail without
+rewriting. Tests 28–36, radio_spacetime and recovery_provenance exercise this.
+
+status/diag comms still disclose no internal data. debug recovery shows emission,
+coverage/time parameters and blocking reason; debug radio reads declarations and
+ledger without mutation. [Physical contract](radio-spacetime.md).
 
 ## Sources and progression
 
-The first clue is a new communication from a reachable historical station, relay
-or waystation within reception coverage at confirmation. A known route to a remote
-emitter does not demonstrate informational access to its first clue. Their local broadcast capability is already part of the current
-model; no interstellar network is simulated. Preparation creates a
+The first clue comes from a reachable historical station, relay or waystation
+within coverage at confirmation, through a previously declared local or remote
+notice whose wave has arrived. Presence at the host proves no activity, and a
+known route alone proves no reception.
+No interstellar network is simulated. Preparation creates a
 `RadioOpportunity` in the common ledger. Retry preserves origin, EN/ES content
 and identity. There is no second queue. An unverified emitter produces a recorded
 limitation, not a fictitious message or consumed attempt.
@@ -127,10 +136,14 @@ publishes no `known_links` and reveals no remaining chain. `NODE`, `SECTOR`,
 
 A physical scale may reuse an already known directed operational link, without
 adding clues or sources. Arriving there enables that existing leg.
-Intermediate sources offer another local broadcast or a salvage document prepared
-before first inspection. Closed/cleaned pools and already visited wrecks cannot
-receive new documents. An exhausted hub may emit a legitimate new communication;
-its pool and resources remain exhausted. Reserved narrative hosts are excluded;
+Intermediate sources need a declared emission for the exact LINK or an existing
+recoverable physical archive containing that clue. Selection reads existing pools
+and installed authored archives, never generates procedural documents to answer a
+blockage. File reference/fingerprint persist without injection or reopening pools.
+Closed/cleaned/already inspected pools gain no new clues. Previously reserved
+source files retain legitimate reading on arrival. Exhausted hubs can only supply
+their declared emissions; installation kind implies no activity. Resources remain
+exhausted. Reserved narrative hosts are excluded;
 content is not displaced and optional singles are not forced. Existing primary
 protection fails closed for unsupported references. Natural scan and exact manual
 `route solve` remain deliberate exceptions.
@@ -138,7 +151,7 @@ protection fails closed for unsupported references. Natural scan and exact manua
 | Plan state | Transition |
 | --- | --- |
 | `prepared` | Internal transactional preparation. |
-| `receipt_pending` | Source prepared; capture awaits gates and local context. |
+| `receipt_pending` | Source prepared; capture awaits gates, coverage and legitimate timing. |
 | `active` | Actual capture or enabled salvage stage. |
 | `stage_consumed` | File read/imported and the link actually published. |
 | `complete` | Last clue consumed and ship arrived at final destination. |
@@ -146,7 +159,7 @@ protection fails closed for unsupported references. Natural scan and exact manua
 
 The next stage requires reading/importing the previous clue and reaching its
 source. Later documents reside at their hosts, not preloaded on the ship.
-Leaving a radio source retains the pending opportunity until a legitimate return.
+Leaving coverage retains the pending opportunity until availability is legitimate again for its emission mode.
 Capture checks `comms`, `radiod`, supply, transit, hibernation and local context.
 Neither `sensord` nor `datad` enables radio.
 
@@ -178,11 +191,37 @@ and plans; incompatible versions are rejected without deleting the file. No
 complex migration of old universes is implemented. Empty additive defaults admit
 older schema 3 saves that were already compatible.
 
+A legitimately invalidated plan can also be saved and loaded: it retains its
+proposal, stage and earlier receipts/imports and stays outside `ACTIVE`. The engine
+records `invalidation` with a reason and progress fingerprint; `source_contract`
+binds the confirmed proposal, version, time and attempt. Merely changing `status`
+to `invalid` does not validate a plan. Physical certificates, protection, source
+structure, contract integrity and ledger/progress correspondence remain mandatory.
+An unprepared radio continuation may lack only its current opportunity; earlier
+opportunities remain required. Archival validation of invalidated plans does not
+require future sources to remain available. Active plans retain full validation;
+complete plans require every stage to be consumed. These are additive schema-3
+fields: older slots obtain the fingerprint on deserialization and pass the normal
+validators; v1/v2 meanings do not change and no legacy sources are created.
+
+If a later v2 stage's emission was already received through passive listening,
+`_radio_stage` reuses that canonical receipt with exact provenance and content.
+It neither recaptures nor increments attempts/cooldowns: unread messages still
+require reading/import; an already imported LINK consumes the stage when it is
+reached. Invalidated plans do not block legitimate new searches for the same
+blockage. Tests: `tests/recovery_invalidation_smoke.py` and case 12 in
+`tests/recovery_provenance_smoke.py`.
+
 ## Relationship to the earlier core and limitations
 
 `propose_deadnode_chain`, `evaluate_deadnode_opportunity` and
 `compare_deadnode_opportunities` remain pure geometry/capacity/economy diagnostics.
-Their proposed nodes are not physical authority. The production adapter reuses
+Their proposed nodes are not physical authority. Without enough declared emissions or existing archives, search remains
+conditional without confirmation, attempts or cooldown. No historical procedural
+transmission catalogue is added. Its possible need is a later design decision
+that may be considered during e5c editorial review.
+
+The production adapter reuses
 `AccessRoute`, intel-source reading, delivery capabilities, primary policy and
 navigation kernels, separating structural Dijkstra from those APIs' economic
 filters.

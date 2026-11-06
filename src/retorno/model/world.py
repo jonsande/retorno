@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import MISSING, dataclass, field, fields
 from enum import Enum
+import math
 from typing import TYPE_CHECKING, Optional, Tuple
 from retorno.config.balance import Balance
 from retorno.model.galaxy import galactic_region_for_op_pos
@@ -145,6 +146,83 @@ class RadioOpportunity:
     read_t: float | None = None
     path: str | None = None
     received_locale: str | None = None
+    emitter: RadioEmitter | None = None
+    emission: RadioEmission | None = None
+
+    def __setstate__(self, state) -> None:
+        # Schema 3 opportunities without these fields retain local semantics.
+        data = state[1] if isinstance(state, tuple) else state
+        for f in fields(self):
+            if f.name in data:
+                value = data[f.name]
+            elif f.default is not MISSING:
+                value = f.default
+            elif f.default_factory is not MISSING:
+                value = f.default_factory()
+            else:
+                raise ValueError(f"Missing radio field: {f.name}")
+            object.__setattr__(self, f.name, value)
+
+
+@dataclass(frozen=True, slots=True)
+class RadioEmitter:
+    emitter_id: str
+    host_id: str
+    category: str
+    power: float
+    version: str = "radio-emitters-v1"
+
+    def __post_init__(self):
+        if self.version != "radio-emitters-v1":
+            raise ValueError("emitter.version: unsupported radio version")
+        if not all(isinstance(v, str) and v.strip() for v in (self.emitter_id, self.host_id)):
+            raise ValueError("emitter.identity: nonempty IDs required")
+        if self.category not in Balance.RADIO_POWER_BY_CATEGORY:
+            raise ValueError("emitter.category: unsupported transmitter category")
+        if (isinstance(self.power, bool) or not isinstance(self.power, (int, float))
+                or not math.isfinite(self.power)
+                or not Balance.RADIO_MIN_POWER <= self.power <= Balance.RADIO_MAX_POWER):
+            raise ValueError("emitter.power: finite positive normalized power within configured bounds required")
+
+
+@dataclass(frozen=True, slots=True)
+class RadioEmission:
+    emission_id: str
+    emitter_id: str
+    mode: str
+    start_t: float
+    end_t: float | None = None
+    channel: str = "captured_signal"
+    content_by_locale: dict[str, str] = field(default_factory=dict)
+    piece_key: str | None = None
+    navigation_link_to: str | None = None
+    time_reference: str = "game-coordinate-seconds-v1"
+
+    def __post_init__(self):
+        if not all(isinstance(v, str) and v.strip() for v in (self.emission_id, self.emitter_id)):
+            raise ValueError("emission.identity: nonempty IDs required")
+        if self.mode not in {"continuous", "finite"}:
+            raise ValueError("emission.mode: continuous or finite required")
+        for name, value in (("start_t", self.start_t), ("end_t", self.end_t)):
+            if name == "end_t" and value is None and self.mode == "continuous":
+                continue
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value) or abs(value) > Balance.RADIO_MAX_TIME_OFFSET_S):
+                raise ValueError(f"emission.{name}: finite game-relative seconds within configured bounds required")
+        if self.end_t is not None and self.end_t <= self.start_t:
+            raise ValueError("emission.end_t: end must follow start")
+        if self.time_reference != "game-coordinate-seconds-v1":
+            raise ValueError("emission.time_reference: unsupported coordinate time reference")
+        if self.channel not in {"captured_signal", "station_broadcast", "ship_os_mail"}:
+            raise ValueError("emission.channel: radio channel required")
+        if self.piece_key is not None:
+            if not isinstance(self.piece_key, str) or not self.piece_key or self.content_by_locale or self.navigation_link_to:
+                raise ValueError("emission.piece_key: unambiguous installed piece reference required")
+        elif (not isinstance(self.content_by_locale, dict) or set(self.content_by_locale) != {"en", "es"}
+                or not all(isinstance(v, str) and v.strip() for v in self.content_by_locale.values())):
+            raise ValueError("emission.content_by_locale: nonempty EN/ES text required")
+        if self.navigation_link_to is not None and (not isinstance(self.navigation_link_to, str) or not self.navigation_link_to):
+            raise ValueError("emission.navigation_link_to: stable target required")
 
 
 @dataclass(slots=True)
@@ -192,6 +270,7 @@ class WorldState:
     recovery_activation_deferred: bool = False
     recovery_plans: dict = field(default_factory=dict)
     recovery_searches: dict = field(default_factory=dict)
+    radio_search_cursor: dict = field(default_factory=dict)
 
     def __setstate__(self, state) -> None:
         """Backward-compatible unpickle for slot additions."""

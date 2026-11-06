@@ -1,201 +1,98 @@
-> **4D-3e5 — current implementation (2026-11-06).** Historical selection, transactional confirmation and common-ledger reception/progression are implemented. The [production contract](structural-recovery.md) and its report supersede historical audits below: no corrective bridges, entries or gateways are fabricated. The 3b/3c/3d core remains diagnostic and cannot authorize materialization. No universal exit is guaranteed.
+# Passive communications — 4D-3e5b
 
-# Passive communications — 4D-3e4b
+[Español](passive-communications.es.md). Current contract for external review.
+Physics/data: [spatial and temporal radio](radio-spacetime.md).
+e4b history: [previous report](../testing/passive-communications-review.md).
 
-## Implemented knowledge boundary — 4D-3e5a
+## Hardware and operation
 
-Under `C-DATA-004`, `status` and `diag comms` show only receiver hardware,
-health, power, service and operational availability. The radio line calls
-`radio_block_reason(state)` without an opportunity. It does not inspect the ledger,
-plans or searches: adding a secret source or changing hidden search results leaves
-public output unchanged, even in debug mode. `ready` describes technical capacity,
-not the existence of a signal or coverage towards a source.
+`comms` (Communications System) is a ShipSystem in BRG-01. Initially installed,
+powered off, forced_offline=True, health 0.72, with no electrical load. Initial
+health supports LIMITED; below 0.60 repair is needed before activation. It needs
+energy_distribution >= NOMINAL and effective supply. `power on comms` does not
+start `radiod` (Radio Communications Service): `boot radiod` is an ordinary
+5-second job. Powering off stops the service. Repair, wear, notices and
+dependencies retain their behavior.
 
-`debug radio`, after `debug on`, inspects the existing ledger: IDs, source/host,
-channel, state, content, timestamps, path, metadata and operational/spatial blocking
-reasons. `debug recovery` inspects stored searches and plans. `debug off` blocks
-both again. CLI and Textual use the same guarded renderers and EN/ES text; no
-second queue or new logging exists. Queries do not retry capture, import intel,
-materialize, consume RNG or advance time. Actually received events and files remain
-visible; reading/importing retains normal effects.
+Provisional nominal consumption is 0.15 kW: LIMITED 0.12, NOMINAL 0.15, UPGRADED
+0.165 kW; full load in CRUISE. Priority 4, base wear 8.5e-11/s, k_power=0.30,
+k_rad=0.10 and existing global factors remain. Greater reception distance adds
+no consumption. Transmitter energy/repair is not simulated.
 
-Ledger, persistence, capture and local coverage remain unchanged. `A-COM-001`
-remains open. 4D-3e5b separately addresses physical range, emitter types, power,
-sensitivity and simplified temporal propagation.
-Test: `tests/knowledge_boundary_smoke.py`.
+`radio_block_reason` requires coherent health and LIMITED/NOMINAL/UPGRADED state,
+dependencies, Core OS at least LIMITED, available terminal, Q >= 0.55, no brownout,
+enough generation + discharge and installed/running radiod. It reuses engine
+electrical kernels. Transit/hibernation suspend reception. Sensors/sensord and
+data_core/datad are not radio requirements.
 
+## Sources, preparation, capture and reading
 
-[Español](passive-communications.es.md). Implementation for external review on
-`78676dbfce5e7b98db36b2e241a427a19b0632fe`, 2026-11-06.
-This does not implement F-DEAD-01 or general interstellar communications.
+`radio_spatial_block_reason` shares coverage across selection and capture.
+Declarations use 3D distance, power and sensitivity; capture adds the window
+propagated at c through `radio_temporal_block_reason`. Preparation is not emission.
+Without new metadata, legacy compatibility stays at the current physical host,
+admissible kind and required docking. Local messages gain neither arbitrary
+interstellar range nor an invented historical delay.
+This compatibility cannot authorize new F-DEAD-01 emissions: every radio stage
+needs a declared emission, including local stages.
 
-## System and service
-
-`comms` — **Communications System / Sistema de comunicaciones** — is an ordinary
-`ShipSystem` in existing room `BRG-01`. It starts installed, OFFLINE,
-`forced_offline=True`, health 0.72 and no electrical load. Powering on gives
-LIMITED operation without prior repair at that initial health. Below health
-0.60, repair is required before `power on comms`; physical damage remains visible
-while disconnected. It needs powered
-`energy_distribution >= NOMINAL`, independently of sensors and data systems.
-Existing mechanisms control power, deterioration, repair and persistence.
-Powering or repairing it does not automatically start its service.
-
-Provisional nominal consumption: **0.15 kW**, compared with sensors' 0.7 kW.
-Normal state multipliers apply: LIMITED 0.12, NOMINAL 0.15, UPGRADED 0.165 kW.
-CRUISE retains this full load while powered. Other system loads are unchanged.
-Priority 4; base deterioration `8.5e-11/s`, `k_power=0.30`, `k_rad=0.10`, reused
-from data_core. Existing global wear factors apply; powering off does not stop
-aging. These conservative parameters remain subject to balance review.
-
-`radiod` — **Radio Communications Service / Servicio de comunicaciones por radio** —
-is comms' `ServiceState`. Installed and stopped initially; a 5 s boot uses
-`BOOT_SERVICE`. `requires_active_owner=True` requires at least LIMITED hardware.
-Boot revalidates installation, owner, dependencies and power during execution
-and when applying its outcome. Powering off the owner stops its service.
-Cancellation and failure use existing finalizers; there is no second daemon
-manager or automatic restart. Legacy sensord boot may still activate initially
-OFFLINE sensors that were not forcibly powered off; radiod requires
-`power on comms` first.
-
-## 4D-3e5 focused correction: coverage and operation
-
-`radio_spatial_block_reason(state, origin_node_id, channel=..., require_docked=...)`
-separates physical coverage/context from receiver operation. Its local implementation
-preserves existing source/node/docking rules. Structural selection and confirmation
-share it with capture, without checking health, electricity or radiod to determine
-spatial eligibility. A known route to another hub does not enable receiving it
-here: its chain may remain diagnostic/conditional without an active plan. An off
-or damaged receiver at the correct location can prepare pending reception, delivered
-once when operational gates hold. Range, power, attenuation and latency remain
-4D-3e5b work. The subsequent 4D-3e5a correction removes `pending=N` from public queries.
-
-## Capacity and channels
-
-`radio_block_reason` checks installed comms, no forced/shed power-off, LIMITED,
-NOMINAL or UPGRADED state and consistent health; power dependencies; Core OS at
-least LIMITED, available terminal, Q >= 0.55 and no brownout. It reuses the
-engine's electrical kernels to compare current generation + available discharge
-against load, including between ticks. Reception is suspended during transit
-or hibernation. Installed, running radiod is required. No RNG or sensors/datad
-consultation occurs.
-
-| Channel | Effective contract |
+| Channel | Contract |
 | --- | --- |
-| `captured_signal` | Radio and a local opportunity created by its real trigger. |
-| `station_broadcast` | Radio, a local physical station/relay/waystation source and authorized context. |
-| Internal `ship_os_mail` | Existing internal delivery without radio. External origin is not inferred from prose or sender names. |
-| Explicit external mail | Piece `mail_origin: "external"`, or `external_origin=True` / SourceRef `kind="external"` in the local API, uses the same radio reception while retaining mail channel/envelope. No active pieces have these markers in this baseline. |
-| `salvage_data` | Existing pool, drone and recovery; no radiod. |
-| `uplink_trace` | Valid local uplink, installed/running data_core/datad; no radio. |
-| `uplink_only` | Existing uplink requirements and LINK validation; no radio. |
+| captured_signal | Radio; physical declaration or original trigger's local compatibility. |
+| station_broadcast | Radio from station/relay/waystation; not every station transmits. |
+| Internal ship_os_mail | Internal delivery independent of radio. |
+| Explicit external mail | mail_origin: external, external_origin=True or external SourceRef uses radio and retains the mail envelope. |
+| salvage_data | Pool/drone recovery, without radio. |
+| uplink_trace / uplink_only | Existing local data_core/datad gates; without radio. |
 
-Triggers, weights, rolls, force and deadlines are unchanged. Dock/uplink/salvage
-action counters retain their contracts; automatic retries never increment them.
-`signal_count` still counts effectively captured lore signals. Legacy hints
-do not acquire a new increment that would change deadlines.
+Only `WorldState.radio_opportunities` and `RadioOpportunity` are used. Legacy
+identities remain; declarations use radio:<emission_id>, lore uses lore:<piece_key>.
+EN/ES content, source/host, trigger, docking, producer metadata and preparation
+freeze; new data also freezes transmitter/emission. Range does not freeze:
+capture revalidates position, sensitivity and time.
 
-## Opportunity, capture and reading
+1. pending: no file, reception event, intel, unlock or narrative consumption.
+2. received: one real GUEST file and SIGNAL_CAPTURED/BROADCAST_RECEIVED/MAIL_RECEIVED;
+   only then are corresponding pools, lore, counters and cooldowns committed.
+3. read_imported: cat, mail read or intel import accessed the file. The existing
+   parser applies valid intel; this status does not guarantee an unlock.
 
-One `WorldState.radio_opportunities` collection holds `RadioOpportunity` for
-lore, local APIs and already prepared legacy stages. Lore identity is
-`lore:<piece_key>`; gateway: `recovery:<generation>:gateway`; deadnode:
-`deadnode:<target>:<attempt>`. The API accepts explicit IDs; its fallback derives
-from channel, source, host and content without RNG.
+IDs capture once across save/load. Deleting a file does not recreate it. Producers
+may capture after preparation. End-of-tick retries, after energy/wear/consequences,
+listen for declared independent emissions and retry pending opportunities without
+scan. piece_key references never prepare through proximity: scheduler, weights,
+windows and dock/uplink/salvage triggers plus docking context remain. Single
+probabilities, deadlines and signal_count meaning do not change.
 
-EN/ES content, source, host, trigger, dock requirement, commit metadata and
-preparation time are frozen. A legacy API supplying only one language retains that text
-as fallback in either direction when switching EN/ES. Status, path, received language/time and read time
-persist. States:
+F-DEAD-01 shares these boundaries: remote first reception needs a pre-existing
+certified notice, sufficient signal and actual arrival. Historical activity and
+transmitters are not invented. Widening search, protection, attempts, cooldowns
+and progression remain; see its [contract](structural-recovery.md).
 
-1. `pending`: no file, success event, intel, unlock or piece consumption.
-2. `received`: an actual GUEST file and one SIGNAL_CAPTURED,
-   BROADCAST_RECEIVED or MAIL_RECEIVED event. Only now are lore/pool delivery,
-   applicable signal_count and producer flags/cooldowns committed.
-3. `read_imported`: `cat`, `mail read` (delegates to cat) or `intel import`
-   accessed the file. The existing parser applies valid intel; this status name
-   does not guarantee useful intel or a primary unlock.
+## Persistence, knowledge and commands
 
-A file primary stays protected until valid reading/import. Public queries do not disclose pending opportunities, including counts or reasons
-derived from hidden sources. Only `debug radio` inspects the ledger; querying
-does not import intel.
+V2/schema 3 envelope, checksum and backups remain. Older slots default to local
+semantics. Catalogue/snapshot, radio configuration, hosts, index, ledger and plans
+are validated. Incompatible files fail without deletion/rewriting. Radio changes
+the content hash without changing physical manifest identity.
 
-The shared writer preserves existing events/directories. Capture and bookkeeping
-are one synchronous in-memory operation under the current execution model;
-there is no deferred callback or intermediate save. Repeating a captured ID
-does not write or emit again. Manually deleting a received file does not
-recreate a consumed opportunity.
-
-## Retries and coverage
-
-Ticks retry pending entries after power, deterioration and engine consequences.
-Producers may attempt immediate capture after preparation. Capacity and source
-are always revalidated. The physical host must still exist and be the current
-node, excluding transit waypoints. Lore opportunities originating from
-dock/uplink/salvage retain docking at that host. Entering a nearby region or
-starting radiod neither creates a lore trigger nor advances docking delivery.
-
-An already prepared local opportunity remains available at the next receiver
-availability in that same context; traveling suspends eligibility and returning
-allows retry. This does not posit a new emitter or galactic propagation.
-The current model has no independent emitter power evolution or electromagnetic
-expiry: host existence/kind and local context are the available conservative
-proof. Reduced range, latency, interference, intermittency and timed emission
-windows remain design/balance work.
-
-An existing legacy chain's gateway allows local arrival coverage without a new
-dock. Generation, entry, gateway and primary protection are revalidated before
-capture. Deadnode retries retain attempt and origin; cooldown is not consumed
-until reception, and they do not publish routes directly.
-
-## Pending structural recovery
-
-Legacy global activation creates entry/gateway before preparing a hint. The
-first indirect deadnode attempt also fabricates a bridge. As authorized for
-this phase, these activations are explicitly deferred
-(`recovery_activation_deferred`) without nodes, hints, success increments or
-cooldown commits. Over-cap or protected-primary legacy LINKs are not transmitted.
-Trackers may still observe thresholds without counting delivery. Stages with
-existing bridges under cap and broadcasts from existing chains use the common
-ledger. The selector, thresholds and cooldown lengths are unchanged; structural
-integration remains e5. Deferral may leave a structural blockage without
-automatic recovery until e5; this phase does not promise an exit in every map.
-
-## Persistence and public operation
-
-V2 container/schema 3 and e4 universe/catalog validation remain. WorldState
-deserialization supplies added field defaults. Earlier schema-3 saves without
-comms receive the same powered-off bootstrap system, without extra resources,
-repairs, activation, historical geography or intel changes. ServiceState restores
-the new flag as false for old services. Loading rewrites neither original nor
-backup. There is no geography or content migration.
+status/diag comms show only receiver, health, power, service and known operational
+capability, never hidden signal counts/names/distances/windows. ready promises no
+emission. debug on enables debug radio with internal parameters/reasons; debug
+recovery reads stored searches/plans. Queries are pure: no generation, RNG,
+time advance, capture or import. CLI/Textual share renderers; event/audio types remain.
 
 ```text
 diag comms
 power on comms
 boot radiod
 jobs
-diag comms
 cat /logs/signals/<received_file>
 power off comms
 ```
 
-Repair energy_distribution first if power dependencies fail. Below LIMITED,
-repair comms with an ordinary drone in BRG-01. `about comms` and `man boot`
-explain operation. Activating hardware or restoring its useful threshold causes
-the engine to inspect actual service ownership/dependencies and notify once of
-stopped (`boot <id>`), uninstalled or blocked (`diag <owner>`) services, with
-EN/ES names and explicit suggestions, for example:
-`Sensor Service (sensord): stopped (Try: boot sensord)`.
-There is no parallel daemon ownership list.
-
-CLI and Textual share renderers, messages and diagnostics. Command `status`
-output includes only receiver operational diagnostics; the Textual systems panel
-shows only systems and their state, without those extra lines. Existing event
-types/audio are retained.
-
-Code: [communications.py](../../src/retorno/core/communications.py),
-[lore.py](../../src/retorno/core/lore.py), [engine.py](../../src/retorno/core/engine.py),
-[model/world.py](../../src/retorno/model/world.py). Tests:
-[passive_communications_smoke.py](../../tests/passive_communications_smoke.py),
-[review report](../testing/passive-communications-review.md).
+Distant signals may be travelling or already past. Silence proves no absence.
+Repair in BRG-01 and stable supply permit new captures when emission mode still
+allows them. Reception implies no living interlocutor. Tests:
+passive_communications_smoke (18), knowledge_boundary_smoke (19),
+radio_spacetime_smoke and the [phase report](../testing/radio-spacetime-review.md).

@@ -509,7 +509,7 @@ def universe_definition(state: GameState):
     definition = state.world.manifest_definition
     snapshot = state.world.narrative_snapshot
     if snapshot and snapshot.get("declarations"):
-        if definition is None or definition.narrative_key != snapshot["catalog_key"]:
+        if definition is None or definition.narrative_key != snapshot.get("physical_catalog_key", snapshot["catalog_key"]):
             raise ValueError("Historical narrative definition missing or changed")
     if definition is not None:
         if definition.seed != state.meta.rng_seed or definition.algorithm_version != ALGORITHM_VERSION:

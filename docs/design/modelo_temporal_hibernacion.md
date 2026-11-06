@@ -1,3 +1,16 @@
+> **4D-3e5b — convención implementada solo para radio / implemented radio convention.**
+> `radio_coordinate_time(state)` usa provisionalmente `state.clock.t` como segundos
+> de coordenadas galácticas desde t=0; `game-coordinate-seconds-v1` identifica la
+> referencia persistida y `Balance.YEAR_S` el año de 365 días. Offsets negativos
+> son relativos al inicio. No cambia ninguno de los consumidores actuales de
+> tiempo ni implementa tres relojes. El futuro adaptador deberá conservar identidad
+> y significado de las emisiones. / `radio_coordinate_time(state)` provisionally
+> uses clock.t as galactic coordinate seconds since t=0, with persisted
+> game-coordinate-seconds-v1 reference and the engine's 365-day year. Negative
+> offsets are game-relative. No existing time consumer changes; three clocks
+> remain unimplemented. A future adapter must preserve emission identity/meaning.
+> [ES](../systems/radio-spacetime.es.md) · [EN](../systems/radio-spacetime.md).
+
 # RETORNO — Modelo temporal, hibernación y edad biológica
 
 **ID:** `RET-DESIGN-TIME`  

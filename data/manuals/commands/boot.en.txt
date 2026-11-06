@@ -19,6 +19,7 @@ Behavior
 - Installation, owner, power and dependencies are rechecked during boot and at completion.
 - Powering hardware off stops its service. Powering it on does not restart that service.
 - radiod boot takes 5 seconds; diag comms explains receiver hardware, service and operational blocks.
+- Once running, radiod listens automatically for signals within physical range whose light-travel delay has elapsed; repeated scan is unnecessary. Brief signals that passed while the receiver was off may be lost.
 
 Common block reasons
 - `service_missing`

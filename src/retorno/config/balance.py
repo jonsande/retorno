@@ -197,6 +197,16 @@ class Balance:
 
     # Sensors
     SENSORS_RANGE_LY = 2.5
+    # Provisional equivalent-isotropic radio budgets, normalized at one ly.
+    # These are gameplay parameters, not calibrated watts or canonical ranges.
+    RADIO_POWER_BY_CATEGORY = {"emergency": 0.25, "station": 36.0, "interstellar_relay": 400.0}
+    RADIO_SENSITIVITY = {"limited": 0.25, "nominal": 1.0, "upgraded": 2.25}
+    RADIO_MIN_POWER = 1.0e-8
+    RADIO_MAX_POWER = 1.0e4
+    RADIO_DISTANCE_FLOOR_LY = 1.0e-9
+    RADIO_MAX_TIME_OFFSET_S = 1.0e7 * YEAR_S
+    RADIO_CANDIDATES_PER_TICK = 128
+    RADIO_MAX_EMISSIONS_PER_EMITTER = 128
     SENSORS_DETECT_P_NEAR = 0.95
     SENSORS_DETECT_P_FAR = 0.30
     SENSORS_DETECT_P_NOMINAL = 1.00

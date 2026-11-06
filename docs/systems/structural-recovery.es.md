@@ -16,9 +16,9 @@ predeterminados como configuración actual, no como mediciones históricas.
 No inventa un historial de candidatos rechazados ni reejecuta el selector para
 reconstruirlo: solo puede mostrar razones y evidencia que ya estén conservadas.
 `debug radio` permite relacionar planes con entregas y bloqueos vigentes.
-`debug off` vuelve a bloquear ambas consultas. No se añade estado persistido,
-logging ni mutaciones de simulación. Cobertura, condiciones de recepción,
-selector y fuentes permanecen intactos; alcance físico sigue reservado a 4D-3e5b.
+`debug off` vuelve a bloquear ambas consultas. Las consultas no añaden logging
+ni mutaciones de simulación. La frontera C-DATA-004 de e5a se conserva al ampliar
+alcance y propagación en 4D-3e5b; los nuevos metadatos físicos sí se persisten.
 Prueba: `tests/knowledge_boundary_smoke.py`.
 
 
@@ -82,47 +82,52 @@ No hay exploración exhaustiva de la galaxia. Los límites de clausura/materiali
 y dominio del manifiesto siguen aplicándose; no se convierten en reglas de balance.
 Una consulta nueva tiene trabajo finito; no usa cachés globales mutables.
 
-## Corrección focal: accesibilidad de la primera pista
+## Cobertura de la primera pista — 4D-3e5b
 
-`communications.radio_spatial_block_reason` es la comprobación reutilizable de
-cobertura/contexto físico. La consultan selección, confirmación y captura; las
-comparaciones de nodos del modelo local quedan en comunicaciones, no en F-DEAD-01.
-Hoy exige fuente física en el nodo actual, tipo admitido y dock cuando proceda.
-No comprueba salud, alimentación ni estado de comms/radiod. Estos gates operativos
-pertenecen a `radio_block_reason` y se reevalúan al capturar. Un receptor apagado
-o averiado en la ubicación adecuada permite un plan `receipt_pending`.
+`radio_spatial_block_reason` y `radio_temporal_block_reason` son las fronteras
+comunes de selección, confirmación y captura. Los planes nuevos, locales y remotos, exigen
+emisor certificado, emisión concreta, potencia/sensibilidad suficiente y onda
+ya llegada. La compatibilidad local solo conserva oportunidades legacy previamente
+persistidas e interacciones narrativas autorizadas. Conocer ruta al host o preparar ahora el mensaje no lo justifica.
 
-Si hay emisores espacialmente elegibles, solo ellos originan propuestas confirmables;
-la distancia dirigida y los rodeos siguen ordenando las cadenas dentro de ese
-conjunto. Sin ellos, la búsqueda puede devolver la mejor cadena remota examinada
-como `conditional`, con razón `first_reception_outside_coverage`; `proposal` no es
-autorización de confirmación. `request_recovery` solo confirma `validated` y
-`confirm_recovery` vuelve a comprobar cobertura antes de copiar/materializar.
-Una búsqueda condicionada no crea plan, oportunidad, archivo, ruta ni contador;
-tampoco bloquea la siguiente búsqueda como frontera activa. El cursor puede
-continuar y cambiar de ubicación permite una selección nueva.
+Todo inicio de plan nuevo solo usa `navigation_link_to` declarado antes de detectar el
+bloqueo, con contenido fijo para ese LINK. Requiere emisión continua sin final:
+permite captura posterior tras reparar/encender. No se crea actividad histórica
+retrospectiva, relé correctivo ni nueva estación. El examen de declaraciones de recuperación
+está acotado a 4096 emisiones; agotamiento no significa ausencia.
 
-Desde 4D-3e5a el diagnóstico jugable no muestra estados internos, ni siquiera
-genéricos; no anuncia el emisor ni el destino remoto. No se añade correo interno, transmisor local, guía omnisciente,
-segunda cola ni nuevas reglas de alcance. La ampliación física futura sustituirá
-la comprobación compartida; potencia, atenuación y latencia quedan para 4D-3e5b.
-La separación de presentación de pendientes está implementada en 4D-3e5a.
-Al guardar/cargar un plan todavía sin captura se valida también el contexto
-original de preparación (`access.path[0]`) mediante el mismo predicado espacial.
-Esto admite salir de una fuente legítima y regresar después, con la oportunidad
-pendiente intacta. Un guardado anterior con primera recepción remota inválida se
-rechaza explícitamente sin borrar ni reescribir su archivo; no se migra ni se
-inventa una orientación para hacerlo válido. Las pruebas 28–36
-reproducen y cubren esta corrección; el grupo 5 conserva la comparación dirigida
-remota con resultado condicionado en lugar de confirmable.
+La selección conserva acceso dirigido, rodeos, presupuesto, expansión, primaries
+protegidos y reservas. Solo primeras fuentes espacial y temporalmente elegibles
+pueden confirmar; sin ellas el resultado permanece condicionado y no crea plan,
+oportunidad, archivo, ruta ni intento. La sensibilidad útil actual determina la
+cobertura; equipo inoperativo usa referencia NOMINAL sin filtrar recursos o
+supervivencia. Un receptor apagado puede mantener `receipt_pending` legítimo.
+
+La propuesta persiste `first_emission_id`, `first_reception_sensitivity` y
+`stage_sources`: identidad y huella del contenido de cada etapa informativa.
+Confirmar revalida llegada y cobertura actuales antes de materializar la cadena.
+El ledger único usa `radio:<emission_id>`; puede vincular un pendiente independiente
+sin duplicarlo. Una emisión recibida no sirve para crear otra captura. Guardar
+valida posición/contexto original (`access.path[0]`), sensibilidad y tiempo de
+preparación, sin exigir salud o ubicación actuales. Capturar sí revalida estas.
+Los planes nuevos usan `historical-recovery-v2`; no admiten fuentes vacías.
+Saves v1 compatibles mantienen únicamente oportunidades ya preparadas, sin
+asignarles emisores ficticios. No se crean nuevas etapas de radio legacy al
+avanzar: si falta una oportunidad previamente persistida, esa continuación se
+marca inválida y permite evaluar alternativas. Remotos inválidos se rechazan
+sin reescribir. Pruebas 28–36, radio_spacetime y recovery_provenance.
+
+`status`/`diag comms` siguen sin datos internos. `debug recovery` muestra emisión,
+parámetros de cobertura/tiempo y bloqueo; `debug radio` inspecciona declaraciones
+y ledger sin mutación. [Contrato físico](radio-spacetime.es.md).
 
 ## Fuentes y progresión
 
-La primera pista siempre es una comunicación nueva desde una estación, relé o
-waystation históricos, alcanzables y con cobertura para la nave al confirmar.
-Una ruta conocida hacia un emisor remoto no demuestra acceso informativo a su
-primera pista. La capacidad local de esos tipos es la ya
-existente en el modelo de broadcasts; no se simula una red interestelar.
+La primera pista procede de una estación, relé o waystation históricos,
+alcanzables y con cobertura al confirmar, mediante un aviso local o remoto
+previamente declarado y ya propagado. Estar en el host no prueba actividad.
+La mera ruta conocida no demuestra recepción.
+No se simula una red interestelar.
 Se prepara un `RadioOpportunity` en el ledger común. Reintentar conserva origen,
 contenido EN/ES e identidad. No hay otra cola. Sin emisor comprobado se registra
 la limitación sin mensaje ficticio ni intento consumido.
@@ -135,10 +140,14 @@ resolución manual conservan sus reglas.
 
 Una escala puede reutilizar un enlace operativo dirigido ya conocido, sin
 añadir pistas ni fuentes. Llegar a esa escala habilita el tramo existente.
-Los intermediarios ofrecen otra comunicación local o un documento de salvamento
-preparado antes de la primera inspección. Un pool cerrado/limpio o un pecio ya
-visitado no admite un documento nuevo. Un hub agotado sí puede emitir una
-comunicación nueva legítima: su pool y sus recursos permanecen agotados.
+Los intermediarios requieren una emisión declarada para su LINK exacto o un
+archivo físico recuperable que ya contenga esa pista. La selección consulta pools
+existentes y archivos authored instalados; no genera documentos procedurales para
+responder al bloqueo. Guarda referencia y huella del archivo, sin inyectar ni
+reabrir pools. Un pool cerrado/limpio o ya inspeccionado no adquiere una pista
+nueva. Una fuente reservada antes de su visita conserva la lectura legítima de
+su archivo ya existente. Un hub agotado solo puede recibir su emisión declarada;
+el tipo de instalación no implica actividad. Sus recursos permanecen agotados.
 Las reservas narrativas se excluyen; no se desplaza contenido ni se fuerza un
 single opcional. La protección reutiliza los primaries existentes y falla de
 forma conservadora si una referencia no puede interpretarse. Scan natural y
@@ -147,7 +156,7 @@ forma conservadora si una referencia no puede interpretarse. Scan natural y
 | Estado del plan | Transición |
 | --- | --- |
 | `prepared` | Preparación transaccional interna. |
-| `receipt_pending` | Fuente preparada; captura pendiente de gates y contexto local. |
+| `receipt_pending` | Fuente preparada; captura pendiente de gates, cobertura y tiempo legítimos. |
 | `active` | Captura real o etapa de salvamento habilitada. |
 | `stage_consumed` | Archivo leído/importado y enlace realmente publicado. |
 | `complete` | Se consumió la última pista y la nave llegó al destino final. |
@@ -155,8 +164,8 @@ forma conservadora si una referencia no puede interpretarse. Scan natural y
 
 La siguiente etapa solo se habilita tras leer/importar la anterior y llegar a
 su fuente. Los documentos posteriores están en sus hosts, no precargados en la
-nave. Abandonar una fuente de radio mantiene la oportunidad pendiente hasta un
-regreso legítimo. `comms`, `radiod`, suministro, tránsito, hibernación y contexto
+nave. Abandonar cobertura mantiene la oportunidad pendiente hasta una nueva
+disponibilidad legítima según su modalidad. `comms`, `radiod`, suministro, tránsito, hibernación y contexto
 se verifican al capturar. `sensord` y `datad` no habilitan radio.
 
 ## Activación, intentos y persistencia
@@ -187,11 +196,38 @@ manifiesto y planes; una versión incompatible se rechaza sin borrar el archivo.
 No se implementa migración compleja de universos antiguos. Los valores nuevos
 vacíos admiten partidas schema 3 anteriores que ya eran compatibles.
 
+Una invalidación legítima también se guarda y carga: conserva la propuesta,
+etapa y recepciones/importaciones anteriores y queda fuera de `ACTIVE`. El motor
+registra `invalidation` con motivo y huella del progreso; `source_contract` fija
+la propuesta confirmada, versión, tiempo e intento. Cambiar solo `status` a
+`invalid` no valida un plan. Se siguen comprobando certificados físicos,
+protecciones, forma de las fuentes, integridad del contrato y correspondencia
+entre ledger y progreso. Una continuación de radio nunca preparada puede carecer
+únicamente de su oportunidad actual; las oportunidades anteriores son obligatorias.
+La validación histórica de planes invalidados no exige disponibilidad actual de
+fuentes futuras. Los activos mantienen la validación completa y los completos
+requieren todas sus etapas consumidas. Los campos son aditivos para schema 3:
+los slots antiguos obtienen la huella al deserializar y pasan las validaciones
+habituales; no cambian las versiones v1/v2 ni se crean fuentes legacy.
+
+Si una emisión de una etapa v2 posterior ya se recibió por escucha pasiva,
+`_radio_stage` reutiliza esa recepción canónica con procedencia y contenido exactos.
+No recaptura ni incrementa intentos/cooldowns: si falta leerla, sigue requiriendo
+lectura/importación; si ya se importó su LINK, la etapa queda consumida al llegar
+a ella. Los planes invalidados no bloquean nuevas búsquedas legítimas del mismo
+bloqueo. Pruebas: `tests/recovery_invalidation_smoke.py` y caso 12 de
+`tests/recovery_provenance_smoke.py`.
+
 ## Relación con el núcleo anterior y límites
 
 `propose_deadnode_chain`, `evaluate_deadnode_opportunity` y
 `compare_deadnode_opportunities` siguen disponibles como diagnóstico puro de
 geometría/capacidad/economía. Sus nodos propuestos no son autoridad física.
+Sin emisiones o archivos con pistas suficientes, la búsqueda queda condicionada
+sin confirmar ni consumir intentos/cooldowns. No se añade un catálogo histórico
+procedural de transmisiones. Su posible necesidad corresponde a una decisión
+posterior, que podrá evaluarse en la auditoría editorial e5c.
+
 El adaptador productivo reutiliza `AccessRoute`, lectura de fuentes de intel,
 capacidades de entrega, política de primaries y kernels de navegación existentes;
 separa el Dijkstra estructural de los filtros económicos de aquellas APIs.

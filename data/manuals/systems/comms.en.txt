@@ -4,7 +4,7 @@ Ref: OS-MAN/SYS/COMMS
 The Communications System receives passive radio traffic independently of the exploration sensors and data uplink stack.
 
 Function
-- Captures locally available signals and station broadcasts into readable files.
+- Automatically captures physically available signals and station broadcasts into readable files.
 - Records captured messages for subsequent reading/import.
 
 Operational dependencies
@@ -16,7 +16,7 @@ Operational dependencies
 - Reception is suspended during transit, hibernation, terminal lock or insufficient power.
 
 Command impact by state
-- LIMITED, NOMINAL and UPGRADED can receive with radiod running.
+- LIMITED, NOMINAL and UPGRADED can receive with radiod running; LIMITED has lower sensitivity, UPGRADED higher sensitivity than NOMINAL.
 - DAMAGED, CRITICAL and OFFLINE cannot receive.
 - Nominal load: 0.15 kW; LIMITED: 0.12 kW. diag comms reports actual state and load.
 - Internal mail and salvage do not require radio. Uplink retains data_core/datad requirements.
@@ -30,13 +30,15 @@ Recovery pattern
 - Inspect diag comms and stabilize electrical distribution.
 - Repair damaged comms with a drone in BRG-01 when required.
 - power on comms; boot radiod. Power activation does not start the service.
-- Remain at the legitimate source; lore triggered by docking still requires docking.
-- Pending reception retries automatically while its source remains locally available.
-- Knowing a route to another station does not let you receive its traffic here. A navigation notice requires a source within local reception coverage.
+- Remain within physical coverage; lore triggered by docking still requires docking.
+- radiod listens continuously without repeated scan. Reception needs sufficient signal strength, which falls with distance, and a wave that has arrived.
+- Light takes one year to cross one light year. Old automatic transmissions may already be arriving; reception does not prove present activity or living senders.
+- Continuous transmissions can be captured later while available; a brief transmission missed with the radio off may be lost.
+- Knowing a route does not prove coverage. A station may have no active transmitter. Local documents triggered by docking still require their original interaction.
 - Read the received file with cat or mail read to apply valid intel.
 
 - Structural navigation notices identify one reachable stage at a time. Read the captured file and reach that source before expecting its next notice or salvage record.
-- An exhausted station may emit new traffic; this does not refill its supplies or recovered files. No reception guarantees a safe onward journey.
+- An exhausted station with a legitimate emission may continue providing its transmissions; this does not refill supplies or recovered files. No reception guarantees a safe onward journey.
 
 Related commands
 - diag comms, power on comms, power off comms, boot radiod, jobs

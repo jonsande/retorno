@@ -422,7 +422,7 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ("diag <system_id>", "inspect system diagnostics", "inspecciona diagnóstico del sistema"),
                 ("boot <service_name>", "start system service", "arranca servicio de sistema"),
                 ("power on comms", "activate passive radio hardware; then boot radiod", "activa el receptor pasivo; después boot radiod"),
-                ("boot radiod", "start passive radio after power on comms", "arranca radio pasiva después de power on comms"),
+                ("boot radiod", "listen automatically within physical range and signal arrival time", "escucha automática según alcance físico y llegada de la señal"),
                 ("diag comms", "receiver hardware, service and operational availability", "equipo receptor, servicio y disponibilidad operativa"),
                 ("power status", "show power telemetry", "muestra telemetría eléctrica"),
                 ("power plan cruise", "set cruise power profile", "activa plan energético cruise"),
@@ -2664,7 +2664,7 @@ def render_debug_radio(state) -> None:
     """Read the existing ledger; never retry, generate or import anything."""
     if not _development_query_allowed(state, "debug radio"):
         return
-    from retorno.core.communications import radio_block_reason, radio_spatial_block_reason
+    from retorno.core.communications import radio_block_reason, radio_spatial_block_reason, radio_link_metrics, radio_temporal_block_reason
     es = state.os.locale.value == "es"
     print("=== DEBUG RADIO ===")
     print("Ledger interno; no es conocimiento de la nave." if es else "Internal ledger; not ship knowledge.")
@@ -2672,10 +2672,26 @@ def render_debug_radio(state) -> None:
     for ident, op in sorted(state.world.radio_opportunities.items()):
         print(f"- {ident}")
         print(json.dumps(asdict(op), ensure_ascii=False, sort_keys=True))
-        print(f"spatial_block={radio_spatial_block_reason(state, op.origin_node_id, channel=op.channel, require_docked=op.require_docked)}")
+        print(f"spatial_block={radio_spatial_block_reason(state, op.origin_node_id, channel=op.channel, require_docked=op.require_docked, emitter=op.emitter)}")
+        if op.emitter:
+            try:
+                print(json.dumps(radio_link_metrics(state, op.emitter, op.emission), sort_keys=True))
+            except ValueError as exc:
+                print(f"physical_error={exc}")
+            print(f"temporal_block={radio_temporal_block_reason(state, op.emitter, op.emission)}")
         print(f"capture_block={radio_block_reason(state, op)}")
     if not state.world.radio_opportunities:
         print("(sin registros)" if es else "(no records)")
+    snapshot = state.world.narrative_snapshot
+    print("Emisiones físicas declaradas (independientes de la preparación):" if es else "Declared physical emissions (independent of preparation):")
+    for eid, emission in sorted(snapshot.get("radio_emissions", {}).items()):
+        emitter = snapshot["radio_emitters"][emission.emitter_id]
+        print(json.dumps({"emitter": asdict(emitter), "emission": asdict(emission)}, ensure_ascii=False, sort_keys=True))
+        try:
+            print(json.dumps(radio_link_metrics(state, emitter, emission), sort_keys=True))
+        except ValueError as exc:
+            print(f"physical_error={exc}")
+    print(f"radio_search_cursor={state.world.radio_search_cursor}")
 
 
 def render_debug_recovery(state) -> None:
@@ -2692,6 +2708,18 @@ def render_debug_recovery(state) -> None:
     print(json.dumps(_canonical(state.world.recovery_searches), ensure_ascii=False, sort_keys=True))
     print("Planes guardados (etapa, acceso, sitios y mecanismos de fuente):" if es else "Stored plans (stage, access, sites and source mechanisms):")
     print(json.dumps(_canonical(state.world.recovery_plans), ensure_ascii=False, sort_keys=True))
+    from retorno.core.communications import radio_link_metrics, radio_block_reason
+    from retorno.core.structural_recovery import _radio_id
+    for plan in state.world.recovery_plans.values():
+        if not plan.proposal.first_emission_id:
+            continue
+        opportunity = state.world.radio_opportunities.get(_radio_id(plan, 0))
+        if opportunity and opportunity.emitter:
+            print(f"first_emission={plan.proposal.first_emission_id} capture_block={radio_block_reason(state, opportunity)}")
+            try:
+                print(json.dumps(radio_link_metrics(state, opportunity.emitter, opportunity.emission), sort_keys=True))
+            except ValueError as exc:
+                print(f"physical_error={exc}")
     print("No se recalcula la selección ni se reconstruyen rechazos no conservados." if es else "Selection is not rerun; unretained rejections are not reconstructed.")
 
 

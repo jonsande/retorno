@@ -1,3 +1,12 @@
+> **4D-3e5b — optional transmitter extension.** Root-level `radio_emitters` in
+> an installed location, arc or single declares equipment/emissions independently
+> of host kind. It reuses this contract's identities, aliases and certificates,
+> adding no geography. `piece_key` + `radio_emission` bind a piece to an emission
+> without advancing its scheduler/trigger. The full catalogue includes radio;
+> the physical hash excludes only that metadata. Format, limits, valid examples
+> and compatibility: [spatial and temporal radio](systems/radio-spacetime.md).
+> General authoring/editorial review remains e5c, without incompatible changes.
+
 # Physical narrative requirements — 4D-3e4
 
 [Español](narrative-world-contract.es.md). Status: tested minimum implementation;

@@ -1,3 +1,11 @@
+> **4D-3e5b — current radio contract.** Spatial/temporal coverage replaces node
+> equality only for declared transmitters/emissions. F-DEAD-01's remote first clue
+> requires a pre-existing certified notice, signal strength and actual arrival;
+> a route or recent preparation is insufficient. Legacy reception stays local.
+> [Model](../systems/radio-spacetime.md) and
+> [recovery](../systems/structural-recovery.md) override the historical audit below.
+> Navigation, three clocks and worldgen remain unchanged.
+
 > **4D-3e5 — current implementation (2026-11-06).** Historical selection, transactional confirmation and common-ledger reception/progression are implemented. The [production contract](../systems/structural-recovery.md) and its report supersede historical audits below: no corrective bridges, entries or gateways are fabricated. The 3b/3c/3d core remains diagnostic and cannot authorize materialization. No universal exit is guaranteed.
 
 # Navigation and recovery design contract
@@ -9,8 +17,8 @@ queries are independent of hidden opportunities/plans, including in debug mode;
 guarded `debug radio` and `debug recovery` are shared by CLI/Textual. `ship survey`
 requires prior knowledge. No simulation or save changes. See the current
 communications, recovery and discovery contracts and
-[tests/review](../testing/knowledge-boundary-review.md). 4D-3e5b retains its separate
-future physical scope; `A-COM-001` remains open.
+[tests/review](../testing/knowledge-boundary-review.md). The subsequent e5b
+extension appears above; `A-COM-001` is partially resolved.
 
 
 Spanish version: [navigation-recovery-contract.es.md](navigation-recovery-contract.es.md)

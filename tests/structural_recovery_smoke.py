@@ -45,7 +45,10 @@ E = Engine()
 SMALL = rec.RecoveryBudget(sectors=0)
 
 
-def scene(spec=None, *, present=None, known=("A",), clean=True, seed=271828):
+def scene(spec=None, *, present=None, known=("A",), clean=True, seed=271828, radio_links=None, archives=(), radio_power=.25):
+    if radio_links is None:
+        # Explicit fixed default scene, not a procedural transmitter policy.
+        radio_links = (("A", "B"),) if spec is None else ()
     spec = spec or [("A","station",(1000.,1000.,1000.)),("B","ship",(1003.,1000.,1000.))]
     s = create_initial_state_sandbox()
     s.meta.rng_seed = seed
@@ -64,6 +67,19 @@ def scene(spec=None, *, present=None, known=("A",), clean=True, seed=271828):
     present = {nid for nid,_,_ in spec} if present is None else set(present)
     sectors = {sector_id_for_pos(*p) for nid,_,p in spec if nid in present}
     gen._ensure_sector_generated_core(s, sorted(sectors))
+    # These are installed fixture declarations, assembled before any recovery
+    # query. No generator infers activity from kind or fills missing stages.
+    for source, dest in archives:
+        loc = next(loc for loc in snap["locations"] if loc["node"]["node_id"] == source)
+        loc.setdefault("fs_files", []).append({"path": f"/logs/nav/fixture_{source}_{dest}.txt",
+            "access": "guest", "content": f"LINK: {source} -> {dest}\n"})
+    snap["locations"][0]["radio_emitters"] = {"version": "radio-emitters-v1", "emitters": [
+        {"id": f"tx-{source}-{dest}", "host": source, "category": "emergency", "power": radio_power,
+         "emissions": [{"id": f"fixture-{source}-{dest}", "mode": "continuous",
+            "start_t": -1000*Balance.YEAR_S, "channel": "station_broadcast", "navigation_link_to": dest}]}
+        for source, dest in radio_links]}
+    from retorno.worldgen.radio import compile_radio
+    compile_radio(definition, snap)
     at(s, "A")
     s.world.known_nodes = set(known)
     s.world.known_contacts = set(known)
@@ -136,7 +152,7 @@ def test_01_existing_certified_and_no_physical_invention():
 
 
 def test_02_lazy_target_and_authored_narrative_identity():
-    s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1045.,1000.,1000.))],present={"A"})
+    s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1045.,1000.,1000.))],present={"A"}, radio_links=(('A', 'B'),))
     assert "B" not in s.world.space.nodes
     p=proposal(s,"B"); s.world.dead_nodes["B"]=DeadNodeState(dead_since_t=0)
     # Tracker belongs to the confirmation snapshot.
@@ -154,8 +170,8 @@ def test_02_lazy_target_and_authored_narrative_identity():
 
 
 def test_03_positive_inclusive_cap_and_missing_endpoint():
-    for distance, status in ((45.,"validated"),(45.00000001,"none_in_scope"),(0.,"none_in_scope")):
-        s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1000.+distance,1000.,1000.))])
+    for distance, status in ((45.,"validated"),(45.00000001,"conditional"),(0.,"conditional")):
+        s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1000.+distance,1000.,1000.))], radio_links=(("A","B"),) if 0<distance<=45 else ())
         r=pure(s,"case","B",budget=SMALL)
         assert r.status==status,(distance,r.status)
     assert pure(scene(),"case","ABSENT",budget=SMALL).status=="invalid"
@@ -163,7 +179,7 @@ def test_03_positive_inclusive_cap_and_missing_endpoint():
 
 def test_04_multi_stage_and_detour():
     s=scene([("A","station",(1000.,1000.,1000.)),("B","relay",(1030.,1020.,1000.)),
-             ("C","ship",(1060.,1000.,1000.))])
+             ("C","ship",(1060.,1000.,1000.))], radio_links=(('A', 'B'), ('B', 'C')))
     p=proposal(s,"C")
     assert path(s,p)==("A","B","C") and p.mechanisms==("radio","radio")
     assert sum(math.dist(a.position_ly,b.position_ly) for a,b in zip(p.sites,p.sites[1:]))>60
@@ -173,7 +189,7 @@ def test_05_directed_complete_distance_beats_euclidean_origin():
     # NEAR is close to target, but costs a 3-edge directed detour to access.
     s=scene([("A","ship",(1000.,1000.,1000.)),("X","ship",(1020.,1030.,1000.)),
         ("Y","ship",(1040.,1030.,1000.)),("NEAR","relay",(1030.,1000.,1000.)),
-        ("GOOD","station",(1000.,1010.,1000.)),("T","ship",(1031.,1000.,1000.))],known=("A","X","Y","NEAR","GOOD"))
+        ("GOOD","station",(1000.,1010.,1000.)),("T","ship",(1031.,1000.,1000.))],known=("A","X","Y","NEAR","GOOD"), radio_links=(('GOOD', 'T'), ('NEAR', 'T')))
     s.world.known_links={"A":{"X","GOOD"},"X":{"Y"},"Y":{"NEAR"}}
     r=pure(s,"directed_case","T",budget=SMALL)
     assert r.status=="conditional" and r.reason=="first_reception_outside_coverage"
@@ -198,7 +214,7 @@ def test_06_pure_economy_hardware_radiation_independence():
 def test_07_empty_isolated_and_no_emitter():
     s=scene([("A","station",(1000.,1000.,1000.))])
     r=pure(s,budget=rec.RecoveryBudget(sectors=4))
-    assert r.status=="none_in_scope" and not r.retained[0].kind=="ship"
+    assert r.status=="conditional" and not r.retained[0].kind=="ship"
     s=scene([("A","ship",(1000.,1000.,1000.)),("B","ship",(1003.,1000.,1000.))])
     before=pickle.dumps(s)
     assert pure(s,budget=SMALL).status=="conditional"
@@ -220,7 +236,7 @@ def test_08_budgets_and_widening_without_maximum_distance():
     r=pure(s,cursor=(2*1000+1)**3,budget=rec.RecoveryBudget(sectors=1))
     assert abs(int(r.sectors[0][1:].split("_")[0])-100)>999
     # A real lazy opportunity outside the first query is found by widening.
-    s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1040.,1000.,1000.))],present={"A"})
+    s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1040.,1000.,1000.))],present={"A"}, radio_links=(('A', 'B'),))
     cursor=0;retained=();statuses=[]
     for _ in range(60):
         r=pure(s,cursor=cursor,retained=retained,budget=rec.RecoveryBudget(sectors=16))
@@ -228,7 +244,7 @@ def test_08_budgets_and_widening_without_maximum_distance():
         if r.proposal:
             assert path(s,r.proposal)==("A","B");break
         cursor,retained=r.cursor,r.retained
-    assert statuses[0]=="none_in_scope" and statuses[-1]=="validated",statuses
+    assert statuses[0]=="conditional" and statuses[-1]=="validated",statuses
 
 
 def test_09_transaction_stale_collision_and_injected_failure():
@@ -244,7 +260,7 @@ def test_09_transaction_stale_collision_and_injected_failure():
 
 
 def test_10_gates_capture_read_no_full_chain():
-    s=scene([("A","station",(1000.,1000.,1000.)),("B","relay",(1040.,1000.,1000.)),("C","ship",(1080.,1000.,1000.))])
+    s=scene([("A","station",(1000.,1000.,1000.)),("B","relay",(1040.,1000.,1000.)),("C","ship",(1080.,1000.,1000.))], radio_links=(('A', 'B'), ('B', 'C')))
     s.world.dead_nodes["C"]=DeadNodeState(dead_since_t=0)
     plan=rec.confirm_recovery(s,proposal(s,"C"))
     assert retry_radio_opportunities(s)==[] and not plan.captured
@@ -256,7 +272,7 @@ def test_10_gates_capture_read_no_full_chain():
     s.ship.is_hibernating=True;assert retry_radio_opportunities(s)==[];s.ship.is_hibernating=False
     assert len(retry_radio_opportunities(s))==1 and plan.captured==(0,)
     assert s.world.dead_nodes["C"].attempts==1 and s.world.dead_nodes["C"].last_action_t==0
-    op=s.world.radio_opportunities[plan.plan_id+":0"]
+    op=s.world.radio_opportunities[rec._radio_id(plan,0)]
     assert "C" not in s.world.known_nodes and "LINK: B -> C" not in s.os.fs[op.path].content
     assert not s.world.known_links
     assert retry_radio_opportunities(s)==[]
@@ -267,7 +283,7 @@ def test_10_gates_capture_read_no_full_chain():
     rec.advance_recovery_plans(s);assert plan.stage==0
     at(s,"B");rec.advance_recovery_plans(s)
     assert plan.stage==1 and len(retry_radio_opportunities(s))==1
-    read(s,s.world.radio_opportunities[plan.plan_id+":1"].path)
+    read(s,s.world.radio_opportunities[rec._radio_id(plan,1)].path)
     assert s.world.dead_nodes["C"].attempts==1
     at(s,"C");rec.advance_recovery_plans(s);assert plan.status=="complete"
 
@@ -284,21 +300,22 @@ def test_11_leave_return_and_invalid_source_at_capture():
 
 
 def test_12_closed_pools_and_salvage_preparation():
-    s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1040.,1000.,1000.)),("C","ship",(1080.,1000.,1000.))])
+    s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1040.,1000.,1000.)),("C","ship",(1080.,1000.,1000.))], radio_links=(('A', 'B'),), archives=(('B', 'C'),))
     s.world.dead_nodes["C"]=DeadNodeState(dead_since_t=0)
     p=proposal(s,"C");assert p.mechanisms==("radio","salvage")
     pool_before=deepcopy(s.world.node_pools["A"])
     plan=rec.confirm_recovery(s,p)
     assert s.world.node_pools["A"]==pool_before
-    pool=s.world.node_pools["B"]
-    assert pool.window_open and len(pool.injected_files)==1 and not s.os.fs.get("/remote/B")
-    rec.confirm_recovery(s,p);assert len(pool.injected_files)==1
+    archive=deepcopy(lore._location_fs_files("B",s))
+    assert len(archive)==1 and "B" not in s.world.node_pools and not s.os.fs.get("/remote/B")
+    rec.confirm_recovery(s,p)
+    assert "B" not in s.world.node_pools and lore._location_fs_files("B",s)==archive
     for visited,closed,cleaned in ((True,False,False),(False,True,False),(False,False,True)):
-        t=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1040.,1000.,1000.)),("C","ship",(1080.,1000.,1000.))])
+        t=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1040.,1000.,1000.)),("C","ship",(1080.,1000.,1000.))], radio_links=(('A', 'B'),), archives=(('B', 'C'),))
         t.world.node_pools["B"]=NodePoolState(window_open=not closed,node_cleaned=cleaned)
         if visited:t.world.visited_nodes.add("B")
         before=pickle.dumps(t)
-        assert pure(t,"x","C",budget=SMALL).status=="none_in_scope"
+        assert pure(t,"x","C",budget=SMALL).status=="conditional"
         assert pickle.dumps(t)==before
 
 
@@ -308,7 +325,7 @@ def test_13_protected_primary_reserved_host_and_unsupported_reference():
     s.world.narrative_snapshot["arcs"][0]["primary_intel"]={"kind":"unrecognized","id":"p"}
     assert pure(s,budget=SMALL).status=="invalid"
     s=scene();s.world.narrative_snapshot["reservations"]={"optional":{"node_id":"B"}}
-    assert pure(s,budget=SMALL).status=="none_in_scope"
+    assert pure(s,budget=SMALL).status=="conditional"
     assert not s.world.lore.delivered
 
 
@@ -321,7 +338,7 @@ def test_14_persist_all_boundaries_and_reject_incompatible():
         plan=rec.confirm_recovery(s,p)
         for phase in ("pending","captured","read","complete"):
             if phase=="captured":ready(s);retry_radio_opportunities(s)
-            if phase=="read":read(s,s.world.radio_opportunities[plan.plan_id+":0"].path)
+            if phase=="read":read(s,s.world.radio_opportunities[rec._radio_id(plan,0)].path)
             if phase=="complete":at(s,"B");rec.advance_recovery_plans(s)
             before=deepcopy(s.world)
             save_load.save_single_slot(s,slot);s=save_load.load_single_slot(slot).state
@@ -422,11 +439,11 @@ def test_19_public_commands_from_declared_scene_without_gameplay_edits():
     # manufactured gameplay resources or prepared recovery. No edits follow.
     s=scene(clean=True)
     transcript=[]
-    for command in ("power off security","power on comms","boot radiod","scan"):
+    for command in ("scan","power off security","power on comms","boot radiod"):
         public_command(s,command);transcript.append(command)
     plans=list(s.world.recovery_plans.values())
     assert plans,"Public scan must trigger recovery after verifying empty sources"
-    plan=plans[0];op=s.world.radio_opportunities[plan.plan_id+":0"]
+    plan=plans[0];op=s.world.radio_opportunities[rec._radio_id(plan,0)]
     assert op.status=="received" and not s.world.known_links
     public_command(s,"cat "+op.path);transcript.append("cat "+op.path)
     assert "B" in s.world.known_links["A"]
@@ -445,7 +462,7 @@ def test_20_metrics_and_technical_limits():
     dense=create_initial_state_sandbox()
     gen._ensure_sector_cluster_generated(dense,[f"S{x:+04d}_{y:+04d}_+000" for x in range(20,24) for y in range(20,24)])
     for name,s in (("installed",create_initial_state_sandbox()),("chain",scene([
-        ("A","station",(1000.,1000.,1000.)),("B","relay",(1040.,1000.,1000.)),("C","ship",(1080.,1000.,1000.))])),("materialized",dense)):
+        ("A","station",(1000.,1000.,1000.)),("B","relay",(1040.,1000.,1000.)),("C","ship",(1080.,1000.,1000.))], radio_links=(('A', 'B'), ('B', 'C')))),("materialized",dense)):
         tracemalloc.start();t=time.perf_counter()
         r=pure(s,"metric","C" if name=="chain" else None)
         elapsed=time.perf_counter()-t;_,peak=tracemalloc.get_traced_memory();tracemalloc.stop()
@@ -456,11 +473,11 @@ def test_20_metrics_and_technical_limits():
 
 def test_21_real_salvage_consumption_between_stages_and_load():
     for locale in (Locale.EN,Locale.ES):
-        s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1040.,1000.,1000.)),("C","ship",(1080.,1000.,1000.))])
+        s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1040.,1000.,1000.)),("C","ship",(1080.,1000.,1000.))], radio_links=(('A', 'B'),), archives=(('B', 'C'),))
         s.os.locale=locale;s.world.dead_nodes["C"]=DeadNodeState(dead_since_t=0)
         s.world.known_contacts.add("C")
         plan=rec.confirm_recovery(s,proposal(s,"C"));ready(s);retry_radio_opportunities(s)
-        read(s,s.world.radio_opportunities[plan.plan_id+":0"].path)
+        read(s,s.world.radio_opportunities[rec._radio_id(plan,0)].path)
         at(s,"B");s.world.known_nodes.add("B");s.world.visited_nodes.add("B")
         lore.close_window_on_orbit_entry(s,"B");rec.advance_recovery_plans(s)
         assert plan.stage==1 and not plan.consumed==(0,1)
@@ -470,7 +487,7 @@ def test_21_real_salvage_consumption_between_stages_and_load():
             public_command(s,"dock B")
             public_command(s,"drone deploy D1 B")
             public_command(s,"drone salvage data D1")
-            remote=f"/remote/B/logs/nav/{plan.plan_id.replace(':','_')}_1.txt"
+            remote=f"/remote/B{plan.proposal.stage_sources[1].reference}"
             assert remote in s.os.fs
             assert "C" not in s.world.known_nodes
             read(s,remote);assert plan.consumed==(0,1)
@@ -483,7 +500,7 @@ def test_21_real_salvage_consumption_between_stages_and_load():
 
 
 def test_22_failed_materialization_and_identity_collisions_are_atomic():
-    s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1045.,1000.,1000.))],present={"A"})
+    s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1045.,1000.,1000.))],present={"A"}, radio_links=(('A', 'B'),))
     s.world.dead_nodes["B"]=DeadNodeState(dead_since_t=0);p=proposal(s,"B")
     before=pickle.dumps(s)
     original=rec._ensure_sector_cluster_generated
@@ -496,19 +513,19 @@ def test_22_failed_materialization_and_identity_collisions_are_atomic():
     s=scene();p=proposal(s)
     ident="structural:"+rec._digest((rec.VERSION,p.scope,p.block,path(s,p),None))
     from retorno.core.communications import prepare_radio_opportunity
-    prepare_radio_opportunity(s,ident+":0","station_broadcast",{"en":"collision"},node_id="A",trigger="test")
-    p=proposal(s);before=pickle.dumps(s)
+    prepare_radio_opportunity(s,"radio:fixture-A-B","station_broadcast",{"en":"collision"},node_id="A",trigger="test")
+    p=replace(p,snapshot=rec.snapshot_key(s));before=pickle.dumps(s)
     reject(lambda:rec.confirm_recovery(s,p));assert pickle.dumps(s)==before
 
 
 def test_23_primary_natural_scan_and_exact_manual_solve_remain_legal():
-    s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1001.,1000.,1000.))])
+    s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1001.,1000.,1000.))], radio_links=(('A', 'B'),))
     s.world.narrative_snapshot["arcs"]=[{"arc_id":"protect","primary_intel":{"id":"p","kind":"node","line":"NODE: B"}}]
     assert "B" in lore._locked_primary_targets(s)
     assert pure(s,"x","B",budget=SMALL).status=="invalid"
     public_command(s,"scan")
     assert "B" in s.world.known_contacts
-    t=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1001.,1000.,1000.))])
+    t=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1001.,1000.,1000.))], radio_links=(('A', 'B'),))
     t.world.narrative_snapshot["arcs"]=deepcopy(s.world.narrative_snapshot["arcs"])
     assert "B" not in t.world.known_nodes
     public_command(t,"route solve B")
@@ -531,7 +548,7 @@ def test_24_domain_and_loaded_search_resume_are_explicit():
 
 
 def test_25_visited_physical_scale_uses_only_preexisting_known_route():
-    s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1040.,1000.,1000.)),("C","ship",(1080.,1000.,1000.))],known=("A","B","C"))
+    s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1040.,1000.,1000.)),("C","ship",(1080.,1000.,1000.))],known=("A","B","C"), radio_links=(('A', 'B'),), archives=(('B', 'C'),))
     s.world.visited_nodes.add("B")
     s.world.node_pools["B"]=NodePoolState(window_open=False,node_cleaned=True)
     s.world.known_links={"B":{"C"}}
@@ -539,7 +556,7 @@ def test_25_visited_physical_scale_uses_only_preexisting_known_route():
     p=proposal(s,"C");assert p.mechanisms==("radio","known_route")
     pool=deepcopy(s.world.node_pools["B"])
     plan=rec.confirm_recovery(s,p);ready(s);retry_radio_opportunities(s)
-    read(s,s.world.radio_opportunities[plan.plan_id+":0"].path)
+    read(s,s.world.radio_opportunities[rec._radio_id(plan,0)].path)
     at(s,"B");rec.advance_recovery_plans(s)
     assert plan.consumed==(0,1) and s.world.node_pools["B"]==pool
     assert len(s.world.radio_opportunities)==1
@@ -569,7 +586,7 @@ def test_26_installed_prologue_public_journey_without_fixture_or_overrides():
 
 
 def test_27_stored_node_frontier_and_stale_deadnode_counter():
-    s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1001.,1000.,1000.))])
+    s=scene([("A","station",(1000.,1000.,1000.)),("B","ship",(1001.,1000.,1000.))], radio_links=(('A', 'B'),))
     assert not has_exploration_frontier(s)
     lore.write_local_intel(s,"ship_os_mail","NODE: B\n")
     before=pickle.dumps(s);assert has_exploration_frontier(s);assert pickle.dumps(s)==before
@@ -581,7 +598,7 @@ def test_27_stored_node_frontier_and_stale_deadnode_counter():
 
 def test_28_remote_navigation_access_does_not_prove_first_reception():
     s=scene([("A","ship",(1000.,1000.,1000.)),("REMOTE","relay",(1010.,1000.,1000.)),
-             ("T","ship",(1040.,1000.,1000.))],known=("A","REMOTE"))
+             ("T","ship",(1040.,1000.,1000.))],known=("A","REMOTE"), radio_links=(('REMOTE', 'T'),))
     s.world.known_links={"A":{"REMOTE"}}
     r=pure(s,"remote_case","T",budget=SMALL)
     assert r.status=="conditional",(r.status,r.reason)
@@ -598,7 +615,7 @@ def test_28_remote_navigation_access_does_not_prove_first_reception():
 def test_29_local_first_reception_overrides_more_attractive_remote_chain():
     s=scene([("A","station",(1000.,1000.,1000.)),("L","relay",(1030.,1030.,1000.)),
         ("M","relay",(1060.,1030.,1000.)),("REMOTE","relay",(1060.,1000.,1000.)),
-        ("T","ship",(1090.,1000.,1000.))],known=("A","POINT","REMOTE"))
+        ("T","ship",(1090.,1000.,1000.))],known=("A","POINT","REMOTE"), radio_links=(('A', 'L'), ('L', 'M'), ('M', 'T'), ('REMOTE', 'T')))
     # A genuine navigation point is not a historical installation/source.
     s.world.space.nodes["POINT"]=SpaceNode("POINT","Point","nav_point",x_ly=1030,y_ly=1000,z_ly=1000)
     s.world.known_links={"A":{"POINT"},"POINT":{"REMOTE"}}
@@ -653,7 +670,7 @@ def test_31_public_repair_and_boot_capture_local_pending_exactly_once():
 def test_32_conditional_search_retries_at_new_location_and_survives_load():
     for locale in (Locale.EN,Locale.ES):
         s=scene([("A","ship",(1000.,1000.,1000.)),("REMOTE","relay",(1010.,1000.,1000.)),
-                 ("T","ship",(1040.,1000.,1000.))],known=("A","REMOTE"))
+                 ("T","ship",(1040.,1000.,1000.))],known=("A","REMOTE"), radio_links=(('REMOTE', 'T'),))
         s.os.locale=locale;s.world.known_links={"A":{"REMOTE"}}
         s.world.dead_nodes["T"]=DeadNodeState(dead_since_t=0)
         rec.request_recovery(s,"deadnode:T","T")
@@ -679,7 +696,7 @@ def test_32_conditional_search_retries_at_new_location_and_survives_load():
 
 def test_33_public_travel_changes_conditional_search_into_local_reception():
     s=scene([("A","ship",(1000.,1000.,1000.)),("REMOTE","relay",(1000.1,1000.,1000.)),
-             ("T","ship",(1003.1,1000.,1000.))],known=("A","REMOTE"))
+             ("T","ship",(1003.1,1000.,1000.))],known=("A","REMOTE"), radio_links=(('REMOTE', 'T'),), radio_power=.0004)
     s.world.known_links={"A":{"REMOTE"}}
     s.world.visited_nodes.add("REMOTE")
     s.world.node_pools["REMOTE"]=NodePoolState(window_open=False,node_cleaned=True,uplink_data_consumed=True)
@@ -703,7 +720,7 @@ def test_33_public_travel_changes_conditional_search_into_local_reception():
 
 def test_34_selector_confirmation_and_capture_share_spatial_boundary():
     s=scene([("A","ship",(1000.,1000.,1000.)),("REMOTE","relay",(1010.,1000.,1000.)),
-             ("T","ship",(1040.,1000.,1000.))],known=("A","REMOTE"))
+             ("T","ship",(1040.,1000.,1000.))],known=("A","REMOTE"), radio_links=(('REMOTE', 'T'),))
     s.world.known_links={"A":{"REMOTE"}}
     assert pure(s,"boundary","T",budget=SMALL).status=="conditional"
     # Substitute only the shared spatial policy, not navigation/delivery or a
@@ -719,7 +736,7 @@ def test_34_selector_confirmation_and_capture_share_spatial_boundary():
 def test_35_remote_condition_does_not_reveal_primaries_or_emitters():
     for locale in (Locale.EN,Locale.ES):
         s=scene([("A","ship",(1000.,1000.,1000.)),("REMOTE","relay",(1010.,1000.,1000.)),
-                 ("T","ship",(1040.,1000.,1000.))],known=("A","REMOTE"))
+                 ("T","ship",(1040.,1000.,1000.))],known=("A","REMOTE"), radio_links=(('REMOTE', 'T'),))
         s.os.locale=locale;s.world.known_links={"A":{"REMOTE"}}
         rec.request_recovery(s,"remote_case","T")
         assert all("REMOTE" not in line and "T ->" not in line and "LINK:" not in line for line in radio_diagnostic_lines(s))
@@ -741,7 +758,7 @@ def test_36_load_checks_original_reception_context_without_requiring_current_cov
         at(loaded,"A");ready(loaded);assert len(retry_radio_opportunities(loaded))==1
         # Recreate a pre-correction remote-first plan only as a hard save fixture.
         s=scene([("A","ship",(1000.,1000.,1000.)),("REMOTE","relay",(1010.,1000.,1000.)),
-                 ("T","ship",(1040.,1000.,1000.))],known=("A","REMOTE"))
+                 ("T","ship",(1040.,1000.,1000.))],known=("A","REMOTE"), radio_links=(('REMOTE', 'T'),))
         s.world.known_links={"A":{"REMOTE"}}
         with patch.object(communications,"radio_spatial_block_reason",return_value=None):
             r=pure(s,"old_remote","T",budget=SMALL);rec.confirm_recovery(s,r.proposal)

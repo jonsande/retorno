@@ -1,3 +1,14 @@
+## 4D-3e5b — implementada para revisión externa
+
+El [modelo físico espacial/temporal](../systems/radio-spacetime.es.md) implementa
+A2, B, C2, D y E: tres perfiles, potencia/sensibilidad, propagación a c, radio
+pasiva automática y extensión optativa validada de emisores. F-DEAD-01 comparte
+la frontera sin inventar emisiones históricas. Parámetros provisionales; sin
+cambios de densidad, navegación, relojes completos o contenido de producción.
+e5c mantiene la revisión editorial; e6 la validación prolongada Textual/audio.
+D01–D24 se conservan. [Informe](../testing/radio-spacetime-review.es.md).
+
+
 # RETORNO — Hoja de ruta de preexistencia procedural, lore y F-DEAD-01
 
 **Versión:** 1.5 — 2026-11-06

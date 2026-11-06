@@ -108,7 +108,7 @@ def records_for(state, kind, fallback):
     snapshot = state.world.narrative_snapshot
     if not snapshot:
         return fallback()
-    if not snapshot["declarations"]:
+    if not snapshot["declarations"] and not snapshot.get("radio_emitters"):
         # Legacy loaders remain domain injection points. Guard real installed
         # files before using them; templates do not become active by this path.
         validate_catalog(state)
@@ -154,7 +154,20 @@ def compile_catalog(seed, catalog=None, *, search_budget=4096):
     from retorno.worldgen.manifest import authored_base, define_manifest, new_session
     catalog = collect_catalog() if catalog is None else deepcopy(catalog)
     catalog["records"].sort(key=lambda r: (r["kind"], r["id"], r["source"]))
+    def finite_fields(value, record, field=""):
+        if isinstance(value, dict):
+            for key, entry in value.items():
+                finite_fields(entry, record, f"{field}.{key}")
+        elif isinstance(value, list):
+            for index, entry in enumerate(value):
+                finite_fields(entry, record, f"{field}[{index}]")
+        elif isinstance(value, float) and not math.isfinite(value):
+            raise ContentError(record["source"], record["id"], field, "finite number required")
+    for record in catalog["records"]:
+        finite_fields(record["value"], record)
     catalog_key = fingerprint(catalog)
+    from retorno.worldgen.radio import physical_catalog
+    physical_catalog_key = fingerprint(physical_catalog(catalog))
     locations, arcs, singles = [], [], []
     entities, aliases, references, relations = {}, {}, [], []
     owners = {}
@@ -304,7 +317,7 @@ def compile_catalog(seed, catalog=None, *, search_budget=4096):
                 compiled_locations.append(dict(node=dict(node_id=ident, name=entity.get("name", ident), kind=entity["kind"],
                     **dict(zip(("x_ly", "y_ly", "z_ly"), positions[ident]))), aliases=entity.get("aliases", [])))
             compiled_locations = [loc for loc in compiled_locations if loc["node"]["node_id"] != "RETORNO_SHIP"]
-            definition = define_manifest(seed, authored=authored_base(compiled_locations), narrative_key=catalog_key if blocks else "")
+            definition = define_manifest(seed, authored=authored_base(compiled_locations), narrative_key=physical_catalog_key if blocks else "")
             session = new_session(definition)
             for rel in normalized:
                 if rel["type"] != "physical_link":
@@ -412,7 +425,7 @@ def compile_catalog(seed, catalog=None, *, search_budget=4096):
 
     bound_texts = dict(catalog["texts"])
     text_paths = {ref: ref for ref in bound_texts}
-    snapshot = dict(version=CONTRACT_VERSION, catalog_key=catalog_key, seed=seed,
+    snapshot = dict(version=CONTRACT_VERSION, catalog_key=catalog_key, physical_catalog_key=physical_catalog_key, seed=seed,
         sources={f"{ {'arcs': 'arc', 'singles': 'single', 'locations': 'location'}[r['kind']]}:{r['id']}": r["source"] for r in catalog["records"]},
         locations=[bind(v, "location:" + v["node"]["node_id"]) for v in locations],
         arcs=[bind(v, "arc:" + v["arc_id"]) for v in arcs],
@@ -455,6 +468,8 @@ def compile_catalog(seed, catalog=None, *, search_budget=4096):
             package = f"{prefix}:{ident}"
             source = snapshot["sources"].get(package, owners.get(ident, "catalog"))
             validate_tokens(value, f"{package} ({source})")
+    from retorno.worldgen.radio import compile_radio
+    compile_radio(solved_definition, snapshot)
     return solved_definition, snapshot
 
 

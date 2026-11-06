@@ -1,3 +1,12 @@
+> **4D-3e5b — extensión optativa de emisores.** `radio_emitters` en la raíz de una
+> localización, arco o single instalado declara equipo y emisiones independientes
+> de su tipo de host. Reutiliza identidades, alias y certificados de este contrato;
+> no define geografía adicional. `piece_key` + `radio_emission` vinculan una pieza
+> a una emisión sin adelantar su scheduler/trigger. El catálogo completo incluye
+> radio; la huella física excluye solo esos metadatos. Formato, límites, ejemplos
+> válidos y compatibilidad: [radio espacial y temporal](systems/radio-spacetime.es.md).
+> Guías generales de autoría y revisión editorial: e5c, sin cambios incompatibles.
+
 # Requisitos narrativos físicos — 4D-3e4
 
 [English](narrative-world-contract.md). Estado: implementación mínima probada;

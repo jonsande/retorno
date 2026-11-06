@@ -1305,10 +1305,14 @@ def _candidate_nodes_for_piece(state, piece_entry: dict) -> list[str]:
     avoid_ids = set(str(x) for x in (rules.get("avoid_node_ids") or []))
     require_kinds = set(str(x) for x in (rules.get("require_kind_any") or []))
     candidates_cfg = set(str(x) for x in (rules.get("candidates") or []))
+    emission = state.world.narrative_snapshot.get("radio_emissions", {}).get(piece.get("radio_emission"))
+    emitter = state.world.narrative_snapshot.get("radio_emitters", {}).get(emission.emitter_id) if emission else None
     max_hops = int(rules.get("max_hops_from_start", 0) or 0)
 
     out: list[str] = []
     for node_id, pool in sorted(state.world.node_pools.items()):
+        if emitter is not None and node_id != emitter.host_id:
+            continue
         if not pool.window_open or pool.node_cleaned:
             continue
         node = state.world.space.nodes.get(node_id)
@@ -1349,6 +1353,11 @@ def _historical_candidates(state, piece_entry, definition=None, max_sectors=64):
     session = new_session(definition)
     sectors = set(_neighbor_sector_ids_2d(sector_id_for_pos(0, 0, 0)))
     sectors.update(sector_id_for_pos(*a.position_ly) for a in definition.authored)
+    emission = state.world.narrative_snapshot.get("radio_emissions", {}).get(piece_entry.get("piece", {}).get("radio_emission"))
+    if emission:
+        from retorno.worldgen.radio import certified_host
+        emitter = state.world.narrative_snapshot["radio_emitters"][emission.emitter_id]
+        sectors.add(certified_host(definition, emitter.host_id).generation_sector_id)
     cons = piece_entry.get("piece", {}).get("constraints", {})
     lo = max(0.0, float(cons.get("min_dist_ly", 0)))
     start = _start_node_for_distance(state)
@@ -1844,6 +1853,7 @@ def _deliver_piece(
             trigger=trigger, require_docked=trigger in {"dock", "uplink", "salvage_data"},
             delivery={"kind": "lore", "piece_key": key, "piece_id": piece_id,
                       "mail_from": piece.get("mail_from"), "mail_subject": piece.get("mail_subject")},
+            emission_id=piece.get("radio_emission"),
         )
         event = capture_radio_opportunity(state, opportunity)
         return LoreDelivery([], [event] if event else [], applied=event is not None)

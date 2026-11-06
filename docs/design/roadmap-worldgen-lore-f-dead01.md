@@ -1,3 +1,14 @@
+## 4D-3e5b — implemented for external review
+
+The [physical spatial/temporal model](../systems/radio-spacetime.md) implements
+A2, B, C2, D and E: three profiles, power/sensitivity, propagation at c, automatic
+passive radio and validated optional transmitter data. F-DEAD-01 shares the
+boundary without inventing historical emissions. Provisional parameters; no
+changes to density, navigation, complete clocks or production content. e5c keeps
+editorial review; e6 extended Textual/audio validation. D01–D24 remain unchanged.
+[Report](../testing/radio-spacetime-review.md).
+
+
 # RETORNO — Procedural preexistence, lore and F-DEAD-01 roadmap
 
 **Version:** 1.5 — 2026-11-06. [Español](roadmap-worldgen-lore-f-dead01.es.md).

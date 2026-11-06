@@ -1,203 +1,100 @@
-> **4D-3e5 — estado vigente (2026-11-06).** Implementado el selector histórico, confirmación transaccional y recepción/progresión mediante el ledger común. El [contrato productivo](structural-recovery.es.md) y su informe prevalecen sobre las auditorías históricas de este documento: no se fabrican puentes, entradas ni gateways. El núcleo 3b/3c/3d sigue siendo diagnóstico; no autoriza materialización. Sin garantía de salida universal.
+# Comunicaciones pasivas — 4D-3e5b
 
-# Comunicaciones pasivas — 4D-3e4b
+[English](passive-communications.md). Contrato vigente para revisión externa.
+La física y los datos se especifican en [radio espacial y temporal](radio-spacetime.es.md).
+Historial de e4b: [informe anterior](../testing/passive-communications-review.es.md).
 
-## Frontera de conocimiento implementada — 4D-3e5a
+## Equipo y operación
 
-Conforme a `C-DATA-004`, `status` y `diag comms` muestran únicamente equipo,
-salud, alimentación, servicio y disponibilidad operativa del receptor. Su línea
-de radio usa `radio_block_reason(state)` sin oportunidad. No consulta el ledger,
-planes ni búsquedas: añadir una fuente secreta o cambiar un resultado oculto no
-cambia la salida pública, incluso con debug activo. `ready` describe capacidad
-técnica, nunca promete una señal existente o cobertura hacia una fuente.
+`comms` (Sistema de comunicaciones) es un ShipSystem en BRG-01. Comienza
+instalado, apagado, `forced_offline=True`, salud 0.72 y sin carga eléctrica.
+Su salud inicial permite LIMITED; por debajo de 0.60 necesita reparación antes
+de encender. Requiere `energy_distribution >= NOMINAL` y suministro efectivo.
+`power on comms` no arranca `radiod` (Servicio de comunicaciones por radio):
+se inicia con `boot radiod`, trabajo ordinario de 5 segundos. Apagar el equipo
+detiene el servicio. Se conservan reparación, deterioro, avisos y dependencias.
 
-`debug radio`, tras `debug on`, consulta el ledger existente: IDs, fuente/host,
-canal, estado, contenido, tiempos, path, metadatos y causas operativas/espaciales
-de bloqueo. `debug recovery` consulta planes y búsquedas guardados. `debug off`
-los bloquea de nuevo. CLI y Textual usan los mismos renderers protegidos y textos
-EN/ES; no hay segunda cola ni logging nuevo. Las consultas no reintentan captura,
-importan intel, materializan, consumen RNG ni avanzan tiempo. Los eventos y archivos
-realmente recibidos siguen visibles; leer/importar conserva sus efectos normales.
+Consumo nominal provisional 0.15 kW: LIMITED 0.12, NOMINAL 0.15, UPGRADED
+0.165 kW; completo en CRUISE. Prioridad 4, deterioro base 8.5e-11/s,
+k_power=0.30, k_rad=0.10 y factores globales intactos. Escuchar más lejos no
+aumenta consumo. No se simula energía o reparación del emisor.
 
-El ledger, la persistencia, captura y cobertura local permanecen intactos.
-`A-COM-001` sigue abierto. 4D-3e5b abordará alcance físico, tipos de emisores,
-potencia, sensibilidad y propagación temporal simplificada por separado.
-Prueba: `tests/knowledge_boundary_smoke.py`.
+`radio_block_reason` exige salud coherente y estado LIMITED/NOMINAL/UPGRADED,
+dependencias, Core OS al menos LIMITED, terminal disponible, Q >= 0.55, sin
+brownout, generación + descarga suficiente y radiod instalado/activo. Reutiliza
+los kernels eléctricos del motor. Suspende recepción durante tránsito e
+hibernación. Sensores/sensord y data_core/datad no son requisitos de radio.
 
+## Fuentes, preparación, captura y lectura
 
-[English](passive-communications.md). Implementación para revisión externa sobre
-`78676dbfce5e7b98db36b2e241a427a19b0632fe`, 2026-11-06.
-No implementa F-DEAD-01 ni comunicaciones interestelares generales.
+`radio_spatial_block_reason` comparte cobertura entre selección y captura.
+Con declaración física usa distancia 3D, potencia y sensibilidad; la captura
+añade la ventana propagada a c mediante `radio_temporal_block_reason`.
+Preparar no es emitir. Sin metadatos nuevos, la compatibilidad heredada sigue
+limitada al host físico actual, kind admisible y dock cuando proceda, sin
+atribuir varios años luz ni retardo histórico a un mensaje local.
+Esta compatibilidad no autoriza emisiones para planes F-DEAD-01 nuevos: cada
+etapa de radio necesita una emisión declarada, también cuando sea local.
 
-## Sistema y servicio
-
-`comms` — **Sistema de comunicaciones / Communications System** — es un
-`ShipSystem` ordinario en `BRG-01`, una estancia existente. Empieza instalado,
-`OFFLINE`, `forced_offline=True`, salud 0.72 y sin consumo eléctrico.
-Al encenderlo queda LIMITED; no necesita reparación previa con esa salud inicial.
-Por debajo de salud 0.60 sí se exige reparar antes de `power on comms`; el daño
-físico permanece visible mientras está desconectado. Necesita
-`energy_distribution >= NOMINAL` alimentado. No depende de sensores ni datos.
-Se enciende, apaga, deteriora, repara y persiste con los mecanismos existentes.
-Encenderlo o repararlo no arranca su servicio automáticamente.
-
-Consumo nominal provisional: **0.15 kW**, frente a 0.7 kW de sensores. Usa los
-multiplicadores normales por estado: LIMITED 0.12, NOMINAL 0.15, UPGRADED
-0.165 kW. En CRUISE conserva esa carga completa si está encendido. No se modifica
-la carga de otros sistemas. Prioridad 4; deterioro base `8.5e-11/s`, `k_power=0.30`,
-`k_rad=0.10`, reutilizados de data_core. Su política de desgaste incluye los
-factores globales existentes; estar apagado no detiene el envejecimiento.
-Estos parámetros conservadores quedan sujetos a revisión de balance.
-
-`radiod` — **Servicio de comunicaciones por radio / Radio Communications Service** —
-es el `ServiceState` de comms. Instalado y detenido al comenzar; boot de 5 s
-mediante `BOOT_SERVICE`. `requires_active_owner=True` exige propietario al menos
-LIMITED. El boot revalida instalación, propietario, dependencias y potencia
-durante el trabajo y al aplicar el resultado. Apagar el propietario detiene su
-servicio. Cancelación y fallo usan los finalizadores ordinarios; no hay otro
-gestor de daemons ni reinicio automático. Se conserva la activación legacy de
-sensores inicialmente OFFLINE sin apagado forzado al arrancar sensord; radiod
-exige primero `power on comms`.
-
-## Corrección focal 4D-3e5: cobertura y operación
-
-`radio_spatial_block_reason(state, origin_node_id, channel=..., require_docked=...)`
-separa cobertura/contexto físico de disponibilidad operativa. Su implementación
-local conserva las condiciones de fuente/nodo/dock existentes. La selección y
-confirmación estructurales la comparten con la captura; no consultan salud,
-energía ni radiod para decidir esa elegibilidad espacial. Tener ruta hasta otro
-hub no permite recibirlo desde aquí: la cadena remota puede ser diagnóstica y
-condicionada, sin plan activo. Apagado/avería en la ubicación correcta sí permite
-preparar una recepción pendiente, entregada una sola vez cuando los gates se cumplan.
-No se implementa alcance, potencia, atenuación o latencia; se reserva esa extensión
-para 4D-3e5b. La corrección posterior 4D-3e5a retira `pending=N` de las consultas públicas.
-
-## Capacidad y canales
-
-`radio_block_reason` comprueba comms existente, no apagado/shed, estado LIMITED,
-NOMINAL o UPGRADED y salud coherente; dependencias de alimentación; Core OS al
-menos LIMITED, terminal disponible, Q >= 0.55 y ausencia de brownout. Reutiliza
-los kernels eléctricos del motor para comprobar generación + descarga disponible
-frente a carga actual, incluso entre ticks. Suspende recepción en tránsito o
-hibernación. Exige radiod instalado y activo. No tira RNG ni consulta sensores/datad.
-
-| Canal | Contrato efectivo |
+| Canal | Contrato |
 | --- | --- |
-| `captured_signal` | Radio y oportunidad local nacida de su trigger real. |
-| `station_broadcast` | Radio, fuente física local station/relay/waystation y contexto autorizado. |
-| `ship_os_mail` interno | Mantiene entrega interna sin radio. No se infiere origen externo a partir de prosa o nombres de remitentes. |
-| Mail explícitamente externo | `mail_origin: "external"` en la pieza, o `external_origin=True` / SourceRef `kind="external"` en la API local, pasa por la misma recepción de radio; conserva canal y envoltura mail. No hay piezas activas con esos marcadores en esta base. |
-| `salvage_data` | Pool, dron y recuperación existentes; sin radiod. |
-| `uplink_trace` | Uplink local válido, data_core/datad instalado y activo; sin radio. |
-| `uplink_only` | Requisitos actuales de uplink y validación del LINK; sin radio. |
+| captured_signal | Radio; declaración física o compatibilidad local del trigger original. |
+| station_broadcast | Radio desde station/relay/waystation; no toda estación emite. |
+| ship_os_mail interno | Entrega interna independiente de radio. |
+| Mail externo explícito | `mail_origin: external`, `external_origin=True` o SourceRef external usa radio y conserva la envoltura mail. |
+| salvage_data | Recuperación por pool/dron, sin radio. |
+| uplink_trace / uplink_only | Gates locales de data_core/datad; sin radio. |
 
-No cambian triggers, pesos, sorteos, force ni deadlines. Los contadores de acciones
-dock/uplink/salvage conservan sus contratos; un reintento automático no los incrementa.
-`signal_count` conserva su significado de señales efectivamente recibidas de lore;
-las pistas legacy no adquieren un nuevo incremento que alterase deadlines.
+Solo existe `WorldState.radio_opportunities`, con `RadioOpportunity`.
+Identidades legacy se conservan; declaraciones usan `radio:<emission_id>` y lore
+`lore:<piece_key>`. Se congelan contenido EN/ES, fuente/host, trigger, dock,
+metadatos del productor y preparación; con datos nuevos también emisor/emisión.
+No se congela alcance: cada captura revalida posición, sensibilidad y tiempo.
 
-## Oportunidad, captura y lectura
+1. `pending`: sin archivo, evento de recepción, intel, unlock ni consumo narrativo.
+2. `received`: un archivo GUEST real y SIGNAL_CAPTURED/BROADCAST_RECEIVED/MAIL_RECEIVED;
+   solo entonces se confirman pool, lore, contadores y cooldown correspondientes.
+3. `read_imported`: `cat`, `mail read` o `intel import` accedieron al archivo.
+   La intel válida se aplica por su parser; el estado no garantiza un unlock.
 
-Una sola colección `WorldState.radio_opportunities` contiene `RadioOpportunity`
-para lore, API local y etapas legacy ya preparadas. Identidad de lore:
-`lore:<piece_key>`; gateway: `recovery:<generation>:gateway`; deadnode:
-`deadnode:<target>:<attempt>`. La API admite ID explícito; su fallback deriva de
-canal, fuente, host y contenido, sin RNG.
+Los IDs se capturan una vez, también tras save/load. Borrar un archivo no lo
+recrea. El productor puede intentar captura tras preparar. Al final del tick,
+después de energía/desgaste/consecuencias, los reintentos escuchan emisiones
+independientes declaradas y reevalúan pendientes. No necesitan `scan`.
+Referencias `piece_key` no se preparan por proximidad: conservan scheduler,
+pesos, ventanas y triggers dock/uplink/salvage, además del contexto de dock.
+No cambia la probabilidad de singles, deadlines ni el significado de signal_count.
 
-Se congelan contenido EN/ES, fuente, host, trigger, exigencia de dock, metadatos de
-commit y tiempo de preparación. Una API legacy que solo aporta un idioma conserva ese texto
-como fallback en ambos sentidos al cambiar EN/ES. Se persisten estado, path, idioma y tiempo de
-captura, y tiempo de lectura. Estados:
+F-DEAD-01 comparte estas fronteras: primera recepción remota exige aviso
+preexistente certificado, suficiente señal y llegada efectiva. No se inventa
+actividad retrospectiva ni un nuevo transmisor. Se conserva búsqueda ampliable,
+protección, intentos, cooldowns y progresión; véase su [contrato](structural-recovery.es.md).
 
-1. `pending`: no archivo, evento de éxito, intel, unlock ni consumo de pieza.
-2. `received`: archivo GUEST real y un único evento SIGNAL_CAPTURED,
-   BROADCAST_RECEIVED o MAIL_RECEIVED. Solo aquí se confirman ledger de lore,
-   pool, signal_count correspondiente, flags/cooldowns de la etapa productora.
-3. `read_imported`: `cat`, `mail read` (delega en cat) o `intel import` accedieron
-   al archivo. El parser existente aplica la intel que sea válida; el nombre del
-   estado no garantiza que hubiese intel útil ni que se desbloquease un primary.
+## Persistencia, conocimiento y comandos
 
-Un primary de archivo sigue protegido hasta su lectura/importación válida. Las consultas públicas no muestran oportunidades pendientes, ni siquiera su
-cantidad o causas derivadas de una fuente oculta. El ledger se inspecciona solo
-con `debug radio`; consultar no importa intel.
+Contenedor V2/schema 3, checksum y backups intactos. Slots antiguos sin metadatos
+usan defaults locales. Se valida catálogo/snapshot, configuración de radio,
+hosts, índice, ledger y planes. Incompatibles se rechazan sin borrar/reescribir.
+Añadir radio cambia huella de contenido, no la identidad física del manifiesto.
 
-El escritor común conserva los eventos y directorios existentes. La captura y
-su bookkeeping son una operación síncrona en memoria bajo el modelo de ejecución
-actual; no hay callback diferido ni segundo guardado intermedio. Repetir el mismo
-ID después de capturarlo no escribe ni emite otra vez. El borrado manual de un
-archivo recibido no recrea una oportunidad consumida.
-
-## Reintentos y cobertura
-
-El tick reintenta pendientes al final de energía, deterioro y consecuencias del
-motor. Un productor puede intentar capturar inmediatamente tras preparar. Siempre
-se revalida capacidad y fuente. Debe seguir existiendo el host físico y ser el
-nodo actual; no puede ser un waypoint de tránsito. Las oportunidades nacidas de
-dock/uplink/salvage de lore conservan la exigencia de dock en ese host. Visitar
-una región cercana o encender radiod no crea un trigger de lore ni adelanta dock.
-
-La oportunidad local ya preparada se conserva para la siguiente disponibilidad
-del receptor en ese mismo contexto; viajar suspende su elegibilidad y volver
-permite reintentar. No se postula un emisor nuevo ni una propagación galáctica.
-El modelo actual no tiene evolución independiente de energía del emisor ni
-caducidad electromagnética: existencia/kind del host y contexto local son la
-prueba conservadora disponible. Alcance reducido, latencia, interferencias,
-intermitencia y ventanas temporales de emisión quedan por diseñar/balancear.
-
-El gateway de una cadena legacy existente admite presencia local al llegar,
-sin exigir dock nuevo. Su generación, entrada, gateway y protección primaria se
-revalidan antes de capturar. Los reintentos deadnode conservan intento y origen;
-no consumen cooldown hasta recibir y no publican enlaces por sí mismos.
-
-## Recuperación estructural pendiente
-
-La activación global legacy crea entrada/gateway antes de poder preparar la
-pista. El primer intento indirecto deadnode también fabrica un puente. Conforme
-a la autorización de esta fase, esas activaciones se aplazan explícitamente
-(`recovery_activation_deferred`) sin crear nodos, entregar pistas, incrementar
-éxitos ni confirmar cooldown. Un LINK legacy sobre cap o a un primary protegido
-tampoco se transmite. Los trackers pueden seguir observando umbrales, sin contar
-una entrega. Las etapas con puente ya existente bajo cap y los broadcasts de
-cadenas existentes sí usan el ledger común. No se reemplaza el selector ni se
-modifican thresholds/cooldowns; su integración estructural sigue siendo e5.
-El aplazamiento puede dejar un bloqueo estructural sin recuperación automática
-hasta e5; esta fase no promete que cualquier mapa tenga salida.
-
-## Persistencia y operación pública
-
-Se mantiene contenedor V2/esquema 3 y la validación de universo/catálogo e4.
-WorldState añade campos con defaults al deserializar. Un esquema 3 anterior sin
-comms recibe el mismo sistema apagado de bootstrap, sin recursos adicionales,
-reparaciones, activación, cambios de física histórica ni intel. ServiceState
-restaura el nuevo flag con default false en servicios antiguos. No se reescribe
-el archivo ni backup al cargar. No hay migración de geografía ni de contenido.
+`status`/`diag comms` solo muestran receptor, salud, energía, servicio y capacidad
+operativa conocida. Nunca cantidades, nombres, distancias ni ventanas de señales
+ocultas. `ready` no promete una emisión. `debug on` permite `debug radio` con
+parámetros y causas internas; `debug recovery` consulta búsquedas/planes guardados.
+Son consultas puras: sin generación, RNG, avance, captura ni importación. CLI y
+Textual comparten renderers; tipos de evento y audio permanecen intactos.
 
 ```text
 diag comms
 power on comms
 boot radiod
 jobs
-diag comms
 cat /logs/signals/<archivo_recibido>
 power off comms
 ```
 
-Si falla alimentación, reparar primero energy_distribution. Si comms está por
-debajo de LIMITED, repararlo con el dron ordinario en BRG-01. `about comms` y
-`man boot` explican la operación. Al activar un sistema o recuperar su umbral
-útil, el motor recorre propietarios/dependencias reales y avisa una vez de
-servicios detenidos (`boot <id>`), no instalados o bloqueados (`diag <owner>`),
-con nombre EN/ES y sugerencia explícita, por ejemplo:
-`Servicio de sensores (sensord): detenido (Prueba: boot sensord)`.
-No mantiene una lista paralela de asociaciones de daemons.
-
-CLI y Textual comparten renderers, mensajes y diagnóstico. El output del comando
-`status` incluye únicamente el diagnóstico operativo del receptor; el panel de sistemas
-de Textual muestra exclusivamente los sistemas y su estado, sin esas líneas
-adicionales. Se conservan tipos de evento y audio.
-
-Código: [communications.py](../../src/retorno/core/communications.py),
-[lore.py](../../src/retorno/core/lore.py), [engine.py](../../src/retorno/core/engine.py),
-[model/world.py](../../src/retorno/model/world.py). Pruebas:
-[passive_communications_smoke.py](../../tests/passive_communications_smoke.py),
-[informe de revisión](../testing/passive-communications-review.es.md).
+Las señales lejanas pueden estar en viaje o haber pasado. El silencio no prueba
+ausencia. Reparar en BRG-01 y estabilizar alimentación permite nuevas capturas
+cuando la modalidad aún las justifica. Recepción no implica interlocutores vivos.
+Pruebas: passive_communications_smoke (18), knowledge_boundary_smoke (19),
+radio_spacetime_smoke y el [informe de esta fase](../testing/radio-spacetime-review.es.md).

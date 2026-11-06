@@ -257,7 +257,7 @@ Esta misma lectura debe aplicarse al contenido narrativo asignado durante la par
 | **A-BIO-002** | Daño y eficacia de `life_support` | Fórmula efectiva, umbrales, comportamiento en fallos y consulta al jugador. |
 | **A-BIO-003** | Longevidad y salud del protagonista | Edad inicial, límites, deterioro fisiológico, enfermedades y consecuencias de envejecer. |
 | **A-GRAV-001** | Implementación futura de gravedad fuerte | Entornos, parámetros de objetos compactos, peligros y cálculo de dilatación. |
-| **A-COM-001** | Comunicaciones a larga distancia | Alcance, latencia, repetidores, disponibilidad y excepciones. |
+| **A-COM-001** | Comunicaciones a larga distancia — parcialmente resuelta | A2/B/C2/D/E: alcance por potencia/sensibilidad, tres familias, propagación a c y escucha pasiva según comms. Abiertos repetidores, interferencias complejas, radio activa, direccionalidad avanzada y excepciones. / Partly resolved: power/sensitivity range, three families, propagation at c and passive listening gated by comms; repeaters, complex interference, active radio, advanced directionality and exceptions remain open. |
 | **A-HIST-003** | Cronología galáctica | Fechas e hitos de expansión, fases regionales del colapso milenario y época presente del jugador. |
 | **A-AUTO-001** | Naturaleza de los automatismos | Autonomía, capacidad de autorreparación, límites energéticos y posibles objetivos. |
 | **A-DEC-003** | Ritmos de deterioro | Dependencia de entorno, tecnología, mantenimiento y paso del tiempo. |
@@ -305,3 +305,11 @@ Las referencias narrativas a miles de años son compatibles con el **colapso mil
 5. Las dudas se convierten en preguntas abiertas antes de convertirse en hechos.
 
 El procedimiento operativo de revisión se desarrolla en [`guia_coherencia.md`](guia_coherencia.md).
+
+**4D-3e5b — A-COM-001 parcialmente resuelta / partly resolved (2026-11-06).**
+Se implementa el modelo pasivo simplificado del [contrato ES](../systems/radio-spacetime.es.md)
+/ [EN contract](../systems/radio-spacetime.md). Sus perfiles y cifras son
+provisionales, no canon definitivo. C-TIME-001/002/003 y C-DATA-004 se conservan;
+recibir no demuestra actualidad ni supervivencia. / The simplified passive
+model is implemented; profiles/numbers remain provisional, not definitive canon.
+C-TIME-001/002/003 and C-DATA-004 remain; reception proves neither currency nor survival.

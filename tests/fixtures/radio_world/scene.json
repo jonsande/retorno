@@ -1,0 +1,24 @@
+{
+  "node": {"node_id": "RADIO_RECEIVER", "name": "Radio receiver fixture", "kind": "ship", "x_ly": 0, "y_ly": 0, "z_ly": 0},
+  "world_requirements": {
+    "version": "narrative-world-v1",
+    "entities": [
+      {"id": "RADIO_REMOTE", "name": "Radio archive fixture", "aliases": ["Radio archive"], "kind": "relay", "position": {"fixed_ly": [-3, 4, 0]}},
+      {"id": "RADIO_TARGET", "kind": "ship", "position": {"fixed_ly": [-3, 16, 0]}},
+      {"id": "RADIO_FAR", "kind": "station", "position": {"fixed_ly": [300, 0, 0]}}
+    ]
+  },
+  "radio_emitters": {
+    "version": "radio-emitters-v1",
+    "emitters": [{
+      "id": "fixture-relay", "host": "Radio archive", "category": "interstellar_relay",
+      "emissions": [{
+        "id": "fixture-history", "mode": "continuous", "start_t": -315360000,
+        "content_by_locale": {
+          "en": "AUTOMATED ARCHIVE COPY\nNODE: RADIO_REMOTE\nNODE: RADIO_TARGET\nLINK: RADIO_REMOTE -> RADIO_TARGET\n",
+          "es": "COPIA AUTOMÁTICA DE ARCHIVO\nNODE: RADIO_REMOTE\nNODE: RADIO_TARGET\nLINK: RADIO_REMOTE -> RADIO_TARGET\n"
+        }
+      }]
+    }]
+  }
+}

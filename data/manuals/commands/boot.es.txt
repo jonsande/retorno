@@ -19,6 +19,7 @@ Comportamiento
 - Durante el arranque y al completar se revalidan instalación, propietario, potencia y dependencias.
 - Apagar el hardware detiene su servicio. Encenderlo no vuelve a arrancar ese servicio.
 - El arranque de radiod dura 5 segundos; diag comms explica equipo receptor, servicio y bloqueos operativos.
+- Una vez activo, radiod escucha automáticamente señales dentro de alcance físico cuyo retardo de propagación haya transcurrido; no hace falta repetir scan. Una señal breve que pasó con el receptor apagado puede perderse.
 
 Bloqueos frecuentes
 - `service_missing`

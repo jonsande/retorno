@@ -6,7 +6,7 @@ The pre-manifest planner remains a diagnostic API for conditional geometry.
 """
 from __future__ import annotations
 
-from copy import deepcopy
+from copy import copy, deepcopy
 from dataclasses import asdict, dataclass, fields, is_dataclass
 import hashlib
 import heapq
@@ -21,7 +21,8 @@ from retorno.model.world import SpaceGraph, SpaceNode, WorldState, is_hop_within
 from retorno.worldgen import manifest
 from retorno.worldgen.generator import universe_definition, _ensure_sector_cluster_generated, validate_universe_state
 
-VERSION = "historical-recovery-v1"
+LEGACY_VERSION = "historical-recovery-v1"
+VERSION = "historical-recovery-v2"
 HUBS = {"station", "relay", "waystation"}
 ACTIVE = {"prepared", "receipt_pending", "active", "stage_consumed"}
 
@@ -43,6 +44,12 @@ class RecoveryBudget:
 
 
 @dataclass(frozen=True, slots=True)
+class StageSource:
+    reference: str
+    payload_key: str
+
+
+@dataclass(frozen=True, slots=True)
 class RecoveryProposal:
     block: str
     scope: str
@@ -50,6 +57,14 @@ class RecoveryProposal:
     sites: tuple[manifest.HistoricalSite, ...]
     access: AccessRoute
     mechanisms: tuple[str, ...]
+    first_emission_id: str | None = None
+    first_reception_sensitivity: float = 1.0
+    stage_sources: tuple[StageSource | None, ...] | None = None
+
+    def __setstate__(self, state):
+        # Frozen slot dataclasses used a positional list in previous schema 3.
+        for index, spec in enumerate(fields(self)):
+            object.__setattr__(self, spec.name, state[index] if index < len(state) else spec.default)
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +91,17 @@ class RecoveryPlan:
     consumed: tuple[int, ...] = ()
     version: str = VERSION
     dead_attempt: int | None = None
+    invalidation: tuple[str, str] | None = None
+    source_contract: str | None = None
+
+    def __setstate__(self, state):
+        # Additive slots for genuine older schema-3 plans; strict validation is
+        # still run by load_single_slot before exposing the loaded state.
+        values = state[1]
+        for spec in fields(self):
+            setattr(self, spec.name, values.get(spec.name, spec.default))
+        if "source_contract" not in values:
+            self.source_contract = _source_contract_key(self)
 
 
 def _canonical(value):
@@ -192,23 +218,107 @@ def _shell_offset(index):
     return a-r+1, b-r+1, (-r if face == 0 else r)
 
 
-def _source(state, nid, site):
-    if site.kind in HUBS:
-        return "radio"
+def _navigation_emissions(state):
+    """Bounded installed activity, never inferred from installation kind."""
+    snapshot = state.world.narrative_snapshot
+    result = {}
+    entries = sorted(snapshot.get("radio_emissions", {}).items())
+    for eid, emission in entries[:4096]:
+        emitter = snapshot.get("radio_emitters", {}).get(emission.emitter_id)
+        if (emitter is None or emission.channel != "station_broadcast" or emission.piece_key
+                or emission.mode != "continuous" or emission.end_t is not None
+                or not emission.navigation_link_to):
+            continue
+        source, dest = emitter.host_id, emission.navigation_link_to
+        if emission.content_by_locale != _hint(source, dest):
+            continue
+        op = state.world.radio_opportunities.get(f"radio:{eid}")
+        if op and (op.status != "pending" or op.delivery.get("kind") != "declared_radio"):
+            continue
+        result.setdefault((source, dest), []).append(eid)
+    return result, len(entries) <= 4096
+
+
+def _first_reception(state, source, emission_id=None, *, receiver_node_id=None,
+                     sensitivity=None, at_t=None, legacy=False):
+    emitter = emission = None
+    if emission_id:
+        snapshot = state.world.narrative_snapshot
+        emission = snapshot.get("radio_emissions", {}).get(emission_id)
+        if (emission is None or emission.mode != "continuous" or emission.end_t is not None
+                or emission.channel != "station_broadcast" or emission.piece_key
+                or not emission.navigation_link_to):
+            return "first_emission_unavailable"
+        emitter = snapshot["radio_emitters"][emission.emitter_id]
+        if emitter.host_id != source or emission.content_by_locale != _hint(source, emission.navigation_link_to):
+            return "first_emission_unavailable"
+    elif not legacy:
+        return "first_emission_undeclared"
+    return (communications.radio_spatial_block_reason(state, source, channel="station_broadcast",
+                emitter=emitter, receiver_node_id=receiver_node_id, sensitivity=sensitivity)
+            or communications.radio_temporal_block_reason(state, emitter, emission,
+                receiver_node_id=receiver_node_id, at_t=at_t))
+
+
+def _at_site(state, source, site):
+    # A private stationary probe for future stages, including lazy certificates.
+    probe = copy(state)
+    probe.world = copy(state.world)
+    probe.world.current_node_id = source
+    probe.world.current_pos_ly = site.position_ly
+    return probe
+
+
+def _salvage_source(state, source, dest, site, *, eligible=True, expected=None):
+    from retorno.core import lore
+    from retorno.model.os import normalize_path
     if "salvage_data" not in information_capabilities(site.kind):
         return None
-    pool = state.world.node_pools.get(nid)
-    if nid in state.world.visited_nodes or (pool and (pool.node_cleaned or not pool.window_open)):
+    pool = state.world.node_pools.get(source)
+    if eligible and (source in state.world.visited_nodes or (pool and (pool.node_cleaned or not pool.window_open))):
         return None
-    return "salvage"
+    # Only existing pools or installed authored archives are evidence. Do not
+    # generate a procedural document or inject the requested LINK during search.
+    files = pool.base_files + pool.injected_files if pool else lore._location_fs_files(source, state)
+    matches, seen_paths = [], set()
+    aliases = state.world.narrative_snapshot.get("aliases", {})
+    for entry in files:
+        path = normalize_path(str(entry.get("path", "")))
+        # Match the existing mount collector's base-before-injected precedence.
+        if path in seen_paths:
+            continue
+        seen_paths.add(path)
+        if not path.startswith(("/logs/", "/data/", "/mail/")) or entry.get("access", "guest") != "guest":
+            continue
+        if eligible and f"/remote/{source}{path}" in state.os.fs:
+            continue
+        for line in str(entry.get("content", "")).splitlines():
+            pair = lore._primary_link_pair({"line": line})
+            if pair and tuple(aliases.get(v.casefold(), v) for v in pair) == (source, dest):
+                matches.append(StageSource(path, _digest(entry)))
+                break
+    if expected is not None:
+        return expected if expected in matches else None
+    return min(matches, key=lambda s: (s.reference, s.payload_key)) if matches else None
 
 
-def _edge_source(state, source, dest, site):
+def _source(state, nid, site, dest, *, emissions=None):
+    emissions = _navigation_emissions(state)[0] if emissions is None else emissions
+    probe = _at_site(state, nid, site)
+    for eid in emissions.get((nid, dest), ()):
+        if _first_reception(probe, nid, eid) is None:
+            emission = state.world.narrative_snapshot["radio_emissions"][eid]
+            return "radio", StageSource(eid, _digest(emission.content_by_locale))
+    salvage = _salvage_source(state, nid, dest, site)
+    return ("salvage", salvage) if salvage else None
+
+
+def _edge_source(state, source, dest, site, *, emissions=None):
     w = state.world
     if (dest in w.known_links.get(source, ()) and dest in (set(w.known_nodes) | set(w.known_intel))
             and is_hop_within_cap(w, source, dest)):
-        return "known_route"
-    return _source(state, source, site)
+        return "known_route", None
+    return _source(state, source, site, dest, emissions=emissions)
 
 
 def select_recovery(state, block="global", target_id=None, *, cursor=0, retained=(), budget=None):
@@ -297,19 +407,24 @@ def select_recovery(state, block="global", target_id=None, *, cursor=0, retained
         origins = sorted(nid for nid in access if nid in sites and sites[nid].kind in HUBS)
         if not origins:
             return result("conditional", "no_reachable_local_emitter")
-        receiving_origins = [nid for nid in origins if communications.radio_spatial_block_reason(
-            state, nid, channel="station_broadcast") is None]
-        # Navigation access is still ranked for remote diagnostics, but cannot
-        # authorize a first clue the player has no way to receive from here.
-        first_reception_eligible = bool(receiving_origins)
-        if receiving_origins:
-            origins = receiving_origins
+        emissions, radio_complete = _navigation_emissions(state)
+        receiving_links = {}
+        for (source, dest), ids in emissions.items():
+            if source in origins:
+                for eid in ids:
+                    if _first_reception(state, source, eid) is None:
+                        receiving_links[(source,dest)] = eid
+                        break
+        first_reception_eligible = bool(receiving_links)
+        if receiving_links:
+            origins = sorted({source for source, dest in receiving_links})
         # Shared hop kernel on a private, physical-only view. No gameplay writes.
         view = _physical_view(sites)
-        best, queue = {}, []
+        best, queue, path_sources = {}, [], {}
         for nid in origins:
             cost = (access[nid].distance_ly, 0, access[nid].hops, (nid,))
             best[nid] = cost
+            path_sources[nid] = ()
             heapq.heappush(queue, (*cost, nid, nid))
         # Spatial buckets bound edge work for large materialized inventories.
         buckets = {}
@@ -327,8 +442,12 @@ def select_recovery(state, block="global", target_id=None, *, cursor=0, retained
             goal = (nid == target_id) if target_id else (nid not in access and nid not in state.world.visited_nodes and not (pool and pool.node_cleaned))
             if goal and len(path) > 1:
                 chain = tuple(sites[p] for p in path)
-                mechanisms = ("radio",)+tuple(_edge_source(state, a, b, sites[a]) for a,b in zip(path[1:-1],path[2:]))
-                proposal = RecoveryProposal(block, definition.scope, snapshot_key(state), chain, access[origin], mechanisms)
+                evidence = path_sources[nid]
+                mechanisms = tuple(value[0] for value in evidence)
+                sources = tuple(value[1] for value in evidence)
+                emission_id = sources[0].reference
+                proposal = RecoveryProposal(block, definition.scope, snapshot_key(state), chain, access[origin], mechanisms,
+                    emission_id, communications.receiver_sensitivity(state, reference_when_unavailable=True), sources)
                 if not first_reception_eligible:
                     return result("conditional", "first_reception_outside_coverage", proposal)
                 return result("validated", "complete_in_examined_scope", proposal)
@@ -339,21 +458,32 @@ def select_recovery(state, block="global", target_id=None, *, cursor=0, retained
             for dest in sorted(neighbors):
                 if dest == nid or dest in path:
                     continue
+                if nid == origin and first_reception_eligible and (nid, dest) not in receiving_links:
+                    continue
                 if edges >= budget.edges:
                     return result("incomplete", "edge_budget")
                 edges += 1
                 d = math.dist(sites[nid].position_ly, sites[dest].position_ly)
                 if d <= 0 or not is_hop_within_cap(view, nid, dest):
                     continue
-                if nid != origin and _edge_source(state, nid, dest, sites[nid]) is None:
+                evidence = (_source(state, nid, sites[nid], dest, emissions=emissions) if nid == origin
+                            else _edge_source(state, nid, dest, sites[nid], emissions=emissions))
+                if nid == origin and first_reception_eligible:
+                    eid = receiving_links[(nid,dest)]
+                    emission = state.world.narrative_snapshot["radio_emissions"][eid]
+                    evidence = ("radio", StageSource(eid, _digest(emission.content_by_locale)))
+                if evidence is None or (nid == origin and evidence[0] != "radio"):
                     continue
                 cost = (distance+d, uncertainty+int(dest not in state.world.space.nodes), hops+1, path+(dest,))
                 if dest not in best or cost < best[dest]:
                     best[dest] = cost
+                    path_sources[dest] = path_sources[nid] + (evidence,)
                     heapq.heappush(queue, (*cost, dest, origin))
+        if not radio_complete:
+            return result("incomplete", "radio_candidate_budget")
         if len(sites) > budget.retained_sites:
             return result("incomplete", "retention_budget")
-        return result("none_in_scope", "no_complete_chain_in_examined_scope")
+        return result("conditional", "no_complete_chain_with_preexisting_sources")
     except (ValueError, OverflowError) as exc:
         return result("incomplete", "manifest_domain_or_budget:"+str(exc))
 
@@ -364,21 +494,51 @@ def _path(state, proposal):
 
 
 def _hint(source, dest):
-    return {"en": f"LOCAL NAVIGATION NOTICE\n\nLINK: {source} -> {dest}\n",
-            "es": f"AVISO LOCAL DE NAVEGACIÓN\n\nLINK: {source} -> {dest}\n"}
+    from retorno.worldgen.radio import navigation_content
+    return navigation_content(source, dest)
+
+
+def _radio_id(plan, index):
+    if plan.proposal.stage_sources is not None:
+        return f"radio:{plan.proposal.stage_sources[index].reference}"
+    if index == 0 and plan.proposal.first_emission_id:
+        return f"radio:{plan.proposal.first_emission_id}"
+    return f"{plan.plan_id}:{index}"
 
 
 def _radio_stage(state, plan, index):
     from retorno.core.communications import prepare_radio_opportunity
     path = _path(state, plan.proposal)
-    existing = state.world.radio_opportunities.get(f"{plan.plan_id}:{index}")
+    ident = _radio_id(plan, index)
+    existing = state.world.radio_opportunities.get(ident)
+    metadata = {"kind": "structural_recovery", "plan": plan.plan_id, "stage": index}
+    declared = existing and existing.delivery == {"kind": "declared_radio"}
     if existing and (existing.origin_node_id != path[index]
-                     or existing.delivery != {"kind": "structural_recovery", "plan": plan.plan_id, "stage": index}
+                     or (existing.delivery != metadata and not declared)
+                     or existing.channel != "station_broadcast"
                      or existing.content_by_locale != _hint(path[index],path[index+1])):
         raise ValueError("Recovery stage ledger collision")
-    return prepare_radio_opportunity(state, f"{plan.plan_id}:{index}", "station_broadcast",
-        _hint(path[index], path[index+1]), node_id=path[index], trigger="recovery_stage",
-        delivery={"kind": "structural_recovery", "plan": plan.plan_id, "stage": index})
+    if plan.version == LEGACY_VERSION:
+        if existing is None or declared:
+            raise ValueError("Legacy recovery cannot create an undeclared radio stage")
+        return existing
+    reference = plan.proposal.stage_sources[index]
+    emission = state.world.narrative_snapshot.get("radio_emissions", {}).get(reference.reference)
+    if emission is None or _digest(emission.content_by_locale) != reference.payload_key:
+        raise ValueError("Recovery emission payload changed")
+    if existing and (existing.emission != emission or existing.emitter !=
+                     state.world.narrative_snapshot["radio_emitters"][emission.emitter_id]):
+        raise ValueError("Recovery stage emission identity mismatch / Identidad de emisión de etapa incompatible")
+    if existing and existing.status in {"received", "read_imported"}:
+        existing.delivery = metadata
+        return existing  # Reuse the real receipt, without another capture.
+    if _first_reception(state, path[index], emission.emission_id):
+        raise ValueError("Recovery stage signal is not available")
+    if declared:
+        existing.delivery = metadata
+    return prepare_radio_opportunity(state, ident, "station_broadcast",
+        emission.content_by_locale, node_id=path[index], trigger="recovery_stage",
+        delivery=metadata, emission_id=emission.emission_id)
 
 
 def _validate_physical(state, proposal):
@@ -389,6 +549,11 @@ def _validate_physical(state, proposal):
     path = _path(state, proposal)
     if not complete or len(path) < 2 or len(set(path)) != len(path) or len(proposal.mechanisms) != len(path)-1:
         raise ValueError("Invalid recovery chain")
+    if proposal.first_emission_id:
+        emission = state.world.narrative_snapshot.get("radio_emissions", {}).get(proposal.first_emission_id)
+        if (not emission or emission.navigation_link_to != path[1] or emission.channel != "station_broadcast"
+                or state.world.narrative_snapshot["radio_emitters"][emission.emitter_id].host_id != path[0]):
+            raise ValueError("Recovery first emission does not carry this navigation notice")
     session = manifest.new_session(d)
     for nid, site in zip(path, proposal.sites):
         if nid in locked or nid in reserved or site not in session.sector(site.generation_sector_id).sites:
@@ -404,30 +569,121 @@ def _validate_physical(state, proposal):
     return path
 
 
-def _validate_prepared_sources(state, plan, path):
-    if any(nid not in state.world.space.nodes for nid in path):
-        raise ValueError("Recovery site disappeared")
-    for i, mechanism in enumerate(plan.proposal.mechanisms):
+def _validate_stage_sources(state, proposal, path, *, at_t=None, archival=False):
+    if not isinstance(proposal.stage_sources, tuple) or len(proposal.stage_sources) != len(proposal.mechanisms):
+        raise ValueError("New recovery requires pre-existing source evidence for every stage")
+    if (proposal.mechanisms[0] != "radio" or not isinstance(proposal.stage_sources[0], StageSource)
+            or proposal.first_emission_id != proposal.stage_sources[0].reference):
+        raise ValueError("Recovery first emission identity mismatch")
+    for i, (mechanism, reference) in enumerate(zip(proposal.mechanisms, proposal.stage_sources)):
+        source, dest = path[i:i+2]
+        if mechanism in {"radio", "salvage"} and (not isinstance(reference, StageSource)
+                or not reference.reference or len(reference.payload_key) != 64
+                or any(c not in "0123456789abcdef" for c in reference.payload_key)):
+            raise ValueError("Recovery stage lacks stable source and payload evidence")
         if mechanism == "radio":
-            if state.world.space.nodes[path[i]].kind not in HUBS:
-                raise ValueError("Recovery emitter unavailable")
-            if i <= plan.stage:
-                op = state.world.radio_opportunities.get(f"{plan.plan_id}:{i}")
-                if (op is None or op.origin_node_id != path[i] or op.channel != "station_broadcast"
-                        or op.delivery != {"kind": "structural_recovery", "plan": plan.plan_id, "stage": i}
-                        or op.content_by_locale != _hint(path[i],path[i+1])):
-                    raise ValueError("Recovery stage ledger mismatch")
-        elif mechanism == "known_route":
-            if _edge_source(state,path[i],path[i+1],plan.proposal.sites[i]) != "known_route":
-                raise ValueError("Recovery known route unavailable")
+            emission = state.world.narrative_snapshot.get("radio_emissions", {}).get(reference.reference) if isinstance(reference, StageSource) else None
+            if emission is not None and (emission.navigation_link_to != dest
+                    or reference.payload_key != _digest(emission.content_by_locale)
+                    or emission.channel != "station_broadcast" or emission.piece_key
+                    or emission.mode != "continuous" or emission.end_t is not None
+                    or state.world.narrative_snapshot.get("radio_emitters", {}).get(emission.emitter_id) is None
+                    or state.world.narrative_snapshot["radio_emitters"][emission.emitter_id].host_id != source):
+                raise ValueError("Recovery declared stage emission identity mismatch / Identidad de emisión declarada incompatible")
+            if not archival and (emission is None or _first_reception(
+                    _at_site(state, source, proposal.sites[i]), source, reference.reference, at_t=at_t)):
+                raise ValueError("Recovery declared stage emission unavailable")
         elif mechanism == "salvage":
-            pool = state.world.node_pools.get(path[i])
-            file = f"/logs/nav/{plan.plan_id.replace(':','_')}_{i}.txt"
-            if not pool or not any(f.get("path") == file and f"LINK: {path[i]} -> {path[i+1]}" in f.get("content", "")
-                                   for f in pool.injected_files):
-                raise ValueError("Recovery prepared document unavailable")
+            if not archival and _salvage_source(state, source, dest, proposal.sites[i], eligible=False, expected=reference) != reference:
+                raise ValueError("Recovery pre-existing archive unavailable")
+        elif mechanism == "known_route":
+            if reference is not None or _edge_source(state, source, dest, proposal.sites[i]) != ("known_route", None):
+                raise ValueError("Recovery known route unavailable")
         else:
             raise ValueError("Unknown recovery delivery mechanism")
+
+
+def _validate_prepared_sources(state, plan, path, *, archival=False, unprepared=False):
+    if any(nid not in state.world.space.nodes for nid in path):
+        raise ValueError("Recovery site disappeared")
+    if plan.version == VERSION:
+        _validate_stage_sources(state, plan.proposal, path, at_t=plan.prepared_t, archival=archival)
+    elif plan.version != LEGACY_VERSION or plan.proposal.stage_sources is not None:
+        raise ValueError("Incompatible recovery source contract")
+    for i, mechanism in enumerate(plan.proposal.mechanisms):
+        if mechanism not in {"radio", "salvage", "known_route"}:
+            raise ValueError("Unknown recovery delivery mechanism")
+        if mechanism == "radio" and i <= plan.stage:
+            op = state.world.radio_opportunities.get(_radio_id(plan, i))
+            if unprepared and i == plan.stage and op is None:
+                continue
+            if (op is None or op.origin_node_id != path[i] or op.channel != "station_broadcast"
+                    or op.delivery != {"kind": "structural_recovery", "plan": plan.plan_id, "stage": i}
+                    or op.content_by_locale != _hint(path[i],path[i+1])):
+                raise ValueError("Recovery stage ledger mismatch")
+            if plan.version == VERSION and (op.emission is None
+                    or op.emission.emission_id != plan.proposal.stage_sources[i].reference):
+                raise ValueError("Recovery stage emission identity mismatch")
+            if ((i in plan.captured) != (op.status in {"received", "read_imported"})
+                    or (i in plan.consumed and op.status != "read_imported")):
+                raise ValueError("Recovery receipt progress mismatch / Progreso de recepción incompatible")
+        elif mechanism == "salvage" and plan.version == LEGACY_VERSION:
+            pool = state.world.node_pools.get(path[i])
+            file = f"/logs/nav/{plan.plan_id.replace(':','_')}_{i}.txt"
+            if not pool or not any(f.get("path") == file and f"LINK: {path[i]} -> {path[i+1]}" in f.get("content", "") for f in pool.injected_files):
+                raise ValueError("Recovery prepared legacy document unavailable")
+        elif mechanism == "known_route" and _edge_source(state, path[i], path[i+1], plan.proposal.sites[i]) != ("known_route", None):
+            raise ValueError("Recovery known route unavailable")
+
+
+def _invalidation_key(plan, reason):
+    # A consistency checkpoint, not a security signature. Merely setting status
+    # to invalid must never turn an incoherent proposal into an accepted save.
+    return _digest((reason, plan.plan_id, plan.version, plan.proposal, plan.prepared_t,
+                    plan.stage, plan.captured, plan.consumed, plan.dead_attempt))
+
+
+def _source_contract_key(plan):
+    return _digest((plan.plan_id, plan.version, plan.proposal, plan.prepared_t, plan.dead_attempt))
+
+
+def _validate_progress(plan, path):
+    count = len(path)-1
+    if (plan.source_contract != _source_contract_key(plan)
+            or plan.status not in ACTIVE | {"complete", "invalid"}
+            or not math.isfinite(plan.prepared_t) or not isinstance(plan.stage, int)
+            or not 0 <= plan.stage < count
+            or not isinstance(plan.captured, tuple) or not isinstance(plan.consumed, tuple)
+            or any(type(i) is not int or not 0 <= i <= plan.stage for i in plan.captured+plan.consumed)
+            or plan.captured != tuple(sorted(set(plan.captured)))
+            or plan.consumed != tuple(range(len(plan.consumed)))
+            or any(i not in plan.consumed for i in range(plan.stage))
+            or any(plan.proposal.mechanisms[i] != "radio" for i in plan.captured)
+            or any(plan.proposal.mechanisms[i] == "radio" and i not in plan.captured for i in plan.consumed)):
+        raise ValueError("Invalid recovery progress / Progreso de recuperación no válido")
+    if plan.status == "complete" and (plan.stage != count-1 or len(plan.consumed) != count):
+        raise ValueError("Incomplete recovery marked complete / Recuperación incompleta marcada como completa")
+    if plan.status == "stage_consumed" and plan.stage not in plan.consumed:
+        raise ValueError("Unconsumed recovery stage / Etapa de recuperación sin consumir")
+    if plan.status in {"prepared", "receipt_pending"} and (plan.stage in plan.captured or plan.stage in plan.consumed):
+        raise ValueError("Pending recovery already consumed / Recuperación pendiente ya consumida")
+
+
+def _invalidate_plan(state, plan, *, unprepared=False):
+    plan.status = "invalid"
+    plan.invalidation = None
+    reason = "stage_unprepared" if unprepared else "sources_unavailable"
+    try:
+        path = _validate_physical(state, plan.proposal)
+        _validate_progress(plan, path)
+        _validate_prepared_sources(state, plan, path, archival=True, unprepared=unprepared)
+        if unprepared and (plan.stage == 0 or plan.stage in plan.captured or plan.stage in plan.consumed
+                           or plan.proposal.mechanisms[plan.stage] != "radio"
+                           or _radio_id(plan, plan.stage) in state.world.radio_opportunities):
+            raise ValueError("Invalid unprepared recovery boundary / Límite de etapa no preparada no válido")
+    except ValueError:
+        return  # Corrupt physical/ledger/proposal state remains unsaveable.
+    plan.invalidation = (reason, _invalidation_key(plan, reason))
 
 
 def confirm_recovery(state, proposal):
@@ -443,12 +699,12 @@ def confirm_recovery(state, proposal):
     if snapshot_key(state) != proposal.snapshot:
         raise ValueError("Stale recovery snapshot")
     path = _validate_physical(state, proposal)
+    _validate_stage_sources(state, proposal, path)
     access = directed_access(state).get(path[0])
     if access != proposal.access or proposal.sites[0].kind not in HUBS or proposal.mechanisms[0] != "radio":
         raise ValueError("Recovery origin is not accessible")
-    if communications.radio_spatial_block_reason(state, path[0], channel="station_broadcast"):
+    if _first_reception(state, path[0], proposal.first_emission_id):
         raise ValueError("Recovery first reception is outside physical coverage")
-    from retorno.core import lore
     staged = deepcopy(state)
     sectors = {site.physical_sector_id for nid,site in zip(path,proposal.sites)
                if nid not in staged.world.space.nodes or not staged.world.space.nodes[nid].historical_key}
@@ -457,10 +713,12 @@ def confirm_recovery(state, proposal):
     if any(nid not in staged.world.space.nodes for nid in path):
         raise ValueError("Recovery endpoint could not be materialized")
     _validate_physical(staged, proposal)
+    _validate_stage_sources(staged, proposal, path)
     for i, mechanism in enumerate(proposal.mechanisms[1:], 1):
-        if _edge_source(staged, path[i], path[i+1], proposal.sites[i]) != mechanism:
-            raise ValueError("Recovery source is stale")
-    ident = "structural:"+_digest((VERSION, proposal.scope, proposal.block, path, state.world.dead_nodes.get(proposal.block.removeprefix("deadnode:"))))
+        if mechanism == "salvage" and _salvage_source(staged, path[i], path[i+1], proposal.sites[i]) != proposal.stage_sources[i]:
+            raise ValueError("Recovery salvage source is stale")
+    ident = "structural:"+_digest((VERSION, proposal.scope, proposal.block, path, proposal.stage_sources,
+        state.world.dead_nodes.get(proposal.block.removeprefix("deadnode:"))))
     if ident in state.world.recovery_plans:
         return state.world.recovery_plans[ident]
     if any(key.startswith(ident+":") for key in state.world.radio_opportunities):
@@ -471,21 +729,7 @@ def confirm_recovery(state, proposal):
         if tracker is None:
             raise ValueError("Missing deadnode tracker")
         plan.dead_attempt = tracker.attempts
-    for i, mechanism in enumerate(proposal.mechanisms):
-        if mechanism != "salvage":
-            continue
-        nid = path[i]
-        lore.initialize_node_pool(staged, nid)
-        pool = staged.world.node_pools[nid]
-        if not pool.window_open or pool.node_cleaned or nid in staged.world.visited_nodes:
-            raise ValueError("Recovery salvage window closed")
-        file_path = f"/logs/nav/{ident.replace(':','_')}_{i}.txt"
-        if (f"/remote/{nid}{file_path}" in staged.os.fs
-                or any(f.get("path") == file_path for f in pool.base_files+pool.injected_files)):
-            raise ValueError("Recovery file collision")
-        content = f"LOCAL NAVIGATION NOTICE / AVISO LOCAL DE NAVEGACIÓN\n\nLINK: {nid} -> {path[i+1]}\n"
-        pool.injected_files.append({"path": file_path, "access": "guest", "content": content})
-        lore.recompute_node_completion(staged, nid)
+    plan.source_contract = _source_contract_key(plan)
     staged.world.recovery_plans[ident] = plan
     _radio_stage(staged, plan, 0)
     plan.status = "receipt_pending"
@@ -523,7 +767,8 @@ def confirm_recovery(state, proposal):
             for field in fields(pool):
                 setattr(old, field.name, getattr(pool, field.name))
     state.world.recovery_plans[ident] = plan
-    state.world.radio_opportunities[f"{ident}:0"] = staged.world.radio_opportunities[f"{ident}:0"]
+    radio_id = _radio_id(plan, 0)
+    state.world.radio_opportunities[radio_id] = staged.world.radio_opportunities[radio_id]
     state.world.recovery_activation_deferred = False
     return plan
 
@@ -549,7 +794,7 @@ def request_recovery(state, block="global", target_id=None):
 def delivery_valid(state, opportunity):
     delivery = opportunity.delivery
     plan = state.world.recovery_plans.get(delivery.get("plan"))
-    if not plan or plan.version != VERSION or plan.status not in ACTIVE:
+    if not plan or plan.version not in {VERSION, LEGACY_VERSION} or plan.status not in ACTIVE:
         return False
     index = delivery.get("stage")
     if index != plan.stage or index in plan.captured or (index and index-1 not in plan.consumed):
@@ -597,10 +842,14 @@ def mark_stage_read(state, file_path):
         if dest not in state.world.known_links.get(source, ()):
             continue
         if plan.proposal.mechanisms[index] == "radio":
-            op = state.world.radio_opportunities.get(f"{plan.plan_id}:{index}")
+            op = state.world.radio_opportunities.get(_radio_id(plan, index))
             matches = op and op.status == "read_imported" and op.path == file_path
+        elif plan.proposal.mechanisms[index] == "salvage":
+            archive = (plan.proposal.stage_sources[index].reference if plan.version == VERSION
+                       else f"/logs/nav/{plan.plan_id.replace(':','_')}_{index}.txt")
+            matches = file_path == f"/remote/{source}{archive}"
         else:
-            matches = file_path == f"/remote/{source}/logs/nav/{plan.plan_id.replace(':','_')}_{index}.txt"
+            continue
         if matches and index not in plan.consumed:
             plan.consumed += (index,)
             plan.status = "stage_consumed"
@@ -612,9 +861,10 @@ def advance_recovery_plans(state):
             continue
         try:
             path = _validate_physical(state, plan.proposal)
+            _validate_progress(plan, path)
             _validate_prepared_sources(state,plan,path)
         except ValueError:
-            plan.status = "invalid"
+            _invalidate_plan(state, plan)
             continue
         index = plan.stage
         if index not in plan.consumed or state.world.current_node_id != path[index+1]:
@@ -625,13 +875,21 @@ def advance_recovery_plans(state):
         plan.stage += 1
         if plan.proposal.mechanisms[plan.stage] == "radio":
             try:
-                _radio_stage(state, plan, plan.stage)
-                plan.status = "receipt_pending"
+                op = _radio_stage(state, plan, plan.stage)
+                if op.status in {"received", "read_imported"}:
+                    plan.captured += (plan.stage,)
+                    plan.status = "active"
+                    if (op.status == "read_imported" and
+                            path[plan.stage+1] in state.world.known_links.get(path[plan.stage], ())):
+                        plan.consumed += (plan.stage,)
+                        plan.status = "stage_consumed"
+                else:
+                    plan.status = "receipt_pending"
             except ValueError:
-                plan.status = "invalid"
+                _invalidate_plan(state, plan, unprepared=True)
         elif plan.proposal.mechanisms[plan.stage] == "known_route":
             if path[plan.stage+1] not in state.world.known_links.get(path[plan.stage], ()):
-                plan.status = "invalid"
+                _invalidate_plan(state, plan)
             else:
                 plan.consumed += (plan.stage,)
                 plan.status = "stage_consumed"
@@ -642,12 +900,30 @@ def advance_recovery_plans(state):
 def validate_recovery_state(state):
     """Reject incompatible plans; never rewrite or delete a save file."""
     for key, plan in state.world.recovery_plans.items():
-        if not isinstance(plan, RecoveryPlan) or key != plan.plan_id or plan.version != VERSION:
+        if not isinstance(plan, RecoveryPlan) or key != plan.plan_id or plan.version not in {VERSION, LEGACY_VERSION}:
             raise ValueError("Incompatible structural recovery / Recuperación estructural incompatible")
         path = _validate_physical(state, plan.proposal)
-        _validate_prepared_sources(state,plan,path)
-        if not plan.captured and (not plan.proposal.access.path or communications.radio_spatial_block_reason(
-                state, path[0], channel="station_broadcast", receiver_node_id=plan.proposal.access.path[0])):
+        _validate_progress(plan, path)
+        invalidation = getattr(plan, "invalidation", None)  # Pre-correction slots.
+        if plan.status == "invalid":
+            if (not isinstance(invalidation, tuple) or len(invalidation) != 2
+                    or invalidation[0] not in {"sources_unavailable", "stage_unprepared"}
+                    or invalidation[1] != _invalidation_key(plan, invalidation[0])):
+                raise ValueError("Uncertified recovery invalidation / Invalidación de recuperación sin constancia válida")
+            unprepared = invalidation[0] == "stage_unprepared"
+            if unprepared and (plan.stage == 0 or plan.stage in plan.captured or plan.stage in plan.consumed
+                               or plan.proposal.mechanisms[plan.stage] != "radio"
+                               or _radio_id(plan, plan.stage) in state.world.radio_opportunities):
+                raise ValueError("Invalid unprepared recovery boundary / Límite de etapa no preparada no válido")
+            _validate_prepared_sources(state, plan, path, archival=True, unprepared=unprepared)
+        else:
+            if invalidation is not None:
+                raise ValueError("Active recovery carries invalidation checkpoint / Recuperación activa con constancia de invalidación")
+            _validate_prepared_sources(state,plan,path)
+        if not plan.captured and (not plan.proposal.access.path or _first_reception(
+                state, path[0], plan.proposal.first_emission_id, receiver_node_id=plan.proposal.access.path[0],
+                sensitivity=plan.proposal.first_reception_sensitivity, at_t=plan.prepared_t,
+                legacy=plan.version == LEGACY_VERSION)):
             raise ValueError("Invalid initial reception context / Contexto inicial de recepción no válido")
         if not 0 <= plan.stage < len(path)-1 or any(i < 0 or i >= len(path)-1 for i in plan.captured+plan.consumed):
             raise ValueError("Invalid structural recovery stage / Etapa de recuperación no válida")

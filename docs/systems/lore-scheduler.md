@@ -1,3 +1,10 @@
+> **4D-3e5b — physical reception.** The shared ledger revalidates 3D distance,
+> power, sensitivity and propagated window at capture. Optional radio_emission
+> binds a piece to a declared transmitter without changing weights, rolls,
+> deadlines, windows or dock/uplink/salvage triggers. Automatic remote listening
+> prepares only independent emissions, never an unauthorized piece.
+> [Current contract](radio-spacetime.md). Historical sections retain their context.
+
 > **Implemented 4D-3e4b update (2026-11-06).** Signals and broadcasts require `comms`/`radiod`, a legitimate local source and actual reception before consuming pieces or stages. Pending, received and read opportunities persist in one ledger. Legacy activations fabricating corrective nodes are explicitly deferred until e5; existing chains can deliver through their real channel. Scheduler policies, scan and uplink are unchanged. The [communications contract](passive-communications.md) specifies gates, coverage, retries and limits, superseding historical descriptions below on these points. F-DEAD-01 remains pending.
 
 > **Implemented 4D-3e4 update (2026-11-05).** The scheduler uses certified preexisting hosts and reservations validated before play. It no longer fabricates nodes for forced pieces or reopens closed/exhausted pools. Policies still force attempts, not discovery or guaranteed delivery. Definitions and texts are tied to the saved catalogue. The current contract and executable examples are [Physical narrative requirements](../narrative-world-contract.md). The earlier body retained below is historical wherever it contradicts this update.
