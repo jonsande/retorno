@@ -18,7 +18,7 @@ Comportamiento
 - Si el servicio ya está en ejecución, no se encola trabajo nuevo.
 - Durante el arranque y al completar se revalidan instalación, propietario, potencia y dependencias.
 - Apagar el hardware detiene su servicio. Encenderlo no vuelve a arrancar ese servicio.
-- El arranque de radiod dura 5 segundos; diag comms explica bloqueos de recepción y recuentos pendientes.
+- El arranque de radiod dura 5 segundos; diag comms explica equipo receptor, servicio y bloqueos operativos.
 
 Bloqueos frecuentes
 - `service_missing`

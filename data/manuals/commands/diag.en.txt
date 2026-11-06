@@ -7,5 +7,7 @@ Usage notes
 - Use canonical system ids (`power_core`, `life_support`, `drone_bay`, etc.).
 - Combine with `alerts explain` for actionable interpretation.
 
+- diag comms reports receiver hardware, health, power, service and availability; it does not certify uncaptured signals.
+
 Related commands
 - `status`, `about <system_id>`, `alerts`, `repair`

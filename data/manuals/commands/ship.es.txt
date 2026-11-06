@@ -31,5 +31,7 @@ Convencion de id de sector
 Notas de uso
 - Usa `ship systems` + `alerts` para triage de fallos antes de operaciones largas.
 
+- ship survey <node_id> consulta contactos conocidos; un ID no descubierto no proporciona datos físicos. Usa scan o adquiere intel para descubrirlo.
+
 Comandos relacionados
 - `status`, `diag <system_id>`, `power status`, `jobs`

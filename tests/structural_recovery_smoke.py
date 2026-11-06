@@ -380,7 +380,7 @@ def test_17_en_es_diagnostics_cli_textual_and_no_leaks():
         s=scene();s.os.locale=locale
         rec.confirm_recovery(s,proposal(s))
         lines=radio_diagnostic_lines(s)
-        assert any(("pendiente" if locale==Locale.ES else "pending") in line for line in lines)
+        assert all("pending=" not in line and "pendientes=" not in line and "Structural recovery" not in line and "Recuperación estructural" not in line for line in lines)
         assert all(next(iter(s.world.recovery_plans)) not in line and "LINK:" not in line for line in lines)
         with redirect_stdout(io.StringIO()) as out:repl.render_status(s)
         assert out.getvalue().strip().splitlines()==presenter.build_command_output(repl.render_status,s)

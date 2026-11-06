@@ -1,0 +1,1635 @@
+{
+  "phase": "4D-3e5a",
+  "date": "2026-11-06",
+  "initial_head": "343829ee925492b4de62c5ccfd6025e3549dea51",
+  "final_head": "343829ee925492b4de62c5ccfd6025e3549dea51",
+  "branch": "main",
+  "upstream": "origin/main",
+  "initial_tree": "clean",
+  "index": "empty",
+  "normative_run": "e5a-delivery",
+  "interpreter": "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+  "runner_source": "import concurrent.futures\nimport json\nimport os\nfrom pathlib import Path\nimport subprocess\nimport sys\nimport time\n\nroot = Path('/home/jon/prog/retorno_case/retorno')\nlabel = sys.argv[1]\nout = Path('/tmp/retorno-e4-' + label)\nout.mkdir(exist_ok=True)\nenv = dict(os.environ, PYTHONPATH=str(root / 'src') + ':' + str(root), RETORNO_SAVE_DIR=str(out / 'saves'))\npaths = sorted(set(root.glob('tests/*smoke*.py')))\ndef run(path):\n    start = time.monotonic()\n    try:\n        p = subprocess.run([sys.executable, str(path)], cwd=root, env=env, text=True,\n                           stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=240)\n        result = dict(file=path.name, code=p.returncode, seconds=round(time.monotonic()-start, 2))\n        (out / (path.stem + '.log')).write_text(p.stdout)\n    except subprocess.TimeoutExpired as exc:\n        result = dict(file=path.name, code='timeout', seconds=240)\n        (out / (path.stem + '.log')).write_bytes(exc.stdout or b'')\n    print(json.dumps(result), flush=True)\n    return result\nwith concurrent.futures.ThreadPoolExecutor(max_workers=int(sys.argv[2]) if len(sys.argv) > 2 else 4) as pool:\n    results = list(pool.map(run, paths))\n(out / 'results.json').write_text(json.dumps(results, indent=2))\nprint('TOTAL', len(results), 'FAIL', sum(r['code'] != 0 for r in results), flush=True)\n",
+  "runs": [
+    {
+      "label": "e5a-baseline",
+      "total": 64,
+      "passed": 63,
+      "results": [
+        {
+          "file": "audio_config_smoke.py",
+          "code": 0,
+          "seconds": 1.19,
+          "log": "AUDIO CONFIG SMOKE PASSED\n"
+        },
+        {
+          "file": "audio_runtime_notice_smoke.py",
+          "code": 0,
+          "seconds": 0.07,
+          "log": ""
+        },
+        {
+          "file": "config_audio_smoke.py",
+          "code": 0,
+          "seconds": 0.16,
+          "log": "CONFIG AUDIO SMOKE PASSED\n"
+        },
+        {
+          "file": "contacts_sector_smoke.py",
+          "code": 0,
+          "seconds": 0.16,
+          "log": ""
+        },
+        {
+          "file": "contacts_smoke.py",
+          "code": 0,
+          "seconds": 0.22,
+          "log": "CONTACTS SMOKE PASSED\n"
+        },
+        {
+          "file": "deadnode_chain_detours_smoke.py",
+          "code": 0,
+          "seconds": 3.47,
+          "log": "PASS test_direct_viable_is_retained\nPASS test_reference_seed_empty_straight_slots_find_offline_nodes\nPASS test_existing_detour_preferred_over_shorter_all_new\nPASS test_mixed_detour_minimizes_new_nodes\nPASS test_real_regional_boundary_with_existing_detour\nPASS test_short_unusable_receiver_loses_to_longer_information_path\nPASS test_equal_alternatives_have_stable_tie_breaks\nPASS test_no_procedural_context_is_not_a_permission\nPASS test_regional_kind_restrictions_not_overridden\nPASS test_shared_slot_reservations_and_coordinate_collision\nPASS test_navigation_only_exhausted_stop_and_direction_preserved\nPASS test_protected_shortcut_excluded_alternative_retained\nPASS test_sources_and_first_reception_remain_pending\nPASS test_generated_explored_and_lazy_insertion_are_distinct\nPASS test_collision_safe_detour_identities\nPASS test_pending_identity_references_are_not_reused\nPASS test_indexed_forecasts_match_the_canonical_full_world_query\nPASS test_budget_exhaustion_is_incomplete_not_universal_impossibility\nPASS test_detour_save_load_hash_seeds_and_all_state_purity\nPASS test_detour_never_calls_live_writers\nPASS test_populated_world_has_bounded_search_and_preserves_state\nDEADNODE CHAIN DETOURS SMOKE PASSED\n"
+        },
+        {
+          "file": "deadnode_chain_planner_smoke.py",
+          "code": 0,
+          "seconds": 4.26,
+          "log": "PASS test_direct_and_inclusive_cap\nPASS test_70_and_100_with_valid_canonical_slots\nPASS test_existing_chain_preferred_and_revealed_progressively\nPASS test_mixed_existing_and_new\nPASS test_alternative_directed_origin_and_disconnected_impostor\nPASS test_invalid_origin_and_endpoints\nPASS test_known_route_projection_does_not_accept_stale_edges\nPASS test_types_follow_real_region_archetype_and_slot_rules\nPASS test_waystation_has_uplink_but_not_salvage_data\nPASS test_unknown_type_cannot_provide_mandatory_data\nPASS test_unavailable_receivers_are_not_reopened\nPASS test_consumed_uplink_not_reused_but_other_sources_independent\nPASS test_visited_scale_can_use_known_route_without_new_information\nPASS test_existing_intel_and_normal_solve_are_distinct_from_recovery_signal\nPASS test_file_intel_must_be_readable_and_uncorrupted\nPASS test_protected_target_intermediary_and_unlocked_host\nPASS test_unresolved_primary_protection_fails_closed\nPASS test_generated_and_lazy_sectors_are_explicit_dependencies\nPASS test_no_policy_or_procedural_slot_is_not_fabricated\nPASS test_identity_collision_is_avoided_without_allocating_ids\nPASS test_complete_no_mutation_and_no_production_helpers\nPASS test_order_determinism_and_save_load_without_proposal_persistence\nPASS test_stopped_waypoint_is_an_origin\nPASS test_no_arbitrary_stage_limit\nPASS test_unknown_record_does_not_make_an_origin_operational\nPASS test_candidate_gates_and_missing_drone_dependency\nPASS test_full_sector_cannot_supply_extra_slots_or_forbidden_types\nPASS test_determinism_across_hash_seeds\nDEADNODE CHAIN PLANNER SMOKE PASSED\n"
+        },
+        {
+          "file": "deadnode_cooldown_zero_smoke.py",
+          "code": 0,
+          "seconds": 0.55,
+          "log": "DEADNODE COOLDOWN ZERO SMOKE PASSED\n"
+        },
+        {
+          "file": "deadnode_opportunity_selection_smoke.py",
+          "code": 0,
+          "seconds": 4.9,
+          "log": "PASS test_01_origin_at_current_node\nPASS test_02_multiple_known_access_hops\nPASS test_03_close_origin_wrong_direction\nPASS test_04_different_access_hops_preserved\nPASS test_05_equal_hops_different_distances\nPASS test_06_short_chain_long_backtrack_counted\nPASS test_07_longer_chain_nearer_origin\nPASS test_08_no_free_repositioning\nPASS test_09_near_unidentified_opportunity\nPASS test_10_near_visited_region_allowed\nPASS test_11_far_old_region_not_forbidden_by_threshold\nPASS test_12_generated_is_not_visited_or_known_sector\nPASS test_13_visited_not_completed\nPASS test_14_completed_remains_completed\nPASS test_15_sensor_coverage_remains_unknown\nPASS test_16_new_in_generated_sector_stays_conditional\nPASS test_17_canonical_travel_time_and_power\nPASS test_18_wear_and_repair_not_predicted_as_exact\nPASS test_19_future_scrap_unknown_not_zero\nPASS test_20_cannibalization_unavailable\nPASS test_21_no_resources_or_consumptions_changed\nPASS test_22_physical_validity_does_not_prove_economy\nPASS test_23_near_beats_disproportionate_backtrack\nPASS test_24_known_near_beats_new_very_far\nPASS test_25_frontier_only_after_comparable_access\nPASS test_26_short_but_unusable_information_excluded\nPASS test_27_longer_valid_progression_retained\nPASS test_28_primary_target_protected\nPASS test_29_future_reception_not_provisional\nPASS test_30_no_verified_solution_is_explicit\nPASS test_31_ties_and_tradeoffs_preserved\nPASS test_32_ordering_without_random_weights\nPASS test_33_whole_state_unchanged_and_no_live_helpers\nPASS test_34_rng_counters_and_attempts_unchanged\nPASS test_35_no_knowledge_or_route_publication\nPASS test_36_hash_seed_determinism\nPASS test_37_save_load_selection\nPASS test_38_thousands_of_nodes\nPASS test_39_multiple_targets_bounded_shared_queries\nPASS test_40_navigation_cap_and_stopped_waypoint\nDEADNODE OPPORTUNITY SELECTION SMOKE PASSED\n"
+        },
+        {
+          "file": "debug_add_commands_smoke.py",
+          "code": 0,
+          "seconds": 0.22,
+          "log": "DEBUG ADD COMMANDS SMOKE PASSED\n"
+        },
+        {
+          "file": "debug_galaxy_smoke.py",
+          "code": 0,
+          "seconds": 0.27,
+          "log": "DEBUG GALAXY SMOKE PASSED\n"
+        },
+        {
+          "file": "debug_lore_arcs_smoke.py",
+          "code": 0,
+          "seconds": 0.27,
+          "log": "DEBUG LORE/ARCS SMOKE PASSED\n"
+        },
+        {
+          "file": "debug_worldgen_graph_smoke.py",
+          "code": 0,
+          "seconds": 0.25,
+          "log": "DEBUG WORLDGEN/GRAPH SMOKE PASSED\n"
+        },
+        {
+          "file": "drone_completion_context_smoke.py",
+          "code": 0,
+          "seconds": 0.49,
+          "log": "DRONE COMPLETION CONTEXT SMOKE PASSED\n"
+        },
+        {
+          "file": "drone_modular_v1_smoke.py",
+          "code": 0,
+          "seconds": 1.02,
+          "log": "DRONE MODULAR V1 SMOKE PASSED\n"
+        },
+        {
+          "file": "drone_recall_all_smoke.py",
+          "code": 0,
+          "seconds": 0.24,
+          "log": "DRONE RECALL ALL SMOKE PASSED\n"
+        },
+        {
+          "file": "drone_salvage_survey_smoke.py",
+          "code": 0,
+          "seconds": 0.75,
+          "log": "DRONE SALVAGE/SURVEY SMOKE PASSED\n"
+        },
+        {
+          "file": "energy_policy_smoke.py",
+          "code": 0,
+          "seconds": 3.17,
+          "log": "ENERGY POLICY SMOKE PASSED\n"
+        },
+        {
+          "file": "exploration_recovery_smoke.py",
+          "code": 0,
+          "seconds": 0.62,
+          "log": "EXPLORATION RECOVERY SMOKE PASSED\n"
+        },
+        {
+          "file": "forced_hidden_ad_hoc_smoke.py",
+          "code": 0,
+          "seconds": 0.29,
+          "log": "FORCED HIDDEN AD-HOC SMOKE PASSED\n"
+        },
+        {
+          "file": "galaxy_physical_model_smoke.py",
+          "code": 0,
+          "seconds": 0.15,
+          "log": "GALAXY PHYSICAL MODEL SMOKE PASSED\n"
+        },
+        {
+          "file": "hibernate_radiation_wake_smoke.py",
+          "code": 0,
+          "seconds": 0.31,
+          "log": "HIBERNATE RADIATION WAKE SMOKE PASSED\n"
+        },
+        {
+          "file": "hibernate_sequence_assets_smoke.py",
+          "code": 0,
+          "seconds": 0.03,
+          "log": ""
+        },
+        {
+          "file": "intel_recent_order_smoke.py",
+          "code": 0,
+          "seconds": 0.4,
+          "log": "INTEL RECENT ORDER SMOKE PASSED\n"
+        },
+        {
+          "file": "job_id_numbering_smoke.py",
+          "code": 0,
+          "seconds": 0.22,
+          "log": "JOB ID NUMBERING SMOKE PASSED\n"
+        },
+        {
+          "file": "known_routes_integrity_smoke.py",
+          "code": 0,
+          "seconds": 2.31,
+          "log": "PASS _assert_hops_and_publication\nPASS _assert_import_history_and_locales\nPASS _assert_components_and_views\nPASS _assert_recovery_frontier\nPASS _assert_deadnode_candidates\nPASS _assert_lazy_sector\nPASS _assert_solve_and_travel\nPASS _assert_job_endpoint_disappears\nPASS _assert_waypoint_is_inert_after_removal\nPASS _assert_persistence\nKNOWN ROUTES INTEGRITY SMOKE PASSED (seed=271828)\n"
+        },
+        {
+          "file": "lore_channel_preference_and_unlock_smoke.py",
+          "code": 0,
+          "seconds": 0.2,
+          "log": "LORE CHANNEL PREFERENCE + UPLINK PRIMARY UNLOCK SMOKE PASSED\n"
+        },
+        {
+          "file": "lore_distance_from_start_smoke.py",
+          "code": 0,
+          "seconds": 0.15,
+          "log": "LORE DISTANCE FROM START SMOKE PASSED\n"
+        },
+        {
+          "file": "lore_secondary_count_weights_hard_smoke.py",
+          "code": 0,
+          "seconds": 1.05,
+          "log": "LORE SECONDARY COUNT + SINGLE WEIGHTS + HARD FORCE SMOKE PASSED\n"
+        },
+        {
+          "file": "lore_smoke.py",
+          "code": 0,
+          "seconds": 0.17,
+          "log": "LORE SMOKE PASSED\n"
+        },
+        {
+          "file": "mail_metadata_and_log_header_smoke.py",
+          "code": 0,
+          "seconds": 0.22,
+          "log": "MAIL METADATA + LOG HEADER SMOKE PASSED\n"
+        },
+        {
+          "file": "narrative_world_integration_smoke.py",
+          "code": 0,
+          "seconds": 18.82,
+          "log": "PASS test_01_bootstrap_identity_and_no_secret_revelation\nPASS test_02_order_and_pure_queries\nPASS test_03_seed_variability_and_bound_clues\nPASS test_04_forced_host_delivery_salvage_and_reading\nPASS test_05_optional_probability_delivery_and_no_physical_dependency\nPASS test_06_pool_exhaustion_and_deadline_never_reopen\nPASS test_07_intel_public_formats_and_pending_references\nPASS test_08_repeated_saves_and_catalog_changes\nPASS test_09_negative_declarations\nPASS test_10_current_catalogue_and_impact_measurement\nPASS test_11_near_is_not_a_connection_and_required_link_rejected\nPASS test_12_corrupt_intel_is_uncertain_and_never_fabricates\nPASS test_13_local_file_bindings_and_compilation_failures\nPASS test_14_all_existing_push_channels_keep_reading_separate\nPASS test_15_essential_document_reserved_on_empty_wreck\nPASS test_16_protected_alias_and_natural_discovery_exceptions\nPASS test_17_unbound_tokens_and_legacy_save_rejection\nPASS test_18_essential_file_path_must_be_recoverable\nPASS test_19_reserved_tokens_are_validated_without_bindings\nPASS test_20_essential_payload_matches_real_delivery_and_language_fallback\nNARRATIVE WORLD INTEGRATION PASSED /tmp/retorno-e4-narrative-evidence.json\n"
+        },
+        {
+          "file": "nav_abort_waypoint_cleanup_smoke.py",
+          "code": 0,
+          "seconds": 3.71,
+          "log": "PASS test_abort_position_and_inactive_abort\nPASS test_scan_from_stopped_waypoint\nPASS test_scan_gates_and_real_transit\nPASS test_third_destination_completion_and_arrival\nPASS test_travel_to_third_destination\nPASS test_return_and_resume_cleanup\nPASS test_save_load_at_all_phases\nPASS test_repeated_aborts\nPASS test_repeated_abort_drops_deleted_origin_metadata\nPASS test_pending_waypoint_jobs_become_history\nPASS test_cleanup_cancellation_event_once_on_arrival\nPASS test_cleanup_cancellation_event_once_on_repeated_abort\nPASS test_cleanup_cancellation_event_once_on_docking_completion\nPASS test_bilingual_status_and_help\nPASS test_rejections_direction_and_ordinary_arrival\nNAV ABORT WAYPOINT CLEANUP SMOKE PASSED\n"
+        },
+        {
+          "file": "nav_map_galaxy_dependencies_smoke.py",
+          "code": 0,
+          "seconds": 0.22,
+          "log": "NAV MAP GALAXY DEPENDENCIES SMOKE PASSED\n"
+        },
+        {
+          "file": "nav_map_galaxy_determinism_smoke.py",
+          "code": 0,
+          "seconds": 0.27,
+          "log": "NAV MAP GALAXY DETERMINISM SMOKE PASSED\n"
+        },
+        {
+          "file": "nav_map_galaxy_smoke.py",
+          "code": 0,
+          "seconds": 0.25,
+          "log": "NAV MAP GALAXY SMOKE PASSED\n"
+        },
+        {
+          "file": "passive_communications_smoke.py",
+          "code": 0,
+          "seconds": 9.24,
+          "log": "test_01_prologue_power_and_boot PASS\ntest_02_boot_interruptions_and_missing_installation PASS\ntest_03_receiver_states_and_independence PASS\ntest_04_lore_pending_capture_read_and_idempotence PASS\ntest_05_coverage_and_no_early_dock PASS\ntest_06_repair_then_capture PASS\ntest_07_non_radio_channels_and_explicit_external_mail PASS\ntest_08_save_pending_received_read_and_old_schema_defaults PASS\ntest_09_recovery_legacy_deferral_and_existing_gateway PASS\ntest_10_deadnode_no_premature_commit_or_new_bridge PASS\ntest_11_localization_diagnostics_and_dynamic_notices PASS\ntest_12_radio_does_not_consume_rng_or_change_physics PASS\nPUBLIC FLOW: power off security -> power off data_core -> drone deploy D1 PWR-A1 -> drone repair D1 power_core -> drone repair D1 power_core -> drone repair D1 power_core -> drone move D1 BUS-A2 -> drone repair D1 energy_distribution -> drone repair D1 energy_distribution -> drone move D1 BRG-01 -> drone repair D1 comms -> power on comms -> boot radiod ; t=314.0s scrap=49 radio=ready\ntest_13_public_prologue_sequence_without_resource_overrides PASS\ntest_14_frozen_lore_across_pending_save_and_locale_switch PASS\ntest_15_live_gates_do_not_write_or_consume_pending PASS\ntest_16_explicit_external_lore_mail_uses_radio PASS\ntest_17_legacy_gateway_rechecks_protected_and_physical_target PASS\ntest_18_save_load_during_service_boot PASS\nPASSIVE COMMUNICATIONS: 18 groups PASS\n"
+        },
+        {
+          "file": "procedural_radiation_smoke.py",
+          "code": 0,
+          "seconds": 0.16,
+          "log": "PROCEDURAL RADIATION SMOKE PASSED\n"
+        },
+        {
+          "file": "radiation_hull_smoke.py",
+          "code": 1,
+          "seconds": 1.11,
+          "log": "Traceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/radiation_hull_smoke.py\", line 217, in <module>\n    main()\n  File \"/home/jon/prog/retorno_case/retorno/tests/radiation_hull_smoke.py\", line 183, in main\n    assert any(e.data.get(\"metric\") == \"env\" for e in ship_rad_events), ship_rad_events\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: []\n"
+        },
+        {
+          "file": "route_hop_cap_smoke.py",
+          "code": 0,
+          "seconds": 0.23,
+          "log": "ROUTE HOP CAP SMOKE PASSED\n"
+        },
+        {
+          "file": "route_solve_out_of_range_origins_smoke.py",
+          "code": 0,
+          "seconds": 0.39,
+          "log": "ROUTE SOLVE OUT OF RANGE ORIGINS SMOKE PASSED\n"
+        },
+        {
+          "file": "save_load_smoke.py",
+          "code": 0,
+          "seconds": 0.33,
+          "log": "SAVE/LOAD SMOKE PASSED\n"
+        },
+        {
+          "file": "scan_job_smoke.py",
+          "code": 0,
+          "seconds": 0.47,
+          "log": "SCAN JOB SMOKE PASSED\n"
+        },
+        {
+          "file": "scan_observation_memory_smoke.py",
+          "code": 0,
+          "seconds": 10.62,
+          "log": "PASS test_01_successful_job_new_contact_and_exact_event_results\nPASS test_02_known_contact_only_is_not_no_signals\nPASS test_03_negative_observation_retains_legitimate_intel_and_later_discovery\nPASS test_04_blocked_sensors_and_sensord_produce_no_observation\nPASS test_05_context_and_sensor_interruptions_do_not_record\nPASS test_06_cancel_before_and_during_work_does_not_record\nPASS test_07_repeated_ticks_effects_and_compatibility_do_not_duplicate\nPASS test_08_execution_conditions_not_queue_snapshot\nPASS test_09_worldgen_failure_is_failed_job_not_negative_observation\nPASS test_10_exception_after_some_materialization_leaves_no_absence_evidence\nPASS test_11_multiple_save_load_cycles_and_scanning_after_load\nPASS test_12_retention_ids_and_completed_job_replay_after_pruning\nPASS test_13_genuine_schema3_slot_shape_without_history_loads_safely\nPASS test_14_immutable_read_api_and_no_retroactive_aliases\nPASS test_15_hidden_and_protected_manifest_sites_never_leak_from_query\nPASS test_16_physical_z_spill_observed_from_actual_position\nPASS test_17_exact_prechange_rng_and_world_results_across_seeds_conditions\nPASS test_18_recovery_entry_exception_keeps_single_rng_increment\nPASS test_19_bilingual_public_event_presentation_shared_by_textual\nPASS test_20_stopped_waypoint_and_live_transit_keep_existing_gates\nSCAN OBSERVATION MEMORY SMOKE PASSED (20 groups)\n"
+        },
+        {
+          "file": "sector_intel_validation_smoke.py",
+          "code": 0,
+          "seconds": 0.83,
+          "log": "SECTOR INTEL VALIDATION SMOKE PASSED\n"
+        },
+        {
+          "file": "sensor_detection_factor_smoke.py",
+          "code": 0,
+          "seconds": 3.66,
+          "log": "SENSOR DETECTION FACTOR SMOKE PASSED\n"
+        },
+        {
+          "file": "ship_layout_output_smoke.py",
+          "code": 0,
+          "seconds": 0.22,
+          "log": "SHIP LAYOUT OUTPUT SMOKE PASSED\n"
+        },
+        {
+          "file": "ship_survey_radiation_smoke.py",
+          "code": 0,
+          "seconds": 0.22,
+          "log": "SHIP SURVEY RADIATION SMOKE PASSED\n"
+        },
+        {
+          "file": "smoke_test.py",
+          "code": 0,
+          "seconds": 0.36,
+          "log": "SMOKE TEST PASSED\n"
+        },
+        {
+          "file": "structural_recovery_smoke.py",
+          "code": 0,
+          "seconds": 16.81,
+          "log": "PASS test_01_existing_certified_and_no_physical_invention\nPASS test_02_lazy_target_and_authored_narrative_identity\nPASS test_03_positive_inclusive_cap_and_missing_endpoint\nPASS test_04_multi_stage_and_detour\nPASS test_05_directed_complete_distance_beats_euclidean_origin\nPASS test_06_pure_economy_hardware_radiation_independence\nPASS test_07_empty_isolated_and_no_emitter\nPASS test_08_budgets_and_widening_without_maximum_distance\nPASS test_09_transaction_stale_collision_and_injected_failure\nPASS test_10_gates_capture_read_no_full_chain\nPASS test_11_leave_return_and_invalid_source_at_capture\nPASS test_12_closed_pools_and_salvage_preparation\nPASS test_13_protected_primary_reserved_host_and_unsupported_reference\nPASS test_14_persist_all_boundaries_and_reject_incompatible\nPASS test_15_real_world_multiseed_order_z_and_topology\nPASS test_16_runtime_global_frontier_and_deadnode_counters\nPASS test_17_en_es_diagnostics_cli_textual_and_no_leaks\nPASS test_18_process_determinism_and_input_order\nPUBLIC SCENE FLOW: power off security -> power on comms -> boot radiod -> scan -> cat /logs/broadcasts/A_0011.en.txt -> nav B ; resources and systems use ordinary rules\nPASS test_19_public_commands_from_declared_scene_without_gameplay_edits\nSEARCH METRICS [{\"case\": \"installed\", \"cohorts\": 42, \"edges\": 25, \"expansions\": 2, \"peak_bytes\": 849776, \"seconds\": 0.245075, \"sectors\": 16, \"status\": \"validated\"}, {\"case\": \"chain\", \"cohorts\": 38, \"edges\": 2, \"expansions\": 3, \"peak_bytes\": 839145, \"seconds\": 0.069154, \"sectors\": 16, \"status\": \"validated\"}, {\"case\": \"materialized\", \"cohorts\": 30, \"edges\": 4, \"expansions\": 2, \"peak_bytes\": 955322, \"seconds\": 0.220463, \"sectors\": 16, \"status\": \"validated\"}]\nPASS test_20_metrics_and_technical_limits\nPASS test_21_real_salvage_consumption_between_stages_and_load\nPASS test_22_failed_materialization_and_identity_collisions_are_atomic\nPASS test_23_primary_natural_scan_and_exact_manual_solve_remain_legal\nPASS test_24_domain_and_loaded_search_resume_are_explicit\nPASS test_25_visited_physical_scale_uses_only_preexisting_known_route\nPUBLIC INSTALLED FLOW: power off security -> power off data_core -> drone deploy D1 PWR-A1 -> drone repair D1 power_core -> drone repair D1 power_core -> drone repair D1 power_core -> drone move D1 BUS-A2 -> drone repair D1 energy_distribution -> drone repair D1 energy_distribution -> drone move D1 BRG-01 -> drone repair D1 comms -> power on comms -> boot radiod -> power on sensors -> boot sensord -> scan -> route solve ECHO_7 -> nav ECHO_7 -> dock ECHO_7 ; t=2153.115s scrap=49; existing frontier preserved\nPASS test_26_installed_prologue_public_journey_without_fixture_or_overrides\nPASS test_27_stored_node_frontier_and_stale_deadnode_counter\nPASS test_28_remote_navigation_access_does_not_prove_first_reception\nPASS test_29_local_first_reception_overrides_more_attractive_remote_chain\nPASS test_30_spatial_eligibility_is_independent_of_receiver_operation\nPUBLIC FIRST RECEPTION REPAIR: power off security -> drone deploy D1 BRG-01 -> drone repair D1 comms -> power on comms -> boot radiod ; one capture\nPASS test_31_public_repair_and_boot_capture_local_pending_exactly_once\nPASS test_32_conditional_search_retries_at_new_location_and_survives_load\nPUBLIC FIRST RECEPTION FLOW: scan -> nav REMOTE -> power off security -> power on comms -> boot radiod -> cat received file; one capture\nPASS test_33_public_travel_changes_conditional_search_into_local_reception\nPASS test_34_selector_confirmation_and_capture_share_spatial_boundary\nPASS test_35_remote_condition_does_not_reveal_primaries_or_emitters\nPASS test_36_load_checks_original_reception_context_without_requiring_current_coverage\nSTRUCTURAL RECOVERY: 36 GROUPS PASSED\n"
+        },
+        {
+          "file": "textual_active_jobs_job_id_smoke.py",
+          "code": 0,
+          "seconds": 0.26,
+          "log": "TEXTUAL ACTIVE JOBS JOB ID SMOKE PASSED\n"
+        },
+        {
+          "file": "textual_command_spacing_smoke.py",
+          "code": 0,
+          "seconds": 3.68,
+          "log": "TEXTUAL COMMAND SPACING SMOKE PASSED\n"
+        },
+        {
+          "file": "textual_completion_context_smoke.py",
+          "code": 0,
+          "seconds": 1.93,
+          "log": "TEXTUAL COMPLETION CONTEXT SMOKE PASSED\n"
+        },
+        {
+          "file": "textual_theme_smoke.py",
+          "code": 0,
+          "seconds": 3.92,
+          "log": "TEXTUAL THEME SMOKE PASSED\n"
+        },
+        {
+          "file": "transit_radiation_progression_smoke.py",
+          "code": 0,
+          "seconds": 0.16,
+          "log": "TRANSIT RADIATION PROGRESSION SMOKE PASSED\n"
+        },
+        {
+          "file": "uplink_authored_and_failsafe_smoke.py",
+          "code": 0,
+          "seconds": 0.58,
+          "log": "UPLINK AUTHORED+FAILSAFE SMOKE PASSED\n"
+        },
+        {
+          "file": "uplink_once_per_node_smoke.py",
+          "code": 0,
+          "seconds": 0.36,
+          "log": "UPLINK ONCE PER NODE SMOKE PASSED\n"
+        },
+        {
+          "file": "uplink_only_delivery_retry_smoke.py",
+          "code": 0,
+          "seconds": 1.7,
+          "log": "UPLINK_ONLY DELIVERY + RETRY SMOKE PASSED\n"
+        },
+        {
+          "file": "worldgen_manifest_integration_smoke.py",
+          "code": 0,
+          "seconds": 5.14,
+          "log": "PASS test_01_orders_grouping_later_neighbors_and_witness_seeds\nPASS test_02_partial_inventory_save_load_and_consumption\nPASS test_03_pure_queries_do_not_touch_game_rng_knowledge_or_pools\nPASS test_04_z_outlier_inverse_completeness_against_wider_sources\nPASS test_05_numerical_bound_extreme_uniform_and_rounding\nPASS test_06_domain_work_bounds_and_atomic_failure\nPASS test_07_matching_reciprocity_maximality_budgets_and_hop_cap\nPASS test_08_authored_declaration_is_not_revelation_or_prose\nPASS test_09_new_ids_intel_blocks_authored_links_and_coord_semantics\nPASS test_10_collision_namespace_and_special_nodes_do_not_consume_quotas\nPASS test_11_incompatible_saves_rules_seed_and_corruption_preserve_files\nPASS test_12_unknown_cleanup_and_authored_properties_preserved\nPASS test_13_hashseed_process_determinism\nPASS test_14_seed_command_compatibility_and_localization\nWORLDGEN MANIFEST INTEGRATION SMOKE PASSED (14 groups)\n"
+        },
+        {
+          "file": "worldgen_manifest_prototype_smoke.py",
+          "code": 0,
+          "seconds": 2.82,
+          "log": "WORLDGEN MANIFEST PROTOTYPE SMOKE PASSED (17 groups)\n"
+        },
+        {
+          "file": "worldgen_modules_pool_smoke.py",
+          "code": 0,
+          "seconds": 1.68,
+          "log": "seed=1 region=disk sector=S+020_+000_+000 archetype=relay_corridor counts=[2, 2, 1]\nseed=1 region=bulge sector=S-25000_+000_+000 archetype=ruin_field counts=[1, 3]\nseed=1 region=halo sector=S+16000_+000_+000 archetype=empty counts=[0]\nseed=2 region=disk sector=S+020_+000_+000 archetype=relay_corridor counts=[2, 1]\nseed=2 region=bulge sector=S-25000_+000_+000 archetype=ruin_field counts=[3, 1]\nseed=2 region=halo sector=S+16000_+000_+000 archetype=empty counts=[0]\nseed=2 drone salvage node=S-25000_+000_+000:WG1_5127933e65399a0dd8554f8138f5a6e35626a3318b346987871ce50067b8d697_0 module=field_service_rig attempts=2; depletion and cargo persist\nWORLDGEN MODULES POOL SMOKE PASSED\n"
+        },
+        {
+          "file": "worldgen_preexistence_catalog_smoke.py",
+          "code": 0,
+          "seconds": 2.02,
+          "log": "WORLDGEN PREEXISTENCE CATALOG SMOKE PASSED (17 groups)\n"
+        },
+        {
+          "file": "worldgen_preexistence_characterization_smoke.py",
+          "code": 0,
+          "seconds": 0.7,
+          "log": "WORLDGEN PREEXISTENCE CHARACTERIZATION SMOKE PASSED (9 groups)\n"
+        },
+        {
+          "file": "worldgen_sparse_archetypes_smoke.py",
+          "code": 0,
+          "seconds": 10.23,
+          "log": "WORLDGEN SPARSE ARCHETYPES SMOKE PASSED\n"
+        }
+      ]
+    },
+    {
+      "label": "e5a-final",
+      "total": 65,
+      "passed": 64,
+      "results": [
+        {
+          "file": "audio_config_smoke.py",
+          "code": 0,
+          "seconds": 1.17,
+          "log": "AUDIO CONFIG SMOKE PASSED\n"
+        },
+        {
+          "file": "audio_runtime_notice_smoke.py",
+          "code": 0,
+          "seconds": 0.06,
+          "log": ""
+        },
+        {
+          "file": "config_audio_smoke.py",
+          "code": 0,
+          "seconds": 0.15,
+          "log": "CONFIG AUDIO SMOKE PASSED\n"
+        },
+        {
+          "file": "contacts_sector_smoke.py",
+          "code": 0,
+          "seconds": 0.15,
+          "log": ""
+        },
+        {
+          "file": "contacts_smoke.py",
+          "code": 0,
+          "seconds": 0.21,
+          "log": "CONTACTS SMOKE PASSED\n"
+        },
+        {
+          "file": "deadnode_chain_detours_smoke.py",
+          "code": 0,
+          "seconds": 3.24,
+          "log": "PASS test_direct_viable_is_retained\nPASS test_reference_seed_empty_straight_slots_find_offline_nodes\nPASS test_existing_detour_preferred_over_shorter_all_new\nPASS test_mixed_detour_minimizes_new_nodes\nPASS test_real_regional_boundary_with_existing_detour\nPASS test_short_unusable_receiver_loses_to_longer_information_path\nPASS test_equal_alternatives_have_stable_tie_breaks\nPASS test_no_procedural_context_is_not_a_permission\nPASS test_regional_kind_restrictions_not_overridden\nPASS test_shared_slot_reservations_and_coordinate_collision\nPASS test_navigation_only_exhausted_stop_and_direction_preserved\nPASS test_protected_shortcut_excluded_alternative_retained\nPASS test_sources_and_first_reception_remain_pending\nPASS test_generated_explored_and_lazy_insertion_are_distinct\nPASS test_collision_safe_detour_identities\nPASS test_pending_identity_references_are_not_reused\nPASS test_indexed_forecasts_match_the_canonical_full_world_query\nPASS test_budget_exhaustion_is_incomplete_not_universal_impossibility\nPASS test_detour_save_load_hash_seeds_and_all_state_purity\nPASS test_detour_never_calls_live_writers\nPASS test_populated_world_has_bounded_search_and_preserves_state\nDEADNODE CHAIN DETOURS SMOKE PASSED\n"
+        },
+        {
+          "file": "deadnode_chain_planner_smoke.py",
+          "code": 0,
+          "seconds": 4.09,
+          "log": "PASS test_direct_and_inclusive_cap\nPASS test_70_and_100_with_valid_canonical_slots\nPASS test_existing_chain_preferred_and_revealed_progressively\nPASS test_mixed_existing_and_new\nPASS test_alternative_directed_origin_and_disconnected_impostor\nPASS test_invalid_origin_and_endpoints\nPASS test_known_route_projection_does_not_accept_stale_edges\nPASS test_types_follow_real_region_archetype_and_slot_rules\nPASS test_waystation_has_uplink_but_not_salvage_data\nPASS test_unknown_type_cannot_provide_mandatory_data\nPASS test_unavailable_receivers_are_not_reopened\nPASS test_consumed_uplink_not_reused_but_other_sources_independent\nPASS test_visited_scale_can_use_known_route_without_new_information\nPASS test_existing_intel_and_normal_solve_are_distinct_from_recovery_signal\nPASS test_file_intel_must_be_readable_and_uncorrupted\nPASS test_protected_target_intermediary_and_unlocked_host\nPASS test_unresolved_primary_protection_fails_closed\nPASS test_generated_and_lazy_sectors_are_explicit_dependencies\nPASS test_no_policy_or_procedural_slot_is_not_fabricated\nPASS test_identity_collision_is_avoided_without_allocating_ids\nPASS test_complete_no_mutation_and_no_production_helpers\nPASS test_order_determinism_and_save_load_without_proposal_persistence\nPASS test_stopped_waypoint_is_an_origin\nPASS test_no_arbitrary_stage_limit\nPASS test_unknown_record_does_not_make_an_origin_operational\nPASS test_candidate_gates_and_missing_drone_dependency\nPASS test_full_sector_cannot_supply_extra_slots_or_forbidden_types\nPASS test_determinism_across_hash_seeds\nDEADNODE CHAIN PLANNER SMOKE PASSED\n"
+        },
+        {
+          "file": "deadnode_cooldown_zero_smoke.py",
+          "code": 0,
+          "seconds": 0.53,
+          "log": "DEADNODE COOLDOWN ZERO SMOKE PASSED\n"
+        },
+        {
+          "file": "deadnode_opportunity_selection_smoke.py",
+          "code": 0,
+          "seconds": 4.76,
+          "log": "PASS test_01_origin_at_current_node\nPASS test_02_multiple_known_access_hops\nPASS test_03_close_origin_wrong_direction\nPASS test_04_different_access_hops_preserved\nPASS test_05_equal_hops_different_distances\nPASS test_06_short_chain_long_backtrack_counted\nPASS test_07_longer_chain_nearer_origin\nPASS test_08_no_free_repositioning\nPASS test_09_near_unidentified_opportunity\nPASS test_10_near_visited_region_allowed\nPASS test_11_far_old_region_not_forbidden_by_threshold\nPASS test_12_generated_is_not_visited_or_known_sector\nPASS test_13_visited_not_completed\nPASS test_14_completed_remains_completed\nPASS test_15_sensor_coverage_remains_unknown\nPASS test_16_new_in_generated_sector_stays_conditional\nPASS test_17_canonical_travel_time_and_power\nPASS test_18_wear_and_repair_not_predicted_as_exact\nPASS test_19_future_scrap_unknown_not_zero\nPASS test_20_cannibalization_unavailable\nPASS test_21_no_resources_or_consumptions_changed\nPASS test_22_physical_validity_does_not_prove_economy\nPASS test_23_near_beats_disproportionate_backtrack\nPASS test_24_known_near_beats_new_very_far\nPASS test_25_frontier_only_after_comparable_access\nPASS test_26_short_but_unusable_information_excluded\nPASS test_27_longer_valid_progression_retained\nPASS test_28_primary_target_protected\nPASS test_29_future_reception_not_provisional\nPASS test_30_no_verified_solution_is_explicit\nPASS test_31_ties_and_tradeoffs_preserved\nPASS test_32_ordering_without_random_weights\nPASS test_33_whole_state_unchanged_and_no_live_helpers\nPASS test_34_rng_counters_and_attempts_unchanged\nPASS test_35_no_knowledge_or_route_publication\nPASS test_36_hash_seed_determinism\nPASS test_37_save_load_selection\nPASS test_38_thousands_of_nodes\nPASS test_39_multiple_targets_bounded_shared_queries\nPASS test_40_navigation_cap_and_stopped_waypoint\nDEADNODE OPPORTUNITY SELECTION SMOKE PASSED\n"
+        },
+        {
+          "file": "debug_add_commands_smoke.py",
+          "code": 0,
+          "seconds": 0.21,
+          "log": "DEBUG ADD COMMANDS SMOKE PASSED\n"
+        },
+        {
+          "file": "debug_galaxy_smoke.py",
+          "code": 0,
+          "seconds": 0.26,
+          "log": "DEBUG GALAXY SMOKE PASSED\n"
+        },
+        {
+          "file": "debug_lore_arcs_smoke.py",
+          "code": 0,
+          "seconds": 0.25,
+          "log": "DEBUG LORE/ARCS SMOKE PASSED\n"
+        },
+        {
+          "file": "debug_worldgen_graph_smoke.py",
+          "code": 0,
+          "seconds": 0.24,
+          "log": "DEBUG WORLDGEN/GRAPH SMOKE PASSED\n"
+        },
+        {
+          "file": "drone_completion_context_smoke.py",
+          "code": 0,
+          "seconds": 0.48,
+          "log": "DRONE COMPLETION CONTEXT SMOKE PASSED\n"
+        },
+        {
+          "file": "drone_modular_v1_smoke.py",
+          "code": 0,
+          "seconds": 0.96,
+          "log": "DRONE MODULAR V1 SMOKE PASSED\n"
+        },
+        {
+          "file": "drone_recall_all_smoke.py",
+          "code": 0,
+          "seconds": 0.23,
+          "log": "DRONE RECALL ALL SMOKE PASSED\n"
+        },
+        {
+          "file": "drone_salvage_survey_smoke.py",
+          "code": 0,
+          "seconds": 0.74,
+          "log": "DRONE SALVAGE/SURVEY SMOKE PASSED\n"
+        },
+        {
+          "file": "energy_policy_smoke.py",
+          "code": 0,
+          "seconds": 2.97,
+          "log": "ENERGY POLICY SMOKE PASSED\n"
+        },
+        {
+          "file": "exploration_recovery_smoke.py",
+          "code": 0,
+          "seconds": 0.59,
+          "log": "EXPLORATION RECOVERY SMOKE PASSED\n"
+        },
+        {
+          "file": "forced_hidden_ad_hoc_smoke.py",
+          "code": 0,
+          "seconds": 0.28,
+          "log": "FORCED HIDDEN AD-HOC SMOKE PASSED\n"
+        },
+        {
+          "file": "galaxy_physical_model_smoke.py",
+          "code": 0,
+          "seconds": 0.14,
+          "log": "GALAXY PHYSICAL MODEL SMOKE PASSED\n"
+        },
+        {
+          "file": "hibernate_radiation_wake_smoke.py",
+          "code": 0,
+          "seconds": 0.3,
+          "log": "HIBERNATE RADIATION WAKE SMOKE PASSED\n"
+        },
+        {
+          "file": "hibernate_sequence_assets_smoke.py",
+          "code": 0,
+          "seconds": 0.03,
+          "log": ""
+        },
+        {
+          "file": "intel_recent_order_smoke.py",
+          "code": 0,
+          "seconds": 0.39,
+          "log": "INTEL RECENT ORDER SMOKE PASSED\n"
+        },
+        {
+          "file": "job_id_numbering_smoke.py",
+          "code": 0,
+          "seconds": 0.21,
+          "log": "JOB ID NUMBERING SMOKE PASSED\n"
+        },
+        {
+          "file": "knowledge_boundary_smoke.py",
+          "code": 0,
+          "seconds": 8.47,
+          "log": "PASS test_01_empty_status_has_no_pending_count\nPASS test_02_hidden_opportunity_is_publicly_indistinguishable\nPASS test_03_stopped_service_only_reports_receiver\nPASS test_04_remote_source_does_not_change_ready_receiver\nPASS test_05_hidden_search_transitions_are_invisible\nPASS test_06_prepared_chain_is_invisible_before_capture\nPASS test_07_capture_preserves_event_and_readable_file\nPASS test_08_read_and_import_keep_normal_unlocks\nPASS test_09_debug_guard_and_live_records_en_es\nPASS test_10_debug_does_not_change_public_meaning\nPASS test_11_textual_command_dispatch_and_off_gate\nPASS test_12_completion_only_uses_acquired_destinations\nPASS test_13_queries_are_read_only_for_entire_state_and_rng\nPASS test_14_survey_hidden_equals_absent_and_known_is_preserved\nPASS test_15_save_load_preserves_hidden_and_received_states\nPASS test_16_real_repl_dispatch_debug_on_off_en_es\nPASS test_17_hidden_catalog_and_scheduler_do_not_affect_public_views_or_errors\nKNOWLEDGE BOUNDARY: 17 GROUPS PASSED\n"
+        },
+        {
+          "file": "known_routes_integrity_smoke.py",
+          "code": 0,
+          "seconds": 2.24,
+          "log": "PASS _assert_hops_and_publication\nPASS _assert_import_history_and_locales\nPASS _assert_components_and_views\nPASS _assert_recovery_frontier\nPASS _assert_deadnode_candidates\nPASS _assert_lazy_sector\nPASS _assert_solve_and_travel\nPASS _assert_job_endpoint_disappears\nPASS _assert_waypoint_is_inert_after_removal\nPASS _assert_persistence\nKNOWN ROUTES INTEGRITY SMOKE PASSED (seed=271828)\n"
+        },
+        {
+          "file": "lore_channel_preference_and_unlock_smoke.py",
+          "code": 0,
+          "seconds": 0.19,
+          "log": "LORE CHANNEL PREFERENCE + UPLINK PRIMARY UNLOCK SMOKE PASSED\n"
+        },
+        {
+          "file": "lore_distance_from_start_smoke.py",
+          "code": 0,
+          "seconds": 0.14,
+          "log": "LORE DISTANCE FROM START SMOKE PASSED\n"
+        },
+        {
+          "file": "lore_secondary_count_weights_hard_smoke.py",
+          "code": 0,
+          "seconds": 1.02,
+          "log": "LORE SECONDARY COUNT + SINGLE WEIGHTS + HARD FORCE SMOKE PASSED\n"
+        },
+        {
+          "file": "lore_smoke.py",
+          "code": 0,
+          "seconds": 0.16,
+          "log": "LORE SMOKE PASSED\n"
+        },
+        {
+          "file": "mail_metadata_and_log_header_smoke.py",
+          "code": 0,
+          "seconds": 0.21,
+          "log": "MAIL METADATA + LOG HEADER SMOKE PASSED\n"
+        },
+        {
+          "file": "narrative_world_integration_smoke.py",
+          "code": 0,
+          "seconds": 18.06,
+          "log": "PASS test_01_bootstrap_identity_and_no_secret_revelation\nPASS test_02_order_and_pure_queries\nPASS test_03_seed_variability_and_bound_clues\nPASS test_04_forced_host_delivery_salvage_and_reading\nPASS test_05_optional_probability_delivery_and_no_physical_dependency\nPASS test_06_pool_exhaustion_and_deadline_never_reopen\nPASS test_07_intel_public_formats_and_pending_references\nPASS test_08_repeated_saves_and_catalog_changes\nPASS test_09_negative_declarations\nPASS test_10_current_catalogue_and_impact_measurement\nPASS test_11_near_is_not_a_connection_and_required_link_rejected\nPASS test_12_corrupt_intel_is_uncertain_and_never_fabricates\nPASS test_13_local_file_bindings_and_compilation_failures\nPASS test_14_all_existing_push_channels_keep_reading_separate\nPASS test_15_essential_document_reserved_on_empty_wreck\nPASS test_16_protected_alias_and_natural_discovery_exceptions\nPASS test_17_unbound_tokens_and_legacy_save_rejection\nPASS test_18_essential_file_path_must_be_recoverable\nPASS test_19_reserved_tokens_are_validated_without_bindings\nPASS test_20_essential_payload_matches_real_delivery_and_language_fallback\nNARRATIVE WORLD INTEGRATION PASSED /tmp/retorno-e4-narrative-evidence.json\n"
+        },
+        {
+          "file": "nav_abort_waypoint_cleanup_smoke.py",
+          "code": 0,
+          "seconds": 3.52,
+          "log": "PASS test_abort_position_and_inactive_abort\nPASS test_scan_from_stopped_waypoint\nPASS test_scan_gates_and_real_transit\nPASS test_third_destination_completion_and_arrival\nPASS test_travel_to_third_destination\nPASS test_return_and_resume_cleanup\nPASS test_save_load_at_all_phases\nPASS test_repeated_aborts\nPASS test_repeated_abort_drops_deleted_origin_metadata\nPASS test_pending_waypoint_jobs_become_history\nPASS test_cleanup_cancellation_event_once_on_arrival\nPASS test_cleanup_cancellation_event_once_on_repeated_abort\nPASS test_cleanup_cancellation_event_once_on_docking_completion\nPASS test_bilingual_status_and_help\nPASS test_rejections_direction_and_ordinary_arrival\nNAV ABORT WAYPOINT CLEANUP SMOKE PASSED\n"
+        },
+        {
+          "file": "nav_map_galaxy_dependencies_smoke.py",
+          "code": 0,
+          "seconds": 0.21,
+          "log": "NAV MAP GALAXY DEPENDENCIES SMOKE PASSED\n"
+        },
+        {
+          "file": "nav_map_galaxy_determinism_smoke.py",
+          "code": 0,
+          "seconds": 0.26,
+          "log": "NAV MAP GALAXY DETERMINISM SMOKE PASSED\n"
+        },
+        {
+          "file": "nav_map_galaxy_smoke.py",
+          "code": 0,
+          "seconds": 0.24,
+          "log": "NAV MAP GALAXY SMOKE PASSED\n"
+        },
+        {
+          "file": "passive_communications_smoke.py",
+          "code": 0,
+          "seconds": 8.88,
+          "log": "test_01_prologue_power_and_boot PASS\ntest_02_boot_interruptions_and_missing_installation PASS\ntest_03_receiver_states_and_independence PASS\ntest_04_lore_pending_capture_read_and_idempotence PASS\ntest_05_coverage_and_no_early_dock PASS\ntest_06_repair_then_capture PASS\ntest_07_non_radio_channels_and_explicit_external_mail PASS\ntest_08_save_pending_received_read_and_old_schema_defaults PASS\ntest_09_recovery_legacy_deferral_and_existing_gateway PASS\ntest_10_deadnode_no_premature_commit_or_new_bridge PASS\ntest_11_localization_diagnostics_and_dynamic_notices PASS\ntest_12_radio_does_not_consume_rng_or_change_physics PASS\nPUBLIC FLOW: power off security -> power off data_core -> drone deploy D1 PWR-A1 -> drone repair D1 power_core -> drone repair D1 power_core -> drone repair D1 power_core -> drone move D1 BUS-A2 -> drone repair D1 energy_distribution -> drone repair D1 energy_distribution -> drone move D1 BRG-01 -> drone repair D1 comms -> power on comms -> boot radiod ; t=314.0s scrap=49 radio=ready\ntest_13_public_prologue_sequence_without_resource_overrides PASS\ntest_14_frozen_lore_across_pending_save_and_locale_switch PASS\ntest_15_live_gates_do_not_write_or_consume_pending PASS\ntest_16_explicit_external_lore_mail_uses_radio PASS\ntest_17_legacy_gateway_rechecks_protected_and_physical_target PASS\ntest_18_save_load_during_service_boot PASS\nPASSIVE COMMUNICATIONS: 18 groups PASS\n"
+        },
+        {
+          "file": "procedural_radiation_smoke.py",
+          "code": 0,
+          "seconds": 0.17,
+          "log": "PROCEDURAL RADIATION SMOKE PASSED\n"
+        },
+        {
+          "file": "radiation_hull_smoke.py",
+          "code": 1,
+          "seconds": 1.1,
+          "log": "Traceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/radiation_hull_smoke.py\", line 217, in <module>\n    main()\n  File \"/home/jon/prog/retorno_case/retorno/tests/radiation_hull_smoke.py\", line 183, in main\n    assert any(e.data.get(\"metric\") == \"env\" for e in ship_rad_events), ship_rad_events\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: []\n"
+        },
+        {
+          "file": "route_hop_cap_smoke.py",
+          "code": 0,
+          "seconds": 0.22,
+          "log": "ROUTE HOP CAP SMOKE PASSED\n"
+        },
+        {
+          "file": "route_solve_out_of_range_origins_smoke.py",
+          "code": 0,
+          "seconds": 0.36,
+          "log": "ROUTE SOLVE OUT OF RANGE ORIGINS SMOKE PASSED\n"
+        },
+        {
+          "file": "save_load_smoke.py",
+          "code": 0,
+          "seconds": 0.33,
+          "log": "SAVE/LOAD SMOKE PASSED\n"
+        },
+        {
+          "file": "scan_job_smoke.py",
+          "code": 0,
+          "seconds": 0.45,
+          "log": "SCAN JOB SMOKE PASSED\n"
+        },
+        {
+          "file": "scan_observation_memory_smoke.py",
+          "code": 0,
+          "seconds": 10.29,
+          "log": "PASS test_01_successful_job_new_contact_and_exact_event_results\nPASS test_02_known_contact_only_is_not_no_signals\nPASS test_03_negative_observation_retains_legitimate_intel_and_later_discovery\nPASS test_04_blocked_sensors_and_sensord_produce_no_observation\nPASS test_05_context_and_sensor_interruptions_do_not_record\nPASS test_06_cancel_before_and_during_work_does_not_record\nPASS test_07_repeated_ticks_effects_and_compatibility_do_not_duplicate\nPASS test_08_execution_conditions_not_queue_snapshot\nPASS test_09_worldgen_failure_is_failed_job_not_negative_observation\nPASS test_10_exception_after_some_materialization_leaves_no_absence_evidence\nPASS test_11_multiple_save_load_cycles_and_scanning_after_load\nPASS test_12_retention_ids_and_completed_job_replay_after_pruning\nPASS test_13_genuine_schema3_slot_shape_without_history_loads_safely\nPASS test_14_immutable_read_api_and_no_retroactive_aliases\nPASS test_15_hidden_and_protected_manifest_sites_never_leak_from_query\nPASS test_16_physical_z_spill_observed_from_actual_position\nPASS test_17_exact_prechange_rng_and_world_results_across_seeds_conditions\nPASS test_18_recovery_entry_exception_keeps_single_rng_increment\nPASS test_19_bilingual_public_event_presentation_shared_by_textual\nPASS test_20_stopped_waypoint_and_live_transit_keep_existing_gates\nSCAN OBSERVATION MEMORY SMOKE PASSED (20 groups)\n"
+        },
+        {
+          "file": "sector_intel_validation_smoke.py",
+          "code": 0,
+          "seconds": 0.77,
+          "log": "SECTOR INTEL VALIDATION SMOKE PASSED\n"
+        },
+        {
+          "file": "sensor_detection_factor_smoke.py",
+          "code": 0,
+          "seconds": 3.42,
+          "log": "SENSOR DETECTION FACTOR SMOKE PASSED\n"
+        },
+        {
+          "file": "ship_layout_output_smoke.py",
+          "code": 0,
+          "seconds": 0.36,
+          "log": "SHIP LAYOUT OUTPUT SMOKE PASSED\n"
+        },
+        {
+          "file": "ship_survey_radiation_smoke.py",
+          "code": 0,
+          "seconds": 0.22,
+          "log": "SHIP SURVEY RADIATION SMOKE PASSED\n"
+        },
+        {
+          "file": "smoke_test.py",
+          "code": 0,
+          "seconds": 0.36,
+          "log": "SMOKE TEST PASSED\n"
+        },
+        {
+          "file": "structural_recovery_smoke.py",
+          "code": 0,
+          "seconds": 16.09,
+          "log": "PASS test_01_existing_certified_and_no_physical_invention\nPASS test_02_lazy_target_and_authored_narrative_identity\nPASS test_03_positive_inclusive_cap_and_missing_endpoint\nPASS test_04_multi_stage_and_detour\nPASS test_05_directed_complete_distance_beats_euclidean_origin\nPASS test_06_pure_economy_hardware_radiation_independence\nPASS test_07_empty_isolated_and_no_emitter\nPASS test_08_budgets_and_widening_without_maximum_distance\nPASS test_09_transaction_stale_collision_and_injected_failure\nPASS test_10_gates_capture_read_no_full_chain\nPASS test_11_leave_return_and_invalid_source_at_capture\nPASS test_12_closed_pools_and_salvage_preparation\nPASS test_13_protected_primary_reserved_host_and_unsupported_reference\nPASS test_14_persist_all_boundaries_and_reject_incompatible\nPASS test_15_real_world_multiseed_order_z_and_topology\nPASS test_16_runtime_global_frontier_and_deadnode_counters\nPASS test_17_en_es_diagnostics_cli_textual_and_no_leaks\nPASS test_18_process_determinism_and_input_order\nPUBLIC SCENE FLOW: power off security -> power on comms -> boot radiod -> scan -> cat /logs/broadcasts/A_0011.en.txt -> nav B ; resources and systems use ordinary rules\nPASS test_19_public_commands_from_declared_scene_without_gameplay_edits\nSEARCH METRICS [{\"case\": \"installed\", \"cohorts\": 42, \"edges\": 25, \"expansions\": 2, \"peak_bytes\": 852581, \"seconds\": 0.23568, \"sectors\": 16, \"status\": \"validated\"}, {\"case\": \"chain\", \"cohorts\": 38, \"edges\": 2, \"expansions\": 3, \"peak_bytes\": 838917, \"seconds\": 0.062699, \"sectors\": 16, \"status\": \"validated\"}, {\"case\": \"materialized\", \"cohorts\": 30, \"edges\": 4, \"expansions\": 2, \"peak_bytes\": 958599, \"seconds\": 0.213805, \"sectors\": 16, \"status\": \"validated\"}]\nPASS test_20_metrics_and_technical_limits\nPASS test_21_real_salvage_consumption_between_stages_and_load\nPASS test_22_failed_materialization_and_identity_collisions_are_atomic\nPASS test_23_primary_natural_scan_and_exact_manual_solve_remain_legal\nPASS test_24_domain_and_loaded_search_resume_are_explicit\nPASS test_25_visited_physical_scale_uses_only_preexisting_known_route\nPUBLIC INSTALLED FLOW: power off security -> power off data_core -> drone deploy D1 PWR-A1 -> drone repair D1 power_core -> drone repair D1 power_core -> drone repair D1 power_core -> drone move D1 BUS-A2 -> drone repair D1 energy_distribution -> drone repair D1 energy_distribution -> drone move D1 BRG-01 -> drone repair D1 comms -> power on comms -> boot radiod -> power on sensors -> boot sensord -> scan -> route solve ECHO_7 -> nav ECHO_7 -> dock ECHO_7 ; t=2153.115s scrap=49; existing frontier preserved\nPASS test_26_installed_prologue_public_journey_without_fixture_or_overrides\nPASS test_27_stored_node_frontier_and_stale_deadnode_counter\nPASS test_28_remote_navigation_access_does_not_prove_first_reception\nPASS test_29_local_first_reception_overrides_more_attractive_remote_chain\nPASS test_30_spatial_eligibility_is_independent_of_receiver_operation\nPUBLIC FIRST RECEPTION REPAIR: power off security -> drone deploy D1 BRG-01 -> drone repair D1 comms -> power on comms -> boot radiod ; one capture\nPASS test_31_public_repair_and_boot_capture_local_pending_exactly_once\nPASS test_32_conditional_search_retries_at_new_location_and_survives_load\nPUBLIC FIRST RECEPTION FLOW: scan -> nav REMOTE -> power off security -> power on comms -> boot radiod -> cat received file; one capture\nPASS test_33_public_travel_changes_conditional_search_into_local_reception\nPASS test_34_selector_confirmation_and_capture_share_spatial_boundary\nPASS test_35_remote_condition_does_not_reveal_primaries_or_emitters\nPASS test_36_load_checks_original_reception_context_without_requiring_current_coverage\nSTRUCTURAL RECOVERY: 36 GROUPS PASSED\n"
+        },
+        {
+          "file": "textual_active_jobs_job_id_smoke.py",
+          "code": 0,
+          "seconds": 0.25,
+          "log": "TEXTUAL ACTIVE JOBS JOB ID SMOKE PASSED\n"
+        },
+        {
+          "file": "textual_command_spacing_smoke.py",
+          "code": 0,
+          "seconds": 3.6,
+          "log": "TEXTUAL COMMAND SPACING SMOKE PASSED\n"
+        },
+        {
+          "file": "textual_completion_context_smoke.py",
+          "code": 0,
+          "seconds": 1.86,
+          "log": "TEXTUAL COMPLETION CONTEXT SMOKE PASSED\n"
+        },
+        {
+          "file": "textual_theme_smoke.py",
+          "code": 0,
+          "seconds": 3.73,
+          "log": "TEXTUAL THEME SMOKE PASSED\n"
+        },
+        {
+          "file": "transit_radiation_progression_smoke.py",
+          "code": 0,
+          "seconds": 0.16,
+          "log": "TRANSIT RADIATION PROGRESSION SMOKE PASSED\n"
+        },
+        {
+          "file": "uplink_authored_and_failsafe_smoke.py",
+          "code": 0,
+          "seconds": 0.56,
+          "log": "UPLINK AUTHORED+FAILSAFE SMOKE PASSED\n"
+        },
+        {
+          "file": "uplink_once_per_node_smoke.py",
+          "code": 0,
+          "seconds": 0.35,
+          "log": "UPLINK ONCE PER NODE SMOKE PASSED\n"
+        },
+        {
+          "file": "uplink_only_delivery_retry_smoke.py",
+          "code": 0,
+          "seconds": 1.66,
+          "log": "UPLINK_ONLY DELIVERY + RETRY SMOKE PASSED\n"
+        },
+        {
+          "file": "worldgen_manifest_integration_smoke.py",
+          "code": 0,
+          "seconds": 4.9,
+          "log": "PASS test_01_orders_grouping_later_neighbors_and_witness_seeds\nPASS test_02_partial_inventory_save_load_and_consumption\nPASS test_03_pure_queries_do_not_touch_game_rng_knowledge_or_pools\nPASS test_04_z_outlier_inverse_completeness_against_wider_sources\nPASS test_05_numerical_bound_extreme_uniform_and_rounding\nPASS test_06_domain_work_bounds_and_atomic_failure\nPASS test_07_matching_reciprocity_maximality_budgets_and_hop_cap\nPASS test_08_authored_declaration_is_not_revelation_or_prose\nPASS test_09_new_ids_intel_blocks_authored_links_and_coord_semantics\nPASS test_10_collision_namespace_and_special_nodes_do_not_consume_quotas\nPASS test_11_incompatible_saves_rules_seed_and_corruption_preserve_files\nPASS test_12_unknown_cleanup_and_authored_properties_preserved\nPASS test_13_hashseed_process_determinism\nPASS test_14_seed_command_compatibility_and_localization\nWORLDGEN MANIFEST INTEGRATION SMOKE PASSED (14 groups)\n"
+        },
+        {
+          "file": "worldgen_manifest_prototype_smoke.py",
+          "code": 0,
+          "seconds": 2.71,
+          "log": "WORLDGEN MANIFEST PROTOTYPE SMOKE PASSED (17 groups)\n"
+        },
+        {
+          "file": "worldgen_modules_pool_smoke.py",
+          "code": 0,
+          "seconds": 1.62,
+          "log": "seed=1 region=disk sector=S+020_+000_+000 archetype=relay_corridor counts=[2, 2, 1]\nseed=1 region=bulge sector=S-25000_+000_+000 archetype=ruin_field counts=[1, 3]\nseed=1 region=halo sector=S+16000_+000_+000 archetype=empty counts=[0]\nseed=2 region=disk sector=S+020_+000_+000 archetype=relay_corridor counts=[2, 1]\nseed=2 region=bulge sector=S-25000_+000_+000 archetype=ruin_field counts=[3, 1]\nseed=2 region=halo sector=S+16000_+000_+000 archetype=empty counts=[0]\nseed=2 drone salvage node=S-25000_+000_+000:WG1_5127933e65399a0dd8554f8138f5a6e35626a3318b346987871ce50067b8d697_0 module=field_service_rig attempts=2; depletion and cargo persist\nWORLDGEN MODULES POOL SMOKE PASSED\n"
+        },
+        {
+          "file": "worldgen_preexistence_catalog_smoke.py",
+          "code": 0,
+          "seconds": 1.94,
+          "log": "WORLDGEN PREEXISTENCE CATALOG SMOKE PASSED (17 groups)\n"
+        },
+        {
+          "file": "worldgen_preexistence_characterization_smoke.py",
+          "code": 0,
+          "seconds": 0.67,
+          "log": "WORLDGEN PREEXISTENCE CHARACTERIZATION SMOKE PASSED (9 groups)\n"
+        },
+        {
+          "file": "worldgen_sparse_archetypes_smoke.py",
+          "code": 0,
+          "seconds": 9.8,
+          "log": "WORLDGEN SPARSE ARCHETYPES SMOKE PASSED\n"
+        }
+      ]
+    },
+    {
+      "label": "e5a-release",
+      "total": 65,
+      "passed": 64,
+      "results": [
+        {
+          "file": "audio_config_smoke.py",
+          "code": 0,
+          "seconds": 1.14,
+          "log": "AUDIO CONFIG SMOKE PASSED\n"
+        },
+        {
+          "file": "audio_runtime_notice_smoke.py",
+          "code": 0,
+          "seconds": 0.07,
+          "log": ""
+        },
+        {
+          "file": "config_audio_smoke.py",
+          "code": 0,
+          "seconds": 0.16,
+          "log": "CONFIG AUDIO SMOKE PASSED\n"
+        },
+        {
+          "file": "contacts_sector_smoke.py",
+          "code": 0,
+          "seconds": 0.15,
+          "log": ""
+        },
+        {
+          "file": "contacts_smoke.py",
+          "code": 0,
+          "seconds": 0.21,
+          "log": "CONTACTS SMOKE PASSED\n"
+        },
+        {
+          "file": "deadnode_chain_detours_smoke.py",
+          "code": 0,
+          "seconds": 3.27,
+          "log": "PASS test_direct_viable_is_retained\nPASS test_reference_seed_empty_straight_slots_find_offline_nodes\nPASS test_existing_detour_preferred_over_shorter_all_new\nPASS test_mixed_detour_minimizes_new_nodes\nPASS test_real_regional_boundary_with_existing_detour\nPASS test_short_unusable_receiver_loses_to_longer_information_path\nPASS test_equal_alternatives_have_stable_tie_breaks\nPASS test_no_procedural_context_is_not_a_permission\nPASS test_regional_kind_restrictions_not_overridden\nPASS test_shared_slot_reservations_and_coordinate_collision\nPASS test_navigation_only_exhausted_stop_and_direction_preserved\nPASS test_protected_shortcut_excluded_alternative_retained\nPASS test_sources_and_first_reception_remain_pending\nPASS test_generated_explored_and_lazy_insertion_are_distinct\nPASS test_collision_safe_detour_identities\nPASS test_pending_identity_references_are_not_reused\nPASS test_indexed_forecasts_match_the_canonical_full_world_query\nPASS test_budget_exhaustion_is_incomplete_not_universal_impossibility\nPASS test_detour_save_load_hash_seeds_and_all_state_purity\nPASS test_detour_never_calls_live_writers\nPASS test_populated_world_has_bounded_search_and_preserves_state\nDEADNODE CHAIN DETOURS SMOKE PASSED\n"
+        },
+        {
+          "file": "deadnode_chain_planner_smoke.py",
+          "code": 0,
+          "seconds": 4.13,
+          "log": "PASS test_direct_and_inclusive_cap\nPASS test_70_and_100_with_valid_canonical_slots\nPASS test_existing_chain_preferred_and_revealed_progressively\nPASS test_mixed_existing_and_new\nPASS test_alternative_directed_origin_and_disconnected_impostor\nPASS test_invalid_origin_and_endpoints\nPASS test_known_route_projection_does_not_accept_stale_edges\nPASS test_types_follow_real_region_archetype_and_slot_rules\nPASS test_waystation_has_uplink_but_not_salvage_data\nPASS test_unknown_type_cannot_provide_mandatory_data\nPASS test_unavailable_receivers_are_not_reopened\nPASS test_consumed_uplink_not_reused_but_other_sources_independent\nPASS test_visited_scale_can_use_known_route_without_new_information\nPASS test_existing_intel_and_normal_solve_are_distinct_from_recovery_signal\nPASS test_file_intel_must_be_readable_and_uncorrupted\nPASS test_protected_target_intermediary_and_unlocked_host\nPASS test_unresolved_primary_protection_fails_closed\nPASS test_generated_and_lazy_sectors_are_explicit_dependencies\nPASS test_no_policy_or_procedural_slot_is_not_fabricated\nPASS test_identity_collision_is_avoided_without_allocating_ids\nPASS test_complete_no_mutation_and_no_production_helpers\nPASS test_order_determinism_and_save_load_without_proposal_persistence\nPASS test_stopped_waypoint_is_an_origin\nPASS test_no_arbitrary_stage_limit\nPASS test_unknown_record_does_not_make_an_origin_operational\nPASS test_candidate_gates_and_missing_drone_dependency\nPASS test_full_sector_cannot_supply_extra_slots_or_forbidden_types\nPASS test_determinism_across_hash_seeds\nDEADNODE CHAIN PLANNER SMOKE PASSED\n"
+        },
+        {
+          "file": "deadnode_cooldown_zero_smoke.py",
+          "code": 0,
+          "seconds": 0.53,
+          "log": "DEADNODE COOLDOWN ZERO SMOKE PASSED\n"
+        },
+        {
+          "file": "deadnode_opportunity_selection_smoke.py",
+          "code": 0,
+          "seconds": 4.72,
+          "log": "PASS test_01_origin_at_current_node\nPASS test_02_multiple_known_access_hops\nPASS test_03_close_origin_wrong_direction\nPASS test_04_different_access_hops_preserved\nPASS test_05_equal_hops_different_distances\nPASS test_06_short_chain_long_backtrack_counted\nPASS test_07_longer_chain_nearer_origin\nPASS test_08_no_free_repositioning\nPASS test_09_near_unidentified_opportunity\nPASS test_10_near_visited_region_allowed\nPASS test_11_far_old_region_not_forbidden_by_threshold\nPASS test_12_generated_is_not_visited_or_known_sector\nPASS test_13_visited_not_completed\nPASS test_14_completed_remains_completed\nPASS test_15_sensor_coverage_remains_unknown\nPASS test_16_new_in_generated_sector_stays_conditional\nPASS test_17_canonical_travel_time_and_power\nPASS test_18_wear_and_repair_not_predicted_as_exact\nPASS test_19_future_scrap_unknown_not_zero\nPASS test_20_cannibalization_unavailable\nPASS test_21_no_resources_or_consumptions_changed\nPASS test_22_physical_validity_does_not_prove_economy\nPASS test_23_near_beats_disproportionate_backtrack\nPASS test_24_known_near_beats_new_very_far\nPASS test_25_frontier_only_after_comparable_access\nPASS test_26_short_but_unusable_information_excluded\nPASS test_27_longer_valid_progression_retained\nPASS test_28_primary_target_protected\nPASS test_29_future_reception_not_provisional\nPASS test_30_no_verified_solution_is_explicit\nPASS test_31_ties_and_tradeoffs_preserved\nPASS test_32_ordering_without_random_weights\nPASS test_33_whole_state_unchanged_and_no_live_helpers\nPASS test_34_rng_counters_and_attempts_unchanged\nPASS test_35_no_knowledge_or_route_publication\nPASS test_36_hash_seed_determinism\nPASS test_37_save_load_selection\nPASS test_38_thousands_of_nodes\nPASS test_39_multiple_targets_bounded_shared_queries\nPASS test_40_navigation_cap_and_stopped_waypoint\nDEADNODE OPPORTUNITY SELECTION SMOKE PASSED\n"
+        },
+        {
+          "file": "debug_add_commands_smoke.py",
+          "code": 0,
+          "seconds": 0.21,
+          "log": "DEBUG ADD COMMANDS SMOKE PASSED\n"
+        },
+        {
+          "file": "debug_galaxy_smoke.py",
+          "code": 0,
+          "seconds": 0.26,
+          "log": "DEBUG GALAXY SMOKE PASSED\n"
+        },
+        {
+          "file": "debug_lore_arcs_smoke.py",
+          "code": 0,
+          "seconds": 0.26,
+          "log": "DEBUG LORE/ARCS SMOKE PASSED\n"
+        },
+        {
+          "file": "debug_worldgen_graph_smoke.py",
+          "code": 0,
+          "seconds": 0.24,
+          "log": "DEBUG WORLDGEN/GRAPH SMOKE PASSED\n"
+        },
+        {
+          "file": "drone_completion_context_smoke.py",
+          "code": 0,
+          "seconds": 0.48,
+          "log": "DRONE COMPLETION CONTEXT SMOKE PASSED\n"
+        },
+        {
+          "file": "drone_modular_v1_smoke.py",
+          "code": 0,
+          "seconds": 0.99,
+          "log": "DRONE MODULAR V1 SMOKE PASSED\n"
+        },
+        {
+          "file": "drone_recall_all_smoke.py",
+          "code": 0,
+          "seconds": 0.23,
+          "log": "DRONE RECALL ALL SMOKE PASSED\n"
+        },
+        {
+          "file": "drone_salvage_survey_smoke.py",
+          "code": 0,
+          "seconds": 0.7,
+          "log": "DRONE SALVAGE/SURVEY SMOKE PASSED\n"
+        },
+        {
+          "file": "energy_policy_smoke.py",
+          "code": 0,
+          "seconds": 2.98,
+          "log": "ENERGY POLICY SMOKE PASSED\n"
+        },
+        {
+          "file": "exploration_recovery_smoke.py",
+          "code": 0,
+          "seconds": 0.59,
+          "log": "EXPLORATION RECOVERY SMOKE PASSED\n"
+        },
+        {
+          "file": "forced_hidden_ad_hoc_smoke.py",
+          "code": 0,
+          "seconds": 0.28,
+          "log": "FORCED HIDDEN AD-HOC SMOKE PASSED\n"
+        },
+        {
+          "file": "galaxy_physical_model_smoke.py",
+          "code": 0,
+          "seconds": 0.14,
+          "log": "GALAXY PHYSICAL MODEL SMOKE PASSED\n"
+        },
+        {
+          "file": "hibernate_radiation_wake_smoke.py",
+          "code": 0,
+          "seconds": 0.3,
+          "log": "HIBERNATE RADIATION WAKE SMOKE PASSED\n"
+        },
+        {
+          "file": "hibernate_sequence_assets_smoke.py",
+          "code": 0,
+          "seconds": 0.03,
+          "log": ""
+        },
+        {
+          "file": "intel_recent_order_smoke.py",
+          "code": 0,
+          "seconds": 0.39,
+          "log": "INTEL RECENT ORDER SMOKE PASSED\n"
+        },
+        {
+          "file": "job_id_numbering_smoke.py",
+          "code": 0,
+          "seconds": 0.22,
+          "log": "JOB ID NUMBERING SMOKE PASSED\n"
+        },
+        {
+          "file": "knowledge_boundary_smoke.py",
+          "code": 0,
+          "seconds": 8.66,
+          "log": "PASS test_01_empty_status_has_no_pending_count\nPASS test_02_hidden_opportunity_is_publicly_indistinguishable\nPASS test_03_stopped_service_only_reports_receiver\nPASS test_04_remote_source_does_not_change_ready_receiver\nPASS test_05_hidden_search_transitions_are_invisible\nPASS test_06_prepared_chain_is_invisible_before_capture\nPASS test_07_capture_preserves_event_and_readable_file\nPASS test_08_read_and_import_keep_normal_unlocks\nPASS test_09_debug_guard_and_live_records_en_es\nPASS test_10_debug_does_not_change_public_meaning\nPASS test_11_textual_command_dispatch_and_off_gate\nPASS test_12_completion_only_uses_acquired_destinations\nPASS test_13_queries_are_read_only_for_entire_state_and_rng\nPASS test_14_survey_hidden_equals_absent_and_known_is_preserved\nPASS test_15_save_load_preserves_hidden_and_received_states\nPASS test_16_real_repl_dispatch_debug_on_off_en_es\nPASS test_17_hidden_catalog_and_scheduler_do_not_affect_public_views_or_errors\nPASS test_18_dock_alias_resolution_does_not_disclose_hidden_ids\nKNOWLEDGE BOUNDARY: 18 GROUPS PASSED\n"
+        },
+        {
+          "file": "known_routes_integrity_smoke.py",
+          "code": 0,
+          "seconds": 2.23,
+          "log": "PASS _assert_hops_and_publication\nPASS _assert_import_history_and_locales\nPASS _assert_components_and_views\nPASS _assert_recovery_frontier\nPASS _assert_deadnode_candidates\nPASS _assert_lazy_sector\nPASS _assert_solve_and_travel\nPASS _assert_job_endpoint_disappears\nPASS _assert_waypoint_is_inert_after_removal\nPASS _assert_persistence\nKNOWN ROUTES INTEGRITY SMOKE PASSED (seed=271828)\n"
+        },
+        {
+          "file": "lore_channel_preference_and_unlock_smoke.py",
+          "code": 0,
+          "seconds": 0.19,
+          "log": "LORE CHANNEL PREFERENCE + UPLINK PRIMARY UNLOCK SMOKE PASSED\n"
+        },
+        {
+          "file": "lore_distance_from_start_smoke.py",
+          "code": 0,
+          "seconds": 0.14,
+          "log": "LORE DISTANCE FROM START SMOKE PASSED\n"
+        },
+        {
+          "file": "lore_secondary_count_weights_hard_smoke.py",
+          "code": 0,
+          "seconds": 1.03,
+          "log": "LORE SECONDARY COUNT + SINGLE WEIGHTS + HARD FORCE SMOKE PASSED\n"
+        },
+        {
+          "file": "lore_smoke.py",
+          "code": 0,
+          "seconds": 0.16,
+          "log": "LORE SMOKE PASSED\n"
+        },
+        {
+          "file": "mail_metadata_and_log_header_smoke.py",
+          "code": 0,
+          "seconds": 0.21,
+          "log": "MAIL METADATA + LOG HEADER SMOKE PASSED\n"
+        },
+        {
+          "file": "narrative_world_integration_smoke.py",
+          "code": 0,
+          "seconds": 18.21,
+          "log": "PASS test_01_bootstrap_identity_and_no_secret_revelation\nPASS test_02_order_and_pure_queries\nPASS test_03_seed_variability_and_bound_clues\nPASS test_04_forced_host_delivery_salvage_and_reading\nPASS test_05_optional_probability_delivery_and_no_physical_dependency\nPASS test_06_pool_exhaustion_and_deadline_never_reopen\nPASS test_07_intel_public_formats_and_pending_references\nPASS test_08_repeated_saves_and_catalog_changes\nPASS test_09_negative_declarations\nPASS test_10_current_catalogue_and_impact_measurement\nPASS test_11_near_is_not_a_connection_and_required_link_rejected\nPASS test_12_corrupt_intel_is_uncertain_and_never_fabricates\nPASS test_13_local_file_bindings_and_compilation_failures\nPASS test_14_all_existing_push_channels_keep_reading_separate\nPASS test_15_essential_document_reserved_on_empty_wreck\nPASS test_16_protected_alias_and_natural_discovery_exceptions\nPASS test_17_unbound_tokens_and_legacy_save_rejection\nPASS test_18_essential_file_path_must_be_recoverable\nPASS test_19_reserved_tokens_are_validated_without_bindings\nPASS test_20_essential_payload_matches_real_delivery_and_language_fallback\nNARRATIVE WORLD INTEGRATION PASSED /tmp/retorno-e4-narrative-evidence.json\n"
+        },
+        {
+          "file": "nav_abort_waypoint_cleanup_smoke.py",
+          "code": 0,
+          "seconds": 3.56,
+          "log": "PASS test_abort_position_and_inactive_abort\nPASS test_scan_from_stopped_waypoint\nPASS test_scan_gates_and_real_transit\nPASS test_third_destination_completion_and_arrival\nPASS test_travel_to_third_destination\nPASS test_return_and_resume_cleanup\nPASS test_save_load_at_all_phases\nPASS test_repeated_aborts\nPASS test_repeated_abort_drops_deleted_origin_metadata\nPASS test_pending_waypoint_jobs_become_history\nPASS test_cleanup_cancellation_event_once_on_arrival\nPASS test_cleanup_cancellation_event_once_on_repeated_abort\nPASS test_cleanup_cancellation_event_once_on_docking_completion\nPASS test_bilingual_status_and_help\nPASS test_rejections_direction_and_ordinary_arrival\nNAV ABORT WAYPOINT CLEANUP SMOKE PASSED\n"
+        },
+        {
+          "file": "nav_map_galaxy_dependencies_smoke.py",
+          "code": 0,
+          "seconds": 0.21,
+          "log": "NAV MAP GALAXY DEPENDENCIES SMOKE PASSED\n"
+        },
+        {
+          "file": "nav_map_galaxy_determinism_smoke.py",
+          "code": 0,
+          "seconds": 0.26,
+          "log": "NAV MAP GALAXY DETERMINISM SMOKE PASSED\n"
+        },
+        {
+          "file": "nav_map_galaxy_smoke.py",
+          "code": 0,
+          "seconds": 0.24,
+          "log": "NAV MAP GALAXY SMOKE PASSED\n"
+        },
+        {
+          "file": "passive_communications_smoke.py",
+          "code": 0,
+          "seconds": 8.91,
+          "log": "test_01_prologue_power_and_boot PASS\ntest_02_boot_interruptions_and_missing_installation PASS\ntest_03_receiver_states_and_independence PASS\ntest_04_lore_pending_capture_read_and_idempotence PASS\ntest_05_coverage_and_no_early_dock PASS\ntest_06_repair_then_capture PASS\ntest_07_non_radio_channels_and_explicit_external_mail PASS\ntest_08_save_pending_received_read_and_old_schema_defaults PASS\ntest_09_recovery_legacy_deferral_and_existing_gateway PASS\ntest_10_deadnode_no_premature_commit_or_new_bridge PASS\ntest_11_localization_diagnostics_and_dynamic_notices PASS\ntest_12_radio_does_not_consume_rng_or_change_physics PASS\nPUBLIC FLOW: power off security -> power off data_core -> drone deploy D1 PWR-A1 -> drone repair D1 power_core -> drone repair D1 power_core -> drone repair D1 power_core -> drone move D1 BUS-A2 -> drone repair D1 energy_distribution -> drone repair D1 energy_distribution -> drone move D1 BRG-01 -> drone repair D1 comms -> power on comms -> boot radiod ; t=314.0s scrap=49 radio=ready\ntest_13_public_prologue_sequence_without_resource_overrides PASS\ntest_14_frozen_lore_across_pending_save_and_locale_switch PASS\ntest_15_live_gates_do_not_write_or_consume_pending PASS\ntest_16_explicit_external_lore_mail_uses_radio PASS\ntest_17_legacy_gateway_rechecks_protected_and_physical_target PASS\ntest_18_save_load_during_service_boot PASS\nPASSIVE COMMUNICATIONS: 18 groups PASS\n"
+        },
+        {
+          "file": "procedural_radiation_smoke.py",
+          "code": 0,
+          "seconds": 0.16,
+          "log": "PROCEDURAL RADIATION SMOKE PASSED\n"
+        },
+        {
+          "file": "radiation_hull_smoke.py",
+          "code": 1,
+          "seconds": 1.07,
+          "log": "Traceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/radiation_hull_smoke.py\", line 217, in <module>\n    main()\n  File \"/home/jon/prog/retorno_case/retorno/tests/radiation_hull_smoke.py\", line 183, in main\n    assert any(e.data.get(\"metric\") == \"env\" for e in ship_rad_events), ship_rad_events\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: []\n"
+        },
+        {
+          "file": "route_hop_cap_smoke.py",
+          "code": 0,
+          "seconds": 0.22,
+          "log": "ROUTE HOP CAP SMOKE PASSED\n"
+        },
+        {
+          "file": "route_solve_out_of_range_origins_smoke.py",
+          "code": 0,
+          "seconds": 0.38,
+          "log": "ROUTE SOLVE OUT OF RANGE ORIGINS SMOKE PASSED\n"
+        },
+        {
+          "file": "save_load_smoke.py",
+          "code": 0,
+          "seconds": 0.32,
+          "log": "SAVE/LOAD SMOKE PASSED\n"
+        },
+        {
+          "file": "scan_job_smoke.py",
+          "code": 0,
+          "seconds": 0.44,
+          "log": "SCAN JOB SMOKE PASSED\n"
+        },
+        {
+          "file": "scan_observation_memory_smoke.py",
+          "code": 0,
+          "seconds": 10.22,
+          "log": "PASS test_01_successful_job_new_contact_and_exact_event_results\nPASS test_02_known_contact_only_is_not_no_signals\nPASS test_03_negative_observation_retains_legitimate_intel_and_later_discovery\nPASS test_04_blocked_sensors_and_sensord_produce_no_observation\nPASS test_05_context_and_sensor_interruptions_do_not_record\nPASS test_06_cancel_before_and_during_work_does_not_record\nPASS test_07_repeated_ticks_effects_and_compatibility_do_not_duplicate\nPASS test_08_execution_conditions_not_queue_snapshot\nPASS test_09_worldgen_failure_is_failed_job_not_negative_observation\nPASS test_10_exception_after_some_materialization_leaves_no_absence_evidence\nPASS test_11_multiple_save_load_cycles_and_scanning_after_load\nPASS test_12_retention_ids_and_completed_job_replay_after_pruning\nPASS test_13_genuine_schema3_slot_shape_without_history_loads_safely\nPASS test_14_immutable_read_api_and_no_retroactive_aliases\nPASS test_15_hidden_and_protected_manifest_sites_never_leak_from_query\nPASS test_16_physical_z_spill_observed_from_actual_position\nPASS test_17_exact_prechange_rng_and_world_results_across_seeds_conditions\nPASS test_18_recovery_entry_exception_keeps_single_rng_increment\nPASS test_19_bilingual_public_event_presentation_shared_by_textual\nPASS test_20_stopped_waypoint_and_live_transit_keep_existing_gates\nSCAN OBSERVATION MEMORY SMOKE PASSED (20 groups)\n"
+        },
+        {
+          "file": "sector_intel_validation_smoke.py",
+          "code": 0,
+          "seconds": 0.77,
+          "log": "SECTOR INTEL VALIDATION SMOKE PASSED\n"
+        },
+        {
+          "file": "sensor_detection_factor_smoke.py",
+          "code": 0,
+          "seconds": 3.42,
+          "log": "SENSOR DETECTION FACTOR SMOKE PASSED\n"
+        },
+        {
+          "file": "ship_layout_output_smoke.py",
+          "code": 0,
+          "seconds": 0.21,
+          "log": "SHIP LAYOUT OUTPUT SMOKE PASSED\n"
+        },
+        {
+          "file": "ship_survey_radiation_smoke.py",
+          "code": 0,
+          "seconds": 0.21,
+          "log": "SHIP SURVEY RADIATION SMOKE PASSED\n"
+        },
+        {
+          "file": "smoke_test.py",
+          "code": 0,
+          "seconds": 0.35,
+          "log": "SMOKE TEST PASSED\n"
+        },
+        {
+          "file": "structural_recovery_smoke.py",
+          "code": 0,
+          "seconds": 15.91,
+          "log": "PASS test_01_existing_certified_and_no_physical_invention\nPASS test_02_lazy_target_and_authored_narrative_identity\nPASS test_03_positive_inclusive_cap_and_missing_endpoint\nPASS test_04_multi_stage_and_detour\nPASS test_05_directed_complete_distance_beats_euclidean_origin\nPASS test_06_pure_economy_hardware_radiation_independence\nPASS test_07_empty_isolated_and_no_emitter\nPASS test_08_budgets_and_widening_without_maximum_distance\nPASS test_09_transaction_stale_collision_and_injected_failure\nPASS test_10_gates_capture_read_no_full_chain\nPASS test_11_leave_return_and_invalid_source_at_capture\nPASS test_12_closed_pools_and_salvage_preparation\nPASS test_13_protected_primary_reserved_host_and_unsupported_reference\nPASS test_14_persist_all_boundaries_and_reject_incompatible\nPASS test_15_real_world_multiseed_order_z_and_topology\nPASS test_16_runtime_global_frontier_and_deadnode_counters\nPASS test_17_en_es_diagnostics_cli_textual_and_no_leaks\nPASS test_18_process_determinism_and_input_order\nPUBLIC SCENE FLOW: power off security -> power on comms -> boot radiod -> scan -> cat /logs/broadcasts/A_0011.en.txt -> nav B ; resources and systems use ordinary rules\nPASS test_19_public_commands_from_declared_scene_without_gameplay_edits\nSEARCH METRICS [{\"case\": \"installed\", \"cohorts\": 42, \"edges\": 25, \"expansions\": 2, \"peak_bytes\": 851828, \"seconds\": 0.235889, \"sectors\": 16, \"status\": \"validated\"}, {\"case\": \"chain\", \"cohorts\": 38, \"edges\": 2, \"expansions\": 3, \"peak_bytes\": 840219, \"seconds\": 0.059905, \"sectors\": 16, \"status\": \"validated\"}, {\"case\": \"materialized\", \"cohorts\": 30, \"edges\": 4, \"expansions\": 2, \"peak_bytes\": 957952, \"seconds\": 0.212076, \"sectors\": 16, \"status\": \"validated\"}]\nPASS test_20_metrics_and_technical_limits\nPASS test_21_real_salvage_consumption_between_stages_and_load\nPASS test_22_failed_materialization_and_identity_collisions_are_atomic\nPASS test_23_primary_natural_scan_and_exact_manual_solve_remain_legal\nPASS test_24_domain_and_loaded_search_resume_are_explicit\nPASS test_25_visited_physical_scale_uses_only_preexisting_known_route\nPUBLIC INSTALLED FLOW: power off security -> power off data_core -> drone deploy D1 PWR-A1 -> drone repair D1 power_core -> drone repair D1 power_core -> drone repair D1 power_core -> drone move D1 BUS-A2 -> drone repair D1 energy_distribution -> drone repair D1 energy_distribution -> drone move D1 BRG-01 -> drone repair D1 comms -> power on comms -> boot radiod -> power on sensors -> boot sensord -> scan -> route solve ECHO_7 -> nav ECHO_7 -> dock ECHO_7 ; t=2153.115s scrap=49; existing frontier preserved\nPASS test_26_installed_prologue_public_journey_without_fixture_or_overrides\nPASS test_27_stored_node_frontier_and_stale_deadnode_counter\nPASS test_28_remote_navigation_access_does_not_prove_first_reception\nPASS test_29_local_first_reception_overrides_more_attractive_remote_chain\nPASS test_30_spatial_eligibility_is_independent_of_receiver_operation\nPUBLIC FIRST RECEPTION REPAIR: power off security -> drone deploy D1 BRG-01 -> drone repair D1 comms -> power on comms -> boot radiod ; one capture\nPASS test_31_public_repair_and_boot_capture_local_pending_exactly_once\nPASS test_32_conditional_search_retries_at_new_location_and_survives_load\nPUBLIC FIRST RECEPTION FLOW: scan -> nav REMOTE -> power off security -> power on comms -> boot radiod -> cat received file; one capture\nPASS test_33_public_travel_changes_conditional_search_into_local_reception\nPASS test_34_selector_confirmation_and_capture_share_spatial_boundary\nPASS test_35_remote_condition_does_not_reveal_primaries_or_emitters\nPASS test_36_load_checks_original_reception_context_without_requiring_current_coverage\nSTRUCTURAL RECOVERY: 36 GROUPS PASSED\n"
+        },
+        {
+          "file": "textual_active_jobs_job_id_smoke.py",
+          "code": 0,
+          "seconds": 0.26,
+          "log": "TEXTUAL ACTIVE JOBS JOB ID SMOKE PASSED\n"
+        },
+        {
+          "file": "textual_command_spacing_smoke.py",
+          "code": 0,
+          "seconds": 3.66,
+          "log": "TEXTUAL COMMAND SPACING SMOKE PASSED\n"
+        },
+        {
+          "file": "textual_completion_context_smoke.py",
+          "code": 0,
+          "seconds": 1.84,
+          "log": "TEXTUAL COMPLETION CONTEXT SMOKE PASSED\n"
+        },
+        {
+          "file": "textual_theme_smoke.py",
+          "code": 0,
+          "seconds": 3.73,
+          "log": "TEXTUAL THEME SMOKE PASSED\n"
+        },
+        {
+          "file": "transit_radiation_progression_smoke.py",
+          "code": 0,
+          "seconds": 0.16,
+          "log": "TRANSIT RADIATION PROGRESSION SMOKE PASSED\n"
+        },
+        {
+          "file": "uplink_authored_and_failsafe_smoke.py",
+          "code": 0,
+          "seconds": 0.56,
+          "log": "UPLINK AUTHORED+FAILSAFE SMOKE PASSED\n"
+        },
+        {
+          "file": "uplink_once_per_node_smoke.py",
+          "code": 0,
+          "seconds": 0.34,
+          "log": "UPLINK ONCE PER NODE SMOKE PASSED\n"
+        },
+        {
+          "file": "uplink_only_delivery_retry_smoke.py",
+          "code": 0,
+          "seconds": 1.66,
+          "log": "UPLINK_ONLY DELIVERY + RETRY SMOKE PASSED\n"
+        },
+        {
+          "file": "worldgen_manifest_integration_smoke.py",
+          "code": 0,
+          "seconds": 4.89,
+          "log": "PASS test_01_orders_grouping_later_neighbors_and_witness_seeds\nPASS test_02_partial_inventory_save_load_and_consumption\nPASS test_03_pure_queries_do_not_touch_game_rng_knowledge_or_pools\nPASS test_04_z_outlier_inverse_completeness_against_wider_sources\nPASS test_05_numerical_bound_extreme_uniform_and_rounding\nPASS test_06_domain_work_bounds_and_atomic_failure\nPASS test_07_matching_reciprocity_maximality_budgets_and_hop_cap\nPASS test_08_authored_declaration_is_not_revelation_or_prose\nPASS test_09_new_ids_intel_blocks_authored_links_and_coord_semantics\nPASS test_10_collision_namespace_and_special_nodes_do_not_consume_quotas\nPASS test_11_incompatible_saves_rules_seed_and_corruption_preserve_files\nPASS test_12_unknown_cleanup_and_authored_properties_preserved\nPASS test_13_hashseed_process_determinism\nPASS test_14_seed_command_compatibility_and_localization\nWORLDGEN MANIFEST INTEGRATION SMOKE PASSED (14 groups)\n"
+        },
+        {
+          "file": "worldgen_manifest_prototype_smoke.py",
+          "code": 0,
+          "seconds": 2.73,
+          "log": "WORLDGEN MANIFEST PROTOTYPE SMOKE PASSED (17 groups)\n"
+        },
+        {
+          "file": "worldgen_modules_pool_smoke.py",
+          "code": 0,
+          "seconds": 1.62,
+          "log": "seed=1 region=disk sector=S+020_+000_+000 archetype=relay_corridor counts=[2, 2, 1]\nseed=1 region=bulge sector=S-25000_+000_+000 archetype=ruin_field counts=[1, 3]\nseed=1 region=halo sector=S+16000_+000_+000 archetype=empty counts=[0]\nseed=2 region=disk sector=S+020_+000_+000 archetype=relay_corridor counts=[2, 1]\nseed=2 region=bulge sector=S-25000_+000_+000 archetype=ruin_field counts=[3, 1]\nseed=2 region=halo sector=S+16000_+000_+000 archetype=empty counts=[0]\nseed=2 drone salvage node=S-25000_+000_+000:WG1_5127933e65399a0dd8554f8138f5a6e35626a3318b346987871ce50067b8d697_0 module=field_service_rig attempts=2; depletion and cargo persist\nWORLDGEN MODULES POOL SMOKE PASSED\n"
+        },
+        {
+          "file": "worldgen_preexistence_catalog_smoke.py",
+          "code": 0,
+          "seconds": 2.02,
+          "log": "WORLDGEN PREEXISTENCE CATALOG SMOKE PASSED (17 groups)\n"
+        },
+        {
+          "file": "worldgen_preexistence_characterization_smoke.py",
+          "code": 0,
+          "seconds": 0.67,
+          "log": "WORLDGEN PREEXISTENCE CHARACTERIZATION SMOKE PASSED (9 groups)\n"
+        },
+        {
+          "file": "worldgen_sparse_archetypes_smoke.py",
+          "code": 0,
+          "seconds": 9.74,
+          "log": "WORLDGEN SPARSE ARCHETYPES SMOKE PASSED\n"
+        }
+      ]
+    },
+    {
+      "label": "e5a-delivery",
+      "total": 65,
+      "passed": 64,
+      "results": [
+        {
+          "file": "audio_config_smoke.py",
+          "code": 0,
+          "seconds": 1.12,
+          "log": "AUDIO CONFIG SMOKE PASSED\n"
+        },
+        {
+          "file": "audio_runtime_notice_smoke.py",
+          "code": 0,
+          "seconds": 0.06,
+          "log": ""
+        },
+        {
+          "file": "config_audio_smoke.py",
+          "code": 0,
+          "seconds": 0.15,
+          "log": "CONFIG AUDIO SMOKE PASSED\n"
+        },
+        {
+          "file": "contacts_sector_smoke.py",
+          "code": 0,
+          "seconds": 0.15,
+          "log": ""
+        },
+        {
+          "file": "contacts_smoke.py",
+          "code": 0,
+          "seconds": 0.21,
+          "log": "CONTACTS SMOKE PASSED\n"
+        },
+        {
+          "file": "deadnode_chain_detours_smoke.py",
+          "code": 0,
+          "seconds": 3.28,
+          "log": "PASS test_direct_viable_is_retained\nPASS test_reference_seed_empty_straight_slots_find_offline_nodes\nPASS test_existing_detour_preferred_over_shorter_all_new\nPASS test_mixed_detour_minimizes_new_nodes\nPASS test_real_regional_boundary_with_existing_detour\nPASS test_short_unusable_receiver_loses_to_longer_information_path\nPASS test_equal_alternatives_have_stable_tie_breaks\nPASS test_no_procedural_context_is_not_a_permission\nPASS test_regional_kind_restrictions_not_overridden\nPASS test_shared_slot_reservations_and_coordinate_collision\nPASS test_navigation_only_exhausted_stop_and_direction_preserved\nPASS test_protected_shortcut_excluded_alternative_retained\nPASS test_sources_and_first_reception_remain_pending\nPASS test_generated_explored_and_lazy_insertion_are_distinct\nPASS test_collision_safe_detour_identities\nPASS test_pending_identity_references_are_not_reused\nPASS test_indexed_forecasts_match_the_canonical_full_world_query\nPASS test_budget_exhaustion_is_incomplete_not_universal_impossibility\nPASS test_detour_save_load_hash_seeds_and_all_state_purity\nPASS test_detour_never_calls_live_writers\nPASS test_populated_world_has_bounded_search_and_preserves_state\nDEADNODE CHAIN DETOURS SMOKE PASSED\n"
+        },
+        {
+          "file": "deadnode_chain_planner_smoke.py",
+          "code": 0,
+          "seconds": 4.07,
+          "log": "PASS test_direct_and_inclusive_cap\nPASS test_70_and_100_with_valid_canonical_slots\nPASS test_existing_chain_preferred_and_revealed_progressively\nPASS test_mixed_existing_and_new\nPASS test_alternative_directed_origin_and_disconnected_impostor\nPASS test_invalid_origin_and_endpoints\nPASS test_known_route_projection_does_not_accept_stale_edges\nPASS test_types_follow_real_region_archetype_and_slot_rules\nPASS test_waystation_has_uplink_but_not_salvage_data\nPASS test_unknown_type_cannot_provide_mandatory_data\nPASS test_unavailable_receivers_are_not_reopened\nPASS test_consumed_uplink_not_reused_but_other_sources_independent\nPASS test_visited_scale_can_use_known_route_without_new_information\nPASS test_existing_intel_and_normal_solve_are_distinct_from_recovery_signal\nPASS test_file_intel_must_be_readable_and_uncorrupted\nPASS test_protected_target_intermediary_and_unlocked_host\nPASS test_unresolved_primary_protection_fails_closed\nPASS test_generated_and_lazy_sectors_are_explicit_dependencies\nPASS test_no_policy_or_procedural_slot_is_not_fabricated\nPASS test_identity_collision_is_avoided_without_allocating_ids\nPASS test_complete_no_mutation_and_no_production_helpers\nPASS test_order_determinism_and_save_load_without_proposal_persistence\nPASS test_stopped_waypoint_is_an_origin\nPASS test_no_arbitrary_stage_limit\nPASS test_unknown_record_does_not_make_an_origin_operational\nPASS test_candidate_gates_and_missing_drone_dependency\nPASS test_full_sector_cannot_supply_extra_slots_or_forbidden_types\nPASS test_determinism_across_hash_seeds\nDEADNODE CHAIN PLANNER SMOKE PASSED\n"
+        },
+        {
+          "file": "deadnode_cooldown_zero_smoke.py",
+          "code": 0,
+          "seconds": 0.52,
+          "log": "DEADNODE COOLDOWN ZERO SMOKE PASSED\n"
+        },
+        {
+          "file": "deadnode_opportunity_selection_smoke.py",
+          "code": 0,
+          "seconds": 4.75,
+          "log": "PASS test_01_origin_at_current_node\nPASS test_02_multiple_known_access_hops\nPASS test_03_close_origin_wrong_direction\nPASS test_04_different_access_hops_preserved\nPASS test_05_equal_hops_different_distances\nPASS test_06_short_chain_long_backtrack_counted\nPASS test_07_longer_chain_nearer_origin\nPASS test_08_no_free_repositioning\nPASS test_09_near_unidentified_opportunity\nPASS test_10_near_visited_region_allowed\nPASS test_11_far_old_region_not_forbidden_by_threshold\nPASS test_12_generated_is_not_visited_or_known_sector\nPASS test_13_visited_not_completed\nPASS test_14_completed_remains_completed\nPASS test_15_sensor_coverage_remains_unknown\nPASS test_16_new_in_generated_sector_stays_conditional\nPASS test_17_canonical_travel_time_and_power\nPASS test_18_wear_and_repair_not_predicted_as_exact\nPASS test_19_future_scrap_unknown_not_zero\nPASS test_20_cannibalization_unavailable\nPASS test_21_no_resources_or_consumptions_changed\nPASS test_22_physical_validity_does_not_prove_economy\nPASS test_23_near_beats_disproportionate_backtrack\nPASS test_24_known_near_beats_new_very_far\nPASS test_25_frontier_only_after_comparable_access\nPASS test_26_short_but_unusable_information_excluded\nPASS test_27_longer_valid_progression_retained\nPASS test_28_primary_target_protected\nPASS test_29_future_reception_not_provisional\nPASS test_30_no_verified_solution_is_explicit\nPASS test_31_ties_and_tradeoffs_preserved\nPASS test_32_ordering_without_random_weights\nPASS test_33_whole_state_unchanged_and_no_live_helpers\nPASS test_34_rng_counters_and_attempts_unchanged\nPASS test_35_no_knowledge_or_route_publication\nPASS test_36_hash_seed_determinism\nPASS test_37_save_load_selection\nPASS test_38_thousands_of_nodes\nPASS test_39_multiple_targets_bounded_shared_queries\nPASS test_40_navigation_cap_and_stopped_waypoint\nDEADNODE OPPORTUNITY SELECTION SMOKE PASSED\n"
+        },
+        {
+          "file": "debug_add_commands_smoke.py",
+          "code": 0,
+          "seconds": 0.21,
+          "log": "DEBUG ADD COMMANDS SMOKE PASSED\n"
+        },
+        {
+          "file": "debug_galaxy_smoke.py",
+          "code": 0,
+          "seconds": 0.26,
+          "log": "DEBUG GALAXY SMOKE PASSED\n"
+        },
+        {
+          "file": "debug_lore_arcs_smoke.py",
+          "code": 0,
+          "seconds": 0.25,
+          "log": "DEBUG LORE/ARCS SMOKE PASSED\n"
+        },
+        {
+          "file": "debug_worldgen_graph_smoke.py",
+          "code": 0,
+          "seconds": 0.24,
+          "log": "DEBUG WORLDGEN/GRAPH SMOKE PASSED\n"
+        },
+        {
+          "file": "drone_completion_context_smoke.py",
+          "code": 0,
+          "seconds": 0.48,
+          "log": "DRONE COMPLETION CONTEXT SMOKE PASSED\n"
+        },
+        {
+          "file": "drone_modular_v1_smoke.py",
+          "code": 0,
+          "seconds": 0.96,
+          "log": "DRONE MODULAR V1 SMOKE PASSED\n"
+        },
+        {
+          "file": "drone_recall_all_smoke.py",
+          "code": 0,
+          "seconds": 0.23,
+          "log": "DRONE RECALL ALL SMOKE PASSED\n"
+        },
+        {
+          "file": "drone_salvage_survey_smoke.py",
+          "code": 0,
+          "seconds": 0.7,
+          "log": "DRONE SALVAGE/SURVEY SMOKE PASSED\n"
+        },
+        {
+          "file": "energy_policy_smoke.py",
+          "code": 0,
+          "seconds": 3.01,
+          "log": "ENERGY POLICY SMOKE PASSED\n"
+        },
+        {
+          "file": "exploration_recovery_smoke.py",
+          "code": 0,
+          "seconds": 0.62,
+          "log": "EXPLORATION RECOVERY SMOKE PASSED\n"
+        },
+        {
+          "file": "forced_hidden_ad_hoc_smoke.py",
+          "code": 0,
+          "seconds": 0.29,
+          "log": "FORCED HIDDEN AD-HOC SMOKE PASSED\n"
+        },
+        {
+          "file": "galaxy_physical_model_smoke.py",
+          "code": 0,
+          "seconds": 0.14,
+          "log": "GALAXY PHYSICAL MODEL SMOKE PASSED\n"
+        },
+        {
+          "file": "hibernate_radiation_wake_smoke.py",
+          "code": 0,
+          "seconds": 0.3,
+          "log": "HIBERNATE RADIATION WAKE SMOKE PASSED\n"
+        },
+        {
+          "file": "hibernate_sequence_assets_smoke.py",
+          "code": 0,
+          "seconds": 0.03,
+          "log": ""
+        },
+        {
+          "file": "intel_recent_order_smoke.py",
+          "code": 0,
+          "seconds": 0.4,
+          "log": "INTEL RECENT ORDER SMOKE PASSED\n"
+        },
+        {
+          "file": "job_id_numbering_smoke.py",
+          "code": 0,
+          "seconds": 0.22,
+          "log": "JOB ID NUMBERING SMOKE PASSED\n"
+        },
+        {
+          "file": "knowledge_boundary_smoke.py",
+          "code": 0,
+          "seconds": 8.76,
+          "log": "PASS test_01_empty_status_has_no_pending_count\nPASS test_02_hidden_opportunity_is_publicly_indistinguishable\nPASS test_03_stopped_service_only_reports_receiver\nPASS test_04_remote_source_does_not_change_ready_receiver\nPASS test_05_hidden_search_transitions_are_invisible\nPASS test_06_prepared_chain_is_invisible_before_capture\nPASS test_07_capture_preserves_event_and_readable_file\nPASS test_08_read_and_import_keep_normal_unlocks\nPASS test_09_debug_guard_and_live_records_en_es\nPASS test_10_debug_does_not_change_public_meaning\nPASS test_11_textual_command_dispatch_and_off_gate\nPASS test_12_completion_only_uses_acquired_destinations\nPASS test_13_queries_are_read_only_for_entire_state_and_rng\nPASS test_14_survey_hidden_equals_absent_and_known_is_preserved\nPASS test_15_save_load_preserves_hidden_and_received_states\nPASS test_16_real_repl_dispatch_debug_on_off_en_es\nPASS test_17_hidden_catalog_and_scheduler_do_not_affect_public_views_or_errors\nPASS test_18_dock_alias_resolution_does_not_disclose_hidden_ids\nPASS test_19_unacquired_navigation_errors_and_logs_hide_physical_existence\nKNOWLEDGE BOUNDARY: 19 GROUPS PASSED\n"
+        },
+        {
+          "file": "known_routes_integrity_smoke.py",
+          "code": 0,
+          "seconds": 2.23,
+          "log": "PASS _assert_hops_and_publication\nPASS _assert_import_history_and_locales\nPASS _assert_components_and_views\nPASS _assert_recovery_frontier\nPASS _assert_deadnode_candidates\nPASS _assert_lazy_sector\nPASS _assert_solve_and_travel\nPASS _assert_job_endpoint_disappears\nPASS _assert_waypoint_is_inert_after_removal\nPASS _assert_persistence\nKNOWN ROUTES INTEGRITY SMOKE PASSED (seed=271828)\n"
+        },
+        {
+          "file": "lore_channel_preference_and_unlock_smoke.py",
+          "code": 0,
+          "seconds": 0.19,
+          "log": "LORE CHANNEL PREFERENCE + UPLINK PRIMARY UNLOCK SMOKE PASSED\n"
+        },
+        {
+          "file": "lore_distance_from_start_smoke.py",
+          "code": 0,
+          "seconds": 0.14,
+          "log": "LORE DISTANCE FROM START SMOKE PASSED\n"
+        },
+        {
+          "file": "lore_secondary_count_weights_hard_smoke.py",
+          "code": 0,
+          "seconds": 1.01,
+          "log": "LORE SECONDARY COUNT + SINGLE WEIGHTS + HARD FORCE SMOKE PASSED\n"
+        },
+        {
+          "file": "lore_smoke.py",
+          "code": 0,
+          "seconds": 0.17,
+          "log": "LORE SMOKE PASSED\n"
+        },
+        {
+          "file": "mail_metadata_and_log_header_smoke.py",
+          "code": 0,
+          "seconds": 0.22,
+          "log": "MAIL METADATA + LOG HEADER SMOKE PASSED\n"
+        },
+        {
+          "file": "narrative_world_integration_smoke.py",
+          "code": 0,
+          "seconds": 18.3,
+          "log": "PASS test_01_bootstrap_identity_and_no_secret_revelation\nPASS test_02_order_and_pure_queries\nPASS test_03_seed_variability_and_bound_clues\nPASS test_04_forced_host_delivery_salvage_and_reading\nPASS test_05_optional_probability_delivery_and_no_physical_dependency\nPASS test_06_pool_exhaustion_and_deadline_never_reopen\nPASS test_07_intel_public_formats_and_pending_references\nPASS test_08_repeated_saves_and_catalog_changes\nPASS test_09_negative_declarations\nPASS test_10_current_catalogue_and_impact_measurement\nPASS test_11_near_is_not_a_connection_and_required_link_rejected\nPASS test_12_corrupt_intel_is_uncertain_and_never_fabricates\nPASS test_13_local_file_bindings_and_compilation_failures\nPASS test_14_all_existing_push_channels_keep_reading_separate\nPASS test_15_essential_document_reserved_on_empty_wreck\nPASS test_16_protected_alias_and_natural_discovery_exceptions\nPASS test_17_unbound_tokens_and_legacy_save_rejection\nPASS test_18_essential_file_path_must_be_recoverable\nPASS test_19_reserved_tokens_are_validated_without_bindings\nPASS test_20_essential_payload_matches_real_delivery_and_language_fallback\nNARRATIVE WORLD INTEGRATION PASSED /tmp/retorno-e4-narrative-evidence.json\n"
+        },
+        {
+          "file": "nav_abort_waypoint_cleanup_smoke.py",
+          "code": 0,
+          "seconds": 3.59,
+          "log": "PASS test_abort_position_and_inactive_abort\nPASS test_scan_from_stopped_waypoint\nPASS test_scan_gates_and_real_transit\nPASS test_third_destination_completion_and_arrival\nPASS test_travel_to_third_destination\nPASS test_return_and_resume_cleanup\nPASS test_save_load_at_all_phases\nPASS test_repeated_aborts\nPASS test_repeated_abort_drops_deleted_origin_metadata\nPASS test_pending_waypoint_jobs_become_history\nPASS test_cleanup_cancellation_event_once_on_arrival\nPASS test_cleanup_cancellation_event_once_on_repeated_abort\nPASS test_cleanup_cancellation_event_once_on_docking_completion\nPASS test_bilingual_status_and_help\nPASS test_rejections_direction_and_ordinary_arrival\nNAV ABORT WAYPOINT CLEANUP SMOKE PASSED\n"
+        },
+        {
+          "file": "nav_map_galaxy_dependencies_smoke.py",
+          "code": 0,
+          "seconds": 0.21,
+          "log": "NAV MAP GALAXY DEPENDENCIES SMOKE PASSED\n"
+        },
+        {
+          "file": "nav_map_galaxy_determinism_smoke.py",
+          "code": 0,
+          "seconds": 0.26,
+          "log": "NAV MAP GALAXY DETERMINISM SMOKE PASSED\n"
+        },
+        {
+          "file": "nav_map_galaxy_smoke.py",
+          "code": 0,
+          "seconds": 0.24,
+          "log": "NAV MAP GALAXY SMOKE PASSED\n"
+        },
+        {
+          "file": "passive_communications_smoke.py",
+          "code": 0,
+          "seconds": 8.82,
+          "log": "test_01_prologue_power_and_boot PASS\ntest_02_boot_interruptions_and_missing_installation PASS\ntest_03_receiver_states_and_independence PASS\ntest_04_lore_pending_capture_read_and_idempotence PASS\ntest_05_coverage_and_no_early_dock PASS\ntest_06_repair_then_capture PASS\ntest_07_non_radio_channels_and_explicit_external_mail PASS\ntest_08_save_pending_received_read_and_old_schema_defaults PASS\ntest_09_recovery_legacy_deferral_and_existing_gateway PASS\ntest_10_deadnode_no_premature_commit_or_new_bridge PASS\ntest_11_localization_diagnostics_and_dynamic_notices PASS\ntest_12_radio_does_not_consume_rng_or_change_physics PASS\nPUBLIC FLOW: power off security -> power off data_core -> drone deploy D1 PWR-A1 -> drone repair D1 power_core -> drone repair D1 power_core -> drone repair D1 power_core -> drone move D1 BUS-A2 -> drone repair D1 energy_distribution -> drone repair D1 energy_distribution -> drone move D1 BRG-01 -> drone repair D1 comms -> power on comms -> boot radiod ; t=314.0s scrap=49 radio=ready\ntest_13_public_prologue_sequence_without_resource_overrides PASS\ntest_14_frozen_lore_across_pending_save_and_locale_switch PASS\ntest_15_live_gates_do_not_write_or_consume_pending PASS\ntest_16_explicit_external_lore_mail_uses_radio PASS\ntest_17_legacy_gateway_rechecks_protected_and_physical_target PASS\ntest_18_save_load_during_service_boot PASS\nPASSIVE COMMUNICATIONS: 18 groups PASS\n"
+        },
+        {
+          "file": "procedural_radiation_smoke.py",
+          "code": 0,
+          "seconds": 0.16,
+          "log": "PROCEDURAL RADIATION SMOKE PASSED\n"
+        },
+        {
+          "file": "radiation_hull_smoke.py",
+          "code": 1,
+          "seconds": 1.07,
+          "log": "Traceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/radiation_hull_smoke.py\", line 217, in <module>\n    main()\n  File \"/home/jon/prog/retorno_case/retorno/tests/radiation_hull_smoke.py\", line 183, in main\n    assert any(e.data.get(\"metric\") == \"env\" for e in ship_rad_events), ship_rad_events\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: []\n"
+        },
+        {
+          "file": "route_hop_cap_smoke.py",
+          "code": 0,
+          "seconds": 0.22,
+          "log": "ROUTE HOP CAP SMOKE PASSED\n"
+        },
+        {
+          "file": "route_solve_out_of_range_origins_smoke.py",
+          "code": 0,
+          "seconds": 0.36,
+          "log": "ROUTE SOLVE OUT OF RANGE ORIGINS SMOKE PASSED\n"
+        },
+        {
+          "file": "save_load_smoke.py",
+          "code": 0,
+          "seconds": 0.32,
+          "log": "SAVE/LOAD SMOKE PASSED\n"
+        },
+        {
+          "file": "scan_job_smoke.py",
+          "code": 0,
+          "seconds": 0.44,
+          "log": "SCAN JOB SMOKE PASSED\n"
+        },
+        {
+          "file": "scan_observation_memory_smoke.py",
+          "code": 0,
+          "seconds": 10.19,
+          "log": "PASS test_01_successful_job_new_contact_and_exact_event_results\nPASS test_02_known_contact_only_is_not_no_signals\nPASS test_03_negative_observation_retains_legitimate_intel_and_later_discovery\nPASS test_04_blocked_sensors_and_sensord_produce_no_observation\nPASS test_05_context_and_sensor_interruptions_do_not_record\nPASS test_06_cancel_before_and_during_work_does_not_record\nPASS test_07_repeated_ticks_effects_and_compatibility_do_not_duplicate\nPASS test_08_execution_conditions_not_queue_snapshot\nPASS test_09_worldgen_failure_is_failed_job_not_negative_observation\nPASS test_10_exception_after_some_materialization_leaves_no_absence_evidence\nPASS test_11_multiple_save_load_cycles_and_scanning_after_load\nPASS test_12_retention_ids_and_completed_job_replay_after_pruning\nPASS test_13_genuine_schema3_slot_shape_without_history_loads_safely\nPASS test_14_immutable_read_api_and_no_retroactive_aliases\nPASS test_15_hidden_and_protected_manifest_sites_never_leak_from_query\nPASS test_16_physical_z_spill_observed_from_actual_position\nPASS test_17_exact_prechange_rng_and_world_results_across_seeds_conditions\nPASS test_18_recovery_entry_exception_keeps_single_rng_increment\nPASS test_19_bilingual_public_event_presentation_shared_by_textual\nPASS test_20_stopped_waypoint_and_live_transit_keep_existing_gates\nSCAN OBSERVATION MEMORY SMOKE PASSED (20 groups)\n"
+        },
+        {
+          "file": "sector_intel_validation_smoke.py",
+          "code": 0,
+          "seconds": 0.77,
+          "log": "SECTOR INTEL VALIDATION SMOKE PASSED\n"
+        },
+        {
+          "file": "sensor_detection_factor_smoke.py",
+          "code": 0,
+          "seconds": 3.42,
+          "log": "SENSOR DETECTION FACTOR SMOKE PASSED\n"
+        },
+        {
+          "file": "ship_layout_output_smoke.py",
+          "code": 0,
+          "seconds": 0.21,
+          "log": "SHIP LAYOUT OUTPUT SMOKE PASSED\n"
+        },
+        {
+          "file": "ship_survey_radiation_smoke.py",
+          "code": 0,
+          "seconds": 0.21,
+          "log": "SHIP SURVEY RADIATION SMOKE PASSED\n"
+        },
+        {
+          "file": "smoke_test.py",
+          "code": 0,
+          "seconds": 0.35,
+          "log": "SMOKE TEST PASSED\n"
+        },
+        {
+          "file": "structural_recovery_smoke.py",
+          "code": 0,
+          "seconds": 16.01,
+          "log": "PASS test_01_existing_certified_and_no_physical_invention\nPASS test_02_lazy_target_and_authored_narrative_identity\nPASS test_03_positive_inclusive_cap_and_missing_endpoint\nPASS test_04_multi_stage_and_detour\nPASS test_05_directed_complete_distance_beats_euclidean_origin\nPASS test_06_pure_economy_hardware_radiation_independence\nPASS test_07_empty_isolated_and_no_emitter\nPASS test_08_budgets_and_widening_without_maximum_distance\nPASS test_09_transaction_stale_collision_and_injected_failure\nPASS test_10_gates_capture_read_no_full_chain\nPASS test_11_leave_return_and_invalid_source_at_capture\nPASS test_12_closed_pools_and_salvage_preparation\nPASS test_13_protected_primary_reserved_host_and_unsupported_reference\nPASS test_14_persist_all_boundaries_and_reject_incompatible\nPASS test_15_real_world_multiseed_order_z_and_topology\nPASS test_16_runtime_global_frontier_and_deadnode_counters\nPASS test_17_en_es_diagnostics_cli_textual_and_no_leaks\nPASS test_18_process_determinism_and_input_order\nPUBLIC SCENE FLOW: power off security -> power on comms -> boot radiod -> scan -> cat /logs/broadcasts/A_0011.en.txt -> nav B ; resources and systems use ordinary rules\nPASS test_19_public_commands_from_declared_scene_without_gameplay_edits\nSEARCH METRICS [{\"case\": \"installed\", \"cohorts\": 42, \"edges\": 25, \"expansions\": 2, \"peak_bytes\": 852141, \"seconds\": 0.23567, \"sectors\": 16, \"status\": \"validated\"}, {\"case\": \"chain\", \"cohorts\": 38, \"edges\": 2, \"expansions\": 3, \"peak_bytes\": 840154, \"seconds\": 0.06205, \"sectors\": 16, \"status\": \"validated\"}, {\"case\": \"materialized\", \"cohorts\": 30, \"edges\": 4, \"expansions\": 2, \"peak_bytes\": 958406, \"seconds\": 0.213075, \"sectors\": 16, \"status\": \"validated\"}]\nPASS test_20_metrics_and_technical_limits\nPASS test_21_real_salvage_consumption_between_stages_and_load\nPASS test_22_failed_materialization_and_identity_collisions_are_atomic\nPASS test_23_primary_natural_scan_and_exact_manual_solve_remain_legal\nPASS test_24_domain_and_loaded_search_resume_are_explicit\nPASS test_25_visited_physical_scale_uses_only_preexisting_known_route\nPUBLIC INSTALLED FLOW: power off security -> power off data_core -> drone deploy D1 PWR-A1 -> drone repair D1 power_core -> drone repair D1 power_core -> drone repair D1 power_core -> drone move D1 BUS-A2 -> drone repair D1 energy_distribution -> drone repair D1 energy_distribution -> drone move D1 BRG-01 -> drone repair D1 comms -> power on comms -> boot radiod -> power on sensors -> boot sensord -> scan -> route solve ECHO_7 -> nav ECHO_7 -> dock ECHO_7 ; t=2153.115s scrap=49; existing frontier preserved\nPASS test_26_installed_prologue_public_journey_without_fixture_or_overrides\nPASS test_27_stored_node_frontier_and_stale_deadnode_counter\nPASS test_28_remote_navigation_access_does_not_prove_first_reception\nPASS test_29_local_first_reception_overrides_more_attractive_remote_chain\nPASS test_30_spatial_eligibility_is_independent_of_receiver_operation\nPUBLIC FIRST RECEPTION REPAIR: power off security -> drone deploy D1 BRG-01 -> drone repair D1 comms -> power on comms -> boot radiod ; one capture\nPASS test_31_public_repair_and_boot_capture_local_pending_exactly_once\nPASS test_32_conditional_search_retries_at_new_location_and_survives_load\nPUBLIC FIRST RECEPTION FLOW: scan -> nav REMOTE -> power off security -> power on comms -> boot radiod -> cat received file; one capture\nPASS test_33_public_travel_changes_conditional_search_into_local_reception\nPASS test_34_selector_confirmation_and_capture_share_spatial_boundary\nPASS test_35_remote_condition_does_not_reveal_primaries_or_emitters\nPASS test_36_load_checks_original_reception_context_without_requiring_current_coverage\nSTRUCTURAL RECOVERY: 36 GROUPS PASSED\n"
+        },
+        {
+          "file": "textual_active_jobs_job_id_smoke.py",
+          "code": 0,
+          "seconds": 0.25,
+          "log": "TEXTUAL ACTIVE JOBS JOB ID SMOKE PASSED\n"
+        },
+        {
+          "file": "textual_command_spacing_smoke.py",
+          "code": 0,
+          "seconds": 3.62,
+          "log": "TEXTUAL COMMAND SPACING SMOKE PASSED\n"
+        },
+        {
+          "file": "textual_completion_context_smoke.py",
+          "code": 0,
+          "seconds": 1.87,
+          "log": "TEXTUAL COMPLETION CONTEXT SMOKE PASSED\n"
+        },
+        {
+          "file": "textual_theme_smoke.py",
+          "code": 0,
+          "seconds": 3.72,
+          "log": "TEXTUAL THEME SMOKE PASSED\n"
+        },
+        {
+          "file": "transit_radiation_progression_smoke.py",
+          "code": 0,
+          "seconds": 0.16,
+          "log": "TRANSIT RADIATION PROGRESSION SMOKE PASSED\n"
+        },
+        {
+          "file": "uplink_authored_and_failsafe_smoke.py",
+          "code": 0,
+          "seconds": 0.61,
+          "log": "UPLINK AUTHORED+FAILSAFE SMOKE PASSED\n"
+        },
+        {
+          "file": "uplink_once_per_node_smoke.py",
+          "code": 0,
+          "seconds": 0.35,
+          "log": "UPLINK ONCE PER NODE SMOKE PASSED\n"
+        },
+        {
+          "file": "uplink_only_delivery_retry_smoke.py",
+          "code": 0,
+          "seconds": 1.64,
+          "log": "UPLINK_ONLY DELIVERY + RETRY SMOKE PASSED\n"
+        },
+        {
+          "file": "worldgen_manifest_integration_smoke.py",
+          "code": 0,
+          "seconds": 4.92,
+          "log": "PASS test_01_orders_grouping_later_neighbors_and_witness_seeds\nPASS test_02_partial_inventory_save_load_and_consumption\nPASS test_03_pure_queries_do_not_touch_game_rng_knowledge_or_pools\nPASS test_04_z_outlier_inverse_completeness_against_wider_sources\nPASS test_05_numerical_bound_extreme_uniform_and_rounding\nPASS test_06_domain_work_bounds_and_atomic_failure\nPASS test_07_matching_reciprocity_maximality_budgets_and_hop_cap\nPASS test_08_authored_declaration_is_not_revelation_or_prose\nPASS test_09_new_ids_intel_blocks_authored_links_and_coord_semantics\nPASS test_10_collision_namespace_and_special_nodes_do_not_consume_quotas\nPASS test_11_incompatible_saves_rules_seed_and_corruption_preserve_files\nPASS test_12_unknown_cleanup_and_authored_properties_preserved\nPASS test_13_hashseed_process_determinism\nPASS test_14_seed_command_compatibility_and_localization\nWORLDGEN MANIFEST INTEGRATION SMOKE PASSED (14 groups)\n"
+        },
+        {
+          "file": "worldgen_manifest_prototype_smoke.py",
+          "code": 0,
+          "seconds": 2.73,
+          "log": "WORLDGEN MANIFEST PROTOTYPE SMOKE PASSED (17 groups)\n"
+        },
+        {
+          "file": "worldgen_modules_pool_smoke.py",
+          "code": 0,
+          "seconds": 1.61,
+          "log": "seed=1 region=disk sector=S+020_+000_+000 archetype=relay_corridor counts=[2, 2, 1]\nseed=1 region=bulge sector=S-25000_+000_+000 archetype=ruin_field counts=[1, 3]\nseed=1 region=halo sector=S+16000_+000_+000 archetype=empty counts=[0]\nseed=2 region=disk sector=S+020_+000_+000 archetype=relay_corridor counts=[2, 1]\nseed=2 region=bulge sector=S-25000_+000_+000 archetype=ruin_field counts=[3, 1]\nseed=2 region=halo sector=S+16000_+000_+000 archetype=empty counts=[0]\nseed=2 drone salvage node=S-25000_+000_+000:WG1_5127933e65399a0dd8554f8138f5a6e35626a3318b346987871ce50067b8d697_0 module=field_service_rig attempts=2; depletion and cargo persist\nWORLDGEN MODULES POOL SMOKE PASSED\n"
+        },
+        {
+          "file": "worldgen_preexistence_catalog_smoke.py",
+          "code": 0,
+          "seconds": 1.96,
+          "log": "WORLDGEN PREEXISTENCE CATALOG SMOKE PASSED (17 groups)\n"
+        },
+        {
+          "file": "worldgen_preexistence_characterization_smoke.py",
+          "code": 0,
+          "seconds": 0.67,
+          "log": "WORLDGEN PREEXISTENCE CHARACTERIZATION SMOKE PASSED (9 groups)\n"
+        },
+        {
+          "file": "worldgen_sparse_archetypes_smoke.py",
+          "code": 0,
+          "seconds": 9.71,
+          "log": "WORLDGEN SPARSE ARCHETYPES SMOKE PASSED\n"
+        }
+      ]
+    }
+  ],
+  "negative_reproductions": {
+    "initial_15_groups": "Traceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 235, in main\n    try:func();print(\"PASS\",name,flush=True)\n        ^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 58, in test_01_empty_status_has_no_pending_count\n    assert \"pending=\" not in text and \"pendientes=\" not in text\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\nTraceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 235, in main\n    try:func();print(\"PASS\",name,flush=True)\n        ^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 66, in test_02_hidden_opportunity_is_publicly_indistinguishable\n    assert public(s)==before\n           ^^^^^^^^^^^^^^^^^\nAssertionError\nTraceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 235, in main\n    try:func();print(\"PASS\",name,flush=True)\n        ^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 74, in test_03_stopped_service_only_reports_receiver\n    assert public(s)==before\n           ^^^^^^^^^^^^^^^^^\nAssertionError\nTraceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 235, in main\n    try:func();print(\"PASS\",name,flush=True)\n        ^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 84, in test_04_remote_source_does_not_change_ready_receiver\n    assert public(s)==before\n           ^^^^^^^^^^^^^^^^^\nAssertionError\nTraceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 235, in main\n    try:func();print(\"PASS\",name,flush=True)\n        ^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 92, in test_05_hidden_search_transitions_are_invisible\n    assert public(s)==before,status\n           ^^^^^^^^^^^^^^^^^\nAssertionError: search_pending\nTraceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 235, in main\n    try:func();print(\"PASS\",name,flush=True)\n        ^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 101, in test_06_prepared_chain_is_invisible_before_capture\n    assert public(s)==before\n           ^^^^^^^^^^^^^^^^^\nAssertionError\nPASS test_07_capture_preserves_event_and_readable_file\nPASS test_08_read_and_import_keep_normal_unlocks\nTraceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 235, in main\n    try:func();print(\"PASS\",name,flush=True)\n        ^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 137, in test_09_debug_guard_and_live_records_en_es\n    assert parse_command(\"debug \"+name)==(\"DEBUG_\"+name.upper(),None)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/src/retorno/cli/parser.py\", line 463, in parse_command\n    raise ParseError(\"usage_debug\")\nretorno.cli.parser.ParseError: usage_debug\nTraceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 235, in main\n    try:func();print(\"PASS\",name,flush=True)\n        ^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 154, in test_10_debug_does_not_change_public_meaning\n    output(repl.render_debug_radio,s);output(repl.render_debug_recovery,s)\n           ^^^^^^^^^^^^^^^^^^^^^^^\nAttributeError: module 'retorno.cli.repl' has no attribute 'render_debug_radio'. Did you mean: 'render_debug_arcs'?\nTraceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 235, in main\n    try:func();print(\"PASS\",name,flush=True)\n        ^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 176, in test_11_textual_command_dispatch_and_off_gate\n    expected=output(getattr(repl,\"render_debug_\"+name),s)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAttributeError: module 'retorno.cli.repl' has no attribute 'render_debug_radio'. Did you mean: 'render_debug_arcs'?\nPASS test_12_completion_only_uses_acquired_destinations\nTraceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 235, in main\n    try:func();print(\"PASS\",name,flush=True)\n        ^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 194, in test_13_queries_are_read_only_for_entire_state_and_rng\n    public(s);output(repl.render_debug_radio,s);output(repl.render_debug_recovery,s)\n                     ^^^^^^^^^^^^^^^^^^^^^^^\nAttributeError: module 'retorno.cli.repl' has no attribute 'render_debug_radio'. Did you mean: 'render_debug_arcs'?\nTraceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 235, in main\n    try:func();print(\"PASS\",name,flush=True)\n        ^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 208, in test_14_survey_hidden_equals_absent_and_known_is_preserved\n    assert output(repl.render_ship_survey,s,\"B\")==absent\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\nPASS test_15_save_load_preserves_hidden_and_received_states\nTraceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 243, in <module>\n    if __name__==\"__main__\":main()\n                            ^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 239, in main\n    assert not failures, failures\n           ^^^^^^^^^^^^\nAssertionError: ['test_01_empty_status_has_no_pending_count', 'test_02_hidden_opportunity_is_publicly_indistinguishable', 'test_03_stopped_service_only_reports_receiver', 'test_04_remote_source_does_not_change_ready_receiver', 'test_05_hidden_search_transitions_are_invisible', 'test_06_prepared_chain_is_invisible_before_capture', 'test_09_debug_guard_and_live_records_en_es', 'test_10_debug_does_not_change_public_meaning', 'test_11_textual_command_dispatch_and_off_gate', 'test_13_queries_are_read_only_for_entire_state_and_rng', 'test_14_survey_hidden_equals_absent_and_known_is_preserved']\n",
+    "dock_alias_group_18": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 283, in test_18_dock_alias_resolution_does_not_disclose_hidden_ids\n    assert repl._resolve_node_id_from_input(s,\"Unreceived Relay\") is None\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+    "navigation_error_group_19": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n  File \"/home/jon/prog/retorno_case/retorno/tests/knowledge_boundary_smoke.py\", line 305, in test_19_unacquired_navigation_errors_and_logs_hide_physical_existence\n    assert rendered[0]==rendered[1] and logs[0]==logs[1]\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n",
+    "final_19_groups": "PASS test_01_empty_status_has_no_pending_count\nPASS test_02_hidden_opportunity_is_publicly_indistinguishable\nPASS test_03_stopped_service_only_reports_receiver\nPASS test_04_remote_source_does_not_change_ready_receiver\nPASS test_05_hidden_search_transitions_are_invisible\nPASS test_06_prepared_chain_is_invisible_before_capture\nPASS test_07_capture_preserves_event_and_readable_file\nPASS test_08_read_and_import_keep_normal_unlocks\nPASS test_09_debug_guard_and_live_records_en_es\nPASS test_10_debug_does_not_change_public_meaning\nPASS test_11_textual_command_dispatch_and_off_gate\nPASS test_12_completion_only_uses_acquired_destinations\nPASS test_13_queries_are_read_only_for_entire_state_and_rng\nPASS test_14_survey_hidden_equals_absent_and_known_is_preserved\nPASS test_15_save_load_preserves_hidden_and_received_states\nPASS test_16_real_repl_dispatch_debug_on_off_en_es\nPASS test_17_hidden_catalog_and_scheduler_do_not_affect_public_views_or_errors\nPASS test_18_dock_alias_resolution_does_not_disclose_hidden_ids\nPASS test_19_unacquired_navigation_errors_and_logs_hide_physical_existence\nKNOWLEDGE BOUNDARY: 19 GROUPS PASSED\n"
+  },
+  "manuals": {
+    "command": "PYTHONPATH=src:. /home/jon/prog/retorno_case/retorno_venv/bin/python tests/manuals_style_check.py",
+    "output": "MANUAL STYLE CHECK PASSED\n"
+  },
+  "known_failure": {
+    "test": "radiation_hull_smoke.py",
+    "line": 183,
+    "fixture": "CARNAVAL_34",
+    "baseline_final_trace_identical": true,
+    "fixture_modified": false
+  },
+  "final_validated_source_sha256": {
+    "src/retorno/core/communications.py": "a87493b0339c31c957dc3428aaa4d6d95e5d6408ffe5846860ab0c53efbe6c6e",
+    "src/retorno/cli/repl.py": "c54ae2d32758b482d1b457e61566321b76d2dc660983eab3904f2a222f9948c9",
+    "src/retorno/cli/parser.py": "5cfe75b08421c1c4b1b9b0e4d6d3b16206fff9f3c7c16e1ece9bee8fb6f90c6a",
+    "src/retorno/ui_textual/app.py": "ff1068eb017f16f32267e15ee218995b0fa43138e9c10147ded2b0661c12f1b3",
+    "tests/knowledge_boundary_smoke.py": "f2eb2d3bfea192fb5399d56671430ae3f7f0c5815652f68d7dbea1d7209650e7",
+    "tests/passive_communications_smoke.py": "aa345ad18276cba08d21304a95aa236f07098895a7935ec37266de1d415d1c45",
+    "tests/structural_recovery_smoke.py": "2e2bfb1dcb49ecf9edd88cdf893f028d340fee7f90a2903d9df9f0b8fa7552d5"
+  },
+  "validation_runner_source": "from pathlib import Path\nimport ast,json,re,subprocess\nr=Path('/home/jon/prog/retorno_case/retorno')\ndef git(*args):return subprocess.check_output(['git',*args],cwd=r,text=True)\nchanged=set(git('diff','--name-only').splitlines())|set(git('ls-files','--others','--exclude-standard').splitlines())\nproblems=[];links=0;parsed=0\nfor name in sorted(changed):\n    p=r/name\n    if p.suffix=='.py':ast.parse(p.read_text());parsed+=1\n    if p.suffix=='.md':\n        for target in re.findall(r'\\]\\(([^)]+)\\)',p.read_text()):\n            if '://' in target or target.startswith('#') or target.startswith('mailto:'):continue\n            target=target.split('#')[0].strip('<>');q=p.parent/target\n            if not q.exists():problems.append([name,target])\n            else:links+=1\n    if name.endswith('.es.md'):assert (r/name.replace('.es.md','.md')).exists(),name\n    if name.endswith('.en.txt'):assert (r/name.replace('.en.txt','.es.txt')).exists(),name\n    if name.endswith('.es.txt'):assert (r/name.replace('.es.txt','.en.txt')).exists(),name\nfor suffix in ('.md','.es.md'):\n    path='docs/design/roadmap-worldgen-lore-f-dead01'+suffix\n    previous=git('show','HEAD:'+path);current=(r/path).read_text()\n    previous_rows=[line for line in previous.splitlines() if re.match(r'\\| \\*\\*D\\d\\d',line)]\n    assert len(previous_rows)==24 and all(line in current for line in previous_rows)\nfor name in ('universo.md','guia_coherencia.md'):\n    p=r/'docs/canon'/name;body=p.read_text();assert '`0.4.0`' in body and '2026-11-06' in body and '**English' in body\nold=git('show','HEAD:docs/canon/universo.md');current=(r/'docs/canon/universo.md').read_text()\nfor section in ('A-SOC-001','A-HIST-002'):\n    pattern=r'### '+section+r'.*?(?=\\n### |\\n## |\\Z)'\n    assert re.search(pattern,old,re.S).group()==re.search(pattern,current,re.S).group()\nassert '| **A-COM-001** | Comunicaciones a larga distancia | Alcance, latencia, repetidores, disponibilidad y excepciones. |' in current\nassert not git('diff','--cached','--name-only').strip()\nassert not problems,problems\nresult={'ast_files':parsed,'existing_local_markdown_targets':links,'documentation_pairs':'PASS','canon_additions_inline_en_es':'PASS','open_decisions_preserved':'PASS','D01_D24_unchanged':'PASS','staging':'empty','diff_check':subprocess.run(['git','diff','--check'],cwd=r,capture_output=True,text=True).returncode}\nassert result['diff_check']==0\nprint(json.dumps(result,indent=2))\nPath('/tmp/retorno-e5a-validation.json').write_text(json.dumps(result,indent=2)+'\\n')\n",
+  "final_validation": {
+    "ast_files": 7,
+    "existing_local_markdown_targets": 120,
+    "documentation_pairs": "PASS",
+    "canon_additions_inline_en_es": "PASS",
+    "open_decisions_preserved": "PASS",
+    "D01_D24_unchanged": "PASS",
+    "staging": "empty",
+    "diff_check": 0,
+    "help_and_parser_en_es": "PASS"
+  }
+}

@@ -362,13 +362,13 @@ def test_11_localization_diagnostics_and_dynamic_notices():
         s=ready(); s.os.locale=locale
         lore.write_local_intel(s,"captured_signal","SECRET COORD: 999,999,999",opportunity_id="hidden")
         text=capture_output(repl.render_diag,s,"comms")
-        assert "SECRET" not in text and "999" not in text and "=1" in text
+        assert "SECRET" not in text and "999" not in text and "pending=" not in text and "pendientes=" not in text
         assert text.strip().splitlines()==presenter.build_command_output(repl.render_diag,s,"comms")
         panel = presenter.build_status_lines(s)
         assert any(line.startswith("comms ") for line in panel)
         assert not any("Radio reception" in line or "Recepción de radio" in line for line in panel)
         status = capture_output(repl.render_status,s)
-        assert ("pending=1" if locale == Locale.EN else "pendientes=1") in status
+        assert "pending=" not in status and "pendientes=" not in status
         assert ("Sistema de comunicaciones" if locale==Locale.ES else "Communications System") in text
         # Ownership is read from the live model, including another installed daemon.
         owner=s.ship.systems["data_core"]

@@ -9,5 +9,7 @@ Comportamiento operativo
 Notas de uso
 - Úsalo como entrada y profundiza con `alerts`, `diag`, `jobs` y comandos de dominio.
 
+- La disponibilidad de radio describe el receptor; no anuncia mensajes sin detectar ni fuentes remotas.
+
 Comandos relacionados
 - `alerts`, `power status`, `ship systems`, `drone status [drone_id]`

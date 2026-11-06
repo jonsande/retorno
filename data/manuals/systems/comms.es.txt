@@ -5,7 +5,7 @@ El Sistema de comunicaciones recibe tráfico de radio pasivo independientemente 
 
 Función
 - Captura señales disponibles localmente y emisiones de estación en archivos legibles.
-- Separa recepción pendiente, mensajes capturados y lectura/importación posterior.
+- Registra mensajes capturados para lectura/importación posterior.
 
 Dependencias operativas
 - Condición inicial del hardware: OFFLINE, salud 0.72, desconectado eléctricamente y sin consumo.
@@ -22,9 +22,9 @@ Impacto en comandos por estado
 - El correo interno y el salvamento no necesitan radio. Uplink conserva sus requisitos de data_core/datad.
 
 Síntomas comunes
-- No hay señal recién capturada aunque exista una comunicación pendiente.
-- radiod detenido, no instalado, alimentación dependiente no disponible o fuente fuera de condiciones de recepción local.
-- El recuento de pendientes no revela contenido ni destinos de mensajes.
+- No hay señal recién capturada; el silencio no demuestra ausencia de emisores.
+- radiod detenido, no instalado o alimentación dependiente no disponible.
+- status y diag comms informan del receptor y su servicio; no enumeran señales no detectadas.
 
 Recuperación típica
 - Consultar diag comms y estabilizar la distribución eléctrica.

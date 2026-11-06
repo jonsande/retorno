@@ -2,6 +2,29 @@
 
 # Comunicaciones pasivas — 4D-3e4b
 
+## Frontera de conocimiento implementada — 4D-3e5a
+
+Conforme a `C-DATA-004`, `status` y `diag comms` muestran únicamente equipo,
+salud, alimentación, servicio y disponibilidad operativa del receptor. Su línea
+de radio usa `radio_block_reason(state)` sin oportunidad. No consulta el ledger,
+planes ni búsquedas: añadir una fuente secreta o cambiar un resultado oculto no
+cambia la salida pública, incluso con debug activo. `ready` describe capacidad
+técnica, nunca promete una señal existente o cobertura hacia una fuente.
+
+`debug radio`, tras `debug on`, consulta el ledger existente: IDs, fuente/host,
+canal, estado, contenido, tiempos, path, metadatos y causas operativas/espaciales
+de bloqueo. `debug recovery` consulta planes y búsquedas guardados. `debug off`
+los bloquea de nuevo. CLI y Textual usan los mismos renderers protegidos y textos
+EN/ES; no hay segunda cola ni logging nuevo. Las consultas no reintentan captura,
+importan intel, materializan, consumen RNG ni avanzan tiempo. Los eventos y archivos
+realmente recibidos siguen visibles; leer/importar conserva sus efectos normales.
+
+El ledger, la persistencia, captura y cobertura local permanecen intactos.
+`A-COM-001` sigue abierto. 4D-3e5b abordará alcance físico, tipos de emisores,
+potencia, sensibilidad y propagación temporal simplificada por separado.
+Prueba: `tests/knowledge_boundary_smoke.py`.
+
+
 [English](passive-communications.md). Implementación para revisión externa sobre
 `78676dbfce5e7b98db36b2e241a427a19b0632fe`, 2026-11-06.
 No implementa F-DEAD-01 ni comunicaciones interestelares generales.
@@ -47,7 +70,7 @@ hub no permite recibirlo desde aquí: la cadena remota puede ser diagnóstica y
 condicionada, sin plan activo. Apagado/avería en la ubicación correcta sí permite
 preparar una recepción pendiente, entregada una sola vez cuando los gates se cumplan.
 No se implementa alcance, potencia, atenuación o latencia; se reserva esa extensión
-para 4D-3e5b. La presentación de `pending=N` no cambia en esta corrección.
+para 4D-3e5b. La corrección posterior 4D-3e5a retira `pending=N` de las consultas públicas.
 
 ## Capacidad y canales
 
@@ -94,9 +117,9 @@ captura, y tiempo de lectura. Estados:
    al archivo. El parser existente aplica la intel que sea válida; el nombre del
    estado no garantiza que hubiese intel útil ni que se desbloquease un primary.
 
-Un primary de archivo sigue protegido hasta su lectura/importación válida. La
-consulta de pendientes muestra únicamente cantidad y causas genéricas, nunca
-texto, fuente secreta, IDs de objetivos, rutas o coordenadas. No importa intel.
+Un primary de archivo sigue protegido hasta su lectura/importación válida. Las consultas públicas no muestran oportunidades pendientes, ni siquiera su
+cantidad o causas derivadas de una fuente oculta. El ledger se inspecciona solo
+con `debug radio`; consultar no importa intel.
 
 El escritor común conserva los eventos y directorios existentes. La captura y
 su bookkeeping son una operación síncrona en memoria bajo el modelo de ejecución
@@ -169,7 +192,7 @@ con nombre EN/ES y sugerencia explícita, por ejemplo:
 No mantiene una lista paralela de asociaciones de daemons.
 
 CLI y Textual comparten renderers, mensajes y diagnóstico. El output del comando
-`status` incluye el diagnóstico de radio y sus pendientes; el panel de sistemas
+`status` incluye únicamente el diagnóstico operativo del receptor; el panel de sistemas
 de Textual muestra exclusivamente los sistemas y su estado, sin esas líneas
 adicionales. Se conservan tipos de evento y audio.
 

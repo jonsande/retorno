@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import hashlib
+import json
 import math
 import os
 import random
@@ -422,7 +423,7 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ("boot <service_name>", "start system service", "arranca servicio de sistema"),
                 ("power on comms", "activate passive radio hardware; then boot radiod", "activa el receptor pasivo; después boot radiod"),
                 ("boot radiod", "start passive radio after power on comms", "arranca radio pasiva después de power on comms"),
-                ("diag comms", "radio gates and pending count without message contents", "puertas de radio y pendientes sin mostrar contenido"),
+                ("diag comms", "receiver hardware, service and operational availability", "equipo receptor, servicio y disponibilidad operativa"),
                 ("power status", "show power telemetry", "muestra telemetría eléctrica"),
                 ("power plan cruise", "set cruise power profile", "activa plan energético cruise"),
                 ("power plan normal", "set normal power profile", "activa plan energético normal"),
@@ -479,6 +480,8 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
             "Debug",
             [
                 ("debug on|off|status", "toggle debug mode", "activa o desactiva modo debug"),
+                ("debug radio", "inspect internal radio ledger (debug mode)", "inspecciona el ledger interno de radio (modo debug)"),
+                ("debug recovery", "inspect stored structural searches and plans (debug mode)", "inspecciona búsquedas y planes estructurales guardados (modo debug)"),
                 ("debug galaxy", "show worldgen and galaxy summary", "muestra resumen de galaxia y worldgen"),
                 ("debug galaxy map <sector|local|regional|global>", "show debug galaxy map", "muestra mapa galáctico debug"),
                 ("debug worldgen sector <sector_id>", "dump one materialized/generated sector", "vuelca un sector materializado/generado"),
@@ -722,6 +725,21 @@ def _has_unlock(state, command_key: str) -> bool:
         if command_key in unlocks:
             return True
     return False
+
+
+def _public_unknown_contact_message(state, event) -> str | None:
+    """Keep physical existence checks internal when the ship has no record."""
+    if event.type != EventType.BOOT_BLOCKED or event.data.get("reason") not in {"node_missing", "unknown_contact"}:
+        return None
+    node_id = event.data.get("node_id")
+    known_ids = _map_known_nodes(state) | state.world.known_contacts | set(state.world.known_intel)
+    if not node_id or node_id in known_ids:
+        return None
+    messages = {
+        "en": "Action blocked: unknown contact. Use 'scan' or acquire navigation intel.",
+        "es": "Acción bloqueada: contacto desconocido. Usa 'scan' o consigue inteligencia de navegación.",
+    }
+    return messages.get(state.os.locale.value, messages["en"])
 
 
 def render_events(state, events, origin_override: str | None = None) -> None:
@@ -1575,7 +1593,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         if e.type == EventType.BOOT_BLOCKED:
             locale = state.os.locale.value
             reason = e.data.get("reason", "")
-            if reason in boot_blocked_reasons:
+            unknown_contact_message = _public_unknown_contact_message(state, e)
+            if unknown_contact_message:
+                message = unknown_contact_message
+            elif reason in boot_blocked_reasons:
                 msg_tmpl = boot_blocked_reasons[reason].get(locale, boot_blocked_reasons[reason]["en"])
                 suggestion = e.data.get("suggestion", "")
                 if suggestion:
@@ -2236,7 +2257,8 @@ def render_logs(state, limit: int = 15) -> None:
         t_label = format_elapsed_short(float(e.t), include_seconds=True)
         if t_label.startswith("T+"):
             t_label = t_label[2:]
-        print(f"- [{t_label}] [{e.severity.value.upper()}] {e.type.value}: {e.message}")
+        message = _public_unknown_contact_message(state, e) or e.message
+        print(f"- [{t_label}] [{e.severity.value.upper()}] {e.type.value}: {message}")
 
 
 def render_jobs(state, limit: int | None = 5) -> None:
@@ -2625,6 +2647,52 @@ def render_modules_catalog(state) -> None:
         print(f"- {mid}: {name} [scope={scope}{slot_txt}] (installation scrap cost {scrap_cost}) [{effects_str}]")
         if desc:
             print(f"  {desc}")
+
+
+def _development_query_allowed(state, command: str) -> bool:
+    if state.os.debug_enabled:
+        return True
+    message = {
+        "en": f"{command}: available only in DEBUG mode. Use: debug on",
+        "es": f"{command}: disponible solo en modo DEBUG. Usa: debug on",
+    }
+    print(message.get(state.os.locale.value, message["en"]))
+    return False
+
+
+def render_debug_radio(state) -> None:
+    """Read the existing ledger; never retry, generate or import anything."""
+    if not _development_query_allowed(state, "debug radio"):
+        return
+    from retorno.core.communications import radio_block_reason, radio_spatial_block_reason
+    es = state.os.locale.value == "es"
+    print("=== DEBUG RADIO ===")
+    print("Ledger interno; no es conocimiento de la nave." if es else "Internal ledger; not ship knowledge.")
+    print(f"receiver_block={radio_block_reason(state)}")
+    for ident, op in sorted(state.world.radio_opportunities.items()):
+        print(f"- {ident}")
+        print(json.dumps(asdict(op), ensure_ascii=False, sort_keys=True))
+        print(f"spatial_block={radio_spatial_block_reason(state, op.origin_node_id, channel=op.channel, require_docked=op.require_docked)}")
+        print(f"capture_block={radio_block_reason(state, op)}")
+    if not state.world.radio_opportunities:
+        print("(sin registros)" if es else "(no records)")
+
+
+def render_debug_recovery(state) -> None:
+    """Inspect retained evidence and plans without running the selector again."""
+    if not _development_query_allowed(state, "debug recovery"):
+        return
+    from retorno.core.structural_recovery import RecoveryBudget, _canonical
+    es = state.os.locale.value == "es"
+    print("=== DEBUG RECOVERY ===")
+    print("Búsquedas y planes internos; no es conocimiento de la nave." if es else "Internal searches and plans; not ship knowledge.")
+    print("Presupuestos técnicos predeterminados:" if es else "Default technical budgets:")
+    print(json.dumps(asdict(RecoveryBudget()), sort_keys=True))
+    print("Búsquedas guardadas (candidatos retenidos, motivo, trabajo y cursor):" if es else "Stored searches (retained candidates, reason, work and cursor):")
+    print(json.dumps(_canonical(state.world.recovery_searches), ensure_ascii=False, sort_keys=True))
+    print("Planes guardados (etapa, acceso, sitios y mecanismos de fuente):" if es else "Stored plans (stage, access, sites and source mechanisms):")
+    print(json.dumps(_canonical(state.world.recovery_plans), ensure_ascii=False, sort_keys=True))
+    print("No se recalcula la selección ni se reconstruyen rechazos no conservados." if es else "Selection is not rerun; unretained rejections are not reconstructed.")
 
 
 def render_debug_arcs(state) -> None:
@@ -3899,6 +3967,8 @@ def _terminal_state_allows(parsed) -> bool:
             "DEBUG_ARCS",
             "DEBUG_LORE",
             "DEBUG_DEADNODES",
+            "DEBUG_RADIO",
+            "DEBUG_RECOVERY",
             "DEBUG_MODULES",
             "DEBUG_GALAXY",
             "DEBUG_GALAXY_MAP",
@@ -5324,11 +5394,14 @@ def render_ship_survey(state, target_id: str) -> None:
         print(f"node_radiation: {max(0.0, float(state.ship.radiation_env_rad_per_s)):.4f}rad/s")
         return
 
-    node = state.world.space.nodes.get(target_norm)
+    # Existence in the physical graph is not discovery. Use the same public
+    # knowledge projection as maps; onboard aliases are handled above.
+    known_ids = _map_known_nodes(state) | state.world.known_contacts
+    node = state.world.space.nodes.get(target_norm) if target_norm in known_ids else None
     if not node:
         msg = {
-            "en": f"ship survey: unknown node ({target_norm})",
-            "es": f"ship survey: nodo desconocido ({target_norm})",
+            "en": "ship survey: unknown contact. Use scan or acquire navigation intel.",
+            "es": "ship survey: contacto desconocido. Usa scan o adquiere intel de navegación.",
         }
         print(msg.get(locale, msg["en"]))
         return
@@ -5344,9 +5417,7 @@ def render_ship_survey(state, target_id: str) -> None:
     dz = node.z_ly - cz
     distance = (dx * dx + dy * dy + dz * dz) ** 0.5
     sector_id = sector_id_for_pos(node.x_ly, node.y_ly, node.z_ly)
-    known = target_norm in (
-        state.world.known_nodes if state.world.known_nodes else state.world.known_contacts
-    )
+    known = target_norm in known_ids
     route = target_norm == current_id or target_norm in reachable_from(state.world, current_id)
     visited = target_norm in state.world.visited_nodes
     in_sensor_range = distance <= state.ship.sensors_range_ly
@@ -5796,7 +5867,9 @@ def _confirm_nav(state, action) -> bool:
 
 def _resolve_node_id_from_input(state, token: str) -> str | None:
     token_lower = token.lower()
-    nodes = state.world.space.nodes
+    # Dock aliases may only resolve acquired contacts, never the hidden catalog.
+    known_ids = _map_known_nodes(state) | state.world.known_contacts
+    nodes = {nid: node for nid, node in state.world.space.nodes.items() if nid in known_ids}
     if token in nodes:
         return token
     # Exact name match (case-insensitive)
@@ -6964,7 +7037,7 @@ def main() -> None:
                     if len(tokens) == 2:
                         candidates = [
                             c
-                            for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "modules", "galaxy", "add"]
+                            for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "radio", "recovery", "modules", "galaxy", "add"]
                             if c.startswith(text)
                         ]
                     elif len(tokens) == 3 and tokens[1] == "scenario":
@@ -7449,6 +7522,11 @@ def main() -> None:
                 loop.start()
                 print("DEBUG mode disabled")
                 continue
+        if isinstance(parsed, tuple) and parsed[0] in {"DEBUG_RADIO", "DEBUG_RECOVERY"}:
+            with loop.with_lock() as locked_state:
+                renderer = render_debug_radio if parsed[0] == "DEBUG_RADIO" else render_debug_recovery
+                renderer(locked_state)
+            continue
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_ARCS":
             with loop.with_lock() as locked_state:
                 if not locked_state.os.debug_enabled:

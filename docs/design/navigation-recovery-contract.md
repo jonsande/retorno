@@ -2,6 +2,17 @@
 
 # Navigation and recovery design contract
 
+## Update 4D-3e5a — 2026-11-06
+
+`C-DATA-004` establishes provenance and limited knowledge. Public radio/recovery
+queries are independent of hidden opportunities/plans, including in debug mode;
+guarded `debug radio` and `debug recovery` are shared by CLI/Textual. `ship survey`
+requires prior knowledge. No simulation or save changes. See the current
+communications, recovery and discovery contracts and
+[tests/review](../testing/knowledge-boundary-review.md). 4D-3e5b retains its separate
+future physical scope; `A-COM-001` remains open.
+
+
 Spanish version: [navigation-recovery-contract.es.md](navigation-recovery-contract.es.md)
 
 ## Implemented 4D-3e4b update — 2026-11-06

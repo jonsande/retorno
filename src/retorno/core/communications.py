@@ -173,41 +173,23 @@ def mark_radio_read(state, path: str) -> None:
 
 def radio_diagnostic_lines(state) -> list[str]:
     locale = state.os.locale.value
-    pending = [o for o in state.world.radio_opportunities.values() if o.status == "pending"]
+    # Public telemetry depends only on the observable receiver, even in debug.
     reason = radio_block_reason(state)
-    if reason is None and any(radio_block_reason(state, o) for o in pending):
-        reason = "source_unavailable"
     labels = {
         "en": {
             "ready": "ready", "comms_missing": "comms not installed", "comms_offline": "comms powered off; use power on comms",
             "comms_damaged": "comms below LIMITED; repair comms", "comms_power_dependency": "comms power dependencies unavailable",
             "terminal_locked": "terminal locked", "core_unavailable": "Core OS unavailable", "power_unavailable": "power unavailable",
             "receiver_context": "reception suspended during transit/hibernation", "radiod_missing": "radiod not installed",
-            "radiod_stopped": "radiod stopped; use boot radiod", "source_unavailable": "pending source outside legitimate local reception conditions",
+            "radiod_stopped": "radiod stopped; use boot radiod",
         },
         "es": {
             "ready": "disponible", "comms_missing": "comms no instalado", "comms_offline": "comms apagado; usa power on comms",
             "comms_damaged": "comms inferior a LIMITED; repara comms", "comms_power_dependency": "alimentación de comms no disponible",
             "terminal_locked": "terminal bloqueado", "core_unavailable": "Core OS no disponible", "power_unavailable": "potencia no disponible",
             "receiver_context": "recepción suspendida durante tránsito/hibernación", "radiod_missing": "radiod no instalado",
-            "radiod_stopped": "radiod detenido; usa boot radiod", "source_unavailable": "fuente pendiente fuera de condiciones legítimas de recepción local",
+            "radiod_stopped": "radiod detenido; usa boot radiod",
         },
     }
-    title, count = ("Radio reception", "pending") if locale != "es" else ("Recepción de radio", "pendientes")
-    lines = [f"{title}: {labels.get(locale, labels['en'])[reason or 'ready']}; {count}={len(pending)}"]
-    statuses = {p.status for p in state.world.recovery_plans.values()}
-    if not statuses:
-        statuses = {s["status"] for s in state.world.recovery_searches.values()}
-    translations = {
-        "en": {"search_pending": "search pending", "validated": "prepared", "prepared": "prepared", "receipt_pending": "reception pending", "active": "active",
-               "stage_consumed": "stage consumed", "complete": "complete", "incomplete": "search incomplete",
-               "none_in_scope": "no complete opportunity in examined scope", "conditional": "delivery unverified", "invalid": "invalid candidate"},
-        "es": {"search_pending": "búsqueda pendiente", "validated": "preparada", "prepared": "preparada", "receipt_pending": "recepción pendiente", "active": "activa",
-               "stage_consumed": "etapa consumida", "complete": "completada", "incomplete": "búsqueda incompleta",
-               "none_in_scope": "sin oportunidad completa en el ámbito examinado", "conditional": "entrega sin verificar", "invalid": "candidato no válido"},
-    }
-    if statuses:
-        title = "Recuperación estructural" if locale == "es" else "Structural recovery"
-        labels = translations.get(locale, translations["en"])
-        lines.append(title+": "+", ".join(labels[s] for s in sorted(statuses)))
-    return lines
+    title = "Recepción de radio" if locale == "es" else "Radio reception"
+    return [f"{title}: {labels.get(locale, labels['en'])[reason or 'ready']}"]

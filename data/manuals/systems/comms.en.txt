@@ -5,7 +5,7 @@ The Communications System receives passive radio traffic independently of the ex
 
 Function
 - Captures locally available signals and station broadcasts into readable files.
-- Separates pending reception, captured messages and subsequent reading/import.
+- Records captured messages for subsequent reading/import.
 
 Operational dependencies
 - Initial hardware condition: OFFLINE, health 0.72, electrically disconnected with no load.
@@ -22,9 +22,9 @@ Command impact by state
 - Internal mail and salvage do not require radio. Uplink retains data_core/datad requirements.
 
 Common symptoms
-- No newly captured signal despite a pending communication.
-- radiod stopped, uninstalled, power dependency unavailable or source outside local reception conditions.
-- Pending counts do not reveal message contents or destinations.
+- No newly captured signal; silence does not establish the absence of emitters.
+- radiod stopped, uninstalled or power dependency unavailable.
+- status and diag comms describe the receiver and service; they do not enumerate undetected signals.
 
 Recovery pattern
 - Inspect diag comms and stabilize electrical distribution.

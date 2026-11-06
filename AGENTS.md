@@ -111,3 +111,38 @@ English and Spanish (EN/ES).
   limitation instead of silently leaving it untranslated.
 - A change that introduces player-facing text or documentation is incomplete
   until both supported languages have been updated and validated.
+
+## Player knowledge and diegetic information boundaries
+
+Follow `C-DATA-004` in `docs/canon/universo.md` and ask “How does the ship know
+this?” using `docs/canon/guia_coherencia.md` before exposing universe facts.
+
+- Every fact presented as ship or protagonist knowledge needs a legitimate
+  observation, measurement, captured communication, read archive, prior ship
+  record, or inference from available evidence.
+- Distinguish physical truth, ship knowledge, and technical scheduler state.
+  Inferences may be approximate, uncertain or false, but must be justifiable
+  and distinguishable from verified facts.
+- Never disclose secret catalogs, undiscovered historical sites, scheduler
+  candidates, reserved documents, prepared narrative opportunities or internal
+  recovery plans without a valid discovery event.
+- Do not use internal collections containing hidden information directly as
+  sources for playable diagnostics. Physical `space.nodes`, `lore_placements`,
+  `radio_opportunities`, `recovery_searches` and `recovery_plans` are not ship
+  knowledge. Known locations, known routes and current reception eligibility
+  are separate facts.
+- Keep omniscient diagnostics behind explicit development commands gated by
+  `debug_enabled`. Ordinary `status` and `diag` retain their public meaning
+  even with debug enabled. Diagnostic queries must not advance or mutate the
+  simulation, consume RNG, generate sites, receive messages or import intel.
+- CLI and Textual must enforce exactly the same knowledge boundary. Review
+  events, sounds, help, contextual entity lists, completion and error messages
+  as potential disclosure surfaces too.
+- New features presenting universe state require negative disclosure tests:
+  hold observations constant, vary hidden engine data, and compare public
+  output. Also verify preservation of legitimately acquired information.
+
+Menus, controls, save/load and general system help do not need artificial
+fictional explanations. This rule concerns universe facts and knowledge
+attributed to the protagonist or ship; it permits ordinary interface information
+and explicitly activated development diagnostics.

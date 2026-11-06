@@ -31,5 +31,7 @@ Sector-id convention
 Usage notes
 - Use `ship systems` + `alerts` to triage failures before long operations.
 
+- ship survey <node_id> inspects known contacts; an undiscovered ID provides no physical data. Use scan or acquire intel to discover it.
+
 Related commands
 - `status`, `diag <system_id>`, `power status`, `jobs`

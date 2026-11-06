@@ -1,12 +1,24 @@
 # RETORNO — Hoja de ruta de preexistencia procedural, lore y F-DEAD-01
 
-**Versión:** 1.4 — 2026-11-06
+**Versión:** 1.5 — 2026-11-06
 **Estado:** 4D-3e5 implementada sobre `ba705e7` para revisión externa; e6 pendiente. [English](roadmap-worldgen-lore-f-dead01.md).
 **Destino recomendado en el repositorio:** `docs/design/roadmap-worldgen-lore-f-dead01.es.md`.
 
 > **Propósito:** conservar las decisiones de diseño y la secuencia de trabajo durante la estabilización final del universo procedural, sin prolongarla indefinidamente ni perder el objetivo de volver a jugar RETORNO con Textual y sonido, y después desarrollar arcos, singles y contenido nuevo.
 >
 > **Precedencia:** esta hoja documenta decisiones de producto y coordinación. No reemplaza `docs/canon/universo.md`, `docs/canon/guia_coherencia.md`, los contratos técnicos existentes ni el código probado. Las discrepancias entre documentos o cambios de mecánica se deben señalar para decisión del desarrollador; no resolver por suposición.
+
+## Intervención aprobada e implementada v1.5 — 4D-3e5a
+
+Después del F-DEAD-01 publicado en `343829e`, se incorpora `C-DATA-004`, la regla
+operativa en AGENTS y «¿Cómo sabe esto la nave?». Se retiran filtraciones de
+`status`/`diag comms` y `ship survey`; debug explícito conserva el acceso interno.
+Pruebas negativas comparativas EN/ES, CLI/Textual y preservación de información
+adquirida: [informe](../testing/knowledge-boundary-review.es.md).
+No cambia selector, mundo, ledger, RNG, persistencia, audio ni D01–D24.
+**4D-3e5b** sigue separada: alcance físico, tipos de emisores, potencia,
+sensibilidad y propagación temporal simplificada. No se implementa en e5a.
+e6, validación jugable prolongada con Textual y sonido, sigue pendiente.
 
 ## Estado implementado v1.4 — 4D-3e5
 
@@ -268,3 +280,5 @@ Al iniciar otra conversación dentro del proyecto RETORNO:
 - **v1.2:** contenido narrativo instalado como entrada de worldgen; entidades/relaciones estructuradas y validación previa a la partida; procedimiento seguro con 4D-3e2 en curso.
 
 - **v1.3:** acuerdo explícito para insertar e4b antes de e5; comms/radiod y recepción persistente local; aplazamiento seguro de activaciones correctivas legacy. D01–D24 y criterios F-DEAD-01 preservados.
+
+- **v1.5 — 2026-11-06:** 4D-3e5a, conocimiento limitado y diagnósticos explícitos de desarrollo; e5b y e6 separados.

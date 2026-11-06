@@ -1,5 +1,26 @@
 # Structural recovery F-DEAD-01 — 4D-3e5
 
+## Presentation and development — 4D-3e5a
+
+Internal selection is not ship knowledge (`C-DATA-004`). `status` and `diag comms`
+do not inspect `recovery_searches` or `recovery_plans` or show generic states
+derived from them, even in debug mode. Preparing a chain before first capture
+reveals nothing. Legitimate capture, received files, reading and intel retain
+existing progression.
+
+`debug on` enables `debug recovery` in CLI and Textual: stored searches,
+result/reason, retained candidate certificates, sectors, expansions/edges,
+cursor and anchor; plans with state, stage, access, sites and source mechanisms,
+captured/consumed stages and version. Default technical budgets are shown as
+current configuration, not historical measurements. It neither invents a rejected
+candidate history nor reruns selection to reconstruct it: only already retained
+reasons and evidence are available. `debug radio` relates plans to deliveries and
+current blocking reasons. `debug off` blocks both queries again. No persisted
+state, logging or simulation mutations are added. Coverage, reception conditions,
+selector and sources are unchanged; physical range remains reserved for 4D-3e5b.
+Test: `tests/knowledge_boundary_smoke.py`.
+
+
 [Español](structural-recovery.es.md). Implementation for external review, 2026-11-06.
 Authority: `core/structural_recovery.py`; tests: `tests/structural_recovery_smoke.py`.
 
@@ -77,11 +98,11 @@ opportunity, file, route or counter, and cannot act as an active-plan frontier
 blocking later selection. Its cursor can continue; a new location permits a new
 selection.
 
-Player diagnostics retain generic states, revealing neither remote source nor
-destination. No internal mail, local transmitter, omniscient guidance, second
+Since 4D-3e5a, player diagnostics show no internal states, even generic ones,
+and reveal neither remote source nor destination. No internal mail, local transmitter, omniscient guidance, second
 queue or new range rules are added. Future physical coverage replaces the shared
 predicate; power, attenuation and latency remain 4D-3e5b. Pending-count presentation
-remains 4D-3e5a. Saving/loading an uncaptured plan also validates its original
+is separated in implemented 4D-3e5a. Saving/loading an uncaptured plan also validates its original
 preparation context (`access.path[0]`) through the same spatial predicate. A player
 can leave a legitimate source and return later with pending reception intact.
 An earlier save with invalid remote-first reception is explicitly rejected without

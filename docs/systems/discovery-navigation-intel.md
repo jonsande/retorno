@@ -6,6 +6,36 @@
 
 # Discovery, navigation, and intel
 
+## Knowledge boundary — 4D-3e5a
+
+`C-DATA-004` distinguishes physical truth, engine internals, acquired observations,
+inferences and consultable knowledge. `space.nodes` represents existence;
+`known_contacts`/`known_nodes` represent knowledge; `known_links` records routes.
+`lore_placements`, `radio_opportunities`, `recovery_searches` and `recovery_plans`
+are not public discovery sources. Knowing a location, knowing a route and current
+reception capability are separate facts.
+
+Ordinary maps, contacts and completion use known projections. `ship survey <id>`
+also requires a known contact or location (including current location and recorded
+route endpoints); a hidden target returns the same localized error as an absent
+one, without physical data. Ship aliases, acquired data, natural scan, exact manual
+route solving and imported intel remain available. Deliberate `route solve` policy
+is unchanged. Received documents may contain false information without thereby
+establishing physical truth.
+
+`status` and `diag comms` describe only receiver/equipment; engine internals are
+available through `debug radio` and `debug recovery` after `debug on`. Queries are
+read-only and `debug off` blocks them. CLI/Textual share the boundary, including
+panels, messages, errors, events, help and completion.
+Dock name/alias resolution also uses acquired knowledge: a hidden name cannot
+be converted into a secret ID inside an error.
+Public events and logs unify `node_missing`/`unknown_contact` when the ship
+has no destination record, preventing error differences from exposing physical
+existence. Internal codes and actions are unchanged; acquired destination details
+remain available.
+Test: `tests/knowledge_boundary_smoke.py`.
+
+
 **4D-3e2 compatibility:** productive worldgen now uses [versioned stable history](../design/historical-worldgen-integration.md).
 `NODE:`/`LINK:` resolve exact `S…:WG1_<scope>_<index>` IDs to their physical sector,
 including Z spill. `SECTOR:`, `COORD:`, intel blocks and authored references keep

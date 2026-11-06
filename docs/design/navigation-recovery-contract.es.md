@@ -2,6 +2,17 @@
 
 # Contrato de diseño de navegación y recuperación
 
+## Actualización 4D-3e5a — 2026-11-06
+
+`C-DATA-004` establece procedencia y conocimiento limitado. Consultas públicas de
+radio/recuperación independientes de oportunidades y planes ocultos, también en
+debug; `debug radio` y `debug recovery` protegidos, compartidos por CLI/Textual.
+`ship survey` requiere conocimiento previo. Sin cambios de simulación o guardado.
+Véanse los contratos vigentes de comunicaciones, recuperación y descubrimiento,
+y [pruebas/informe](../testing/knowledge-boundary-review.es.md). 4D-3e5b mantiene
+su alcance físico futuro separado; `A-COM-001` sigue abierto.
+
+
 Versión inglesa: [navigation-recovery-contract.md](navigation-recovery-contract.md)
 
 ## Actualización implementada 4D-3e4b — 2026-11-06

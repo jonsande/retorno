@@ -1,8 +1,8 @@
 # RETORNO — Guía de coherencia narrativa y de diseño
 
 **ID:** `RET-GUIA-COHERENCIA`  
-**Versión:** `0.3.0`  
-**Fecha:** 2026-11-05  
+**Versión:** `0.4.0`<br>
+**Fecha:** 2026-11-06<br>
 **Estado:** protocolo de trabajo inicial  
 **Destinatarios:** desarrollo, Codex, diseño de sistemas, generación de arcos y singles, revisión de contenido  
 **Fuente normativa del mundo:** [`universo.md`](universo.md)  
@@ -37,6 +37,53 @@ Antes de añadir o modificar mecánicas, generación, economía de recursos, nav
 6. **Evaluar tiempo e información:** separar cuándo sucedió algo, cuándo quedó registrado y cuándo llega a conocerlo el jugador; distinguir una pista cierta en el pasado de una prueba válida en el presente.
 7. **Evaluar compatibilidad con la progresión:** no hacer desaparecer por azar una ruta, recurso o pista indispensable sin una alternativa definida. La carrera contra el tiempo no autoriza bloqueos irreversibles arbitrarios.
 8. **Documentar resultado:** principio respetado, propuesta de excepción o nueva pregunta abierta; pruebas pertinentes.
+
+### ¿Cómo sabe esto la nave? — C-DATA-004
+
+Para cada dato relevante mostrado al jugador, identificar una fuente: medición,
+observación, comunicación capturada, archivo leído, registro previo de la nave,
+inferencia derivada de evidencia disponible o información ordinaria del propio
+sistema. Si no hay ninguna, no presentarlo como conocimiento jugable. Distinguir
+la observación o testimonio recibido, la verdad física y la inferencia; explicitar
+incertidumbre cuando corresponda. Una inferencia puede ser errónea sin ser arbitraria.
+
+| Caso | Comprobación de conocimiento |
+| --- | --- |
+| Una estación existe en el manifiesto, pero no ha sido descubierta. | Su existencia interna no permite enumerarla en contactos, mapas ni autocompletado. |
+| Una ruta es físicamente posible, pero no está en `known_links`. | No presentarla como ruta registrada. Conservar scan y route solve manual autorizados. |
+| Un scheduler reservó un documento todavía no recibido. | Ni su contenido, ni su identidad ni su reserva son conocimiento de la nave. |
+| Hay una oportunidad de radio pendiente con receptor apagado. | Mostrar equipo/servicio apagado; ninguna salida debe depender de esa oportunidad oculta. |
+| F-DEAD-01 calculó una cadena sin proporcionar una pista. | Sus resultados, fuentes, cursor y etapas pertenecen a debug explícito. |
+| Un mensaje recibido afirma que existe una comunidad humana. | Conservar el testimonio adquirido; no demuestra que la comunidad siga viva. |
+
+Menús, controles, guardado/carga y ayudas generales pueden describir el sistema.
+Esta comprobación no exige una explicación diegética artificial para cada control.
+CLI, Textual, eventos, sonidos, ayuda, errores y compleción respetan la misma
+frontera; variar datos ocultos con observaciones constantes requiere pruebas
+negativas comparativas, además de preservar la información adquirida.
+
+**English — How does the ship know this?**
+
+For every relevant fact shown to the player, identify a measurement, observation,
+captured communication, read archive, prior ship record, inference from available
+evidence, or ordinary system information. Without one, do not present it as
+playable knowledge. Distinguish observations or received testimony, physical truth
+and inference; express uncertainty where appropriate. An inference may be wrong
+without being arbitrary.
+
+| Case | Knowledge check |
+| --- | --- |
+| A station exists in the manifest but is undiscovered. | Do not enumerate it in contacts, maps or completion. |
+| A physical route is possible but absent from `known_links`. | Do not present it as registered; preserve authorized scan and manual route solve. |
+| The scheduler reserved an unreceived document. | Its content, identity and reservation are not ship knowledge. |
+| A radio opportunity is pending with the receiver off. | Report hardware/service state; no output may depend on that hidden opportunity. |
+| F-DEAD-01 computed a chain without delivering a clue. | Results, sources, cursor and stages belong to explicit debug. |
+| A received message claims that a human community exists. | Preserve acquired testimony; it does not prove current survival. |
+
+Menus, controls, save/load and general help may describe the system without
+artificial fictional explanations. CLI, Textual, events, sounds, help, errors
+and completion share the boundary. Negative comparative tests must vary hidden
+data with observations held constant and also preserve acquired information.
 
 ### Ficha mínima de decisión (para tareas de Codex)
 
@@ -317,3 +364,5 @@ Este bloque está **listo para copiar**, adaptándolo a la organización real de
 **Versión 0.3.0:** se incorpora el viaje sublumínico, la distinción entre tres magnitudes temporales, la tecnología de hibernación química avanzada, la edad biológica como recurso finito, la dependencia de la eficacia respecto de `life_support` y la necesidad de consulta al jugador. Se mantienen como propuestas ajustables `0,5c` para el crucero y `0,5 %` (`0.005`) para el envejecimiento nominal en hibernación. Queda establecido como objetivo de mundo futuro incorporar agujeros negros y dilatación gravitatoria intensa, **sin afirmar implementación presente**.
 
 La siguiente tarea recomendada es estudiar y aprobar el **contrato técnico** de tres relojes y su impacto en motor, guardados, vida biológica, hibernación, energía y mantenimiento. Se ha preparado [`modelo_temporal_hibernacion.md`](../design/modelo_temporal_hibernacion.md) como borrador de ese contrato, sin modificar código ni parámetros del juego.
+
+**Revisión 0.4.0 — 2026-11-06:** se incorpora la comprobación «¿Cómo sabe esto la nave?» y sus seis casos de conocimiento, verdad e inferencia bajo `C-DATA-004`. Las decisiones abiertas anteriores se conservan. / **Revision 0.4.0:** adds the knowledge-provenance check and six cases under `C-DATA-004`; previous open decisions remain unchanged.

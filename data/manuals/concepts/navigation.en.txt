@@ -36,12 +36,13 @@ Operational notes
 - Region semantics (bulge/disk/halo) are evaluated on the physical galactic layer.
 - `nav map galaxy` uses four fixed radii: `10ly`, `100ly`, `10000ly`, `500000ly`.
 - Single-hop travel and route publication are guarded by `MAX_ROUTE_HOP_LY` (default `45ly`).
-- `ship survey <target>` gives point telemetry, but requires active `sensors` + `data_core`.
+- `ship survey <target>` gives point telemetry for known contacts and requires active `sensors` + `data_core`.
+- An unknown-contact rejection does not establish whether the destination physically exists. Discover it through scan or acquired intel.
 
 Structural navigation notices
 - A legitimate local transmission may offer an onward route when known exploration opportunities are exhausted. Enable comms and radiod at its source, then read/import the received file.
 - Each notice describes one leg. Explore its destination to obtain the next broadcast or recoverable record. All legs obey the 45 ly limit; resources and repairs remain your responsibility.
-- Pending reception, incomplete search and a completed route are different states. status reports reception/recovery without revealing unread destinations. No exit is guaranteed.
+- Captured notices and registered routes are different records. status reports receiver availability, not undetected traffic or onward opportunities. No exit is guaranteed.
 
 Relevant commands
 - `nav`, `nav galaxy`, `ship survey`, `scan`, `route solve`, `uplink`, `intel import`, `debug galaxy map <scale>`, `dock`, `undock`.

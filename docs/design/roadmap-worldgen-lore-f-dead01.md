@@ -1,6 +1,6 @@
 # RETORNO — Procedural preexistence, lore and F-DEAD-01 roadmap
 
-**Version:** 1.4 — 2026-11-06. [Español](roadmap-worldgen-lore-f-dead01.es.md).
+**Version:** 1.5 — 2026-11-06. [Español](roadmap-worldgen-lore-f-dead01.es.md).
 **Status:** 4D-3e5 implemented on `ba705e7` for external review; e6 pending.
 
 This roadmap preserves agreed design decisions and a bounded stabilization
@@ -8,6 +8,18 @@ sequence so development can return to playing RETORNO with Textual/sound, then
 to new arcs, singles and content. It records product/coordination decisions;
 it does not replace [canon](../canon/universo.md), coherence guidelines, technical
 contracts or tested code. Report discrepancies for developer decision.
+
+## Approved and implemented intervention v1.5 — 4D-3e5a
+
+After F-DEAD-01 published at `343829e`, add `C-DATA-004`, the AGENTS operational
+rule and “How does the ship know this?”. Remove disclosures from `status`/`diag
+comms` and `ship survey`; explicit debug retains internal access. Comparative
+negative EN/ES tests, CLI/Textual and acquired information preservation:
+[review](../testing/knowledge-boundary-review.md).
+Selector, world, ledger, RNG, persistence, audio and D01–D24 are unchanged.
+**4D-3e5b** remains separate: physical range, emitter types, power, sensitivity
+and simplified temporal propagation. It is not implemented in e5a.
+e6, extended playable validation with Textual and sound, remains pending.
 
 ## Implemented status v1.4 — 4D-3e5
 
@@ -319,3 +331,5 @@ narrative inputs, structured requirements/prevalidation and safe coordination
 with e2 already running; v1.3 explicit insertion of e4b before e5, passive
 comms/radiod, persistent local reception and safe deferral of corrective legacy
 activation, preserving D01–D24 and F-DEAD-01 criteria.
+
+- **v1.5 — 2026-11-06:** 4D-3e5a, limited knowledge and explicit development diagnostics; e5b and e6 remain separate.

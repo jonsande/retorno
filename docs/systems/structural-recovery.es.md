@@ -1,5 +1,27 @@
 # Recuperación estructural F-DEAD-01 — 4D-3e5
 
+## Presentación y desarrollo — 4D-3e5a
+
+La selección interna no es conocimiento de la nave (`C-DATA-004`). `status` y
+`diag comms` no consultan `recovery_searches` ni `recovery_plans`, ni muestran
+estados genéricos que dependan de ellos, incluso con debug activo. Preparar una
+cadena sin primera captura no revela nada. Captura, archivo recibido, lectura e
+intel legítimos mantienen la progresión anterior.
+
+`debug on` habilita `debug recovery` en CLI y Textual: muestra búsquedas guardadas,
+resultado/motivo, certificados candidatos retenidos, sectores, expansiones/aristas,
+cursor y ancla; planes con estado, etapa, acceso, sitios y mecanismos de fuente,
+etapas capturadas/consumidas y versión. Muestra los presupuestos técnicos
+predeterminados como configuración actual, no como mediciones históricas.
+No inventa un historial de candidatos rechazados ni reejecuta el selector para
+reconstruirlo: solo puede mostrar razones y evidencia que ya estén conservadas.
+`debug radio` permite relacionar planes con entregas y bloqueos vigentes.
+`debug off` vuelve a bloquear ambas consultas. No se añade estado persistido,
+logging ni mutaciones de simulación. Cobertura, condiciones de recepción,
+selector y fuentes permanecen intactos; alcance físico sigue reservado a 4D-3e5b.
+Prueba: `tests/knowledge_boundary_smoke.py`.
+
+
 [English](structural-recovery.md). Implementación para revisión externa, 2026-11-06.
 Autoridad: `core/structural_recovery.py`; pruebas: `tests/structural_recovery_smoke.py`.
 
@@ -80,11 +102,11 @@ Una búsqueda condicionada no crea plan, oportunidad, archivo, ruta ni contador;
 tampoco bloquea la siguiente búsqueda como frontera activa. El cursor puede
 continuar y cambiar de ubicación permite una selección nueva.
 
-El diagnóstico jugable conserva estados genéricos; no anuncia el emisor ni el
-destino remoto. No se añade correo interno, transmisor local, guía omnisciente,
+Desde 4D-3e5a el diagnóstico jugable no muestra estados internos, ni siquiera
+genéricos; no anuncia el emisor ni el destino remoto. No se añade correo interno, transmisor local, guía omnisciente,
 segunda cola ni nuevas reglas de alcance. La ampliación física futura sustituirá
 la comprobación compartida; potencia, atenuación y latencia quedan para 4D-3e5b.
-Los cambios de presentación de pendientes quedan para 4D-3e5a.
+La separación de presentación de pendientes está implementada en 4D-3e5a.
 Al guardar/cargar un plan todavía sin captura se valida también el contexto
 original de preparación (`access.path[0]`) mediante el mismo predicado espacial.
 Esto admite salir de una fuente legítima y regresar después, con la oportunidad

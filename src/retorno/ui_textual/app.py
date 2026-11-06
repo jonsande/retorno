@@ -937,6 +937,8 @@ class RetornoTextualApp(App):
                         "scenario",
                         "seed",
                         "deadnodes",
+                        "radio",
+                        "recovery",
                         "arcs",
                         "lore",
                         "modules",
@@ -2033,6 +2035,11 @@ class RetornoTextualApp(App):
                 self.loop.start()
                 self._log_line("DEBUG mode disabled")
                 return
+        if isinstance(parsed, tuple) and parsed[0] in {"DEBUG_RADIO", "DEBUG_RECOVERY"}:
+            with self.loop.with_lock() as state:
+                renderer = repl.render_debug_radio if parsed[0] == "DEBUG_RADIO" else repl.render_debug_recovery
+                self._log_lines(presenter.build_command_output(renderer, state))
+            return
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG_ARCS":
             with self.loop.with_lock() as state:
                 if not state.os.debug_enabled:

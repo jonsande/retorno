@@ -2,6 +2,29 @@
 
 # Passive communications — 4D-3e4b
 
+## Implemented knowledge boundary — 4D-3e5a
+
+Under `C-DATA-004`, `status` and `diag comms` show only receiver hardware,
+health, power, service and operational availability. The radio line calls
+`radio_block_reason(state)` without an opportunity. It does not inspect the ledger,
+plans or searches: adding a secret source or changing hidden search results leaves
+public output unchanged, even in debug mode. `ready` describes technical capacity,
+not the existence of a signal or coverage towards a source.
+
+`debug radio`, after `debug on`, inspects the existing ledger: IDs, source/host,
+channel, state, content, timestamps, path, metadata and operational/spatial blocking
+reasons. `debug recovery` inspects stored searches and plans. `debug off` blocks
+both again. CLI and Textual use the same guarded renderers and EN/ES text; no
+second queue or new logging exists. Queries do not retry capture, import intel,
+materialize, consume RNG or advance time. Actually received events and files remain
+visible; reading/importing retains normal effects.
+
+Ledger, persistence, capture and local coverage remain unchanged. `A-COM-001`
+remains open. 4D-3e5b separately addresses physical range, emitter types, power,
+sensitivity and simplified temporal propagation.
+Test: `tests/knowledge_boundary_smoke.py`.
+
+
 [Español](passive-communications.es.md). Implementation for external review on
 `78676dbfce5e7b98db36b2e241a427a19b0632fe`, 2026-11-06.
 This does not implement F-DEAD-01 or general interstellar communications.
@@ -45,7 +68,7 @@ spatial eligibility. A known route to another hub does not enable receiving it
 here: its chain may remain diagnostic/conditional without an active plan. An off
 or damaged receiver at the correct location can prepare pending reception, delivered
 once when operational gates hold. Range, power, attenuation and latency remain
-4D-3e5b work. The `pending=N` presentation does not change in this correction.
+4D-3e5b work. The subsequent 4D-3e5a correction removes `pending=N` from public queries.
 
 ## Capacity and channels
 
@@ -93,9 +116,9 @@ persist. States:
    accessed the file. The existing parser applies valid intel; this status name
    does not guarantee useful intel or a primary unlock.
 
-A file primary stays protected until valid reading/import. Pending diagnostics
-show only counts and generic reasons, never content, secret sources, target IDs,
-routes or coordinates. They do not import intel.
+A file primary stays protected until valid reading/import. Public queries do not disclose pending opportunities, including counts or reasons
+derived from hidden sources. Only `debug radio` inspects the ledger; querying
+does not import intel.
 
 The shared writer preserves existing events/directories. Capture and bookkeeping
 are one synchronous in-memory operation under the current execution model;
@@ -167,7 +190,7 @@ EN/ES names and explicit suggestions, for example:
 There is no parallel daemon ownership list.
 
 CLI and Textual share renderers, messages and diagnostics. Command `status`
-output includes radio diagnostics and pending counts; the Textual systems panel
+output includes only receiver operational diagnostics; the Textual systems panel
 shows only systems and their state, without those extra lines. Existing event
 types/audio are retained.
 

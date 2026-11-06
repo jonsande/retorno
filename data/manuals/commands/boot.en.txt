@@ -18,7 +18,7 @@ Behavior
 - If the service is already running, no new job is queued.
 - Installation, owner, power and dependencies are rechecked during boot and at completion.
 - Powering hardware off stops its service. Powering it on does not restart that service.
-- radiod boot takes 5 seconds; diag comms explains reception blocks and pending counts.
+- radiod boot takes 5 seconds; diag comms explains receiver hardware, service and operational blocks.
 
 Common block reasons
 - `service_missing`

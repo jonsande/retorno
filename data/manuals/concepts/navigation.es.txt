@@ -36,12 +36,13 @@ Notas operativas
 - La semántica de regiones (bulge/disk/halo) se evalúa en la capa física galáctica.
 - `nav map galaxy` usa cuatro radios fijos: `10ly`, `100ly`, `10000ly`, `500000ly`.
 - El tránsito por salto y la publicación de rutas quedan protegidos por `MAX_ROUTE_HOP_LY` (por defecto `45ly`).
-- `ship survey <target>` aporta telemetría puntual, pero sí requiere `sensors`+`data_core` activos.
+- `ship survey <target>` aporta telemetría puntual de contactos conocidos y requiere `sensors`+`data_core` activos.
+- Un rechazo por contacto desconocido no demuestra si el destino existe físicamente. Descúbrelo mediante scan o intel adquirida.
 
 Avisos de navegación estructural
 - Una transmisión local legítima puede ofrecer una ruta cuando se agotan las oportunidades conocidas. Activa comms y radiod en su fuente y lee/importa el archivo recibido.
 - Cada aviso describe un tramo. Explora su destino para obtener el siguiente broadcast o registro recuperable. Cada tramo respeta los 45 ly; recursos y reparaciones siguen siendo tu responsabilidad.
-- Recepción pendiente, búsqueda incompleta y ruta completada son estados distintos. status informa de recepción/recuperación sin revelar destinos no leídos. No hay salida garantizada.
+- Los avisos capturados y las rutas registradas son registros distintos. status informa de disponibilidad del receptor, no de tráfico sin detectar ni oportunidades posteriores. No hay salida garantizada.
 
 Comandos relacionados
 - `nav`, `nav galaxy`, `ship survey`, `scan`, `route solve`, `uplink`, `intel import`, `debug galaxy map <scale>`, `dock`, `undock`.

@@ -6,6 +6,36 @@
 
 # Descubrimiento, navegación e intel
 
+## Frontera de conocimiento — 4D-3e5a
+
+`C-DATA-004` distingue verdad física, estado interno del motor, observaciones
+adquiridas, inferencias y conocimiento consultable. `space.nodes` es existencia;
+`known_contacts`/`known_nodes` son conocimiento; `known_links` son rutas
+registradas. `lore_placements`, `radio_opportunities`, `recovery_searches` y
+`recovery_plans` no son fuentes públicas de descubrimiento. Conocer lugar, ruta
+y capacidad actual de recepción son hechos distintos.
+
+Los mapas ordinarios, contactos y autocompletado usan las proyecciones conocidas;
+`ship survey <id>` exige además contacto o localización conocidos (incluye posición
+actual y extremos de rutas registradas); un destino oculto devuelve el mismo error
+localizado que uno ausente, sin datos físicos. Se conservan aliases de nave, datos
+adquiridos, scan natural, ruta manual exacta e intel importada. No se redefine la
+política deliberada de `route solve`. Los documentos recibidos pueden contener
+información falsa sin convertirse por ello en verdad física.
+
+`status` y `diag comms` describen solo receptor/equipo; los datos internos se
+consultan mediante `debug radio` y `debug recovery` tras `debug on`. Las consultas
+son de solo lectura y `debug off` las bloquea. CLI/Textual comparten frontera,
+incluidos paneles, mensajes, errores, eventos, ayuda y compleción.
+La resolución de nombres/alias para dock también se limita al conocimiento
+adquirido: un nombre oculto no se convierte en un ID secreto dentro de un error.
+Los eventos y logs públicos unifican `node_missing`/`unknown_contact` cuando
+la nave carece de registro del destino: no permiten deducir existencia física
+de una diferencia de error. Los códigos internos y las acciones no cambian;
+los detalles de destinos ya adquiridos se conservan.
+Prueba: `tests/knowledge_boundary_smoke.py`.
+
+
 **Compatibilidad 4D-3e2:** el worldgen productivo usa ahora [historia estable versionada](../design/historical-worldgen-integration.es.md).
 `NODE:`/`LINK:` resuelven los IDs `S…:WG1_<ámbito>_<índice>` exactos hacia su sector físico,
 incluido desbordamiento Z. `SECTOR:`, `COORD:`, bloques de intel y referencias authored

@@ -1,8 +1,8 @@
 # RETORNO — Canon del universo
 
 **ID:** `RET-CAN`  
-**Versión:** `0.3.0`  
-**Fecha:** 2026-11-05  
+**Versión:** `0.4.0`<br>
+**Fecha:** 2026-11-06<br>
 **Estado:** base canónica inicial, revisable mediante decisión explícita  
 **Destinatarios:** diseño narrativo, sistemas, programación, pruebas y asistentes de desarrollo  
 **Documento complementario:** [`guia_coherencia.md`](guia_coherencia.md)  
@@ -213,6 +213,30 @@ El viajero encontrará **una y otra vez mensajes cuyos emisores murieron hace mu
 
 Un mensaje puede conservar **verdad histórica** sin describir una **situación vigente**. La obra debe diferenciar, cuando importe, la fecha del hecho, la del registro, la de su transmisión o almacenamiento y la de su recuperación. La certeza sobre la muerte de un emisor tampoco debe inventarse en una fuente donde solo sea una conjetura.
 
+### C-DATA-004 — Conocimiento limitado y procedencia de la información [C]
+
+La existencia de una información en el estado interno del universo no implica que el protagonista pueda conocerla. Toda información presentada como conocimiento de la nave o del jugador debe proceder de una observación, recepción, lectura, registro o inferencia legítima. Las inferencias pueden ser inciertas o erróneas y deben distinguirse de los hechos verificados. La simulación puede conocer hechos que permanecen inaccesibles al protagonista.
+
+Deben distinguirse cinco capas:
+
+1. Verdad física e histórica del universo.
+2. Información interna del motor, incluidas decisiones procedurales y narrativas.
+3. Observaciones y registros efectivamente adquiridos por la nave.
+4. Inferencias o hipótesis elaboradas a partir de evidencia legítima.
+5. Conocimiento que el jugador puede consultar por las interfaces ordinarias.
+
+La existencia física o asignación interna no publica conocimiento. Conocer una localización no equivale a conocer una ruta hasta ella ni a poder recibir ahora sus transmisiones. Un testimonio recibido puede conservar información falsa sin convertirla en verdad física; una inferencia debe señalar su incertidumbre y su base disponible.
+
+Este principio se refiere a hechos del universo y conocimientos atribuidos al protagonista o la nave. Menús, controles, guardado/carga y ayuda general pueden ofrecer información ordinaria del sistema sin una justificación diegética artificial. Los comandos explícitos de desarrollo pueden revelar el estado omnisciente del motor; activar debug no altera el significado de las consultas públicas. No se resuelven aquí supervivientes, cronología galáctica ni `A-COM-001`.
+
+**English — C-DATA-004: Limited knowledge and information provenance [C]**
+
+Information existing in the universe’s internal state does not imply that the protagonist can know it. All information presented as ship or player knowledge must come from a legitimate observation, reception, reading, record or inference. Inferences may be uncertain or wrong and must be distinguished from verified facts. The simulation may know facts that remain inaccessible to the protagonist.
+
+Distinguish five layers: (1) physical and historical truth; (2) internal engine information, including procedural and narrative decisions; (3) observations and records actually acquired by the ship; (4) inferences or hypotheses based on legitimate evidence; (5) knowledge accessible through ordinary player interfaces. Physical existence or internal assignment does not publish knowledge. Knowing a location, knowing a route to it and being able to receive its transmissions now are separate facts. False testimony remains received evidence rather than physical truth; inferences must identify their uncertainty and available basis.
+
+The principle concerns universe facts and knowledge attributed to the protagonist or ship. Menus, controls, save/load and general help may provide ordinary system information without artificial fictional explanations. Explicit development commands may expose omniscient engine state; enabling debug does not change public queries. Survivors, galactic chronology and `A-COM-001` remain open.
+
 ## 7. Cómo interpretar la generación procedural
 
 ### C-WORLD-001 — Descubrir no es crear físicamente [C]
@@ -267,6 +291,7 @@ Una historia o implementación puede trabajar con una de estas incógnitas, pero
 | **0.3** | `P-TIME-005` | Velocidad de crucero candidata `0,5c`; aún no implementada. | Provisional |
 | **0.3** | `P-BIO-001` | Tasa nominal en hibernación `0,5 %` (`0.005`); configurable y pendiente de balance. | Provisional |
 | **0.3** | `P-NAR-007` | Escala orientativa de 200 años galácticos entre grandes hitos. | Provisional |
+| **0.4 — 2026-11-06** | `C-DATA-004` | Conocimiento limitado, cinco capas y procedencia legítima; diagnósticos explícitos de desarrollo separados. / Limited knowledge, five layers and legitimate provenance; explicit development diagnostics kept separate. | Establecido / Established |
 | **0.3** | `C-GRAV-001` | Agujeros negros y dilatación gravitatoria intensa previstos para una fase futura. | Establecido como objetivo de mundo |
 
 Las referencias narrativas a miles de años son compatibles con el **colapso milenario** establecido; **ninguna fecha exacta, porcentaje de supervivencia, duración de viaje o final posible** se vuelve canónico por figurar en un ejemplo de lore. Las tasas `0,5c` y `0,5 %` son **hipótesis de balance** hasta su validación.

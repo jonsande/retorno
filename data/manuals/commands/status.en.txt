@@ -9,5 +9,7 @@ Operational behavior
 Usage notes
 - Use as entry point, then drill down with `alerts`, `diag`, `jobs`, and domain commands.
 
+- Radio availability describes the receiver; it does not announce undetected messages or remote sources.
+
 Related commands
 - `alerts`, `power status`, `ship systems`, `drone status [drone_id]`
