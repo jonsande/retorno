@@ -1,3 +1,5 @@
+> **4D-3e5 — estado vigente (2026-11-06).** Implementado el selector histórico, confirmación transaccional y recepción/progresión mediante el ledger común. El [contrato productivo](../systems/structural-recovery.es.md) y su informe prevalecen sobre las auditorías históricas de este documento: no se fabrican puentes, entradas ni gateways. El núcleo 3b/3c/3d sigue siendo diagnóstico; no autoriza materialización. Sin garantía de salida universal.
+
 # Contrato de diseño de navegación y recuperación
 
 Versión inglesa: [navigation-recovery-contract.md](navigation-recovery-contract.md)

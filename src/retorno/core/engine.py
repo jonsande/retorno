@@ -212,6 +212,8 @@ class Engine:
 
         events.extend(self._apply_critical_system_consequences(state, dt))
         events.extend(self._update_alerts(state, p_load, p_gen, power_quality))
+        from retorno.core.structural_recovery import advance_recovery_plans
+        advance_recovery_plans(state)
         events.extend(retry_radio_opportunities(state))
 
         for event in events:

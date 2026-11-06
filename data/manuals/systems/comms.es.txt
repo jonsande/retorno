@@ -32,7 +32,11 @@ Recuperación típica
 - power on comms; boot radiod. Encender el sistema no arranca el servicio.
 - Permanecer en la fuente legítima; el lore disparado por acoplamiento sigue exigiendo dock.
 - La recepción pendiente se reintenta automáticamente mientras la fuente siga disponible localmente.
+- Conocer una ruta hacia otra estación no permite recibir su tráfico desde aquí. Un aviso de navegación necesita una fuente dentro de la cobertura local de recepción.
 - Leer el archivo recibido con cat o mail read para aplicar intel válida.
+
+- Los avisos de navegación estructural identifican una etapa alcanzable cada vez. Lee el archivo recibido y llega a esa fuente para obtener el siguiente aviso o registro de salvamento.
+- Una estación agotada puede emitir tráfico nuevo; eso no repone suministros ni archivos recuperados. Recibir una pista no garantiza sobrevivir al viaje.
 
 Comandos relacionados
 - diag comms, power on comms, power off comms, boot radiod, jobs

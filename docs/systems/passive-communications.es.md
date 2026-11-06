@@ -1,3 +1,5 @@
+> **4D-3e5 — estado vigente (2026-11-06).** Implementado el selector histórico, confirmación transaccional y recepción/progresión mediante el ledger común. El [contrato productivo](structural-recovery.es.md) y su informe prevalecen sobre las auditorías históricas de este documento: no se fabrican puentes, entradas ni gateways. El núcleo 3b/3c/3d sigue siendo diagnóstico; no autoriza materialización. Sin garantía de salida universal.
+
 # Comunicaciones pasivas — 4D-3e4b
 
 [English](passive-communications.md). Implementación para revisión externa sobre
@@ -33,6 +35,19 @@ servicio. Cancelación y fallo usan los finalizadores ordinarios; no hay otro
 gestor de daemons ni reinicio automático. Se conserva la activación legacy de
 sensores inicialmente OFFLINE sin apagado forzado al arrancar sensord; radiod
 exige primero `power on comms`.
+
+## Corrección focal 4D-3e5: cobertura y operación
+
+`radio_spatial_block_reason(state, origin_node_id, channel=..., require_docked=...)`
+separa cobertura/contexto físico de disponibilidad operativa. Su implementación
+local conserva las condiciones de fuente/nodo/dock existentes. La selección y
+confirmación estructurales la comparten con la captura; no consultan salud,
+energía ni radiod para decidir esa elegibilidad espacial. Tener ruta hasta otro
+hub no permite recibirlo desde aquí: la cadena remota puede ser diagnóstica y
+condicionada, sin plan activo. Apagado/avería en la ubicación correcta sí permite
+preparar una recepción pendiente, entregada una sola vez cuando los gates se cumplan.
+No se implementa alcance, potencia, atenuación o latencia; se reserva esa extensión
+para 4D-3e5b. La presentación de `pending=N` no cambia en esta corrección.
 
 ## Capacidad y canales
 

@@ -1,12 +1,16 @@
 # RETORNO — Hoja de ruta de preexistencia procedural, lore y F-DEAD-01
 
-**Versión:** 1.3 — 2026-11-06
-**Estado:** 4D-3e4 integrada en `78676dbfce5e7b98db36b2e241a427a19b0632fe`; 4D-3e4b implementada para revisión externa antes de e5. [English](roadmap-worldgen-lore-f-dead01.md).
+**Versión:** 1.4 — 2026-11-06
+**Estado:** 4D-3e5 implementada sobre `ba705e7` para revisión externa; e6 pendiente. [English](roadmap-worldgen-lore-f-dead01.md).
 **Destino recomendado en el repositorio:** `docs/design/roadmap-worldgen-lore-f-dead01.es.md`.
 
 > **Propósito:** conservar las decisiones de diseño y la secuencia de trabajo durante la estabilización final del universo procedural, sin prolongarla indefinidamente ni perder el objetivo de volver a jugar RETORNO con Textual y sonido, y después desarrollar arcos, singles y contenido nuevo.
 >
 > **Precedencia:** esta hoja documenta decisiones de producto y coordinación. No reemplaza `docs/canon/universo.md`, `docs/canon/guia_coherencia.md`, los contratos técnicos existentes ni el código probado. Las discrepancias entre documentos o cambios de mecánica se deben señalar para decisión del desarrollador; no resolver por suposición.
+
+## Estado implementado v1.4 — 4D-3e5
+
+Base `ba705e7` (Tweaks íntegro). F-DEAD-01 implementado para revisión externa: selección histórica acotada, ampliación, preparación atómica y pistas progresivas por radio/salvamento. Véanse [contrato](../systems/structural-recovery.es.md) e [informe](../testing/structural-recovery-review.es.md). D01–D24 permanecen literalmente intactas. Los apartados anteriores de coordinación y auditorías conservan su contexto histórico; la entrega e5 prevalece sobre sus referencias a activación aplazada. e6, validación jugable con Textual y sonido, queda pendiente.
 
 ## Acuerdo explícito adicional v1.3
 

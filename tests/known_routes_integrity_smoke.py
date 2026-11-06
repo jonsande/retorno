@@ -189,7 +189,7 @@ def _assert_recovery_frontier():
     assert not has_exploration_frontier(state), "Invalid route created a phantom recovery frontier"
     events = ensure_exploration_recovery(state, "scan")
     assert events == [] and state.world.exploration_recovery.generation == 0
-    assert state.world.recovery_activation_deferred  # e4b: no corrective nodes before e5.
+    assert state.world.recovery_searches["global"]["status"] == "conditional"
     assert state.world.exploration_recovery.entry_node_id is None
     valid = _state()
     valid.world.known_links = {"A": {"B"}}

@@ -7,7 +7,6 @@ from retorno.config.balance import Balance
 from retorno.core.lore import write_local_intel, _locked_primary_targets
 from retorno.model.events import Event
 from retorno.model.world import DeadNodeState, SpaceNode, reachable_known_nodes, is_hop_within_cap
-from retorno.worldgen.generator import _generate_node_id, _name_from_node_id, sync_sector_state_for_node
 
 
 def _hash_rng(seed: int, *parts: str) -> random.Random:
@@ -51,41 +50,8 @@ def _thresholds_for_node(state, node_id: str) -> tuple[int, int, float, float]:
     return stuck_uplinks, dead_uplinks, stuck_years, dead_years
 
 
-def _create_bridge_node(state, dead_node_id: str, attempt: int) -> SpaceNode | None:
-    dead_node = state.world.space.nodes.get(dead_node_id)
-    if not dead_node:
-        return None
-    rng = _hash_rng(state.meta.rng_seed, "bridge", dead_node_id, str(attempt))
-    dist = Balance.SENSORS_RANGE_LY * 0.6
-    theta = rng.uniform(0, math.tau)
-    phi = rng.uniform(-math.pi / 2, math.pi / 2)
-    dx = dist * math.cos(phi) * math.cos(theta)
-    dy = dist * math.cos(phi) * math.sin(theta)
-    dz = dist * math.sin(phi)
-    node_id = _generate_node_id(state, "relay", rng)
-    node = SpaceNode(
-        node_id=node_id,
-        name=_name_from_node_id(node_id, "relay"),
-        kind="relay",
-        radiation_rad_per_s=0.001,
-        x_ly=dead_node.x_ly + dx,
-        y_ly=dead_node.y_ly + dy,
-        z_ly=dead_node.z_ly + dz,
-        is_hub=True,
-        is_topology_hub=True,
-    )
-    state.world.space.nodes[node_id] = node
-    sync_sector_state_for_node(state, node_id)
-    return node
-
-
 def evaluate_dead_nodes(state, trigger: str, debug: bool = False) -> list[Event]:
     if not Balance.DEADNODE_FAILSAFE_ENABLED:
-        return []
-    # Deadnodes protects against globally broken runs. It is not meant to erase
-    # every local dead end created by sparse worldgen.
-    pool = getattr(state.world, "node_pools", {}).get(state.world.current_node_id)
-    if pool and getattr(pool, "node_cleaned", False):
         return []
     events: list[Event] = []
     uplinks_total = state.world.lore.counters.get("uplink_count", 0)
@@ -94,7 +60,7 @@ def evaluate_dead_nodes(state, trigger: str, debug: bool = False) -> list[Event]
 
     candidates = []
     source_nodes = set(state.world.known_contacts) | set(getattr(state.world, "forced_hidden_nodes", set()) or set())
-    for node_id in source_nodes:
+    for node_id in sorted(source_nodes):
         node_pool = getattr(state.world, "node_pools", {}).get(node_id)
         if node_pool and getattr(node_pool, "node_cleaned", False):
             continue
@@ -139,18 +105,23 @@ def evaluate_dead_nodes(state, trigger: str, debug: bool = False) -> list[Event]
         if st.attempts > 0 and years_since_action < Balance.DEADNODE_ACTION_COOLDOWN_YEARS:
             continue
 
-        # Do not create retrospective bridges. Existing stages can use the same
-        # reception ledger as lore; structural replacement remains an e5 task.
+        # Only a bridge already recorded in a legacy save uses that envelope.
+        # New chains are certified, prepared and received through the common
+        # ledger. Thresholds/cooldowns above retain their original meaning.
+        if not st.bridge_node_id:
+            from retorno.core.structural_recovery import request_recovery
+            request_recovery(state, "deadnode:"+node_id, node_id)
+            from retorno.core.communications import retry_radio_opportunities
+            events.extend(retry_radio_opportunities(state))
+            continue
         target_id = node_id
         if st.attempts < Balance.DEADNODE_MAX_INDIRECT_ATTEMPTS:
             if not st.bridge_node_id or st.bridge_node_id not in state.world.space.nodes:
-                state.world.recovery_activation_deferred = True
                 continue
             target_id = st.bridge_node_id
         if target_id in _locked_primary_targets(state) or node_id in _locked_primary_targets(state):
             continue
         if not is_hop_within_cap(state.world, state.world.current_node_id, target_id):
-            state.world.recovery_activation_deferred = True
             continue
         content = "NAV NOTE\n\n" + f"LINK: {state.world.current_node_id} -> {target_id}\n"
         channel = "captured_signal" if trigger != "dock" else "station_broadcast"

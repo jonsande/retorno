@@ -32,7 +32,11 @@ Recovery pattern
 - power on comms; boot radiod. Power activation does not start the service.
 - Remain at the legitimate source; lore triggered by docking still requires docking.
 - Pending reception retries automatically while its source remains locally available.
+- Knowing a route to another station does not let you receive its traffic here. A navigation notice requires a source within local reception coverage.
 - Read the received file with cat or mail read to apply valid intel.
+
+- Structural navigation notices identify one reachable stage at a time. Read the captured file and reach that source before expecting its next notice or salvage record.
+- An exhausted station may emit new traffic; this does not refill its supplies or recovered files. No reception guarantees a safe onward journey.
 
 Related commands
 - diag comms, power on comms, power off comms, boot radiod, jobs

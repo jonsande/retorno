@@ -190,6 +190,8 @@ class WorldState:
     next_scan_observation_seq: int = 1
     radio_opportunities: dict[str, RadioOpportunity] = field(default_factory=dict)
     recovery_activation_deferred: bool = False
+    recovery_plans: dict = field(default_factory=dict)
+    recovery_searches: dict = field(default_factory=dict)
 
     def __setstate__(self, state) -> None:
         """Backward-compatible unpickle for slot additions."""

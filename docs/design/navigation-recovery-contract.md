@@ -1,3 +1,5 @@
+> **4D-3e5 — current implementation (2026-11-06).** Historical selection, transactional confirmation and common-ledger reception/progression are implemented. The [production contract](../systems/structural-recovery.md) and its report supersede historical audits below: no corrective bridges, entries or gateways are fabricated. The 3b/3c/3d core remains diagnostic and cannot authorize materialization. No universal exit is guaranteed.
+
 # Navigation and recovery design contract
 
 Spanish version: [navigation-recovery-contract.es.md](navigation-recovery-contract.es.md)

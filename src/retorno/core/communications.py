@@ -16,6 +16,27 @@ RADIO_CHANNELS = {"captured_signal", "station_broadcast"}
 RECEIVING_STATES = {SystemState.LIMITED, SystemState.NOMINAL, SystemState.UPGRADED}
 
 
+def radio_spatial_block_reason(state, origin_node_id: str, *, channel: str,
+                               require_docked: bool = False,
+                               receiver_node_id: str | None = None) -> str | None:
+    """Physical reception eligibility, independent of receiver operation.
+
+    Today's coverage is local to the current physical node. Selection and
+    capture share this boundary so a future physical range model replaces it
+    here without embedding coverage assumptions in structural recovery. An
+    explicit receiver node validates the recorded preparation context on load.
+    """
+    node = state.world.space.nodes.get(origin_node_id)
+    receiver_id = state.world.current_node_id if receiver_node_id is None else receiver_node_id
+    if node is None or node.kind == "transit" or receiver_id != node.node_id:
+        return "source_unavailable"
+    if require_docked and state.ship.docked_node_id != node.node_id:
+        return "source_requires_dock"
+    if channel == "station_broadcast" and node.kind not in {"relay", "station", "waystation"}:
+        return "source_unavailable"
+    return None
+
+
 def radio_block_reason(state, opportunity: RadioOpportunity | None = None) -> str | None:
     systems = state.ship.systems
     comms = systems.get("comms")
@@ -57,14 +78,18 @@ def radio_block_reason(state, opportunity: RadioOpportunity | None = None) -> st
     if not svc.is_running:
         return "radiod_stopped"
     if opportunity is not None:
+        spatial_reason = radio_spatial_block_reason(
+            state, opportunity.origin_node_id, channel=opportunity.channel,
+            require_docked=opportunity.require_docked,
+        )
+        if spatial_reason:
+            return spatial_reason
         node = state.world.space.nodes.get(opportunity.origin_node_id)
-        if node is None or node.kind == "transit" or state.world.current_node_id != node.node_id:
-            return "source_unavailable"
-        if opportunity.require_docked and state.ship.docked_node_id != node.node_id:
-            return "source_requires_dock"
-        if opportunity.channel == "station_broadcast" and node.kind not in {"relay", "station", "waystation"}:
-            return "source_unavailable"
         delivery = opportunity.delivery
+        if delivery.get("kind") == "structural_recovery":
+            from retorno.core.structural_recovery import delivery_valid
+            if not delivery_valid(state, opportunity):
+                return "source_unavailable"
         if delivery.get("kind") == "recovery_gateway":
             from retorno.core.lore import _locked_primary_targets
             rec = state.world.exploration_recovery
@@ -142,6 +167,8 @@ def mark_radio_read(state, path: str) -> None:
         if opportunity.status == "received" and opportunity.path == path:
             opportunity.status = "read_imported"
             opportunity.read_t = float(state.clock.t)
+    from retorno.core.structural_recovery import mark_stage_read
+    mark_stage_read(state, path)
 
 
 def radio_diagnostic_lines(state) -> list[str]:
@@ -168,7 +195,19 @@ def radio_diagnostic_lines(state) -> list[str]:
     }
     title, count = ("Radio reception", "pending") if locale != "es" else ("Recepción de radio", "pendientes")
     lines = [f"{title}: {labels.get(locale, labels['en'])[reason or 'ready']}; {count}={len(pending)}"]
-    if state.world.recovery_activation_deferred:
-        lines.append({"en": "Structural recovery activation deferred: legacy corrective-node creation awaits 4D-3e5.",
-                      "es": "Activación de recuperación estructural aplazada: la creación legacy de nodos correctivos espera a 4D-3e5."}.get(locale, "Recovery deferred / Recuperación aplazada"))
+    statuses = {p.status for p in state.world.recovery_plans.values()}
+    if not statuses:
+        statuses = {s["status"] for s in state.world.recovery_searches.values()}
+    translations = {
+        "en": {"search_pending": "search pending", "validated": "prepared", "prepared": "prepared", "receipt_pending": "reception pending", "active": "active",
+               "stage_consumed": "stage consumed", "complete": "complete", "incomplete": "search incomplete",
+               "none_in_scope": "no complete opportunity in examined scope", "conditional": "delivery unverified", "invalid": "invalid candidate"},
+        "es": {"search_pending": "búsqueda pendiente", "validated": "preparada", "prepared": "preparada", "receipt_pending": "recepción pendiente", "active": "activa",
+               "stage_consumed": "etapa consumida", "complete": "completada", "incomplete": "búsqueda incompleta",
+               "none_in_scope": "sin oportunidad completa en el ámbito examinado", "conditional": "entrega sin verificar", "invalid": "candidato no válido"},
+    }
+    if statuses:
+        title = "Recuperación estructural" if locale == "es" else "Structural recovery"
+        labels = translations.get(locale, translations["en"])
+        lines.append(title+": "+", ".join(labels[s] for s in sorted(statuses)))
     return lines

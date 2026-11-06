@@ -1,3 +1,5 @@
+> **4D-3e5 — current implementation (2026-11-06).** Historical selection, transactional confirmation and common-ledger reception/progression are implemented. The [production contract](structural-recovery.md) and its report supersede historical audits below: no corrective bridges, entries or gateways are fabricated. The 3b/3c/3d core remains diagnostic and cannot authorize materialization. No universal exit is guaranteed.
+
 # Passive communications — 4D-3e4b
 
 [Español](passive-communications.es.md). Implementation for external review on
@@ -32,6 +34,18 @@ Cancellation and failure use existing finalizers; there is no second daemon
 manager or automatic restart. Legacy sensord boot may still activate initially
 OFFLINE sensors that were not forcibly powered off; radiod requires
 `power on comms` first.
+
+## 4D-3e5 focused correction: coverage and operation
+
+`radio_spatial_block_reason(state, origin_node_id, channel=..., require_docked=...)`
+separates physical coverage/context from receiver operation. Its local implementation
+preserves existing source/node/docking rules. Structural selection and confirmation
+share it with capture, without checking health, electricity or radiod to determine
+spatial eligibility. A known route to another hub does not enable receiving it
+here: its chain may remain diagnostic/conditional without an active plan. An off
+or damaged receiver at the correct location can prepare pending reception, delivered
+once when operational gates hold. Range, power, attenuation and latency remain
+4D-3e5b work. The `pending=N` presentation does not change in this correction.
 
 ## Capacity and channels
 

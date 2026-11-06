@@ -314,6 +314,9 @@ def commit_radio_delivery(state, opportunity) -> None:
         tracker = state.world.dead_nodes[delivery["target"]]
         tracker.attempts += 1
         tracker.last_action_t = state.clock.t
+    elif kind == "structural_recovery":
+        from retorno.core.structural_recovery import on_capture
+        on_capture(state, opportunity)
 
 
 def _known_node_ids(state) -> list[str]:
@@ -935,8 +938,12 @@ def survey_reports_data_signatures(state, node_id: str, job_id: str, data_availa
 
 def sync_node_pools_for_known_nodes(state) -> None:
     for node_id in _pool_seed_node_ids(state):
-        if node_id in state.world.node_pools:
-            continue
+        initialize_node_pool(state, node_id)
+
+
+def initialize_node_pool(state, node_id: str) -> None:
+    """Prepare one real host before inspection, without revealing it."""
+    if node_id not in state.world.node_pools:
         node = state.world.space.nodes.get(node_id)
         pool = NodePoolState(initialized_t=float(state.clock.t), window_open=True)
         pool.base_files = _collect_base_files_for_node(state, node_id, node)

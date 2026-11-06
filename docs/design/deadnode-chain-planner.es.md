@@ -1,3 +1,5 @@
+> **4D-3e5 — estado vigente (2026-11-06).** Implementado el selector histórico, confirmación transaccional y recepción/progresión mediante el ledger común. El [contrato productivo](../systems/structural-recovery.es.md) y su informe prevalecen sobre las auditorías históricas de este documento: no se fabrican puentes, entradas ni gateways. El núcleo 3b/3c/3d sigue siendo diagnóstico; no autoriza materialización. Sin garantía de salida universal.
+
 # Núcleo de propuestas de cadenas deadnode — Fases 4D-3b/3c/3d
 
 Versión inglesa: [deadnode-chain-planner.md](deadnode-chain-planner.md).

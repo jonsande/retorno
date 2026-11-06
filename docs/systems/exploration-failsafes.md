@@ -1,3 +1,5 @@
+> **4D-3e5 — current implementation (2026-11-06).** Historical selection, transactional confirmation and common-ledger reception/progression are implemented. The [production contract](structural-recovery.md) and its report supersede historical audits below: no corrective bridges, entries or gateways are fabricated. The 3b/3c/3d core remains diagnostic and cannot authorize materialization. No universal exit is guaranteed.
+
 > **Implemented 4D-3e4b update (2026-11-06).** Signals and broadcasts require `comms`/`radiod`, a legitimate local source and actual reception before consuming pieces or stages. Pending, received and read opportunities persist in one ledger. Legacy activations fabricating corrective nodes are explicitly deferred until e5; existing chains can deliver through their real channel. Scheduler policies, scan and uplink are unchanged. The [communications contract](passive-communications.md) specifies gates, coverage, retries and limits, superseding historical descriptions below on these points. F-DEAD-01 remains pending.
 
 # Exploration failsafes, deadnodes, and recovery

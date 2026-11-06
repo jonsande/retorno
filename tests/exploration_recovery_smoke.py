@@ -61,8 +61,10 @@ def _assert_diegetic_recovery_chain_is_consumable() -> None:
 
     before = set(state.world.space.nodes)
     assert repl.ensure_exploration_recovery(state, "scan") == []
-    assert set(state.world.space.nodes) == before and state.world.recovery_activation_deferred
-    # e4b may consume a previously prepared chain, but cannot create one.
+    assert set(state.world.space.nodes) == before
+    assert state.world.recovery_searches["global"]["status"] == "conditional"
+    # A non-historical synthetic anchor cannot invent a transmitter. Existing
+    # legacy stages remain consumable, independently of the new selector.
     entry_id, gateway_id = "EXISTING_ENTRY_TEST", "EXISTING_GATEWAY_TEST"
     state.world.space.nodes[entry_id] = SpaceNode(entry_id, "Existing entry", "station", x_ly=1, is_hub=True)
     state.world.space.nodes[gateway_id] = SpaceNode(gateway_id, "Existing gateway", "station", x_ly=15, is_hub=True)
@@ -114,7 +116,7 @@ def _assert_hibernate_recovery_defers_external_cache_creation() -> None:
     before = set(state.os.fs), set(state.world.space.nodes)
     assert repl.ensure_exploration_recovery(state, "hibernate_end") == []
     assert (set(state.os.fs), set(state.world.space.nodes)) == before
-    assert state.world.recovery_activation_deferred
+    assert state.world.recovery_searches["global"]["status"] == "conditional"
     assert state.world.exploration_recovery.passive_hint_path is None
 
 

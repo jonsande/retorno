@@ -323,7 +323,7 @@ def test_09_recovery_legacy_deferral_and_existing_gateway():
     for trigger in ("scan","dock","uplink","hibernate_end"):
         assert ensure_exploration_recovery(s,trigger) == []
     assert s.world.space == before and s.world.mobility_failsafe_count == 0
-    assert s.world.recovery_activation_deferred
+    assert s.world.recovery_searches["global"]["status"] == "conditional"
     # Previously prepared chains may still be consumed legitimately on arrival.
     s.world.space.nodes["ENTRY"] = SpaceNode("ENTRY","Entry","station",x_ly=1)
     s.world.space.nodes["GATEWAY"] = SpaceNode("GATEWAY","Gateway","station",x_ly=15)

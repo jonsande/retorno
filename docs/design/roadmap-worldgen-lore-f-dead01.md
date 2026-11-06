@@ -1,14 +1,17 @@
 # RETORNO — Procedural preexistence, lore and F-DEAD-01 roadmap
 
-**Version:** 1.3 — 2026-11-06. [Español](roadmap-worldgen-lore-f-dead01.es.md).
-**Status:** 4D-3e4 integrated in `78676dbfce5e7b98db36b2e241a427a19b0632fe`;
-4D-3e4b implemented for external review before e5.
+**Version:** 1.4 — 2026-11-06. [Español](roadmap-worldgen-lore-f-dead01.es.md).
+**Status:** 4D-3e5 implemented on `ba705e7` for external review; e6 pending.
 
 This roadmap preserves agreed design decisions and a bounded stabilization
 sequence so development can return to playing RETORNO with Textual/sound, then
 to new arcs, singles and content. It records product/coordination decisions;
 it does not replace [canon](../canon/universo.md), coherence guidelines, technical
 contracts or tested code. Report discrepancies for developer decision.
+
+## Implemented status v1.4 — 4D-3e5
+
+Baseline `ba705e7` (Tweaks preserved). F-DEAD-01 is implemented for external review: bounded historical selection, widening, atomic preparation and progressive radio/salvage clues. See [contract](../systems/structural-recovery.md) and [report](../testing/structural-recovery-review.md). D01–D24 remain literally unchanged. Earlier coordination sections and audits retain their historical context; e5 supersedes their references to deferred activation. e6, playable Textual/sound validation, remains pending.
 
 ## Explicit additional agreement v1.3
 

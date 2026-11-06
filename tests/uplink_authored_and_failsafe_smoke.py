@@ -164,7 +164,7 @@ def _assert_uplink_defers_corrective_recovery() -> None:
         "Uplink rescue must not inject a known_link directly into the reachable graph"
     )
     assert recovery.entry_node_id is None and recovery.gateway_node_id is None
-    assert state.world.recovery_activation_deferred
+    assert state.world.recovery_searches["global"]["status"] == "conditional"
     assert int(state.world.mobility_failsafe_count) == before_failsafe
     assert int(state.world.mobility_no_new_uplink_count) == int(Balance.UPLINK_FAILSAFE_N)
     assert int(state.world.lore.counters.get("uplink_count", 0)) == before_uplink_count
