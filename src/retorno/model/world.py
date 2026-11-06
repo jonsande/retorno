@@ -10,6 +10,7 @@ from retorno.model.systems import SystemState
 
 if TYPE_CHECKING:
     from retorno.worldgen.manifest import ManifestDefinition
+    from retorno.worldgen.information import InformationDefinition
 
 
 def information_capabilities(kind: str) -> tuple[str, ...]:
@@ -285,6 +286,10 @@ class WorldState:
     recovery_plans: dict = field(default_factory=dict)
     recovery_searches: dict = field(default_factory=dict)
     radio_search_cursor: dict = field(default_factory=dict)
+    # Defaults describe pre-B1 saves. Only new-game preparation opts into v1;
+    # an uninitialized legacy pool must never silently acquire new rules.
+    information_version: str = "legacy-information-v0"
+    information_definition: InformationDefinition | None = None
 
     def __setstate__(self, state) -> None:
         """Backward-compatible unpickle for slot additions."""
@@ -340,6 +345,25 @@ class NodePoolState:
     data_complete: bool = False
     extras_complete: bool = False
     node_cleaned: bool = False
+    information_version: str = "legacy-information-v0"
+    information_rules_key: str = ""
+    uplink_records: list[dict] = field(default_factory=list)
+
+    def __setstate__(self, state) -> None:
+        """Real schema-3 slot migration; old archives retain legacy provenance."""
+        values = state[1] if isinstance(state, tuple) else state
+        if not isinstance(values, dict):
+            raise TypeError("Unsupported NodePoolState pickle payload")
+        for spec in fields(self):
+            if spec.name in values:
+                value = values[spec.name]
+            elif spec.default is not MISSING:
+                value = spec.default
+            elif spec.default_factory is not MISSING:
+                value = spec.default_factory()
+            else:
+                raise ValueError(f"Missing pool field: {spec.name}")
+            object.__setattr__(self, spec.name, value)
 
 
 @dataclass(slots=True)

@@ -1,3 +1,17 @@
+## 4D-3e5c-B1 — implemented for external review
+
+New games use [historical-information-v1](../systems/historical-information.md),
+with stable finite archives and navigation records, typed historical connections
+and calculated routes, protected delivery, strict additive schema-3 validation
+and whole-save legacy information rules. B0 physical capabilities remain.
+Physical worldgen, scheduler policy, radio, resources and audio are unchanged.
+This update supersedes the earlier e5c editorial-only scope below. Version 1.6
+retains D01–D24 literally. B2 remains pending: procedural transmitters/emissions
+and any exceptional reactivation require original hardware, preservation, energy,
+repair capability, historical payload, actual start time, propagation and a
+persisted intervention trail. No retroactive emission or repair is implemented.
+Extended e6 Textual/audio play validation remains separate.
+
 ## 4D-3e5b — implemented for external review
 
 The [physical spatial/temporal model](../systems/radio-spacetime.md) implements
@@ -11,8 +25,8 @@ editorial review; e6 extended Textual/audio validation. D01–D24 remain unchang
 
 # RETORNO — Procedural preexistence, lore and F-DEAD-01 roadmap
 
-**Version:** 1.5 — 2026-11-06. [Español](roadmap-worldgen-lore-f-dead01.es.md).
-**Status:** 4D-3e5 implemented on `ba705e7` for external review; e6 pending.
+**Version:** 1.6 — 2026-11-06. [Español](roadmap-worldgen-lore-f-dead01.es.md).
+**Status:** 4D-3e5c-B1 implemented on `445217e` for external review; B2/e6 pending.
 
 This roadmap preserves agreed design decisions and a bounded stabilization
 sequence so development can return to playing RETORNO with Textual/sound, then

@@ -34,6 +34,9 @@ from tests.fixtures.scan_590a3e8 import perform_scan as baseline_scan
 
 def _state():
     s = _scan_state(SystemState.NOMINAL)
+    # Observation fixture injects a synthetic pending archive, not v1 history.
+    s.world.information_version = "legacy-information-v0"
+    s.world.information_definition = None
     # A real unconsumed data frontier keeps the existing recovery system from
     # adding its exceptional guaranteed contact between controlled test sweeps.
     s.world.node_pools[ORIGIN_ID] = NodePoolState(

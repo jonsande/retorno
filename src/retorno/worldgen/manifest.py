@@ -409,9 +409,11 @@ def _query_session(session, sector_ids):
     return result
 
 
-def lookup_site(definition: ManifestDefinition, identity: SiteIdentity) -> SiteLookup:
+def lookup_site(definition: ManifestDefinition, identity: SiteIdentity, *, session=None) -> SiteLookup:
     """Validate typed addresses without converting legacy conditional samples."""
-    session = _Session(definition)
+    session = _Session(definition) if session is None else session
+    if session.d != definition:
+        raise ValueError("Historical lookup session belongs to another definition")
     if identity.scope != definition.scope:
         return SiteLookup(Assessment(EvidenceStatus.INVALID, ("different_universe_scope",)))
     if identity.namespace == "special":
@@ -502,18 +504,18 @@ def operative_id(definition, site):
         suffix = f"C{attempt}"
 
 
-def resolve_operative_id(definition, node_id):
+def resolve_operative_id(definition, node_id, *, session=None):
     """Exact deterministic lookup; no arbitrary suffix or registry allocation."""
     for a in definition.authored:
         if a.raw_id == node_id:
-            return lookup_site(definition, SiteIdentity(definition.scope,"authored",node_id)).site
+            return lookup_site(definition, SiteIdentity(definition.scope,"authored",node_id), session=session).site
     import re
     match = re.fullmatch(r"(S[^:]+):WG1(?:C[1-9][0-9]*)?_([0-9a-f]{64})_([0-9]+)", node_id)
     if not match or match[2] != definition.scope:
         return None
     try:
         identity = SiteIdentity(definition.scope,"procedural",json.dumps((match[1],int(match[3])),separators=(",",":")))
-        result = lookup_site(definition,identity)
+        result = lookup_site(definition,identity,session=session)
         if result.site and operative_id(definition,result.site) == node_id:
             return result.site
     except (ValueError,TypeError):

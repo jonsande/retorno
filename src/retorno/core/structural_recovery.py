@@ -34,11 +34,13 @@ class RecoveryBudget:
     edges: int = 65536
     # A rolling certificate window, not a maximum distance from the ship.
     retained_sites: int = 1024
+    information_hosts: int = 128
 
     def __post_init__(self):
         if not (0 <= self.sectors <= 64 and 0 < self.sites <= 4096
                 and 0 <= self.expansions <= 65536 and 0 <= self.edges <= 262144
-                and 0 < self.retained_sites <= self.sites):
+                and 0 < self.retained_sites <= self.sites
+                and type(self.information_hosts) is int and 0 <= self.information_hosts <= 512):
             raise ValueError("Invalid recovery technical budget")
 
 
@@ -146,7 +148,8 @@ def snapshot_key(state):
     return _digest((universe_definition(state), w.current_node_id, w.current_pos_ly,
                     nodes, w.known_nodes, w.known_contacts, w.known_intel, w.known_links,
                     w.visited_nodes, pools, protection(state), w.arc_placements,
-                    w.narrative_snapshot, w.dead_nodes, sorted(state.os.fs)))
+                    w.narrative_snapshot, w.dead_nodes, sorted(state.os.fs),
+                    w.information_version, w.information_definition))
 
 
 def directed_access(state) -> dict[str, AccessRoute]:
@@ -268,7 +271,8 @@ def _at_site(state, source, site):
     return probe
 
 
-def _salvage_source(state, source, dest, site, *, eligible=True, expected=None):
+def _salvage_source(state, source, dest, site, *, eligible=True, expected=None,
+                    archive_cache=None, archive_limit=128):
     from retorno.core import lore
     from retorno.model.os import normalize_path
     if "salvage_data" not in information_capabilities(site.kind):
@@ -276,9 +280,24 @@ def _salvage_source(state, source, dest, site, *, eligible=True, expected=None):
     pool = state.world.node_pools.get(source)
     if eligible and (source in state.world.visited_nodes or (pool and (pool.node_cleaned or not pool.window_open))):
         return None
-    # Only existing pools or installed authored archives are evidence. Do not
-    # generate a procedural document or inject the requested LINK during search.
-    files = pool.base_files + pool.injected_files if pool else lore._location_fs_files(source, state)
+    if pool:
+        files = pool.base_files + pool.injected_files
+    elif lore.historical_information_enabled(state):
+        # A v1 record is pre-existing even before lazy preparation. This pure
+        # projection neither initializes a pool nor manufactures the sought LINK.
+        if archive_cache is not None and source in archive_cache:
+            files = archive_cache[source]
+        else:
+            if archive_cache is not None and len(archive_cache) >= archive_limit:
+                raise ValueError("historical_information_host_budget; source evaluation incomplete")
+            information = lore.historical_information_for_node(state, source)
+            files = information.files if information else []
+            if archive_cache is not None:
+                archive_cache[source] = files
+    else:
+        # Legacy histories cannot acquire retrospective procedural provenance.
+        files = lore._location_fs_files(source, state)
+    files = lore.disclosable_data_files(state, files)
     matches, seen_paths = [], set()
     aliases = state.world.narrative_snapshot.get("aliases", {})
     for entry in files:
@@ -301,23 +320,24 @@ def _salvage_source(state, source, dest, site, *, eligible=True, expected=None):
     return min(matches, key=lambda s: (s.reference, s.payload_key)) if matches else None
 
 
-def _source(state, nid, site, dest, *, emissions=None):
+def _source(state, nid, site, dest, *, emissions=None, archive_cache=None, archive_limit=128):
     emissions = _navigation_emissions(state)[0] if emissions is None else emissions
     probe = _at_site(state, nid, site)
     for eid in emissions.get((nid, dest), ()):
         if _first_reception(probe, nid, eid) is None:
             emission = state.world.narrative_snapshot["radio_emissions"][eid]
             return "radio", StageSource(eid, _digest(emission.content_by_locale))
-    salvage = _salvage_source(state, nid, dest, site)
+    salvage = _salvage_source(state, nid, dest, site, archive_cache=archive_cache, archive_limit=archive_limit)
     return ("salvage", salvage) if salvage else None
 
 
-def _edge_source(state, source, dest, site, *, emissions=None):
+def _edge_source(state, source, dest, site, *, emissions=None, archive_cache=None, archive_limit=128):
     w = state.world
     if (dest in w.known_links.get(source, ()) and dest in (set(w.known_nodes) | set(w.known_intel))
             and is_hop_within_cap(w, source, dest)):
         return "known_route", None
-    return _source(state, source, site, dest, emissions=emissions)
+    return _source(state, source, site, dest, emissions=emissions,
+        archive_cache=archive_cache, archive_limit=archive_limit)
 
 
 def select_recovery(state, block="global", target_id=None, *, cursor=0, retained=(), budget=None):
@@ -420,6 +440,7 @@ def select_recovery(state, block="global", target_id=None, *, cursor=0, retained
         # Shared hop kernel on a private, physical-only view. No gameplay writes.
         view = _physical_view(sites)
         best, queue, path_sources = {}, [], {}
+        archive_cache = {}
         for nid in origins:
             cost = (access[nid].distance_ly, 0, access[nid].hops, (nid,))
             best[nid] = cost
@@ -465,8 +486,10 @@ def select_recovery(state, block="global", target_id=None, *, cursor=0, retained
                 d = math.dist(sites[nid].position_ly, sites[dest].position_ly)
                 if d <= 0 or not is_hop_within_cap(view, nid, dest):
                     continue
-                evidence = (_source(state, nid, sites[nid], dest, emissions=emissions) if nid == origin
-                            else _edge_source(state, nid, dest, sites[nid], emissions=emissions))
+                evidence = (_source(state, nid, sites[nid], dest, emissions=emissions,
+                                archive_cache=archive_cache, archive_limit=budget.information_hosts) if nid == origin
+                            else _edge_source(state, nid, dest, sites[nid], emissions=emissions,
+                                archive_cache=archive_cache, archive_limit=budget.information_hosts))
                 if nid == origin and first_reception_eligible:
                     eid = receiving_links[(nid,dest)]
                     emission = state.world.narrative_snapshot["radio_emissions"][eid]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import hashlib
 import math
 import random
@@ -439,7 +439,48 @@ def _parse_sector_id(sector_id: str) -> tuple[int, int, int]:
         return 0, 0, 0
 
 
+def historical_information_enabled(state) -> bool:
+    from retorno.worldgen.information import VERSION, LEGACY_VERSION
+    if state.world.information_version not in {VERSION, LEGACY_VERSION}:
+        raise ValueError("Unsupported historical information version / Versión de información histórica no admitida")
+    return state.world.information_version == VERSION
+
+
+def historical_information_for_node(state, node_id: str, *, budget=None):
+    """Pure adapter; no pool activation, materialization, disclosure or RNG use."""
+    if not historical_information_enabled(state):
+        return None
+    from retorno.worldgen.information import query_information
+    from retorno.worldgen.generator import universe_definition
+    return query_information(universe_definition(state), state.world.information_definition,
+        node_id, budget=budget)
+
+
+def disclosable_data_files(state, files: list[dict]) -> list[dict]:
+    """Delivery authorization never edits history or substitutes another record."""
+    if not any(entry.get("navigation_record") for entry in files):
+        return list(files)
+    locked = _locked_primary_targets(state)
+    return [entry for entry in files
+        if entry.get("navigation_record", {}).get("destination_id") not in locked]
+
+
+def disclosable_uplink_destinations(state, pool) -> list[str]:
+    from retorno.worldgen.information import VERSION
+    if pool.information_version != VERSION:
+        return list(pool.uplink_route_pool)
+    locked = _locked_primary_targets(state)
+    return [dest for dest in pool.uplink_route_pool if dest not in locked]
+
+
 def _precompute_uplink_route_pool_for_node(state, node_id: str, max_new: int = 3) -> list[str]:
+    if historical_information_enabled(state):
+        information = historical_information_for_node(state, node_id)
+        return [r.destination_id for r in information.uplink[:max(0, max_new)]] if information else []
+    return _legacy_precompute_uplink_route_pool_for_node(state, node_id, max_new)
+
+
+def _legacy_precompute_uplink_route_pool_for_node(state, node_id: str, max_new: int = 3) -> list[str]:
     node = state.world.space.nodes.get(node_id)
     if not node or "uplink" not in information_capabilities(node.kind):
         return []
@@ -597,6 +638,13 @@ def _precompute_uplink_route_pool_for_node(state, node_id: str, max_new: int = 3
 
 
 def _procedural_fs_files(state, node: SpaceNode) -> list[dict]:
+    if historical_information_enabled(state):
+        information = historical_information_for_node(state, node.node_id)
+        return information.files if information else []
+    return _legacy_procedural_fs_files(state, node)
+
+
+def _legacy_procedural_fs_files(state, node: SpaceNode) -> list[dict]:
     seed = _stable_seed64(state.meta.rng_seed, node.node_id)
     rng = random.Random(seed)
     files: list[dict] = []
@@ -659,6 +707,13 @@ def _dominant_peer_kind(state, node: SpaceNode) -> str:
 
 
 def build_procedural_salvage_mail_content(state, node: SpaceNode) -> str:
+    if historical_information_enabled(state):
+        information = historical_information_for_node(state, node.node_id)
+        return information.mail_by_locale[int(state.os.locale.value == "es")] if information else ""
+    return _legacy_build_procedural_salvage_mail_content(state, node)
+
+
+def _legacy_build_procedural_salvage_mail_content(state, node: SpaceNode) -> str:
     lang = str(getattr(state.os.locale, "value", "en") or "en").lower()
     seed = _stable_seed64(getattr(state.meta, "rng_seed", 0), node.node_id, "salvage_mail_v1")
     rng = random.Random(seed)
@@ -850,6 +905,9 @@ def build_lore_context(state, node_id: str) -> LoreContext:
 
 
 def _collect_base_files_for_node(state, node_id: str, node: SpaceNode | None) -> list[dict]:
+    if historical_information_enabled(state):
+        information = historical_information_for_node(state, node_id)
+        return information.files if information else _location_fs_files(node_id, state)
     base = _location_fs_files(node_id, state)
     if base:
         return list(base)
@@ -865,7 +923,7 @@ def collect_node_salvage_data_files(state, node_id: str) -> list[dict]:
     if not pool or not node or "salvage_data" not in information_capabilities(node.kind):
         return []
     merged: dict[str, dict] = {}
-    for entry in list(pool.base_files) + list(pool.injected_files):
+    for entry in disclosable_data_files(state, list(pool.base_files) + list(pool.injected_files)):
         src = normalize_path(str(entry.get("path", "")))
         if not src:
             continue
@@ -947,8 +1005,16 @@ def initialize_node_pool(state, node_id: str) -> None:
     if node_id not in state.world.node_pools:
         node = state.world.space.nodes.get(node_id)
         pool = NodePoolState(initialized_t=float(state.clock.t), window_open=True)
-        pool.base_files = _collect_base_files_for_node(state, node_id, node)
-        pool.uplink_route_pool = _precompute_uplink_route_pool_for_node(state, node_id, max_new=3)
+        if historical_information_enabled(state):
+            information = historical_information_for_node(state, node_id)
+            pool.information_version = state.world.information_version
+            pool.information_rules_key = state.world.information_definition.rules_key
+            pool.base_files = information.files if information else _location_fs_files(node_id, state)
+            pool.uplink_records = [asdict(r) for r in information.uplink] if information else []
+            pool.uplink_route_pool = [r["destination_id"] for r in pool.uplink_records]
+        else:
+            pool.base_files = _collect_base_files_for_node(state, node_id, node)
+            pool.uplink_route_pool = _precompute_uplink_route_pool_for_node(state, node_id, max_new=3)
         state.world.node_pools[node_id] = pool
         # Finalize a reserved opportunity before the first inspection closes
         # its window. A deadline that has not fired may legitimately expire.
@@ -983,7 +1049,7 @@ def _pending_node_files_count(state, node_id: str, pool: NodePoolState) -> int:
     if not node or "salvage_data" not in information_capabilities(node.kind):
         return 0
     mount_root = normalize_path(f"/remote/{node_id}")
-    files = list(pool.base_files) + list(pool.injected_files)
+    files = disclosable_data_files(state, list(pool.base_files) + list(pool.injected_files))
     return len(_project_mount_paths(state.os.fs, mount_root, files, include_existing=False))
 
 

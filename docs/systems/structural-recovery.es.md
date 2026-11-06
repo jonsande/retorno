@@ -1,3 +1,5 @@
+> **4D-3e5c-B1 — fuentes de archivo histórico.** F-DEAD-01 puede consultar un [archivo procedural v1](historical-information.es.md) fijo antes de preparar el pool, con evidencia exacta de archivo/payload, sin materializar, inyectar ni divulgar. Las consultas informativas por selección tienen presupuesto explícito de hosts. No cambia la procedencia legacy de fuentes/planes ni la exigencia de primera emisión radio declarada.
+
 # Recuperación estructural F-DEAD-01 — 4D-3e5
 
 ## Presentación y desarrollo — 4D-3e5a
@@ -142,9 +144,13 @@ Una escala puede reutilizar un enlace operativo dirigido ya conocido, sin
 añadir pistas ni fuentes. Llegar a esa escala habilita el tramo existente.
 Los intermediarios requieren una emisión declarada para su LINK exacto o un
 archivo físico recuperable que ya contenga esa pista. La selección consulta pools
-existentes y archivos authored instalados; no genera documentos procedurales para
-responder al bloqueo. Guarda referencia y huella del archivo, sin inyectar ni
-reabrir pools. Un pool cerrado/limpio o ya inspeccionado no adquiere una pista
+existentes y archivos authored instalados. Con historical-information-v1 también
+puede consultar el archivo procedural fijo preexistente antes de preparar el
+pool; legacy conserva la regla de fuentes existentes. La consulta nunca crea
+ni adapta un documento para responder al bloqueo. Guarda referencia y huella,
+sin inyectar ni reabrir pools. Por defecto consulta hasta 128 hosts informativos
+distintos por selección; agotamiento produce `incomplete`.
+Un pool cerrado/limpio o ya inspeccionado no adquiere una pista
 nueva. Una fuente reservada antes de su visita conserva la lectura legítima de
 su archivo ya existente. Un hub agotado solo puede recibir su emisión declarada;
 el tipo de instalación no implica actividad. Sus recursos permanecen agotados.

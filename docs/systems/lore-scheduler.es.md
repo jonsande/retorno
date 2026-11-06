@@ -1,3 +1,5 @@
+> **4D-3e5c-B1 — preparación de archivos.** Los archivos base y hasta tres registros uplink de partidas nuevas proceden de [historical-information-v1](historical-information.es.md). Asignación, pesos, deadlines y triggers del scheduler siguen separados y no cambian. La divulgación protegida filtra proyecciones sin reescribir ni sustituir registros. Las partidas legacy conservan sus productores.
+
 > **4D-3e5b — recepción física.** El ledger común revalida distancia 3D,
 > potencia, sensibilidad y ventana propagada al capturar. `radio_emission` optativo
 > vincula una pieza a un emisor declarado; no modifica pesos, sorteos, deadlines,
@@ -282,7 +284,9 @@ Al inicializar se congelan:
 - `initialized_t`;
 - `base_files`, procedentes de la localización authored o generados
   proceduralmente;
-- `uplink_route_pool`, con hasta tres destinos calculados en ese momento.
+- `uplink_route_pool`, con hasta tres destinos: proyección lazy de registros
+  históricos fijos en partidas nuevas y selección runtime original en legacy;
+- metadatos de contrato/reglas y `uplink_records` tipados en partidas nuevas.
 
 El pool uplink no se amplía con nodos materializados o desbloqueados después.
 Sí pueden incorporarse más tarde `injected_files` del scheduler o de

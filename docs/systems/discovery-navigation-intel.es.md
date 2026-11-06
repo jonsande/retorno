@@ -1,3 +1,5 @@
+> **4D-3e5c-B1 — contrato informativo vigente.** La [información histórica](historical-information.es.md) fija uplink y archivos procedurales de partidas nuevas sin depender de hora, conocimiento u orden de materialización. La entrega conserva cap y autorización narrativa, distinguiendo conexión documentada de navegación calculada. Las partidas legacy mantienen la selección antigua descrita más abajo.
+
 > **4D-3e5 — estado vigente (2026-11-06).** Implementado el selector histórico, confirmación transaccional y recepción/progresión mediante el ledger común. El [contrato productivo](structural-recovery.es.md) y su informe prevalecen sobre las auditorías históricas de este documento: no se fabrican puentes, entradas ni gateways. El núcleo 3b/3c/3d sigue siendo diagnóstico; no autoriza materialización. Sin garantía de salida universal.
 
 > **Actualización implementada 4D-3e4b (2026-11-06).** Señales y broadcasts requieren `comms`/`radiod`, fuente local legítima y recepción efectiva antes de consumir piezas o etapas. Oportunidades pendientes, recibidas y leídas persisten en un ledger común. Las activaciones legacy que fabrican nodos correctivos se aplazan explícitamente hasta e5; las cadenas ya existentes pueden entregar por el canal real. No se alteran políticas del scheduler, scan ni uplink. El [contrato de comunicaciones](passive-communications.es.md) describe gates, cobertura, reintentos y límites; prevalece sobre las descripciones históricas siguientes en estos puntos. F-DEAD-01 sigue pendiente.
@@ -405,7 +407,14 @@ Requisitos:
 - servicio `datad` instalado y en ejecución.
 
 `sync_node_pools_for_known_nodes` inicializa una sola vez los pools de nodos
-conocidos, nodos `forced_hidden` y anclas actuales. Al preparar un pool uplink:
+conocidos, nodos `forced_hidden` y anclas actuales. Los pools de partidas nuevas
+proyectan [historical-information-v1](historical-information.es.md): registros
+fijos certificados, independientes de hora, conocimiento y materialización.
+Prepararlos internamente no materializa sus destinos ni revela contactos.
+La primera acción válida autoriza entrega y puede resolver entonces los extremos
+lazy.
+
+Las partidas legacy conservan la siguiente política B0 de preparación:
 
 - materializa el sector actual;
 - excluye el placeholder `UNKNOWN`, el propio nodo, rutas ya conocidas y

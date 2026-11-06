@@ -199,7 +199,11 @@ def test_05_deadnodes_global_and_structural_recovery_share_effective_potential()
     assert structural_recovery._salvage_source(state, target, "ECHO_7", site, eligible=False) is None
     # A prepared eligible LINK on a real station retains its existing interface.
     legitimate, host = scene("station")
-    dest = sorted(legitimate.world.space.nodes[host].links)[0]
+    # Materialized links can be partial. Use the actually prepared record,
+    # whose endpoints B1 obtains from the certified historical query.
+    dest = next(pair[1] for entry in legitimate.world.node_pools[host].base_files
+        for line in entry.get("content", "").splitlines()
+        if (pair := lore._primary_link_pair({"line": line})) and pair[0] == host)
     legitimate.world.node_pools[host].injected_files.append(dict(
         path="/data/source.txt", access="guest", content=f"LINK: {host} -> {dest}\n"))
     before = pickle.dumps(legitimate)

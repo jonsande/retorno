@@ -69,7 +69,11 @@ def test_02_partial_inventory_save_load_and_consumption():
     node.salvage_modules_available.clear()
     node.recoverable_drones_count = 0
     node.salvage_dry = True
-    a.world.node_pools[node.node_id] = NodePoolState(uplink_data_consumed=True)
+    # Prepare the actual versioned pool before recording its consumed state.
+    from retorno.core.lore import initialize_node_pool, recompute_node_completion
+    initialize_node_pool(a, node.node_id)
+    a.world.node_pools[node.node_id].uplink_data_consumed = True
+    recompute_node_completion(a, node.node_id)
     with TemporaryDirectory() as tmp:
         slot = Path(tmp)/'new.dat'
         for _ in range(3):

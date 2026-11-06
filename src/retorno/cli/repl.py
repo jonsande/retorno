@@ -4190,12 +4190,20 @@ def _handle_uplink(state) -> None:
             data={"routes": []},
         )
         return
-    fixed_pool = list(pool.uplink_route_pool) if pool else []
+    from retorno.core.lore import disclosable_uplink_destinations
+    from retorno.worldgen.information import VERSION as INFORMATION_VERSION, NavigationRecord, navigation_content
+    fixed_pool = disclosable_uplink_destinations(state, pool) if pool else []
     added: list[str] = []
     discarded_by_cap = 0
     for dest in fixed_pool:
         if not dest or dest == current_node_id:
             continue
+        if pool.information_version == INFORMATION_VERSION:
+            # A legitimate read of a certified record can resolve its lazy
+            # destination now. Historical queries alone never do this.
+            from retorno.worldgen.generator import ensure_historical_node
+            if not ensure_historical_node(state, dest):
+                continue
         added_link, rejected, distance = _try_add_known_link_with_cap(
             state, current_node_id, dest, bidirectional=True
         )
@@ -4228,6 +4236,9 @@ def _handle_uplink(state) -> None:
     seq = state.events.next_event_seq
     log_path = f"/logs/nav/uplink_{current_node_id}_{seq:05d}.txt"
     log_content = "".join(f"LINK: {nid}\n" for nid in added)
+    if pool and pool.information_version == INFORMATION_VERSION:
+        log_content = "\n".join(navigation_content(NavigationRecord(**record))
+            for record in pool.uplink_records if record["destination_id"] in fixed_pool)
     state.os.fs[log_path] = FSNode(
         path=log_path,
         node_type=FSNodeType.FILE,

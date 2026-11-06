@@ -476,6 +476,9 @@ def compile_catalog(seed, catalog=None, *, search_budget=4096):
 def prepare_new_world(state):
     definition, snapshot = compile_catalog(state.meta.rng_seed)
     state.world.narrative_snapshot = snapshot
+    from retorno.worldgen.information import VERSION, define_information
+    state.world.information_version = VERSION
+    state.world.information_definition = define_information(snapshot)
     # Preserve seed selection before materialization for catalogues without new
     # physical declarations. Requirement-bearing universes are pinned now.
     if snapshot["declarations"]:

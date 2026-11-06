@@ -1,3 +1,5 @@
+> **Compatibilidad B1.** Se conservan la matriz física y la finalización B0 descritas abajo. Las partidas nuevas preparan archivos [historical-information-v1](historical-information.es.md), manteniendo archivos brutos inaccesibles de waystation sin frontera de salvage. Los pushes legítimos pendientes siguen siendo independientes del uplink agotado.
+
 # Capacidades físicas de información — 4D-3e5c-B0
 
 [English](information-capabilities.md). Implementado el 2026-11-06, sobre

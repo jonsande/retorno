@@ -1,3 +1,18 @@
+## 4D-3e5c-B1 — implementada para revisión externa
+
+Las partidas nuevas usan [historical-information-v1](../systems/historical-information.es.md),
+con archivos y registros navegacionales estables y finitos, conexiones históricas
+y rutas calculadas tipadas, entrega protegida, validación aditiva estricta de
+esquema 3 y reglas informativas legacy para toda la partida. B0 conserva sus
+capacidades físicas. No cambian worldgen físico, políticas del scheduler, radio,
+recursos ni audio. Esta actualización prevalece sobre el alcance editorial e5c
+anterior. La versión 1.6 conserva D01–D24 literalmente. B2 queda pendiente:
+transmisores/emisiones procedurales y una posible reactivación excepcional
+requieren hardware original, conservación, energía, capacidad de reparación,
+payload histórico, inicio real, propagación y trazabilidad persistida. No se
+implementan emisiones retroactivas ni reparaciones. La validación jugable e6
+prolongada de Textual/audio sigue separada.
+
 ## 4D-3e5b — implementada para revisión externa
 
 El [modelo físico espacial/temporal](../systems/radio-spacetime.es.md) implementa
@@ -11,8 +26,8 @@ D01–D24 se conservan. [Informe](../testing/radio-spacetime-review.es.md).
 
 # RETORNO — Hoja de ruta de preexistencia procedural, lore y F-DEAD-01
 
-**Versión:** 1.5 — 2026-11-06
-**Estado:** 4D-3e5 implementada sobre `ba705e7` para revisión externa; e6 pendiente. [English](roadmap-worldgen-lore-f-dead01.md).
+**Versión:** 1.6 — 2026-11-06
+**Estado:** 4D-3e5c-B1 implementada sobre `445217e` para revisión externa; B2/e6 pendientes. [English](roadmap-worldgen-lore-f-dead01.md).
 **Destino recomendado en el repositorio:** `docs/design/roadmap-worldgen-lore-f-dead01.es.md`.
 
 > **Propósito:** conservar las decisiones de diseño y la secuencia de trabajo durante la estabilización final del universo procedural, sin prolongarla indefinidamente ni perder el objetivo de volver a jugar RETORNO con Textual y sonido, y después desarrollar arcos, singles y contenido nuevo.

@@ -41,6 +41,10 @@ def _state(distance=100.0, y=25.0):
     state.meta.rng_seed = state.world.rng_seed = 271828
     state.meta.rng_counter = 17
     world = state.world
+    # This diagnostic fixture installs pre-contract synthetic archives, not a
+    # certified historical-information-v1 universe. Retain its legacy rules.
+    world.information_version = "legacy-information-v0"
+    world.information_definition = None
     world.space.nodes = {"A": _node("A", 0, y), "D": _node("D", distance, y)}
     world.space.edges = {}
     world.current_node_id = state.ship.current_node_id = "A"

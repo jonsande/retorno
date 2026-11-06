@@ -1,3 +1,5 @@
+> **B1 compatibility.** The B0 physical matrix and completion semantics below remain. New games prepare [historical-information-v1](historical-information.md) archives, retaining raw inaccessible waystation files without a salvage frontier. Legitimate pending pushes remain independent of exhausted uplink.
+
 # Physical information capabilities — 4D-3e5c-B0
 
 [Español](information-capabilities.es.md). Implemented on 2026-11-06, based on

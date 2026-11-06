@@ -141,10 +141,10 @@ def _has_non_uplink_data_frontier(state, reachable: set[str]) -> bool:
     for node_id in reachable:
         pool = state.world.node_pools.get(node_id)
         if not pool:
-            from retorno.core.lore import _collect_base_files_for_node
+            from retorno.core.lore import _collect_base_files_for_node, disclosable_data_files
             node = state.world.space.nodes.get(node_id)
             if (node and "salvage_data" in information_capabilities(node.kind)
-                    and _collect_base_files_for_node(state, node_id, node)):
+                    and disclosable_data_files(state, _collect_base_files_for_node(state, node_id, node))):
                 return True
             continue
         if _pending_node_files_count(state, node_id, pool) > 0:
@@ -162,7 +162,8 @@ def _node_has_pending_uplink_payload(state, node_id: str) -> bool:
     pool = state.world.node_pools.get(node_id)
     if not pool or pool.uplink_data_consumed:
         return False
-    if any(dest for dest in pool.uplink_route_pool if dest and dest != node_id):
+    from retorno.core.lore import disclosable_uplink_destinations
+    if any(dest for dest in disclosable_uplink_destinations(state, pool) if dest and dest != node_id):
         return True
     for piece_key in sorted(pool.pending_push_piece_ids):
         if piece_key in pool.delivered_piece_ids:
@@ -180,6 +181,13 @@ def _has_uplink_frontier(state, reachable: set[str]) -> bool:
         if not node or "uplink" not in information_capabilities(node.kind):
             continue
         if node_id not in state.world.node_pools:
+            from retorno.core.lore import historical_information_enabled, historical_information_for_node, _locked_primary_targets
+            if historical_information_enabled(state):
+                information = historical_information_for_node(state, node_id)
+                locked = _locked_primary_targets(state)
+                if information and any(r.destination_id not in locked for r in information.uplink):
+                    return True
+                continue
             from retorno.worldgen.generator import universe_definition
             from retorno.worldgen.manifest import resolve_operative_id
             if resolve_operative_id(universe_definition(state), node_id):

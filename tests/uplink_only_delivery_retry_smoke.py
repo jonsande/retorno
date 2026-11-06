@@ -68,6 +68,10 @@ def _add_node(state, node_id: str, *, dx: float) -> None:
 
 def _prepared_state(line: str):
     state = create_initial_state_sandbox()
+    # This retry fixture edits its route pool and creates literal synthetic
+    # endpoints. Test the retained legacy mechanism explicitly.
+    state.world.information_version = "legacy-information-v0"
+    state.world.information_definition = None
     state.clock.t = 123.0
     state.ship.docked_node_id = state.world.current_node_id
     sync_node_pools_for_known_nodes(state)

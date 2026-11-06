@@ -40,6 +40,9 @@ def _state():
     # Fix this synthetic world's definition before persistence snapshots.
     pin_universe(state)
     world = state.world
+    # Synthetic navigation pools carry legacy data, without historical claims.
+    world.information_version = "legacy-information-v0"
+    world.information_definition = None
     world.space.nodes = {
         nid: SpaceNode(node_id=nid, name=nid, kind="derelict", region="disk", x_ly=x)
         for nid, x in (("A", 0.0), ("B", 10.0), ("LIMIT", 45.0), ("FAR", 80.0), ("TAIL", 81.0))

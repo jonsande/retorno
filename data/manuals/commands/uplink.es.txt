@@ -12,6 +12,9 @@ Requisitos (gating)
   - bloqueado en estado crítico de energía.
 
 Comportamiento operativo
+- Las partidas nuevas consultan hasta tres registros navegacionales conservados y fijos de la instalación; una ruta ya conocida no recibe otro destino sustituto.
+- Una conexión histórica documentada y una solución navegacional calculada son distintas. Una ruta calculada no prueba tráfico histórico ni una red activa.
+- La primera lectura agota la tabla de rutas. Repetir uplink permite reintentar una entrega narrativa pendiente, sin reponer rutas ni logs.
 - Descarga intel de rutas/contactos desde cachés remotas.
 - Actualiza enlaces conocidos y puede abrir nuevos caminos alcanzables.
 - Escribe artefactos de log de navegación en `/logs/nav/`.

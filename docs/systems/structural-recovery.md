@@ -1,3 +1,5 @@
+> **4D-3e5c-B1 — historical archive sources.** F-DEAD-01 can inspect a fixed [v1 procedural archive](historical-information.md) before pool preparation, with exact file/payload evidence and no materialization, injection or disclosure. Per-search information host queries have an explicit budget. Legacy source/plan provenance and the first declared radio-emission requirement remain unchanged.
+
 # Structural recovery F-DEAD-01 — 4D-3e5
 
 ## Presentation and development — 4D-3e5a
@@ -138,8 +140,12 @@ A physical scale may reuse an already known directed operational link, without
 adding clues or sources. Arriving there enables that existing leg.
 Intermediate sources need a declared emission for the exact LINK or an existing
 recoverable physical archive containing that clue. Selection reads existing pools
-and installed authored archives, never generates procedural documents to answer a
-blockage. File reference/fingerprint persist without injection or reopening pools.
+and installed authored archives. In historical-information-v1 it can also query
+the fixed pre-existing procedural archive before lazy pool preparation; legacy
+saves retain their existing-only source rule. The query never creates or adapts
+a document to a blockage. File reference/fingerprint persist without injection
+or reopening pools. Up to 128 distinct historical information hosts are queried
+per selection by default; exhaustion produces `incomplete`.
 Closed/cleaned/already inspected pools gain no new clues. Previously reserved
 source files retain legitimate reading on arrival. Exhausted hubs can only supply
 their declared emissions; installation kind implies no activity. Resources remain

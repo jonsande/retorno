@@ -30,6 +30,9 @@ Requisitos (gating)
   - si `scope=drone`, requisitos: `docked` en `DRN-BAY`, `drone_bay=NOMINAL`, `energy_distribution!=OFFLINE`.
 
 Comportamiento operativo
+- En partidas nuevas, los archivos procedurales conservan registros fijos. Un LINK recuperado puede documentar una conexión histórica o aportar datos para calcular una ruta; su etiqueta distingue ambos casos.
+- Los archivos de telemetría describen registros conservados, posiblemente obsoletos. No verifican tráfico actual, contactos con respuesta, estaciones operativas ni supervivientes.
+- Un mismo correo conservado puede tener copias en inglés y español. Recuperar o releer una copia no crea un acontecimiento histórico nuevo.
 - Las firmas de datos del survey corresponden a archivos recuperables por el dron. La infraestructura uplink se informa por separado; no detectar firmas de datos de dron no descarta uplink.
 - Sin destino, drone deploy <drone_id> despliega en la bahía de drones de la nave (normalmente DRN-BAY); el sector se determina por la ubicación actual de la bahía.
 - Se conservan los destinos explícitos y los requisitos de despliegue normal/de emergencia.

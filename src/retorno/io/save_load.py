@@ -130,6 +130,8 @@ def _pack_state(state: GameState) -> bytes:
         validate_universe_state(state)
         from retorno.core.communications import validate_radio_state
         validate_radio_state(state)
+        from retorno.worldgen.information import validate_information_state
+        validate_information_state(state)
         from retorno.core.structural_recovery import validate_recovery_state
         validate_recovery_state(state)
     except (ValueError,TypeError,AttributeError) as exc:
@@ -186,6 +188,8 @@ def _load_from_file(path: Path) -> GameState:
         validate_universe_state(loaded)
         from retorno.core.communications import validate_radio_state
         validate_radio_state(loaded)
+        from retorno.worldgen.information import validate_information_state
+        validate_information_state(loaded)
         from retorno.core.structural_recovery import validate_recovery_state
         validate_recovery_state(loaded)
     except (ValueError,TypeError,AttributeError) as exc:

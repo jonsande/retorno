@@ -32,6 +32,10 @@ def _assert_current_anchor_node_seeds_pool() -> None:
 
 def _assert_authored_uplink_table_is_applied() -> None:
     state = create_initial_state_sandbox()
+    # Runtime loader injection predates the captured v1 authored definition.
+    # The certified v1 authored-table case lives in historical_information_smoke.
+    state.world.information_version = "legacy-information-v0"
+    state.world.information_definition = None
     node_id = "AUTH_HUB_TEST"
     authored_candidates = {"AUTH_RELAY_A", "AUTH_STATION_B"}
     state.world.space.nodes[node_id] = SpaceNode(

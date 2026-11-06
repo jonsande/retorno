@@ -1,3 +1,5 @@
+> **4D-3e5c-B1 — archive preparation.** New-game base files and up to three uplink records come from [historical-information-v1](historical-information.md). Scheduler assignment, weights, deadlines and triggers remain separate and unchanged. Protected delivery filters projections without rewriting or replacing historical records. Existing legacy saves retain their producers.
+
 > **4D-3e5b — physical reception.** The shared ledger revalidates 3D distance,
 > power, sensitivity and propagated window at capture. Optional radio_emission
 > binds a piece to a declared transmitter without changing weights, rolls,
@@ -277,7 +279,10 @@ Initialization freezes:
 
 - `initialized_t`;
 - `base_files`, from authored location data or procedural generation;
-- `uplink_route_pool`, with at most three destinations calculated then.
+- `uplink_route_pool`, with at most three destinations: a lazy projection of
+  fixed historical records in new games, the original runtime selection in
+  legacy games;
+- information contract/rule metadata and typed `uplink_records` in new games.
 
 The uplink pool does not grow when nodes are materialized or unlocked later.
 Scheduler and breadcrumb `injected_files` and pending push pieces may be added

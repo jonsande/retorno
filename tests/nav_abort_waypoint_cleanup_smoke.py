@@ -31,6 +31,9 @@ def _state():
     pin_universe(state)
     state.meta.rng_counter = 0
     world = state.world
+    # Hand-built navigation/abort archives deliberately use legacy semantics.
+    world.information_version = "legacy-information-v0"
+    world.information_definition = None
     positions = {
         "A": (0.0, 0.0, 0.0), "B": (8.0, 4.0, 2.0),
         "C": (2.0, 1.1, 0.5), "D": (2.0, 5.0, 0.5),

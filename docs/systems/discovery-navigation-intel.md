@@ -1,3 +1,5 @@
+> **4D-3e5c-B1 — current information contract.** [Historical information](historical-information.md) fixes new-game uplink and procedural archives independently of time, knowledge and materialization order. Delivery retains the operational cap and narrative authorization, with documented connections distinguished from calculated navigation. Legacy saves retain the old selection described below.
+
 > **4D-3e5 — current implementation (2026-11-06).** Historical selection, transactional confirmation and common-ledger reception/progression are implemented. The [production contract](structural-recovery.md) and its report supersede historical audits below: no corrective bridges, entries or gateways are fabricated. The 3b/3c/3d core remains diagnostic and cannot authorize materialization. No universal exit is guaranteed.
 
 > **Implemented 4D-3e4b update (2026-11-06).** Signals and broadcasts require `comms`/`radiod`, a legitimate local source and actual reception before consuming pieces or stages. Pending, received and read opportunities persist in one ledger. Legacy activations fabricating corrective nodes are explicitly deferred until e5; existing chains can deliver through their real channel. Scheduler policies, scan and uplink are unchanged. The [communications contract](passive-communications.md) specifies gates, coverage, retries and limits, superseding historical descriptions below on these points. F-DEAD-01 remains pending.
@@ -393,7 +395,13 @@ Requirements:
 - `datad` installed and running.
 
 `sync_node_pools_for_known_nodes` initializes pools once for known nodes,
-`forced_hidden` nodes, and current anchors. When preparing an uplink pool it:
+`forced_hidden` nodes, and current anchors. New-game pools project
+[historical-information-v1](historical-information.md): certified, fixed records
+independent of time, knowledge and materialization order. Internal preparation
+does not materialize their destinations or reveal contacts. The first valid
+action authorizes delivery and can resolve the lazy endpoints then.
+
+Legacy saves retain the following B0 preparation policy:
 
 - materializes the current sector;
 - excludes the `UNKNOWN` placeholder, the node itself, existing routes, and
