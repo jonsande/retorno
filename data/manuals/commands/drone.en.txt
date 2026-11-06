@@ -21,6 +21,7 @@ Purpose
 Requirements (gating)
 - Deploy/recall/reboot/repair/salvage require a valid drone and battery/integrity gates.
 - World-node operations require drone and ship to remain co-located at that node.
+- `drone salvage data` requires a station, relay, ship, or derelict data interface. Waystations use `uplink` under its own docking and service requirements.
 - `drone install <drone_id> <module_id>` resolves by module scope:
   - if `scope=ship`, requirements: operator drone deployed on ship, module in inventory, scrap cost available.
   - if `scope=drone`, requirements: `docked` in `DRN-BAY`, `drone_bay=NOMINAL`, `energy_distribution!=OFFLINE`, free slots.
@@ -29,6 +30,7 @@ Requirements (gating)
   - if `scope=drone`, requirements: `docked` in `DRN-BAY`, `drone_bay=NOMINAL`, `energy_distribution!=OFFLINE`.
 
 Operational behavior
+- Survey data signatures refer to files recoverable by the drone. Uplink infrastructure is reported separately; no drone data signatures does not rule out uplink.
 - Without a destination, drone deploy <drone_id> deploys into the ship drone bay (normally DRN-BAY); the current bay location determines the sector.
 - Explicit destinations and normal/emergency deployment requirements still apply.
 - Drone modules do not mutate base stats destructively.

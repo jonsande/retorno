@@ -21,6 +21,7 @@ from retorno.model.os import read_file
 from retorno.model.world import (
     SpaceNode, WorldState, is_hop_within_cap, reachable_from, reachable_known_nodes,
     region_for_pos, sector_id_for_pos,
+    information_capabilities as _information_capabilities,
 )
 from retorno.runtime.data_loader import load_worldgen_archetypes, load_worldgen_templates
 from retorno.worldgen.generator import _plan_sector_kinds, _sector_center, _select_archetype
@@ -182,15 +183,9 @@ class RecoveryProposal:
         return self.viability == Viability.VERIFIED
 
 
-# Engine.SalvageData rejects waystation, despite lore's broader channel filter.
-# Uplink's kind gate is in exploration_recovery.uplink_blocked_reason.
 def information_capabilities(kind: str) -> tuple[Mechanism, ...]:
-    capabilities = []
-    if kind in {"station", "ship", "derelict", "relay"}:
-        capabilities.append(Mechanism.SALVAGE_DATA)
-    if kind in {"station", "relay", "waystation"}:
-        capabilities.append(Mechanism.UPLINK)
-    return tuple(capabilities)
+    """Preserve the diagnostic API's enum type using the physical criterion."""
+    return tuple(Mechanism(value) for value in _information_capabilities(kind))
 
 
 def _digest(*parts: object) -> str:

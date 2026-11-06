@@ -85,6 +85,7 @@ from retorno.model.world import (
     SpaceNode,
     add_known_link,
     distance_between_nodes_ly,
+    information_capabilities,
     is_hop_within_cap,
     reachable_from,
     record_intel,
@@ -3156,7 +3157,7 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            if node.kind not in {"station", "ship", "derelict", "relay"}:
+            if "salvage_data" not in information_capabilities(node.kind):
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
@@ -4570,7 +4571,7 @@ class Engine:
                 str(job.internal_id or job.job_id),
                 recoverable_data_files > 0,
             )
-            uplink_detected = bool(node and node.kind in {"relay", "station", "waystation"})
+            uplink_detected = bool(node and "uplink" in information_capabilities(node.kind))
             recompute_node_completion(state, node_id)
             pool = state.world.node_pools.get(node_id)
             drone_id = job.params.get("drone_id")

@@ -15,9 +15,8 @@ import json
 import math
 
 from retorno.core.deadnode_opportunities import AccessRoute
-from retorno.core.deadnode_planner import information_capabilities
 from retorno.core import communications
-from retorno.model.world import SpaceGraph, SpaceNode, WorldState, is_hop_within_cap, sector_id_for_pos
+from retorno.model.world import SpaceGraph, SpaceNode, WorldState, information_capabilities, is_hop_within_cap, sector_id_for_pos
 from retorno.worldgen import manifest
 from retorno.worldgen.generator import universe_definition, _ensure_sector_cluster_generated, validate_universe_state
 

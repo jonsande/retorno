@@ -302,9 +302,16 @@ Completion flags are recomputed as follows:
 
 - `scrap_complete`: no physical scrap remains;
 - `extras_complete`: no recoverable modules or drones remain;
-- `data_complete`: no new file paths remain to mount, no push is pending, and a
-  hub's uplink has been consumed;
+- `data_complete`: no new salvage file paths remain for a host with that
+  physical interface, no push is pending, and an available uplink interface's
+  route pool has been consumed;
 - `node_cleaned`: all three are true.
+
+The [physical information capability criterion](information-capabilities.md)
+filters recoverability and completion. A waystation's internal archives remain
+stored but do not count as salvage opportunities; its uplink remains separate.
+Pool preparation, channel assignment, probabilities and scheduler policies are
+unchanged. Schema-3 load refreshes stale completion flags for non-salvage hosts.
 
 Mounting does not remove the pool entry. It counts as consumed because the
 destination path now exists in the filesystem. `uplink_data_consumed` only

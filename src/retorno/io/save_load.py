@@ -196,6 +196,15 @@ def _load_from_file(path: Path) -> GameState:
     if "comms" not in loaded.ship.systems:
         from retorno.model.systems import build_communications_system
         loaded.ship.systems["comms"] = build_communications_system()
+    # Old schema-3 saves can cache pending data for archives with no physical
+    # salvage interface. Refresh derived flags only; retain archives, delivered
+    # information, uplink consumption, resource stocks and the on-disk payload.
+    from retorno.core.lore import recompute_node_completion
+    from retorno.model.world import information_capabilities
+    for node_id in loaded.world.node_pools:
+        node = loaded.world.space.nodes.get(node_id)
+        if node and "salvage_data" not in information_capabilities(node.kind):
+            recompute_node_completion(loaded, node_id)
     return loaded
 
 

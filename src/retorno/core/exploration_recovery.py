@@ -9,7 +9,7 @@ from retorno.core.lore import (
 )
 from retorno.model.events import Event, SourceRef
 from retorno.model.systems import SystemState
-from retorno.model.world import SpaceNode, is_hop_within_cap, reachable_from
+from retorno.model.world import SpaceNode, information_capabilities, is_hop_within_cap, reachable_from
 
 
 def _state_rank(state: SystemState) -> int:
@@ -85,7 +85,7 @@ def uplink_blocked_reason(state) -> str | None:
     if state.ship.docked_node_id != state.world.current_node_id:
         return "not_docked"
     node = state.world.space.nodes.get(state.world.current_node_id)
-    if not node or node.kind not in {"relay", "station", "waystation"}:
+    if not node or "uplink" not in information_capabilities(node.kind):
         return "not_relay"
     return None
 
@@ -142,7 +142,9 @@ def _has_non_uplink_data_frontier(state, reachable: set[str]) -> bool:
         pool = state.world.node_pools.get(node_id)
         if not pool:
             from retorno.core.lore import _collect_base_files_for_node
-            if _collect_base_files_for_node(state, node_id, state.world.space.nodes.get(node_id)):
+            node = state.world.space.nodes.get(node_id)
+            if (node and "salvage_data" in information_capabilities(node.kind)
+                    and _collect_base_files_for_node(state, node_id, node)):
                 return True
             continue
         if _pending_node_files_count(state, node_id, pool) > 0:
@@ -175,7 +177,7 @@ def _has_uplink_frontier(state, reachable: set[str]) -> bool:
     nodes = state.world.space.nodes
     for node_id in reachable:
         node = nodes.get(node_id)
-        if not node or node.kind not in {"relay", "station", "waystation"}:
+        if not node or "uplink" not in information_capabilities(node.kind):
             continue
         if node_id not in state.world.node_pools:
             from retorno.worldgen.generator import universe_definition

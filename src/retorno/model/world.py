@@ -12,6 +12,20 @@ if TYPE_CHECKING:
     from retorno.worldgen.manifest import ManifestDefinition
 
 
+def information_capabilities(kind: str) -> tuple[str, ...]:
+    """Physical information interfaces, independent of ship readiness or payload.
+
+    Internal archives may outlive or predate an available interface. Keeping
+    them in a pool does not grant an interaction or make them recoverable.
+    """
+    capabilities = []
+    if kind in {"station", "ship", "derelict", "relay"}:
+        capabilities.append("salvage_data")
+    if kind in {"station", "relay", "waystation"}:
+        capabilities.append("uplink")
+    return tuple(capabilities)
+
+
 @dataclass(slots=True)
 class SpaceNode:
     node_id: str

@@ -16,6 +16,7 @@ from retorno.model.world import (
     NodePoolState,
     SpaceNode,
     add_known_link,
+    information_capabilities,
     is_hop_within_cap,
     reachable_from,
     record_intel,
@@ -440,7 +441,7 @@ def _parse_sector_id(sector_id: str) -> tuple[int, int, int]:
 
 def _precompute_uplink_route_pool_for_node(state, node_id: str, max_new: int = 3) -> list[str]:
     node = state.world.space.nodes.get(node_id)
-    if not node or node.kind not in {"relay", "station", "waystation"}:
+    if not node or "uplink" not in information_capabilities(node.kind):
         return []
     if max_new <= 0:
         return []
@@ -452,7 +453,6 @@ def _precompute_uplink_route_pool_for_node(state, node_id: str, max_new: int = 3
     routes = reachable_from(state.world, node_id)
     locked_primary_targets = _locked_primary_targets(state)
     authored_ids = _location_node_ids(state)
-    hub_kinds = {"relay", "station", "waystation"}
     deterministic = Balance.DETERMINISTIC_LORE_INTEL
     candidates: dict[str, int] = {}
     selected: list[str] = []
@@ -503,7 +503,7 @@ def _precompute_uplink_route_pool_for_node(state, node_id: str, max_new: int = 3
             _add_candidate(nid, 5)
         if n.kind == "derelict":
             _add_candidate(nid, 1)
-        if nid not in authored_ids and n.kind in hub_kinds and sid in neighbor_sectors:
+        if nid not in authored_ids and "uplink" in information_capabilities(n.kind) and sid in neighbor_sectors:
             _add_candidate(nid, 4)
 
     max_authored = max(0, min(max_new, max_authored))
@@ -861,7 +861,8 @@ def _collect_base_files_for_node(state, node_id: str, node: SpaceNode | None) ->
 def collect_node_salvage_data_files(state, node_id: str) -> list[dict]:
     sync_node_pools_for_known_nodes(state)
     pool = state.world.node_pools.get(node_id)
-    if not pool:
+    node = state.world.space.nodes.get(node_id)
+    if not pool or not node or "salvage_data" not in information_capabilities(node.kind):
         return []
     merged: dict[str, dict] = {}
     for entry in list(pool.base_files) + list(pool.injected_files):
@@ -978,6 +979,9 @@ def close_windows_for_visited_nodes(state) -> None:
 
 
 def _pending_node_files_count(state, node_id: str, pool: NodePoolState) -> int:
+    node = state.world.space.nodes.get(node_id)
+    if not node or "salvage_data" not in information_capabilities(node.kind):
+        return 0
     mount_root = normalize_path(f"/remote/{node_id}")
     files = list(pool.base_files) + list(pool.injected_files)
     return len(_project_mount_paths(state.os.fs, mount_root, files, include_existing=False))
@@ -1003,7 +1007,7 @@ def recompute_node_completion(state, node_id: str) -> None:
         for pid in pool.pending_push_piece_ids
         if pid not in pool.delivered_piece_ids
     ]
-    uplink_needed = bool(node and node.kind in {"relay", "station", "waystation"})
+    uplink_needed = bool(node and "uplink" in information_capabilities(node.kind))
     uplink_complete = (not uplink_needed) or bool(pool.uplink_data_consumed)
     data_complete = pending_files == 0 and len(pending_push) == 0 and uplink_complete
 

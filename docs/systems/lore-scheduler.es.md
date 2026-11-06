@@ -307,9 +307,17 @@ Los flags se recalculan así:
 
 - `scrap_complete`: no queda scrap físico;
 - `extras_complete`: no quedan módulos ni drones recuperables;
-- `data_complete`: no quedan rutas de archivo nuevas por montar, no hay push
-  pendiente y, para hubs, el uplink se consumió;
+- `data_complete`: no quedan rutas nuevas de archivos de salvage en un host
+  con esa interfaz física, no hay push pendiente y se consumió el pool de rutas
+  de la interfaz uplink cuando existe;
 - `node_cleaned`: los tres anteriores son ciertos.
+
+El [criterio de capacidades físicas de información](information-capabilities.es.md)
+filtra recuperabilidad y finalización. Los archivos internos de waystation se
+conservan sin contar como oportunidades de salvage; su uplink es independiente.
+No cambian preparación, asignación de canales, probabilidades ni políticas del
+scheduler. La carga de esquema 3 recalcula indicadores obsoletos de hosts sin
+salvage.
 
 Montar un archivo no borra su entrada del pool. Se considera consumido porque
 la ruta destino ya existe en el filesystem. `uplink_data_consumed` sólo agota el
