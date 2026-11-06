@@ -71,6 +71,7 @@ def _make_state(*, start_t: float = 0.0):
     state.world.lore.counters["uplink_count"] = 0
     comms = state.ship.systems["comms"]
     comms.state = SystemState.NOMINAL
+    comms.health = .9
     comms.forced_offline = False
     comms.service.is_running = True
     return state

@@ -76,6 +76,8 @@ class ShipSystem:
     tags: set[str] = field(default_factory=set)
 
     def p_effective_kw(self) -> float:
+        if self.forced_offline:
+            return 0.0
         return self.p_nom_kw * power_multiplier(self.state)
 
 
@@ -83,7 +85,7 @@ def build_communications_system() -> ShipSystem:
     """Shared new-game and additive schema-3 default; never starts the receiver."""
     return ShipSystem(
         system_id="comms", name="Communications System", sector_id="BRG-01",
-        state=SystemState.OFFLINE, forced_offline=True, health=0.90,
+        state=SystemState.OFFLINE, forced_offline=True, health=0.72,
         p_nom_kw=0.15, priority=4, base_decay_per_s=8.5e-11,
         k_power=0.30, k_rad=0.10,
         dependencies=[Dependency("system_state_at_least", "energy_distribution", "nominal")],

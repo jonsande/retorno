@@ -21,9 +21,11 @@ def radio_block_reason(state, opportunity: RadioOpportunity | None = None) -> st
     comms = systems.get("comms")
     if comms is None:
         return "comms_missing"
+    if comms.health < Balance.SYSTEM_HEALTH_DAMAGED:
+        return "comms_damaged"
     if comms.forced_offline or comms.state == SystemState.OFFLINE:
         return "comms_offline"
-    if comms.state not in RECEIVING_STATES or comms.health < Balance.SYSTEM_HEALTH_DAMAGED:
+    if comms.state not in RECEIVING_STATES:
         return "comms_damaged"
     for dep in comms.dependencies:
         if dep.dep_type == "system_state_at_least":

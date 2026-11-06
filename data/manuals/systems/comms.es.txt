@@ -8,6 +8,8 @@ Función
 - Separa recepción pendiente, mensajes capturados y lectura/importación posterior.
 
 Dependencias operativas
+- Condición inicial del hardware: OFFLINE, salud 0.72, desconectado eléctricamente y sin consumo.
+- La salud inicial permite funcionar en LIMITED tras power on comms. Solo hace falta reparar antes de activarlo si la salud baja de 0.60.
 - Hardware en BRG-01; energy_distribution >= nominal y alimentación eléctrica efectiva.
 - power on comms, después boot radiod (Servicio de comunicaciones por radio; 5 segundos).
 - La radio pasiva no depende de sensors, sensord, data_core ni datad.

@@ -109,7 +109,7 @@ _PARSE_ERROR_MESSAGES = {
         "usage_power_on": "Usage: power on <system_id>",
         "usage_power_off": "Usage: power off <system_id>",
         "usage_shutdown": "Usage: shutdown <system_id>",
-        "usage_drone": "Usage: drone status [drone_id] | drone deploy <drone_id> <sector_id> | drone move <drone_id> <target_id> | drone survey <drone_id> [node_id] | drone recall [<drone_id>|all] | drone autorecall <drone_id> <on|off|amount_percent> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id> | drone uninstall <drone_id> <module_id>",
+        "usage_drone": "Usage: drone status [drone_id] | drone deploy <drone_id> [sector_id] | drone move <drone_id> <target_id> | drone survey <drone_id> [node_id] | drone recall [<drone_id>|all] | drone autorecall <drone_id> <on|off|amount_percent> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id> | drone uninstall <drone_id> <module_id>",
         "usage_drone_status": "Usage: drone status [drone_id]",
         "usage_drone_recall": "Usage: drone recall [<drone_id>|all]",
         "usage_drone_reboot": "Usage: drone reboot <drone_id>",
@@ -124,7 +124,7 @@ _PARSE_ERROR_MESSAGES = {
         "usage_drone_salvage_scrap": "Usage: drone salvage scrap <drone_id> <node_id> <amount>",
         "usage_drone_salvage_drone": "Usage: drone salvage drone(s) <drone_id> [node_id]",
         "usage_drone_salvage_data": "Usage: drone salvage data <drone_id> [node_id]",
-        "usage_drone_deploy": "Usage: drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>",
+        "usage_drone_deploy": "Usage: drone deploy <drone_id> [sector_id] | drone deploy! <drone_id> [sector_id]",
         "unknown_drone_subcommand": "Unknown drone subcommand. Use: drone status | drone deploy ... | drone move ... | drone survey ... | drone recall ... | drone autorecall ...",
         "usage_repair": "Usage: drone repair <drone_id> <target_id> | repair <system_id> --selftest",
         "module_install_migrated": "module install/install has been removed. Use: drone install <drone_id> <module_id>",
@@ -196,7 +196,7 @@ _PARSE_ERROR_MESSAGES = {
         "usage_power_on": "Uso: power on <system_id>",
         "usage_power_off": "Uso: power off <system_id>",
         "usage_shutdown": "Uso: shutdown <system_id>",
-        "usage_drone": "Uso: drone status [drone_id] | drone deploy <drone_id> <sector_id> | drone move <drone_id> <target_id> | drone survey <drone_id> [node_id] | drone recall [<drone_id>|all] | drone autorecall <drone_id> <on|off|porcentaje> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id> | drone uninstall <drone_id> <module_id>",
+        "usage_drone": "Uso: drone status [drone_id] | drone deploy <drone_id> [sector_id] | drone move <drone_id> <target_id> | drone survey <drone_id> [node_id] | drone recall [<drone_id>|all] | drone autorecall <drone_id> <on|off|porcentaje> | drone repair <drone_id> <target_id> | drone install <drone_id> <module_id> | drone uninstall <drone_id> <module_id>",
         "usage_drone_status": "Uso: drone status [drone_id]",
         "usage_drone_recall": "Uso: drone recall [<drone_id>|all]",
         "usage_drone_reboot": "Uso: drone reboot <drone_id>",
@@ -211,7 +211,7 @@ _PARSE_ERROR_MESSAGES = {
         "usage_drone_salvage_scrap": "Uso: drone salvage scrap <drone_id> <node_id> <amount>",
         "usage_drone_salvage_drone": "Uso: drone salvage drone(s) <drone_id> [node_id]",
         "usage_drone_salvage_data": "Uso: drone salvage data <drone_id> [node_id]",
-        "usage_drone_deploy": "Uso: drone deploy <drone_id> <sector_id> | drone deploy! <drone_id> <sector_id>",
+        "usage_drone_deploy": "Uso: drone deploy <drone_id> [sector_id] | drone deploy! <drone_id> [sector_id]",
         "unknown_drone_subcommand": "Subcomando drone desconocido. Usa: drone status | drone deploy ... | drone move ... | drone survey ... | drone recall ... | drone autorecall ...",
         "usage_repair": "Uso: drone repair <drone_id> <target_id> | repair <system_id> --selftest",
         "module_install_migrated": "module install/install fue eliminado. Usa: drone install <drone_id> <module_id>",
@@ -803,9 +803,9 @@ def parse_command(line: str):
             if rest and rest[0] == "--emergency":
                 emergency = True
                 rest = rest[1:]
-            if len(rest) != 2:
+            if len(rest) not in {1, 2}:
                 raise ParseError("usage_drone_deploy")
-            return DroneDeploy(drone_id=rest[0], sector_id=rest[1], emergency=emergency)
+            return DroneDeploy(drone_id=rest[0], sector_id=rest[1] if len(rest) == 2 else None, emergency=emergency)
         raise ParseError("unknown_drone_subcommand")
 
     if cmd == "repair":

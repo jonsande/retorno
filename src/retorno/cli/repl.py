@@ -436,8 +436,8 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
             "Drones",
             [
                 ("drone status [drone_id]", "show drone fleet or one drone status", "muestra estado de la flota o de un dron"),
-                ("drone deploy <drone_id> <sector_id>", "deploy drone to sector", "despliega dron a sector"),
-                ("drone deploy! <drone_id> <sector_id>", "emergency deploy override", "despliegue de emergencia"),
+                ("drone deploy <drone_id> [sector_id]", "deploy drone; default: ship drone bay", "despliega dron; destino por defecto: bahía de drones"),
+                ("drone deploy! <drone_id> [sector_id]", "emergency deploy override", "despliegue de emergencia"),
                 ("drone move <drone_id> <target_id>", "move drone to target", "mueve dron a objetivo"),
                 ("drone survey <drone_id> [node_id]", "survey salvage signatures at node", "inspecciona señales de salvage en nodo"),
                 ("drone autorecall <drone_id> on", "enable automatic recall", "activa autorretorno"),
@@ -1613,8 +1613,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                 status = e.data["service_status"]
                 labels = {"en": {"stopped": "stopped", "not_installed": "not installed", "blocked": "blocked"},
                           "es": {"stopped": "detenido", "not_installed": "no instalado", "blocked": "bloqueado"}}
-                print(f"[{origin_tag}] {name} ({e.data['service']}): {labels.get(locale, labels['en'])[status]}" +
-                      (f"; boot {e.data['service']}" if status == "stopped" else f"; diag {e.data['owner']}"))
+                suggestion = f"boot {e.data['service']}" if status == "stopped" else f"diag {e.data['owner']}"
+                hint = {"en": "Try", "es": "Prueba"}.get(locale, "Try")
+                print(f"[{origin_tag}] {name} ({e.data['service']}): {labels.get(locale, labels['en'])[status]} "
+                      f"({hint}: {suggestion})")
                 continue
             if e.data.get("message_key") == "radiation_level_changed":
                 level_labels = {

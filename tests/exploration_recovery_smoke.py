@@ -69,6 +69,7 @@ def _assert_diegetic_recovery_chain_is_consumable() -> None:
     state.world.exploration_recovery = ExplorationRecoveryState(generation=1, entry_node_id=entry_id, gateway_node_id=gateway_id)
     comms = state.ship.systems["comms"]
     comms.state = SystemState.NOMINAL
+    comms.health = .9
     comms.forced_offline = False
     comms.service.is_running = True
     path, event = write_local_intel(state, "captured_signal", f"NODE: {entry_id}\n", opportunity_id="existing-entry")

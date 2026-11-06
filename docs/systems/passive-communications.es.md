@@ -8,7 +8,10 @@ No implementa F-DEAD-01 ni comunicaciones interestelares generales.
 
 `comms` — **Sistema de comunicaciones / Communications System** — es un
 `ShipSystem` ordinario en `BRG-01`, una estancia existente. Empieza instalado,
-`OFFLINE`, `forced_offline=True`, salud 0.90. Necesita
+`OFFLINE`, `forced_offline=True`, salud 0.72 y sin consumo eléctrico.
+Al encenderlo queda LIMITED; no necesita reparación previa con esa salud inicial.
+Por debajo de salud 0.60 sí se exige reparar antes de `power on comms`; el daño
+físico permanece visible mientras está desconectado. Necesita
 `energy_distribution >= NOMINAL` alimentado. No depende de sensores ni datos.
 Se enciende, apaga, deteriora, repara y persiste con los mecanismos existentes.
 Encenderlo o repararlo no arranca su servicio automáticamente.
@@ -146,10 +149,14 @@ debajo de LIMITED, repararlo con el dron ordinario en BRG-01. `about comms` y
 `man boot` explican la operación. Al activar un sistema o recuperar su umbral
 útil, el motor recorre propietarios/dependencias reales y avisa una vez de
 servicios detenidos (`boot <id>`), no instalados o bloqueados (`diag <owner>`),
-con nombre EN/ES. No mantiene una lista paralela de asociaciones de daemons.
+con nombre EN/ES y sugerencia explícita, por ejemplo:
+`Servicio de sensores (sensord): detenido (Prueba: boot sensord)`.
+No mantiene una lista paralela de asociaciones de daemons.
 
-CLI y Textual comparten renderers, mensajes y diagnóstico; el adaptador de status
-añade las mismas líneas sin panel nuevo. Se conservan tipos de evento y audio.
+CLI y Textual comparten renderers, mensajes y diagnóstico. El output del comando
+`status` incluye el diagnóstico de radio y sus pendientes; el panel de sistemas
+de Textual muestra exclusivamente los sistemas y su estado, sin esas líneas
+adicionales. Se conservan tipos de evento y audio.
 
 Código: [communications.py](../../src/retorno/core/communications.py),
 [lore.py](../../src/retorno/core/lore.py), [engine.py](../../src/retorno/core/engine.py),

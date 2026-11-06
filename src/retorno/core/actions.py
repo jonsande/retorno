@@ -35,7 +35,7 @@ class PowerPlan(Action):
 @dataclass(slots=True)
 class DroneDeploy(Action):
     drone_id: str
-    sector_id: str
+    sector_id: str | None = None
     emergency: bool = False
 
 

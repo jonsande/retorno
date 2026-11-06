@@ -8,7 +8,10 @@ This does not implement F-DEAD-01 or general interstellar communications.
 
 `comms` — **Communications System / Sistema de comunicaciones** — is an ordinary
 `ShipSystem` in existing room `BRG-01`. It starts installed, OFFLINE,
-`forced_offline=True`, health 0.90. It needs powered
+`forced_offline=True`, health 0.72 and no electrical load. Powering on gives
+LIMITED operation without prior repair at that initial health. Below health
+0.60, repair is required before `power on comms`; physical damage remains visible
+while disconnected. It needs powered
 `energy_distribution >= NOMINAL`, independently of sensors and data systems.
 Existing mechanisms control power, deterioration, repair and persistence.
 Powering or repairing it does not automatically start its service.
@@ -145,10 +148,14 @@ repair comms with an ordinary drone in BRG-01. `about comms` and `man boot`
 explain operation. Activating hardware or restoring its useful threshold causes
 the engine to inspect actual service ownership/dependencies and notify once of
 stopped (`boot <id>`), uninstalled or blocked (`diag <owner>`) services, with
-EN/ES names. There is no parallel daemon ownership list.
+EN/ES names and explicit suggestions, for example:
+`Sensor Service (sensord): stopped (Try: boot sensord)`.
+There is no parallel daemon ownership list.
 
-CLI and Textual share renderers, messages and diagnostics; the status adapter
-adds identical lines without a new panel. Existing event types/audio are retained.
+CLI and Textual share renderers, messages and diagnostics. Command `status`
+output includes radio diagnostics and pending counts; the Textual systems panel
+shows only systems and their state, without those extra lines. Existing event
+types/audio are retained.
 
 Code: [communications.py](../../src/retorno/core/communications.py),
 [lore.py](../../src/retorno/core/lore.py), [engine.py](../../src/retorno/core/engine.py),

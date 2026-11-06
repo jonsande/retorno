@@ -1764,6 +1764,8 @@ class Engine:
                 return []
             if system.service:
                 system.service.is_running = False
+            if system.forced_offline:
+                return []
             if system.state != SystemState.OFFLINE:
                 old_state = system.state
                 system.state = SystemState.OFFLINE
@@ -1785,7 +1787,9 @@ class Engine:
             system = state.ship.systems.get(action.system_id)
             if not system:
                 return []
-            if system.health <= Balance.SYSTEM_HEALTH_MIN_ON:
+            if (system.health <= Balance.SYSTEM_HEALTH_MIN_ON or (
+                system.system_id == "comms" and system.health < Balance.SYSTEM_HEALTH_DAMAGED
+            )):
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
@@ -1906,11 +1910,11 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            requested_target_id = str(action.sector_id)
+            requested_target_id = str(action.sector_id if action.sector_id is not None else self._drone_bay_sector_id(state))
             canonical_target_id = canonical_ship_sector_id(requested_target_id)
             target_kind = "ship_sector"
             target_id = canonical_target_id
-            if requested_target_id in state.world.space.nodes:
+            if action.sector_id is not None and requested_target_id in state.world.space.nodes:
                 if state.ship.docked_node_id != requested_target_id:
                     event = self._make_event(
                         state,
@@ -5017,7 +5021,7 @@ class Engine:
         for system in systems_sorted:
             if p_load <= p_capacity:
                 break
-            if system.state == SystemState.OFFLINE or system.priority == 1:
+            if system.forced_offline or system.state == SystemState.OFFLINE or system.priority == 1:
                 continue
             prev_load = system.p_effective_kw()
             old_state = system.state
@@ -6475,7 +6479,7 @@ class Engine:
             reverse=True,
         )
         for system in systems_sorted:
-            if system.state == SystemState.OFFLINE:
+            if system.forced_offline or system.state == SystemState.OFFLINE:
                 continue
             if not self._is_noncritical_system(system):
                 continue
@@ -6511,7 +6515,7 @@ class Engine:
             reverse=True,
         )
         for system in systems_sorted:
-            if system.state == SystemState.OFFLINE:
+            if system.forced_offline or system.state == SystemState.OFFLINE:
                 continue
             if not self._is_noncritical_system(system):
                 continue
@@ -6797,6 +6801,11 @@ class Engine:
             if system.service:
                 system.service.is_running = False
             system.state = SystemState.OFFLINE
+            # Preserve visible radio hardware damage while electrically isolated.
+            # Repair restores recoverability; power on remains a separate action.
+            if system.system_id == "comms" and 0 < system.health < Balance.SYSTEM_HEALTH_DAMAGED:
+                system.state = (SystemState.DAMAGED if system.health >= Balance.SYSTEM_HEALTH_CRITICAL
+                                else SystemState.CRITICAL)
             return
         if system.state_locked:
             return

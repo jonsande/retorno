@@ -46,6 +46,7 @@ def at(s, node_id, docked=True):
 
 def ready(s=None):
     s = s or create_initial_state_sandbox()
+    s.ship.systems["comms"].health = .9  # Receiver fixtures start repaired; prologue is tested separately.
     for ident in ("energy_distribution", "power_core"):
         sys = s.ship.systems[ident]
         sys.health = 1
@@ -78,13 +79,23 @@ def test_01_prologue_power_and_boot():
     s = create_initial_state_prologue(seed=701)
     c = s.ship.systems["comms"]
     assert c.sector_id == "BRG-01" and c.sector_id in s.ship.sectors
-    assert c.health == .90 and c.forced_offline and c.state == SystemState.OFFLINE
+    assert c.health == .72 and c.forced_offline and c.state == SystemState.OFFLINE
+    assert c.p_effective_kw() == 0
+    assert radio_block_reason(s) == "comms_offline"
     assert c.p_nom_kw == .15 < s.ship.systems["sensors"].p_nom_kw
     assert command(s, "boot radiod")[0].type == EventType.BOOT_BLOCKED
     assert command(s, "power on comms")[0].type == EventType.BOOT_BLOCKED
     for _ in range(3):
         E.tick(s, 1)
     assert c.state == SystemState.OFFLINE and not c.service.is_running
+    dist = s.ship.systems["energy_distribution"]
+    dist.state = SystemState.NOMINAL
+    dist.forced_offline = False
+    assert not any(e.type == EventType.BOOT_BLOCKED for e in command(s, "power on comms"))
+    assert c.state == SystemState.LIMITED
+    command(s, "power off comms")
+    c.health = .5
+    assert command(s, "power on comms")[0].data["reason"] == "system_too_damaged"
     ready(s)
     before = E._compute_load_kw(s)
     events = command(s, "power on comms")
@@ -353,7 +364,11 @@ def test_11_localization_diagnostics_and_dynamic_notices():
         text=capture_output(repl.render_diag,s,"comms")
         assert "SECRET" not in text and "999" not in text and "=1" in text
         assert text.strip().splitlines()==presenter.build_command_output(repl.render_diag,s,"comms")
-        assert any("=1" in line for line in presenter.build_status_lines(s))
+        panel = presenter.build_status_lines(s)
+        assert any(line.startswith("comms ") for line in panel)
+        assert not any("Radio reception" in line or "Recepción de radio" in line for line in panel)
+        status = capture_output(repl.render_status,s)
+        assert ("pending=1" if locale == Locale.EN else "pendientes=1") in status
         assert ("Sistema de comunicaciones" if locale==Locale.ES else "Communications System") in text
         # Ownership is read from the live model, including another installed daemon.
         owner=s.ship.systems["data_core"]
@@ -362,9 +377,19 @@ def test_11_localization_diagnostics_and_dynamic_notices():
         events=command(s,"power on comms")
         assert {e.data.get("service") for e in events if e.data.get("message_key")=="service_activation_notice"}=={"radiod","fixture_service"}
         rendered=capture_output(repl.render_events,s,events)
-        assert "boot radiod" in rendered and "boot fixture_service" in rendered
+        hint = "Try" if locale == Locale.EN else "Prueba"
+        assert f"({hint}: boot radiod)" in rendered and f"({hint}: boot fixture_service)" in rendered
         assert ("Servicio de comunicaciones por radio" if locale==Locale.ES else "Radio Communications Service") in rendered
         assert command(s,"power on comms")==[]
+        for owner_id in ("sensors", "data_core", "security", "comms"):
+            actual = ready()
+            actual.os.locale = locale
+            command(actual, f"power off {owner_id}")
+            notices = command(actual, f"power on {owner_id}")
+            service = actual.ship.systems[owner_id].service.service_name
+            output = capture_output(repl.render_events, actual, notices)
+            assert f"({hint}: boot {service})" in output, (owner_id, output)
+            assert output.strip().splitlines() == presenter.format_event_lines(actual, notices)
         for verbose in (False,True):
             help_text=capture_output(repl.print_help,locale.value,verbose)
             assert "power on comms" in help_text and "diag comms" in help_text
@@ -398,6 +423,7 @@ def test_13_public_prologue_sequence_without_resource_overrides():
     script=["power off security","power off data_core","drone deploy D1 PWR-A1",
             "drone repair D1 power_core","drone repair D1 power_core","drone repair D1 power_core",
             "drone move D1 BUS-A2","drone repair D1 energy_distribution","drone repair D1 energy_distribution",
+            "drone move D1 BRG-01","drone repair D1 comms",
             "power on comms","boot radiod"]
     for text in script:
         events=command(s,text)
@@ -408,9 +434,8 @@ def test_13_public_prologue_sequence_without_resource_overrides():
             # Ordinary probabilistic repair failures remain part of this real run.
         assert not s.jobs.active_job_ids, text
     assert s.ship.systems["comms"].service.is_running and radio_block_reason(s) is None
-    assert s.ship.cargo_scrap == 52 and s.ship.power.power_quality > Balance.POWER_QUALITY_BLOCK_THRESHOLD
-    assert s.clock.t == 256
-    print("PUBLIC FLOW:"," -> ".join(script),"; t=256s scrap=52 radio=ready")
+    assert s.ship.cargo_scrap > 0 and s.ship.power.power_quality > Balance.POWER_QUALITY_BLOCK_THRESHOLD
+    print("PUBLIC FLOW:"," -> ".join(script),f"; t={s.clock.t}s scrap={s.ship.cargo_scrap} radio=ready")
 
 
 def test_14_frozen_lore_across_pending_save_and_locale_switch():

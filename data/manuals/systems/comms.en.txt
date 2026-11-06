@@ -8,6 +8,8 @@ Function
 - Separates pending reception, captured messages and subsequent reading/import.
 
 Operational dependencies
+- Initial hardware condition: OFFLINE, health 0.72, electrically disconnected with no load.
+- Initial health supports LIMITED operation after power on comms. Repair is needed before activation only if health falls below 0.60.
 - Hardware in BRG-01; energy_distribution >= nominal and effective electrical supply.
 - Power on comms, then boot radiod (Radio Communications Service; 5 seconds).
 - No sensors, sensord, data_core or datad dependency for passive radio.

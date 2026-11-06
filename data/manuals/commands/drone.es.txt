@@ -1,6 +1,6 @@
 drone status [drone_id]
-drone deploy <drone_id> <sector_id|node_id>
-drone deploy! <drone_id> <sector_id|node_id>
+drone deploy <drone_id> [sector_id|node_id]
+drone deploy! <drone_id> [sector_id|node_id]
 drone move <drone_id> <target_id>
 drone survey <drone_id> [node_id]
 drone autorecall <drone_id> <on|off|porcentaje>
@@ -29,6 +29,8 @@ Requisitos (gating)
   - si `scope=drone`, requisitos: `docked` en `DRN-BAY`, `drone_bay=NOMINAL`, `energy_distribution!=OFFLINE`.
 
 Comportamiento operativo
+- Sin destino, drone deploy <drone_id> despliega en la bahía de drones de la nave (normalmente DRN-BAY); el sector se determina por la ubicación actual de la bahía.
+- Se conservan los destinos explícitos y los requisitos de despliegue normal/de emergencia.
 - Los modulos de dron no mutan de forma destructiva los stats base.
 - El perfil efectivo se deriva de chasis base + modulos instalados.
 - El perfil efectivo modifica ETA de `move`, `deploy/deploy!`, `survey` y `repair` activo.
