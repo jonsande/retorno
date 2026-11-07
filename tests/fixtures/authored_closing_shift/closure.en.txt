@@ -1,0 +1,6 @@
+CIERRE — CLOSURE REGISTER, ARCHIVED COPY
+The last shift crossed out the heating schedule, one empty compartment at a time. Nobody signed for a replacement shift. The clerk left the column blank instead of writing zero.
+The closing record says that the tug Estiba was withdrawn from service with the uncollected stores aboard. Its later condition and the whereabouts of the people are not recorded here.
+The final task was to copy this register to Margen. The relay was set to repeat an archive, not to answer callers.
+Historical transfer route; relay sector: {{sector}}.
+LINK: CLOSING_STATION -> {{relay}}

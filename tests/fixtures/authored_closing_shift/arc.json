@@ -1,0 +1,57 @@
+{
+  "arc_id": "experimental_closing_shift",
+  "world_requirements": {
+    "version": "narrative-world-v1",
+    "entities": [
+      {"id": "CLOSING_STATION", "name": "Cierre", "kind": "station", "position": {"fixed_ly": [0.002, 0.002, 0]}},
+      {"id": "CLOSING_RELAY", "name": "Margen", "kind": "relay", "position": {"offset_from": "CLOSING_STATION", "offset_box_ly": [[0.002, 0.002], [0, 0], [0, 0]]}},
+      {"id": "CLOSING_WRECK", "name": "Estiba", "kind": "ship", "position": {"offset_from": "CLOSING_RELAY", "offset_box_ly": [[0.002, 0.003], [0, 0], [0, 0]]}}
+    ],
+    "references": ["ECHO_7"],
+    "relations": [
+      {"type": "near", "from": "ECHO_7", "to": "CLOSING_STATION", "min_ly": 0.0027, "max_ly": 0.003},
+      {"type": "physical_link", "from": "CLOSING_STATION", "to": "CLOSING_RELAY", "from_kind": "station", "to_kind": "relay"},
+      {"type": "near", "from": "CLOSING_RELAY", "to": "CLOSING_WRECK", "min_ly": 0.002, "max_ly": 0.0031},
+      {"type": "historical_association", "from": "CLOSING_STATION", "to": "CLOSING_WRECK", "to_kind": "ship"}
+    ]
+  },
+  "primary_intel": {
+    "id": "primary", "kind": "link", "line": "LINK: ECHO_7 -> CLOSING_STATION",
+    "force": true, "force_policy": "hard", "allowed_channels": ["uplink_only"]
+  },
+  "secondary_lore_docs": [
+    {
+      "id": "closure", "force": true, "force_policy": "hard", "allowed_channels": ["salvage_data"],
+      "constraints": {"min_dist_ly": 0.0027, "max_dist_ly": 0.003},
+      "path_template": "/logs/records/closing_shift.{lang}.txt",
+      "content_ref_en": "lore/experimental_closing_shift/closure.en.txt",
+      "content_ref_es": "lore/experimental_closing_shift/closure.es.txt",
+      "spatial_bindings": {"version": "narrative-world-v1", "values": {
+        "relay": {"entity": "CLOSING_RELAY", "field": "id"},
+        "sector": {"entity": "CLOSING_RELAY", "field": "sector"}
+      }}
+    },
+    {
+      "id": "repetition", "force": true, "force_policy": "hard", "allowed_channels": ["captured_signal"],
+      "radio_emission": "closing-archive-loop",
+      "content_ref_en": "lore/experimental_closing_shift/repetition.en.txt",
+      "content_ref_es": "lore/experimental_closing_shift/repetition.es.txt",
+      "spatial_bindings": {"version": "narrative-world-v1", "values": {
+        "wreck": {"entity": "CLOSING_WRECK", "field": "id"},
+        "sector": {"entity": "CLOSING_WRECK", "field": "sector"},
+        "coord": {"entity": "CLOSING_WRECK", "field": "coord"}
+      }}
+    }
+  ],
+  "placement_rules": {
+    "primary": {"candidates": ["ECHO_7"]},
+    "secondary": {"count": 2, "candidates": ["CLOSING_STATION", "CLOSING_RELAY"]}
+  },
+  "radio_emitters": {"version": "radio-emitters-v1", "emitters": [
+    {"id": "closing-station-silent", "host": "CLOSING_STATION", "category": "station", "emissions": []},
+    {"id": "closing-wreck-silent", "host": "CLOSING_WRECK", "category": "emergency", "emissions": []},
+    {"id": "closing-relay-archive", "host": "CLOSING_RELAY", "category": "interstellar_relay", "emissions": [
+      {"id": "closing-archive-loop", "mode": "continuous", "start_t": -31536000, "piece_key": "arc:experimental_closing_shift:repetition"}
+    ]}
+  ]}
+}

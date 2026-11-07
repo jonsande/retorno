@@ -1,0 +1,9 @@
+{
+  "single_id": "experimental_left_inventory",
+  "world_requirements": {"version": "narrative-world-v1", "references": ["CLOSING_WRECK"]},
+  "weight": 1, "force": true, "force_policy": "hard", "channels": ["salvage_data"],
+  "constraints": {"min_dist_ly": 0.0063, "max_dist_ly": 0.0074},
+  "path_template": "/logs/records/left_inventory.{lang}.txt",
+  "content_ref_en": "lore/experimental_closing_shift/inventory.en.txt",
+  "content_ref_es": "lore/experimental_closing_shift/inventory.es.txt"
+}

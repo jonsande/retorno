@@ -1,0 +1,7 @@
+MARGEN — AUTOMATIC REPETITION OF THE CLOSURE ARCHIVE
+This is a stored message. Its repetition is not a report of present occupancy.
+The receipt predates the archive loop: register copied; heating schedule cancelled; return address removed. The operator had written “leave the lamps packed, someone may collect them” and then struck out “someone”. The lamps remained on the inventory.
+Estiba's last recorded berth follows. The record ends with a place for a collection signature. It is empty. It gives no later destination for the staff.
+Archived berth: {{sector}}, {{coord}}.
+NODE: {{wreck}}
+LINK: CLOSING_RELAY -> {{wreck}}

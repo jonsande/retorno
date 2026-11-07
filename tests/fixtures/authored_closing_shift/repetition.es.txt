@@ -1,0 +1,7 @@
+MARGEN — REPETICIÓN AUTOMÁTICA DEL ARCHIVO DE CLAUSURA
+Este es un mensaje almacenado. Su repetición no informa de ocupación presente.
+El acuse es anterior al bucle del archivo: registro copiado; horario de calefacción cancelado; dirección de retorno retirada. Quien operaba había escrito «dejad las lámparas embaladas, alguien puede recogerlas» y después tachó «alguien». Las lámparas siguieron en el inventario.
+A continuación figura el último atraque registrado de Estiba. El registro termina con un espacio para firmar la recogida. Está vacío. No indica ningún destino posterior del personal.
+Atraque archivado: {{sector}}, {{coord}}.
+NODE: {{wreck}}
+LINK: CLOSING_RELAY -> {{wreck}}

@@ -1,0 +1,6 @@
+CIERRE — REGISTRO DE CLAUSURA, COPIA ARCHIVADA
+El último turno tachó el horario de calefacción, compartimento vacío a compartimento vacío. Nadie firmó por un turno de relevo. La persona encargada dejó la columna en blanco en vez de escribir cero.
+El registro de clausura dice que el remolcador Estiba fue retirado del servicio con los suministros sin recoger a bordo. Aquí no constan su estado posterior ni el paradero de las personas.
+La última tarea fue copiar este registro a Margen. El relé quedó programado para repetir un archivo, no para responder a llamadas.
+Ruta histórica de transferencia; sector del relé: {{sector}}.
+LINK: CLOSING_STATION -> {{relay}}
