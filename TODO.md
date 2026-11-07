@@ -1,7 +1,29 @@
 ========================
-=== TODO AND PROMPTS ===
+=== NEW TODO ===
 ========================
 
+- [] Existen textos procedurales que no contienen rutas. La función build_procedural_salvage_mail_content() genera informes de telemetría con información sobre el lugar: tipo de instalación, región, integridad de la caché, señales de deterioro y referencias a su entorno. Estos textos no son arcos ni singles. Son documentos generales producidos a partir de las características de la localización. No constituyen todavía un sistema narrativo procedural especialmente rico, pero sí proporcionan contenido ambiental básico. Debemos desarrollar un sistema narrativo procedural más rico.
+
+- [] El sistema de descubrimiento tiene oportunidades finitas. Un uplink puede agotarse. Un nodo puede no tener enlaces útiles. Un scan puede no encontrar contactos nuevos. Y F-DEAD-01 tampoco garantiza una salida universal. Por tanto, no podemos concluir simplemente por la existencia de estos sistemas que todas las semillas permitan una exploración prolongada y satisfactoria. Necesitamos alguna manera de comprobar cómo de probable es una bloqueo exploratorio, y desarrollar las contramedidas necesarias para evitarlo o minimizarlo en lo posible (existe documentación en el repositorio explicando en detalle qué es un bloqueo exploratorio y qué está pendiente de investigar en este sentido).
+
+- [] Para **calcular una ruta nueva**, los requisitos actuales son:
+
+| Sistema o servicio | Requisito |
+|---|---|
+| `core_os` | **NOMINAL o UPGRADED**. En LIMITED ya bloquea `route solve`. |
+| `sensors` | **LIMITED o superior**, encendido. |
+| `sensord` | Instalado y **en ejecución**. |
+| `energy_distribution` | **NOMINAL o superior**, por la dependencia de `sensors`/`sensord`. |
+| Alimentación | **Q ≥ 0.55**, sin `brownout` ni estado crítico de potencia. |
+
+No exige `data_core`/`datad` ni `comms`/`radiod`. Tampoco exige un estado concreto de `power_core`: debe proporcionar alimentación suficiente para cumplir las condiciones anteriores. Durante el cálculo deben mantenerse **`sensors ≥ LIMITED` y `sensord` en ejecución**; si dejan de cumplirlo, el trabajo falla. Me gustaría que, para calcular una nueva ruta ("route solve"), además de los requisitos actuales, se requiera tener data_core LIMITED o superior y encendido, así como "datad" instalado y en ejecución.
+
+- [] Desde los últimos cambios la hibernación ahora tarda mucho en ejecutarse. Pasa lo mismo con la orden wait del modo debug: si haces wait 5 no se nota, pero wait 300 tarda unos 15s en ejecutarse, y wait 3000 tarda demasiado (no sé cuánto porque no he tenido paciencia y he matado el proceso del juego, pensando que podría haberse bloqueado el programa). Un viaje de 15.23ly hibernando tarda 1 minuto y 21 segundos aproximadamente en ejecutarse. Me parece excesivo. Antes de los últimos cambios esto no sucedía. El salto era prácticamente inmediato. ¿A qué se debe? Si no fuera posible reducir el tiempo de espera, haría falta indicárselo al jugador de alguna manera, pues de otro modo parece simplemente que el juego se ha quedado bloqueado.
+
+
+===================================================================
+=== TAREAS ANTIGUAS (¡REVISAR!). ALGUNAS PUEDEN ESTAR OBSOLETAS ===
+===================================================================
 
 === PROLOGUE ===
 
