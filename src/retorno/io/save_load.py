@@ -174,6 +174,8 @@ def _load_from_file(path: Path) -> GameState:
 
     if not isinstance(loaded, GameState):
         raise SaveLoadError(f"Save file {path} does not contain a GameState")
+    # Debug protection belongs to the live session, never to a loaded game.
+    loaded.os.debug_god_enabled = False
     if int(getattr(loaded.meta, "save_version", 0)) != 3:
         raise SaveLoadError(
             _universe_error(loaded)

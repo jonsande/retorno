@@ -487,6 +487,7 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
             "Debug",
             "Debug",
             [
+                ("debug god on|off|status", "damage and drone exhaustion protection (debug only)", "protección contra daños y agotamiento de drones (solo debug)"),
                 ("debug on|off|status", "toggle debug mode", "activa o desactiva modo debug"),
                 ("wait <seconds>", "advance simulation time manually (DEBUG mode only)", "avanza el tiempo de simulación manualmente (solo en modo DEBUG)"),
                 ("debug radio", "inspect internal radio ledger (debug mode)", "inspecciona el ledger interno de radio (modo debug)"),
@@ -2686,6 +2687,20 @@ def _development_query_allowed(state, command: str) -> bool:
     return False
 
 
+def handle_debug_god(state, mode: str) -> None:
+    if mode == "on":
+        if not _development_query_allowed(state, "debug god on"):
+            return
+        state.os.debug_god_enabled = True
+    elif mode == "off":
+        state.os.debug_god_enabled = False
+    message = {
+        "en": "God mode: " + ("ON" if state.os.god_active else "OFF"),
+        "es": "Modo dios: " + ("ACTIVADO" if state.os.god_active else "DESACTIVADO"),
+    }
+    print(message.get(state.os.locale.value, message["en"]))
+
+
 def render_debug_radio(state) -> None:
     """Read the existing ledger; never retry, generate or import anything."""
     if not _development_query_allowed(state, "debug radio"):
@@ -4027,6 +4042,7 @@ def _terminal_state_allows(parsed) -> bool:
             "ALERTS_EXPLAIN",
             "JOBS",
             "DEBUG",
+            "DEBUG_GOD",
             "DEBUG_ARCS",
             "DEBUG_LORE",
             "DEBUG_DEADNODES",
@@ -7162,9 +7178,11 @@ def main() -> None:
                     if len(tokens) == 2:
                         candidates = [
                             c
-                            for c in ["on", "off", "status", "scenario", "seed", "deadnodes", "arcs", "lore", "radio", "recovery", "modules", "galaxy", "add"]
+                            for c in ["on", "off", "status", "god", "scenario", "seed", "deadnodes", "arcs", "lore", "radio", "recovery", "modules", "galaxy", "add"]
                             if c.startswith(text)
                         ]
+                    elif len(tokens) == 3 and tokens[1] == "god":
+                        candidates = [c for c in ["on", "off", "status"] if c.startswith(text)]
                     elif len(tokens) == 3 and tokens[1] == "scenario":
                         candidates = [c for c in ["prologue", "sandbox", "fast_sandbox", "dev"] if c.startswith(text)]
                     elif len(tokens) == 3 and tokens[1] == "add":
@@ -7629,6 +7647,10 @@ def main() -> None:
             with loop.with_lock() as locked_state:
                 _handle_intel_import(locked_state, parsed[1])
             continue
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_GOD":
+            with loop.with_lock() as locked_state:
+                handle_debug_god(locked_state, parsed[1])
+            continue
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG":
             mode = parsed[1]
             if mode == "status":
@@ -7637,13 +7659,13 @@ def main() -> None:
                 continue
             if mode == "on":
                 with loop.with_lock() as locked_state:
-                    locked_state.os.debug_enabled = True
+                    locked_state.os.set_debug(True)
                 loop.set_auto_tick(False)
                 print("DEBUG mode enabled")
                 continue
             if mode == "off":
                 with loop.with_lock() as locked_state:
-                    locked_state.os.debug_enabled = False
+                    locked_state.os.set_debug(False)
                 loop.set_auto_tick(True)
                 loop.start()
                 print("DEBUG mode disabled")

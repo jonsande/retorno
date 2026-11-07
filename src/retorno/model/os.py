@@ -61,6 +61,7 @@ class OSState:
     help_verbose: bool = True
     theme_preset: str = "linux"
     debug_enabled: bool = False
+    debug_god_enabled: bool = False
     fs: dict[str, FSNode] = field(default_factory=dict)
     mail_received_t: dict[str, float] = field(default_factory=dict)
     mail_received_seq: int = 0
@@ -68,6 +69,16 @@ class OSState:
     audio: AudioSettings = field(default_factory=AudioSettings)
     terminal_lock: bool = False
     terminal_reason: str | None = None
+
+    @property
+    def god_active(self) -> bool:
+        return self.debug_enabled and self.debug_god_enabled
+
+    def set_debug(self, enabled: bool) -> None:
+        # A new debug session always starts without protection.
+        if not enabled or not self.debug_enabled:
+            self.debug_god_enabled = False
+        self.debug_enabled = enabled
 
     def __setstate__(self, state) -> None:
         """Backward-compatible unpickle for slot additions."""

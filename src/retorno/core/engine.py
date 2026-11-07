@@ -3660,13 +3660,17 @@ class Engine:
 
         return None
 
+    def _drain_drone_battery(self, state: GameState, drone, amount: float) -> None:
+        if not state.os.god_active:
+            drone.battery = max(0.0, drone.battery - amount)
+
     def _drain_repair_operator_battery(self, state: GameState, job: Job) -> None:
         drone_id = str(job.params.get("drone_id", "") or "")
         if not drone_id:
             return
         drone = state.ship.drones.get(drone_id)
         if drone:
-            drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_REPAIR)
+            self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_REPAIR)
 
     def _effective_repair_amount(self, current: float, maximum: float, nominal_amount: float) -> float:
         missing = max(0.0, float(maximum) - float(current))
@@ -4185,7 +4189,7 @@ class Engine:
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
                 drone.status = DroneStatus.DEPLOYED
-                drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_DEPLOY)
+                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_DEPLOY)
                 if job.target.kind == "world_node":
                     drone.location = DroneLocation(kind="world_node", id=job.target.id)
                 else:
@@ -4217,7 +4221,7 @@ class Engine:
                     drone.location = DroneLocation(kind="world_node", id=job.target.id)
                 else:
                     drone.location = DroneLocation(kind="ship_sector", id=job.target.id)
-                drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_MOVE)
+                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_MOVE)
                 events.append(
                     self._make_job_outcome_event(
                         state,
@@ -4246,8 +4250,8 @@ class Engine:
                 if rng.random() < p_success:
                     drone.status = DroneStatus.DOCKED
                     drone.location = DroneLocation(kind="ship_sector", id=self._drone_bay_sector_id(state))
-                    drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_RECALL)
-                    drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_REBOOT)
+                    self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_RECALL)
+                    self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_REBOOT)
                     events.append(
                         self._make_job_outcome_event(
                             state,
@@ -4395,7 +4399,7 @@ class Engine:
             drone_id = job.params.get("drone_id")
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
-                drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_SALVAGE)
+                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_SALVAGE)
             events.append(
                 self._make_event(
                     state,
@@ -4501,7 +4505,7 @@ class Engine:
             drone_id = job.params.get("drone_id")
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
-                drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_SALVAGE)
+                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_SALVAGE)
             recompute_node_completion(state, node_id)
             return events
 
@@ -4522,7 +4526,7 @@ class Engine:
             drone_id = job.params.get("drone_id")
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
-                drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_SALVAGE)
+                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_SALVAGE)
             lore_ctx = self._build_lore_context(state, node_id)
             lore_result = maybe_deliver_lore(state, "salvage_data", lore_ctx, count_trigger=False)
             if count > 0 or lore_result.files or lore_result.events:
@@ -4577,7 +4581,7 @@ class Engine:
             drone_id = job.params.get("drone_id")
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
-                drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_SALVAGE)
+                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_SALVAGE)
             events.append(
                 self._make_job_outcome_event(
                     state,
@@ -4634,7 +4638,7 @@ class Engine:
             drone_id = job.params.get("drone_id")
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
-                drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_SALVAGE)
+                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_SALVAGE)
             events.append(
                 self._make_job_outcome_event(
                     state,
@@ -4770,7 +4774,7 @@ class Engine:
             drone_id = job.params.get("drone_id")
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
-                drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_REPAIR)
+                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_REPAIR)
             effects: dict = {}
             if module_id and module_id in state.ship.cargo_modules:
                 modules = load_modules()
@@ -4815,7 +4819,7 @@ class Engine:
             drone_id = str(job.params.get("drone_id", "") or "")
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
-                drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_DRAIN_REPAIR)
+                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_REPAIR)
             if module_id and module_id in list(state.ship.installed_modules or []):
                 prev_installed = list(state.ship.installed_modules or [])
                 state.ship.installed_modules.remove(module_id)
@@ -5074,6 +5078,8 @@ class Engine:
         brownout_sustained: bool,
         internal_rad: float,
     ) -> list[Event]:
+        if state.os.god_active:
+            return []
         internal_rad_norm = self._clamp(internal_rad / Balance.R_REF)
         events: list[Event] = []
         wear_mult = 1.0
@@ -5094,6 +5100,8 @@ class Engine:
         return events
 
     def _apply_radiation(self, state: GameState, dt: float, env_rad: float) -> None:
+        if state.os.god_active:
+            return
         for drone in state.ship.drones.values():
             if drone.status == DroneStatus.DOCKED:
                 continue
@@ -5102,8 +5110,8 @@ class Engine:
     def _update_drone_maintenance(self, state: GameState, dt: float) -> None:
         for drone in state.ship.drones.values():
             if drone.status == DroneStatus.DEPLOYED:
-                drone.battery = max(0.0, drone.battery - Balance.DRONE_BATTERY_IDLE_DRAIN_DEPLOYED_PER_S * dt)
-            if drone.status != DroneStatus.DOCKED:
+                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_IDLE_DRAIN_DEPLOYED_PER_S * dt)
+            if drone.status != DroneStatus.DOCKED and not state.os.god_active:
                 decay_mult = self._drone_rad_decay_mult(drone.dose_rad)
                 drone.integrity = max(
                     0.0,
@@ -5133,7 +5141,8 @@ class Engine:
                     state.ship.cargo_scrap = max(0, state.ship.cargo_scrap - repair_scrap_cost)
                     state.ship.manifest_dirty = True
                     if repair_fail_p > 0.0 and self._rng(state).random() < repair_fail_p:
-                        drone.integrity = max(0.0, drone.integrity - repair_fail_hit)
+                        if not state.os.god_active:
+                            drone.integrity = max(0.0, drone.integrity - repair_fail_hit)
                         continue
                     repair_gain = Balance.DRONE_REPAIR_INTEGRITY_PER_SCRAP * repair_rate_mult
                     drone.integrity = min(profile.integrity_max_effective, drone.integrity + repair_gain)
@@ -6164,6 +6173,8 @@ class Engine:
         rng = self._rng(state)
         if rng.random() >= Balance.DRONE_BAY_DAMAGED_INTEGRITY_RISK_P:
             return []
+        if state.os.god_active:
+            return []
         old_integrity = drone.integrity
         drone.integrity = max(0.0, drone.integrity - Balance.DRONE_BAY_DAMAGED_INTEGRITY_HIT)
         return [
@@ -6313,7 +6324,7 @@ class Engine:
         self._damage_hull(state, amount)
 
     def _damage_hull(self, state: GameState, amount: float) -> None:
-        if amount <= 0.0:
+        if amount <= 0.0 or state.os.god_active:
             return
         state.ship.hull_integrity = self._clamp(state.ship.hull_integrity - amount)
 
@@ -6867,9 +6878,10 @@ class Engine:
         if job.owner_id:
             drone = state.ship.drones.get(job.owner_id)
             if drone:
+                source = SourceRef(kind="drone", id=drone.drone_id)
+            if drone and not state.os.god_active:
                 drone.status = DroneStatus.DISABLED
                 drone.integrity = max(0.0, drone.integrity - 0.25)
-                source = SourceRef(kind="drone", id=drone.drone_id)
                 damaged_event = self._make_event(
                     state,
                     EventType.DRONE_DAMAGED,

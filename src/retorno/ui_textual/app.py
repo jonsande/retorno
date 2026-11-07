@@ -942,6 +942,7 @@ class RetornoTextualApp(App):
                         "on",
                         "off",
                         "status",
+                        "god",
                         "scenario",
                         "seed",
                         "deadnodes",
@@ -955,6 +956,8 @@ class RetornoTextualApp(App):
                     ]
                     if c.startswith(text)
                 ]
+            if len(tokens) == 3 and tokens[1] == "god":
+                return [c for c in ["on", "off", "status"] if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "scenario":
                 return [c for c in ["prologue", "sandbox", "fast_sandbox", "dev"] if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "add":
@@ -2026,6 +2029,10 @@ class RetornoTextualApp(App):
                 if self._confirm_repair_auto_move_needed(state, parsed):
                     return
 
+        if isinstance(parsed, tuple) and parsed[0] == "DEBUG_GOD":
+            with self.loop.with_lock() as state:
+                self._log_lines(presenter.build_command_output(repl.handle_debug_god, state, parsed[1]))
+            return
         if isinstance(parsed, tuple) and parsed[0] == "DEBUG":
             mode = parsed[1]
             if mode == "status":
@@ -2034,13 +2041,13 @@ class RetornoTextualApp(App):
                 return
             if mode == "on":
                 with self.loop.with_lock() as state:
-                    state.os.debug_enabled = True
+                    state.os.set_debug(True)
                 self.loop.set_auto_tick(False)
                 self._log_line("DEBUG mode enabled")
                 return
             if mode == "off":
                 with self.loop.with_lock() as state:
-                    state.os.debug_enabled = False
+                    state.os.set_debug(False)
                 self.loop.set_auto_tick(True)
                 self.loop.start()
                 self._log_line("DEBUG mode disabled")

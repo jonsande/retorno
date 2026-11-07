@@ -1,4 +1,5 @@
 debug on|off|status
+debug god on|off|status
 debug scenario prologue|sandbox|fast_sandbox|dev
 debug seed <n>
 debug arcs
@@ -17,6 +18,11 @@ Purpose
 - Operator/developer control surface for deterministic testing and scenario resets.
 
 Operational behavior
+- `debug god on|off|status` controls session-only damage protection. Activation requires DEBUG; off and status work in either mode.
+- Protection blocks new hull/system wear, harmful drone radiation dose, drone integrity damage and operational battery drain. Existing damage, disabled drones and empty batteries are not restored.
+- `debug off`, a new debug session, scenario reset and loading a save leave god mode off. Repeating `debug on` within the same session preserves its state.
+- Ambient/internal radiation readings remain real. Ordinary bay maintenance and requested repairs still operate; resources, power limits, job failures, discovery and physical durations keep their normal rules.
+- `debug on` stops automatic time; `wait N` advances manually using the existing one-second steps. God mode does not change travel or job times.
 - `debug on|off` toggles debug mode and auto-tick control.
 - SANDBOX and FAST_SANDBOX are initially intended exclusively for debugging and design testing. FAST_SANDBOX recovers ECHO_7 completely and starts in orbit with fully repaired systems and drones in the bay.
 - `debug scenario ...` resets world state to preset.
