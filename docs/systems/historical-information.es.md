@@ -174,8 +174,9 @@ pruebas negativas de divulgación e input Textual EN/ES real. B0 permanece.
 La evidencia externa cubre las doce semillas auditadas, catálogos A/B/C,
 baseline y regresión final, recorridos desde prólogo, save/load y continuación.
 
-B2 no está implementada. Deberá resolver hardware original, conservación,
-energía disponible, capacidad de reparar/reactivar, payload histórico, inicio
-real de transmisión, retardo de luz y procedencia persistida de la intervención.
-Tener archivos no activa transmisores. No se incluyen emisiones retroactivas,
-reparación de estaciones, topología nueva, acciones/sensores nuevos ni audio.
+B2 se implementa por separado en [historical-radio-v1](historical-radio.es.md),
+reutilizando estos registros sin cambios para el contenido de emisiones. Hardware
+original, conservación, energía, programas y ondas son hechos separados. Tener
+archivos no activa transmisores. Reparación/reactivación excepcional y procedencia
+persistida de la intervención quedan como trabajo futuro; B2 no añade emisiones
+de rescate retrospectivas, reparación, topología, acciones/sensores nuevos ni audio.

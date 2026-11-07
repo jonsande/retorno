@@ -43,6 +43,8 @@ def _state():
     # Synthetic navigation pools carry legacy data, without historical claims.
     world.information_version = "legacy-information-v0"
     world.information_definition = None
+    world.radio_history_version = "legacy-radio-v0"
+    world.radio_definition = None
     world.space.nodes = {
         nid: SpaceNode(node_id=nid, name=nid, kind="derelict", region="disk", x_ly=x)
         for nid, x in (("A", 0.0), ("B", 10.0), ("LIMIT", 45.0), ("FAR", 80.0), ("TAIL", 81.0))

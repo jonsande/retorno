@@ -1,3 +1,5 @@
+> **B2 update.** [Historical radio](historical-radio.md) supplies certified procedural emissions through the same resolver, selector and ledger. Existing first-stage, open-ended continuous, coverage, payload and protection requirements remain. Later stages can reuse prior procedural receipts. Selection has an additional bounded radio-host budget; no transmitter repair is implemented.
+
 > **4D-3e5c-B1 — historical archive sources.** F-DEAD-01 can inspect a fixed [v1 procedural archive](historical-information.md) before pool preparation, with exact file/payload evidence and no materialization, injection or disclosure. Per-search information host queries have an explicit budget. Legacy source/plan provenance and the first declared radio-emission requirement remain unchanged.
 
 # Structural recovery F-DEAD-01 — 4D-3e5

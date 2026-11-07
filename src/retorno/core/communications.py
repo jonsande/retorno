@@ -240,11 +240,10 @@ def prepare_radio_opportunity(
         return existing
     emitter = emission = None
     if emission_id is not None:
-        snapshot = state.world.narrative_snapshot
-        emission = snapshot.get("radio_emissions", {}).get(emission_id)
+        from retorno.worldgen.historical_radio import resolve_emission
+        emitter, emission = resolve_emission(state, emission_id)
         if emission is None:
-            raise ValueError("Unknown declared radio emission")
-        emitter = snapshot["radio_emitters"][emission.emitter_id]
+            raise ValueError("Unknown certified radio emission")
         canonical_id = f"lore:{emission.piece_key}" if emission.piece_key else f"radio:{emission_id}"
         if opportunity_id != canonical_id:
             raise ValueError("Radio emission must use its canonical ledger identity")
@@ -275,10 +274,13 @@ def capture_radio_opportunity(state, opportunity: RadioOpportunity):
     content = opportunity.content_by_locale.get(locale)
     if content is None:
         content = opportunity.content_by_locale.get("en", next(iter(opportunity.content_by_locale.values()), ""))
+    # A captured archive does not certify the hidden host's coordinates or ID.
+    # The content may identify it legitimately; events/filenames must not do so.
+    procedural = opportunity.emission and opportunity.emission.emission_id.startswith("@HR1:")
     path, event = _write_local_intel(
         state, opportunity.channel, content,
-        node_id=opportunity.origin_node_id,
-        source=SourceRef(opportunity.source_kind, opportunity.source_id),
+        node_id="radio" if procedural else opportunity.origin_node_id,
+        source=SourceRef("ship_system", "comms") if procedural else SourceRef(opportunity.source_kind, opportunity.source_id),
         mail_from=opportunity.delivery.get("mail_from"),
         mail_subject=opportunity.delivery.get("mail_subject"),
     )
@@ -286,7 +288,11 @@ def capture_radio_opportunity(state, opportunity: RadioOpportunity):
     opportunity.path = path
     opportunity.received_locale = locale
     opportunity.received_t = float(state.clock.t)
-    event.data["opportunity_id"] = opportunity.opportunity_id
+    if opportunity.emitter:
+        opportunity.received_position_ly = tuple(state.world.current_pos_ly)
+        opportunity.received_sensitivity = receiver_sensitivity(state)
+    if not procedural:
+        event.data["opportunity_id"] = opportunity.opportunity_id
     commit_radio_delivery(state, opportunity)
     return event
 
@@ -308,11 +314,14 @@ def discover_radio_opportunities(state):
     interaction must authorize those first. Candidate budgets resume fairly.
     """
     snapshot = state.world.narrative_snapshot
-    if not snapshot.get("radio_emitters") or radio_block_reason(state):
+    if radio_block_reason(state):
         return
     from retorno.worldgen.radio import query_emitters
     from retorno.core.lore import _locked_primary_targets
-    candidates, cursor, _complete = query_emitters(state, cursor=state.world.radio_search_cursor)
+    # Reserve a share for each source so a full authored bucket cannot starve
+    # procedural listening (or vice versa). Both cursors resume within buckets.
+    budget = max(1, Balance.RADIO_CANDIDATES_PER_TICK // 2)
+    candidates, cursor, _complete = query_emitters(state, cursor=state.world.radio_search_cursor, limit=budget)
     state.world.radio_search_cursor = cursor
     locked = _locked_primary_targets(state)
     for ident in candidates:
@@ -327,14 +336,79 @@ def discover_radio_opportunities(state):
             prepare_radio_opportunity(state, f"radio:{eid}", emission.channel, emission.content_by_locale,
                 node_id=emitter.host_id, trigger="passive_listen", emission_id=eid,
                 delivery={"kind": "declared_radio"})
+    discover_historical_radio(state, locked, budget=budget)
+
+
+def discover_historical_radio(state, locked, *, budget):
+    from retorno.worldgen import historical_radio as history
+    from retorno.worldgen.generator import universe_definition
+    world = state.world
+    if world.radio_history_version != history.VERSION:
+        return
+    physical = universe_definition(state)
+    anchor, sectors = history.local_domain(world.current_pos_ly, world.radio_definition)
+    key = (world.radio_definition.rules_key, physical.scope, anchor)
+    search = world.procedural_radio_search
+    if search.get("cursor", {}).get("anchor") != key:
+        search = dict(cursor={}, histories={}, reception_offset=0)
+    if search.get("window_remaining") == 0:
+        # Overflow mode rotates only after every cached candidate was checked.
+        # Continue the physical cursor; after the final window, revisit the
+        # domain fairly for waves that were not yet available on an earlier lap.
+        cursor = search["cursor"]
+        if cursor["cell"] == len(sectors):
+            cursor = dict(anchor=key, cell=0, offset=0)
+        search = dict(cursor=cursor, histories={}, reception_offset=0,
+            window_start=dict(cursor), window_remaining=None)
+    room = Balance.HISTORICAL_RADIO_LOCAL_HOST_LIMIT-len(search["histories"])
+    if room > 0:
+        page = history.query_local(physical, world.radio_definition, world.information_definition,
+            world.current_pos_ly, cursor=search["cursor"], limit=min(budget, room),
+            sector_budget=Balance.HISTORICAL_RADIO_SECTORS_PER_TICK)
+        search["cursor"] = page.cursor
+        for record in page.histories:
+            search["histories"][record.emitter.host_id] = record
+    if len(search["histories"]) >= Balance.HISTORICAL_RADIO_LOCAL_HOST_LIMIT:
+        search.setdefault("window_start", dict(anchor=key, cell=0, offset=0))
+        if search.get("window_remaining") is None:
+            search["window_remaining"] = len(search["histories"])
+    elif ("window_start" in search and search["cursor"].get("cell") == len(sectors)
+            and search.get("window_remaining") is None):
+        search["window_remaining"] = len(search["histories"])
+    world.procedural_radio_search = search
+    records = sorted(search["histories"].items())
+    count = len(records)
+    start = search["reception_offset"] % count if count else 0
+    for i in range(min(budget, count)):
+        host, record = records[(start+i) % count]
+        emitter = record.emitter
+        # The cached position is manifest-certified. Cheap geometric rejection
+        # avoids repeatedly resolving hundreds of distant low-power archives;
+        # survivors still pass the common provenance/physics gates below.
+        if not radio_link_budget(emitter.power, receiver_sensitivity(state),
+                math.dist(record.host.position_ly, world.current_pos_ly))["decodable"]:
+            continue
+        for emission in record.emissions:
+            if host in locked or emission.navigation_link_to in locked:
+                continue
+            if (radio_spatial_block_reason(state, host, channel=emission.channel, emitter=emitter,
+                    sensitivity=receiver_sensitivity(state)) or radio_temporal_block_reason(state, emitter, emission)):
+                continue
+            prepare_radio_opportunity(state, f"radio:{emission.emission_id}", emission.channel,
+                emission.content_by_locale, node_id=host, trigger="passive_listen",
+                emission_id=emission.emission_id, delivery={"kind": "declared_radio"})
+    search["reception_offset"] = (start+min(budget, count)) % count if count else 0
+    if search.get("window_remaining") is not None:
+        search["window_remaining"] = max(0, search["window_remaining"]-min(budget, count))
 
 
 def validate_radio_state(state):
     """Fail closed on incompatible declarations or ledger, without rewriting saves."""
     from dataclasses import asdict
     from retorno.worldgen.radio import validate_radio_catalog
+    from retorno.worldgen.historical_radio import validate_state, resolve_emission
     validate_radio_catalog(state)
-    snapshot = state.world.narrative_snapshot
+    validate_state(state)
     for key, op in state.world.radio_opportunities.items():
         if (not isinstance(op, RadioOpportunity) or key != op.opportunity_id
                 or op.status not in {"pending", "received", "read_imported"}
@@ -351,8 +425,8 @@ def validate_radio_state(state):
             raise ValueError("Incomplete radio provenance / Procedencia de radio incompleta")
         RadioEmitter(**asdict(op.emitter))
         RadioEmission(**asdict(op.emission))
-        if (snapshot.get("radio_emitters", {}).get(op.emitter.emitter_id) != op.emitter
-                or snapshot.get("radio_emissions", {}).get(op.emission.emission_id) != op.emission
+        emitter, emission = resolve_emission(state, op.emission.emission_id)
+        if (emitter != op.emitter or emission != op.emission
                 or op.origin_node_id != op.emitter.host_id or op.emission.emitter_id != op.emitter.emitter_id
                 or op.channel != op.emission.channel):
             raise ValueError("Radio declaration mismatch / Declaración de radio incompatible")
@@ -360,6 +434,23 @@ def validate_radio_state(state):
         if key != canonical_id or (not op.emission.piece_key and op.content_by_locale != op.emission.content_by_locale):
             raise ValueError("Radio payload/identity mismatch / Contenido o identidad de radio incompatible")
         _source_site(state, op.emitter)
+        if op.emission.emission_id.startswith("@HR1:") and op.prepared_t > float(state.clock.t):
+            raise ValueError("Historical radio prepared in the future / Radio histórica preparada en el futuro")
+        if op.emission.emission_id.startswith("@HR1:") and op.status != "pending":
+            position, sensitivity = op.received_position_ly, op.received_sensitivity
+            if (not isinstance(position, tuple) or len(position) != 3
+                    or any(type(v) not in (int, float) or not math.isfinite(v) for v in position)
+                    or type(sensitivity) not in (float, int) or sensitivity not in Balance.RADIO_SENSITIVITY.values()
+                    or op.received_locale not in {"en", "es"}
+                    or not op.prepared_t <= op.received_t <= float(state.clock.t)
+                    or (op.read_t is not None and not op.received_t <= op.read_t <= float(state.clock.t))):
+                raise ValueError("Invalid historical radio receipt context / Contexto de recepción histórico no válido")
+            distance = math.dist(_source_site(state, op.emitter).position_ly, position)
+            delay = distance*Balance.YEAR_S
+            if (not radio_link_budget(op.emitter.power, sensitivity, distance)["decodable"]
+                    or op.received_t < op.emission.start_t+delay
+                    or (op.emission.end_t is not None and op.received_t >= op.emission.end_t+delay)):
+                raise ValueError("Historical radio capture outside arrival window / Captura histórica fuera de ventana")
 
 
 def mark_radio_read(state, path: str) -> None:

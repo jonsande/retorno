@@ -45,6 +45,8 @@ def _state(distance=100.0, y=25.0):
     # certified historical-information-v1 universe. Retain its legacy rules.
     world.information_version = "legacy-information-v0"
     world.information_definition = None
+    world.radio_history_version = "legacy-radio-v0"
+    world.radio_definition = None
     world.space.nodes = {"A": _node("A", 0, y), "D": _node("D", distance, y)}
     world.space.edges = {}
     world.current_node_id = state.ship.current_node_id = "A"

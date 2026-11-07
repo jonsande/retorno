@@ -1,3 +1,5 @@
+> **B2 update.** [Historical radio](historical-radio.md) adds deterministic procedural equipment and emission histories for new games, alongside the authored contract below. All five installation classes have original communications hardware; present capability and transmission are separate facts. The B2 contract supersedes the former absence of procedural sources.
+
 # Spatial and temporal radio — 4D-3e5b
 
 [Español](radio-spacetime.es.md). Implemented for external review. Authorities:
@@ -32,9 +34,9 @@ values and P outside 10^-8..10^4 fail.
 
 Sensitivities: LIMITED 0.25, NOMINAL 1, UPGRADED 2.25. OFFLINE, CRITICAL and
 DAMAGED cannot decode. These are configurable provisional values, not canon
-or calibrated technology. Valid explicit P adjusts the profile. Being a station,
-wreck or relay implies neither transmitter nor activity. Narrative needs do not
-repair installations.
+or calibrated technology. Valid explicit P adjusts the profile. B2 installations
+have original communications hardware; present capability and actual emissions
+require their separate historical model. Narrative needs do not repair installations.
 
 ## Time
 
@@ -132,8 +134,8 @@ New plans use `historical-recovery-v2`. Local compatibility preserves only alrea
 persisted v1 opportunities and authorized legacy narrative interactions. A v1 plan
 can consume its saved opportunity, but cannot now create unprepared radio stages.
 New plans cannot invoke that fallback. Missing sources leave a conditional result
-without attempts/cooldown. No procedural transmission catalogue is added to fill
-the gap; that possible dependency remains a design/editorial question for e5c.
+without attempts/cooldown. B2 adds pre-existing certified procedural histories
+through the same resolver; it never generates an emission to fill a recovery gap.
 
 A legitimately invalidated continuation persists inactive with its contract and
 progress checked; it does not require an opportunity that could never be prepared.

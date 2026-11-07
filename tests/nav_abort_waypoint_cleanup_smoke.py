@@ -34,6 +34,8 @@ def _state():
     # Hand-built navigation/abort archives deliberately use legacy semantics.
     world.information_version = "legacy-information-v0"
     world.information_definition = None
+    world.radio_history_version = "legacy-radio-v0"
+    world.radio_definition = None
     positions = {
         "A": (0.0, 0.0, 0.0), "B": (8.0, 4.0, 2.0),
         "C": (2.0, 1.1, 0.5), "D": (2.0, 5.0, 0.5),

@@ -1,3 +1,5 @@
+> **Actualización B2.** [Radio histórica](historical-radio.es.md) aporta emisiones procedurales certificadas al mismo resolver, selector y ledger. Se conservan primera etapa, repetición continua sin final, cobertura, payload y protección. Etapas posteriores reutilizan capturas procedurales previas. La selección añade un presupuesto acotado de hosts de radio; no se implementa reparación de transmisores.
+
 > **4D-3e5c-B1 — fuentes de archivo histórico.** F-DEAD-01 puede consultar un [archivo procedural v1](historical-information.es.md) fijo antes de preparar el pool, con evidencia exacta de archivo/payload, sin materializar, inyectar ni divulgar. Las consultas informativas por selección tienen presupuesto explícito de hosts. No cambia la procedencia legacy de fuentes/planes ni la exigencia de primera emisión radio declarada.
 
 # Recuperación estructural F-DEAD-01 — 4D-3e5

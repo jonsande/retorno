@@ -36,6 +36,8 @@ def _assert_authored_uplink_table_is_applied() -> None:
     # The certified v1 authored-table case lives in historical_information_smoke.
     state.world.information_version = "legacy-information-v0"
     state.world.information_definition = None
+    state.world.radio_history_version = "legacy-radio-v0"
+    state.world.radio_definition = None
     node_id = "AUTH_HUB_TEST"
     authored_candidates = {"AUTH_RELAY_A", "AUTH_STATION_B"}
     state.world.space.nodes[node_id] = SpaceNode(

@@ -171,8 +171,9 @@ negative public disclosure and actual EN/ES Textual input. B0 tests remain.
 External evidence covers the twelve audit seeds, A/B/C catalogues, baseline and
 final regression, command-driven prologue runs, save/load and continuation.
 
-B2 has no implementation here. It must separately establish original hardware,
-preservation state, available energy, repair/reactivation capability, historical
-payload, actual transmission start, light-travel delay and persisted intervention
-provenance. Archives do not activate transmitters. No retroactive emission,
-station repair, topology change, new action, sensor or audio change is included.
+B2 is implemented separately in [historical-radio-v1](historical-radio.md), reusing
+these unchanged records for procedural emission content. Original hardware,
+conservation, energy, programs and propagating waves are separate facts. Archives
+do not activate transmitters. Exceptional repair/reactivation and its persisted
+intervention provenance remain future work; B2 adds no retrospective rescue
+emission, station repair, topology, new action, sensor or audio change.

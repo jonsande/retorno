@@ -2692,6 +2692,12 @@ def render_debug_radio(state) -> None:
         except ValueError as exc:
             print(f"physical_error={exc}")
     print(f"radio_search_cursor={state.world.radio_search_cursor}")
+    search = state.world.procedural_radio_search
+    print(f"historical_radio_version={state.world.radio_history_version}")
+    print(f"historical_radio_cursor={search.get('cursor', {})}")
+    print(f"historical_radio_cached_hosts={len(search.get('histories', {}))}")
+    for host, history in sorted(search.get("histories", {}).items()):
+        print(f"historical_host={host} equipment_at_zero={history.equipment_at(0)} emissions={len(history.emissions)}")
 
 
 def render_debug_recovery(state) -> None:

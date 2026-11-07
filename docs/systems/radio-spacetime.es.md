@@ -1,3 +1,5 @@
+> **Actualización B2.** [Radio histórica](historical-radio.es.md) añade historias procedurales deterministas de equipo y emisiones a las partidas nuevas junto al contrato authored siguiente. Las cinco clases de instalación tienen hardware original de comunicaciones; capacidad presente y transmisión son hechos separados. El contrato B2 sustituye la ausencia anterior de fuentes procedurales.
+
 # Radio espacial y temporal — 4D-3e5b
 
 [English](radio-spacetime.md). Implementado para revisión externa. Autoridades:
@@ -32,8 +34,9 @@ Se rechazan booleanos, no finitos y P fuera de 10^-8..10^4.
 
 Sensibilidades: LIMITED 0,25; NOMINAL 1; UPGRADED 2,25. OFFLINE, CRITICAL y
 DAMAGED no decodifican. Son cifras configurables provisionales, no canon ni
-tecnología calibrada. P explícita válida ajusta el perfil. Ser estación, pecio
-o relé no implica emisor ni actividad. No se reparan instalaciones por narrativa.
+tecnología calibrada. P explícita válida ajusta el perfil. Las instalaciones B2
+tienen hardware original de comunicaciones; capacidad presente y emisiones reales
+requieren su modelo histórico separado. No se reparan instalaciones por narrativa.
 
 ## Tiempo
 
@@ -132,8 +135,8 @@ conserva oportunidades v1 ya persistidas e interacciones narrativas legacy
 autorizadas. Un plan v1 puede consumir su oportunidad guardada; no puede crear
 ahora etapas de radio no preparadas. Los nuevos planes no pueden invocar ese
 fallback. La falta de fuentes deja el resultado condicionado, sin intentos ni
-cooldown. No se añade un catálogo procedural de transmisiones para suplirla;
-esa posible dependencia sigue pendiente de diseño/editorial en e5c.
+cooldown. B2 aporta historias procedurales preexistentes y certificadas por el
+mismo resolver; nunca genera una emisión para suplir una carencia de recovery.
 
 Una continuación legítimamente invalidada persiste inactiva con contrato y
 progreso comprobados; no exige una oportunidad que nunca pudo prepararse.

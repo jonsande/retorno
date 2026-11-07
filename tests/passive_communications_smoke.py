@@ -46,6 +46,9 @@ def at(s, node_id, docked=True):
 
 def ready(s=None):
     s = s or create_initial_state_sandbox()
+    # Isolate the pre-B2 interaction-delivery matrix from unrelated broadcasts.
+    s.world.radio_history_version = "legacy-radio-v0"
+    s.world.radio_definition = None
     s.ship.systems["comms"].health = .9  # Receiver fixtures start repaired; prologue is tested separately.
     for ident in ("energy_distribution", "power_core"):
         sys = s.ship.systems[ident]

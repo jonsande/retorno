@@ -37,6 +37,8 @@ def _state():
     # Observation fixture injects a synthetic pending archive, not v1 history.
     s.world.information_version = "legacy-information-v0"
     s.world.information_definition = None
+    s.world.radio_history_version = "legacy-radio-v0"
+    s.world.radio_definition = None
     # A real unconsumed data frontier keeps the existing recovery system from
     # adding its exceptional guaranteed contact between controlled test sweeps.
     s.world.node_pools[ORIGIN_ID] = NodePoolState(

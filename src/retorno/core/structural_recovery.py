@@ -18,6 +18,7 @@ from retorno.core.deadnode_opportunities import AccessRoute
 from retorno.core import communications
 from retorno.model.world import SpaceGraph, SpaceNode, WorldState, information_capabilities, is_hop_within_cap, sector_id_for_pos
 from retorno.worldgen import manifest
+from retorno.worldgen.historical_radio import resolve_emission
 from retorno.worldgen.generator import universe_definition, _ensure_sector_cluster_generated, validate_universe_state
 
 LEGACY_VERSION = "historical-recovery-v1"
@@ -35,12 +36,14 @@ class RecoveryBudget:
     # A rolling certificate window, not a maximum distance from the ship.
     retained_sites: int = 1024
     information_hosts: int = 128
+    radio_hosts: int = 128
 
     def __post_init__(self):
         if not (0 <= self.sectors <= 64 and 0 < self.sites <= 4096
                 and 0 <= self.expansions <= 65536 and 0 <= self.edges <= 262144
                 and 0 < self.retained_sites <= self.sites
-                and type(self.information_hosts) is int and 0 <= self.information_hosts <= 512):
+                and type(self.information_hosts) is int and 0 <= self.information_hosts <= 512
+                and type(self.radio_hosts) is int and 0 <= self.radio_hosts <= 512):
             raise ValueError("Invalid recovery technical budget")
 
 
@@ -149,7 +152,8 @@ def snapshot_key(state):
                     nodes, w.known_nodes, w.known_contacts, w.known_intel, w.known_links,
                     w.visited_nodes, pools, protection(state), w.arc_placements,
                     w.narrative_snapshot, w.dead_nodes, sorted(state.os.fs),
-                    w.information_version, w.information_definition))
+                    w.information_version, w.information_definition,
+                    w.radio_history_version, w.radio_definition))
 
 
 def directed_access(state) -> dict[str, AccessRoute]:
@@ -220,39 +224,58 @@ def _shell_offset(index):
     return a-r+1, b-r+1, (-r if face == 0 else r)
 
 
-def _navigation_emissions(state):
+def _navigation_payload(state, emitter, emission):
+    if emission.emission_id.startswith("@HR1:"):
+        # The common resolver certifies the exact bilingual B1 payload.
+        return resolve_emission(state, emission.emission_id) == (emitter, emission)
+    return emission.content_by_locale == _hint(emitter.host_id, emission.navigation_link_to)
+
+
+def _navigation_emissions(state, sites=None, *, origins=(), host_budget=128):
     """Bounded installed activity, never inferred from installation kind."""
     snapshot = state.world.narrative_snapshot
     result = {}
     entries = sorted(snapshot.get("radio_emissions", {}).items())
-    for eid, emission in entries[:4096]:
-        emitter = snapshot.get("radio_emitters", {}).get(emission.emitter_id)
+    complete = len(entries) <= 4096
+    entries = [(snapshot["radio_emitters"].get(e.emitter_id), e) for _, e in entries[:4096]]
+    from retorno.worldgen import historical_radio as history
+    if sites and state.world.radio_history_version == history.VERSION:
+        physical = universe_definition(state)
+        session = manifest.new_session(physical)
+        hosts = sorted((nid for nid, site in sites.items() if site.kind in HUBS),
+            key=lambda nid: (nid not in origins, math.dist(sites[nid].position_ly, state.world.current_pos_ly), nid))
+        complete = complete and len(hosts) <= host_budget
+        for nid in hosts[:host_budget]:
+            record = history.query_host(physical, state.world.radio_definition,
+                state.world.information_definition, nid, session=session)
+            if record:
+                entries.extend((record.emitter, e) for e in record.emissions)
+    for emitter, emission in entries:
+        eid = emission.emission_id
         if (emitter is None or emission.channel != "station_broadcast" or emission.piece_key
                 or emission.mode != "continuous" or emission.end_t is not None
                 or not emission.navigation_link_to):
             continue
         source, dest = emitter.host_id, emission.navigation_link_to
-        if emission.content_by_locale != _hint(source, dest):
+        if not _navigation_payload(state, emitter, emission):
             continue
         op = state.world.radio_opportunities.get(f"radio:{eid}")
-        if op and (op.status != "pending" or op.delivery.get("kind") != "declared_radio"):
+        if op and op.delivery.get("kind") != "declared_radio":
             continue
         result.setdefault((source, dest), []).append(eid)
-    return result, len(entries) <= 4096
+    return result, complete
 
 
 def _first_reception(state, source, emission_id=None, *, receiver_node_id=None,
                      sensitivity=None, at_t=None, legacy=False):
     emitter = emission = None
     if emission_id:
-        snapshot = state.world.narrative_snapshot
-        emission = snapshot.get("radio_emissions", {}).get(emission_id)
+        emitter, emission = resolve_emission(state, emission_id)
         if (emission is None or emission.mode != "continuous" or emission.end_t is not None
                 or emission.channel != "station_broadcast" or emission.piece_key
                 or not emission.navigation_link_to):
             return "first_emission_unavailable"
-        emitter = snapshot["radio_emitters"][emission.emitter_id]
-        if emitter.host_id != source or emission.content_by_locale != _hint(source, emission.navigation_link_to):
+        if emitter.host_id != source or not _navigation_payload(state, emitter, emission):
             return "first_emission_unavailable"
     elif not legacy:
         return "first_emission_undeclared"
@@ -321,11 +344,11 @@ def _salvage_source(state, source, dest, site, *, eligible=True, expected=None,
 
 
 def _source(state, nid, site, dest, *, emissions=None, archive_cache=None, archive_limit=128):
-    emissions = _navigation_emissions(state)[0] if emissions is None else emissions
+    emissions = _navigation_emissions(state, {nid: site})[0] if emissions is None else emissions
     probe = _at_site(state, nid, site)
     for eid in emissions.get((nid, dest), ()):
         if _first_reception(probe, nid, eid) is None:
-            emission = state.world.narrative_snapshot["radio_emissions"][eid]
+            _, emission = resolve_emission(state, eid)
             return "radio", StageSource(eid, _digest(emission.content_by_locale))
     salvage = _salvage_source(state, nid, dest, site, archive_cache=archive_cache, archive_limit=archive_limit)
     return ("salvage", salvage) if salvage else None
@@ -426,11 +449,14 @@ def select_recovery(state, block="global", target_id=None, *, cursor=0, retained
         origins = sorted(nid for nid in access if nid in sites and sites[nid].kind in HUBS)
         if not origins:
             return result("conditional", "no_reachable_local_emitter")
-        emissions, radio_complete = _navigation_emissions(state)
+        emissions, radio_complete = _navigation_emissions(state, sites, origins=origins, host_budget=budget.radio_hosts)
         receiving_links = {}
         for (source, dest), ids in emissions.items():
             if source in origins:
                 for eid in ids:
+                    op = state.world.radio_opportunities.get(f"radio:{eid}")
+                    if op and op.status != "pending":
+                        continue  # First stages retain the existing unreceived-source rule.
                     if _first_reception(state, source, eid) is None:
                         receiving_links[(source,dest)] = eid
                         break
@@ -492,7 +518,7 @@ def select_recovery(state, block="global", target_id=None, *, cursor=0, retained
                                 archive_cache=archive_cache, archive_limit=budget.information_hosts))
                 if nid == origin and first_reception_eligible:
                     eid = receiving_links[(nid,dest)]
-                    emission = state.world.narrative_snapshot["radio_emissions"][eid]
+                    _, emission = resolve_emission(state, eid)
                     evidence = ("radio", StageSource(eid, _digest(emission.content_by_locale)))
                 if evidence is None or (nid == origin and evidence[0] != "radio"):
                     continue
@@ -535,21 +561,22 @@ def _radio_stage(state, plan, index):
     existing = state.world.radio_opportunities.get(ident)
     metadata = {"kind": "structural_recovery", "plan": plan.plan_id, "stage": index}
     declared = existing and existing.delivery == {"kind": "declared_radio"}
+    reference = plan.proposal.stage_sources[index] if plan.version == VERSION else None
+    expected_emitter, expected_emission = resolve_emission(state, reference.reference) if reference else (None, None)
+    expected_content = expected_emission.content_by_locale if expected_emission else _hint(path[index], path[index+1])
     if existing and (existing.origin_node_id != path[index]
                      or (existing.delivery != metadata and not declared)
                      or existing.channel != "station_broadcast"
-                     or existing.content_by_locale != _hint(path[index],path[index+1])):
+                     or existing.content_by_locale != expected_content):
         raise ValueError("Recovery stage ledger collision")
     if plan.version == LEGACY_VERSION:
         if existing is None or declared:
             raise ValueError("Legacy recovery cannot create an undeclared radio stage")
         return existing
-    reference = plan.proposal.stage_sources[index]
-    emission = state.world.narrative_snapshot.get("radio_emissions", {}).get(reference.reference)
+    emission = expected_emission
     if emission is None or _digest(emission.content_by_locale) != reference.payload_key:
         raise ValueError("Recovery emission payload changed")
-    if existing and (existing.emission != emission or existing.emitter !=
-                     state.world.narrative_snapshot["radio_emitters"][emission.emitter_id]):
+    if existing and (existing.emission != emission or existing.emitter != expected_emitter):
         raise ValueError("Recovery stage emission identity mismatch / Identidad de emisión de etapa incompatible")
     if existing and existing.status in {"received", "read_imported"}:
         existing.delivery = metadata
@@ -572,9 +599,9 @@ def _validate_physical(state, proposal):
     if not complete or len(path) < 2 or len(set(path)) != len(path) or len(proposal.mechanisms) != len(path)-1:
         raise ValueError("Invalid recovery chain")
     if proposal.first_emission_id:
-        emission = state.world.narrative_snapshot.get("radio_emissions", {}).get(proposal.first_emission_id)
+        emitter, emission = resolve_emission(state, proposal.first_emission_id)
         if (not emission or emission.navigation_link_to != path[1] or emission.channel != "station_broadcast"
-                or state.world.narrative_snapshot["radio_emitters"][emission.emitter_id].host_id != path[0]):
+                or emitter.host_id != path[0]):
             raise ValueError("Recovery first emission does not carry this navigation notice")
     session = manifest.new_session(d)
     for nid, site in zip(path, proposal.sites):
@@ -604,13 +631,13 @@ def _validate_stage_sources(state, proposal, path, *, at_t=None, archival=False)
                 or any(c not in "0123456789abcdef" for c in reference.payload_key)):
             raise ValueError("Recovery stage lacks stable source and payload evidence")
         if mechanism == "radio":
-            emission = state.world.narrative_snapshot.get("radio_emissions", {}).get(reference.reference) if isinstance(reference, StageSource) else None
+            emitter, emission = resolve_emission(state, reference.reference) if isinstance(reference, StageSource) else (None, None)
             if emission is not None and (emission.navigation_link_to != dest
                     or reference.payload_key != _digest(emission.content_by_locale)
                     or emission.channel != "station_broadcast" or emission.piece_key
                     or emission.mode != "continuous" or emission.end_t is not None
-                    or state.world.narrative_snapshot.get("radio_emitters", {}).get(emission.emitter_id) is None
-                    or state.world.narrative_snapshot["radio_emitters"][emission.emitter_id].host_id != source):
+                    or emitter is None or emitter.host_id != source
+                    or not _navigation_payload(state, emitter, emission)):
                 raise ValueError("Recovery declared stage emission identity mismatch / Identidad de emisión declarada incompatible")
             if not archival and (emission is None or _first_reception(
                     _at_site(state, source, proposal.sites[i]), source, reference.reference, at_t=at_t)):
@@ -639,9 +666,11 @@ def _validate_prepared_sources(state, plan, path, *, archival=False, unprepared=
             op = state.world.radio_opportunities.get(_radio_id(plan, i))
             if unprepared and i == plan.stage and op is None:
                 continue
+            _, expected_emission = resolve_emission(state, plan.proposal.stage_sources[i].reference) if plan.version == VERSION else (None, None)
+            expected_content = expected_emission.content_by_locale if expected_emission else _hint(path[i], path[i+1])
             if (op is None or op.origin_node_id != path[i] or op.channel != "station_broadcast"
                     or op.delivery != {"kind": "structural_recovery", "plan": plan.plan_id, "stage": i}
-                    or op.content_by_locale != _hint(path[i],path[i+1])):
+                    or op.content_by_locale != expected_content):
                 raise ValueError("Recovery stage ledger mismatch")
             if plan.version == VERSION and (op.emission is None
                     or op.emission.emission_id != plan.proposal.stage_sources[i].reference):

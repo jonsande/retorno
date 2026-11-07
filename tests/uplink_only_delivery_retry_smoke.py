@@ -72,6 +72,8 @@ def _prepared_state(line: str):
     # endpoints. Test the retained legacy mechanism explicitly.
     state.world.information_version = "legacy-information-v0"
     state.world.information_definition = None
+    state.world.radio_history_version = "legacy-radio-v0"
+    state.world.radio_definition = None
     state.clock.t = 123.0
     state.ship.docked_node_id = state.world.current_node_id
     sync_node_pools_for_known_nodes(state)

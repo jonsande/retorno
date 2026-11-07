@@ -207,6 +207,14 @@ class Balance:
     RADIO_MAX_TIME_OFFSET_S = 1.0e7 * YEAR_S
     RADIO_CANDIDATES_PER_TICK = 128
     RADIO_MAX_EMISSIONS_PER_EMITTER = 128
+    # Experimental B2 equipment probabilities, independent of original hardware.
+    # P(current capability) = P(serviceable) * P(powered).
+    HISTORICAL_RADIO_SERVICEABLE = {"station": .64, "relay": .8125, "waystation": 5/7, "ship": .25, "derelict": .20}
+    HISTORICAL_RADIO_DAMAGED = {"station": .20, "relay": .12, "waystation": .15, "ship": .40, "derelict": .30}
+    HISTORICAL_RADIO_POWERED = {"station": .625, "relay": .80, "waystation": .70, "ship": .40, "derelict": .25}
+    HISTORICAL_RADIO_PROFILE = "intermediate"
+    HISTORICAL_RADIO_SECTORS_PER_TICK = 4
+    HISTORICAL_RADIO_LOCAL_HOST_LIMIT = 4096
     SENSORS_DETECT_P_NEAR = 0.95
     SENSORS_DETECT_P_FAR = 0.30
     SENSORS_DETECT_P_NOMINAL = 1.00

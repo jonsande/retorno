@@ -1,3 +1,7 @@
+## 4D-3e5c-B2 — implemented for external review
+
+[historical-radio-v1](../systems/historical-radio.md) separates original hardware, conservation, energy, emission programs and propagating waves. It reuses the manifest, B1, radio physics and reception ledger; authored declarations override whole hosts. Local lazy discovery, persistence and certified F-DEAD-01 sources are implemented. Exceptional physical repair and prolonged e6 validation remain future work. Previous B2-pending statements below describe earlier phases.
+
 ## 4D-3e5c-B1 — implemented for external review
 
 New games use [historical-information-v1](../systems/historical-information.md),

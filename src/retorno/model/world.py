@@ -11,6 +11,7 @@ from retorno.model.systems import SystemState
 if TYPE_CHECKING:
     from retorno.worldgen.manifest import ManifestDefinition
     from retorno.worldgen.information import InformationDefinition
+    from retorno.worldgen.historical_radio import RadioDefinition
 
 
 def information_capabilities(kind: str) -> tuple[str, ...]:
@@ -163,6 +164,8 @@ class RadioOpportunity:
     received_locale: str | None = None
     emitter: RadioEmitter | None = None
     emission: RadioEmission | None = None
+    received_position_ly: tuple[float, float, float] | None = None
+    received_sensitivity: float | None = None
 
     def __setstate__(self, state) -> None:
         # Schema 3 opportunities without these fields retain local semantics.
@@ -290,6 +293,10 @@ class WorldState:
     # an uninitialized legacy pool must never silently acquire new rules.
     information_version: str = "legacy-information-v0"
     information_definition: InformationDefinition | None = None
+    # Pre-B2 saves retain authored radio only; no retroactive procedural waves.
+    radio_history_version: str = "legacy-radio-v0"
+    radio_definition: RadioDefinition | None = None
+    procedural_radio_search: dict = field(default_factory=dict)
 
     def __setstate__(self, state) -> None:
         """Backward-compatible unpickle for slot additions."""

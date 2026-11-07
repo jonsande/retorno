@@ -6,6 +6,8 @@ The Communications System receives passive radio traffic independently of the ex
 Function
 - Automatically captures physically available signals and station broadcasts into readable files.
 - Records captured messages for subsequent reading/import.
+- Historical installations were equipped with communications; retained hardware, power and automatic transmission programs may have failed independently.
+- Some recordings carry historical navigation notices; others contain only environmental or damaged data.
 
 Operational dependencies
 - Initial hardware condition: OFFLINE, health 0.72, electrically disconnected with no load.
@@ -33,6 +35,8 @@ Recovery pattern
 - Remain within physical coverage; lore triggered by docking still requires docking.
 - radiod listens continuously without repeated scan. Reception needs sufficient signal strength, which falls with distance, and a wave that has arrived.
 - Light takes one year to cross one light year. Old automatic transmissions may already be arriving; reception does not prove present activity or living senders.
+- A wave can arrive after its source has lost power or its transmitter has been destroyed. Receiving it does not require that source to remain active.
+- A recording may identify a route while leaving its present validity uncertain. An unidentified signal does not supply precise source coordinates.
 - Continuous transmissions can be captured later while available; a brief transmission missed with the radio off may be lost.
 - Knowing a route does not prove coverage. A station may have no active transmitter. Local documents triggered by docking still require their original interaction.
 - Read the received file with cat or mail read to apply valid intel.

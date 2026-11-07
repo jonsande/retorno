@@ -1,3 +1,7 @@
+## 4D-3e5c-B2 — implementada para revisión externa
+
+[historical-radio-v1](../systems/historical-radio.es.md) separa hardware original, conservación, energía, programación y ondas en propagación. Reutiliza manifiesto, B1, física y ledger de recepción; authored explícito prevalece para todo su host. Se implementan descubrimiento lazy local, persistencia y fuentes certificadas para F-DEAD-01. La reparación física excepcional y la validación e6 prolongada quedan pendientes. Las menciones inferiores a B2 pendiente describen fases anteriores.
+
 ## 4D-3e5c-B1 — implementada para revisión externa
 
 Las partidas nuevas usan [historical-information-v1](../systems/historical-information.es.md),

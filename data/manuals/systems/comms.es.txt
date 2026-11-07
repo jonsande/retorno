@@ -6,6 +6,8 @@ El Sistema de comunicaciones recibe tráfico de radio pasivo independientemente 
 Función
 - Captura automáticamente señales físicamente disponibles y emisiones de estación en archivos legibles.
 - Registra mensajes capturados para lectura/importación posterior.
+- Las instalaciones históricas se equiparon con comunicaciones; conservación, energía y programas de transmisión automática pueden haber fallado de forma independiente.
+- Algunas grabaciones contienen avisos históricos de navegación; otras solo aportan datos ambientales o deteriorados.
 
 Dependencias operativas
 - Condición inicial del hardware: OFFLINE, salud 0.72, desconectado eléctricamente y sin consumo.
@@ -33,6 +35,8 @@ Recuperación típica
 - Permanecer dentro de cobertura física; el lore disparado por acoplamiento sigue exigiendo dock.
 - radiod escucha continuamente sin repetir scan. Recibir exige suficiente intensidad, que decrece con la distancia, y una onda que ya haya llegado.
 - La luz tarda un año en recorrer un año luz. Transmisiones automáticas antiguas pueden estar llegando; recibir no prueba actividad presente ni remitentes vivos.
+- Una onda puede llegar después de que su fuente pierda energía o su transmisor sea destruido. Recibirla no exige que esa fuente siga activa.
+- Una grabación puede identificar una ruta dejando incierta su validez presente. Una señal sin identificar no proporciona coordenadas precisas de origen.
 - Las transmisiones continuas pueden capturarse después mientras estén disponibles; una transmisión breve que pase con la radio apagada puede perderse.
 - Conocer una ruta no prueba cobertura. Una estación puede carecer de transmisor activo. Los documentos locales disparados por dock conservan su interacción original.
 - Leer el archivo recibido con cat o mail read para aplicar intel válida.

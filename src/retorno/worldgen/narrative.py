@@ -479,6 +479,9 @@ def prepare_new_world(state):
     from retorno.worldgen.information import VERSION, define_information
     state.world.information_version = VERSION
     state.world.information_definition = define_information(snapshot)
+    from retorno.worldgen.historical_radio import VERSION as RADIO_VERSION, define_radio
+    state.world.radio_history_version = RADIO_VERSION
+    state.world.radio_definition = define_radio(snapshot, state.world.information_definition)
     # Preserve seed selection before materialization for catalogues without new
     # physical declarations. Requirement-bearing universes are pinned now.
     if snapshot["declarations"]:

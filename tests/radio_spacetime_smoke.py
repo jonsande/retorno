@@ -68,6 +68,10 @@ def emission(scene):
 
 def state(*, online=True):
     s = create_initial_state_sandbox()
+    # This matrix isolates authored signals. B2 coexistence is exercised by
+    # historical_radio_smoke; production/new-game defaults remain procedural.
+    s.world.radio_history_version = "legacy-radio-v0"
+    s.world.radio_definition = None
     # Controlled integration setup; the public journey below does not use this.
     for ident in ('power_core', 'energy_distribution', 'core_os', 'comms'):
         system = s.ship.systems[ident]
@@ -581,7 +585,8 @@ def test_31_unselected_optional_piece_does_not_appear_by_proximity():
         s=state();lore.run_lore_scheduler_tick(s)
         assert not s.world.lore_placements.piece_to_node
         for _ in range(3):E.tick(s,1)
-        assert not s.world.radio_opportunities and not s.world.lore.delivered
+        assert not any(op.emission and op.emission.piece_key for op in s.world.radio_opportunities.values())
+        assert not s.world.lore.delivered
 
 
 def test_32_selected_piece_still_waits_for_dock_uplink_or_salvage_trigger():
