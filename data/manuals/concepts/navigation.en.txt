@@ -30,6 +30,13 @@ Coordinates vs IDs
 - `sector`: S{sx}_{sy}_{sz} grid cell from x/y/z.
 - `node_id`: operational identifier used by `nav`, `dock`, `ship survey`.
 
+Public location IDs
+- Contacts, maps and acquired navigation records show a compact location ID such as P-1.2.0.1. It is a single token: copy it directly or use TAB.
+- Use that ID with nav, route solve, dock, ship survey, nav map path/graph and drone location targets. Existing named installation IDs and full archived IDs remain valid.
+- TAB offers targets appropriate to the command: known contacts, known routes or the current local installation. A shared prefix lists choices; it never selects a destination for you.
+- IDs persist across saves within this voyage. They do not establish a route, present activity or permission to access an unknown installation.
+- Read an acquired navigation record to register its references. The display abbreviates installation references; the retained archive and its integrity data are preserved.
+
 Operational notes
 - Knowing a contact is not the same as knowing a route to it.
 - `nav map *` depends on `core_os` only (not on `sensors` or `data_core`).

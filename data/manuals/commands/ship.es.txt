@@ -7,6 +7,8 @@ Propósito
 - Proporcionar snapshots operativos de nivel nave y flujos de survey.
 
 Comportamiento operativo
+- Los destinos de localización aceptan el ID público compacto de contactos/mapas; TAB ofrece destinos contextuales legítimos. Siguen siendo válidos los IDs completos archivados. Consulta: man navigation.
+
 - `ship status`: resumen compacto de salud/energía.
 - `ship systems`: tabla de subsistemas con estado/salud/servicio.
 - `ship sectors`: topología interna y ubicación.

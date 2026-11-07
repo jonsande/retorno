@@ -19,4 +19,6 @@ Bloqueos frecuentes
 - objetivo no conocido / nodo inexistente / acoplamiento no permitido
 
 Comandos relacionados
+- Los destinos de localización aceptan el ID público compacto de contactos/mapas; TAB ofrece destinos contextuales legítimos. Siguen siendo válidos los IDs completos archivados. Consulta: man navigation.
+
 - `undock`, `jobs`, `job cancel <job_id>`, `status`

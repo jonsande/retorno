@@ -806,7 +806,7 @@ class RetornoTextualApp(App):
         for sys in state.ship.systems.values():
             if sys.service and sys.service.is_installed:
                 services.append(sys.service.service_name)
-        fs_paths = list(state.os.fs.keys())
+        fs_paths = [repl.public_text(state, path) for path in state.os.fs]
         music_track_ids = [track.track_id for track in self._audio_manager.list_music_tracks()] if self._audio_manager is not None else []
 
         if not tokens:
@@ -1176,7 +1176,7 @@ class RetornoTextualApp(App):
         self._pending_confirm_action = action
         self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
         self._pending_confirm_locale = locale
-        self._log_line(self._pending_confirm_prompt)
+        self._log_line(repl.public_text(self.loop.state, self._pending_confirm_prompt))
         return True
 
     def _confirm_nav_needed(self, state, action) -> bool:
@@ -1208,7 +1208,7 @@ class RetornoTextualApp(App):
         self._pending_confirm_action = action
         self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
         self._pending_confirm_locale = locale
-        self._log_line(self._pending_confirm_prompt)
+        self._log_line(repl.public_text(self.loop.state, self._pending_confirm_prompt))
         return True
 
     def _confirm_repair_auto_move_needed(self, state, action: Repair) -> bool:
@@ -1218,7 +1218,7 @@ class RetornoTextualApp(App):
         self._pending_confirm_action = ("REPAIR_AUTO_MOVE", action)
         self._pending_confirm_prompt = prompt
         self._pending_confirm_locale = state.os.locale.value
-        self._log_line(self._pending_confirm_prompt)
+        self._log_line(repl.public_text(self.loop.state, self._pending_confirm_prompt))
         return True
 
     def _confirm_travel_abort_needed(self, state) -> bool:
@@ -1230,7 +1230,7 @@ class RetornoTextualApp(App):
         self._pending_confirm_action = "TRAVEL_ABORT"
         self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
         self._pending_confirm_locale = locale
-        self._log_line(self._pending_confirm_prompt)
+        self._log_line(repl.public_text(self.loop.state, self._pending_confirm_prompt))
         return True
 
     def _confirm_hibernate_non_cruise_needed(self, state) -> bool:
@@ -1242,7 +1242,7 @@ class RetornoTextualApp(App):
         self._pending_confirm_action = "HIBERNATE_NON_CRUISE"
         self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
         self._pending_confirm_locale = locale
-        self._log_line(self._pending_confirm_prompt)
+        self._log_line(repl.public_text(self.loop.state, self._pending_confirm_prompt))
         return True
 
     def _confirm_hibernate_drones_needed(self, state) -> bool:
@@ -1262,7 +1262,7 @@ class RetornoTextualApp(App):
         self._pending_confirm_action = "HIBERNATE_DRONES"
         self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
         self._pending_confirm_locale = locale
-        self._log_line(self._pending_confirm_prompt)
+        self._log_line(repl.public_text(self.loop.state, self._pending_confirm_prompt))
         return True
 
     def _confirm_hibernate_wake_needed(self, state) -> None:
@@ -1274,7 +1274,7 @@ class RetornoTextualApp(App):
         self._pending_confirm_action = "HIBERNATE_WAKE"
         self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
         self._pending_confirm_locale = locale
-        self._log_line(self._pending_confirm_prompt)
+        self._log_line(repl.public_text(self.loop.state, self._pending_confirm_prompt))
 
     def _confirm_hibernate_start_needed(self, state, parsed: Hibernate) -> bool:
         locale = state.os.locale.value
@@ -1291,7 +1291,7 @@ class RetornoTextualApp(App):
         self._pending_confirm_action = "HIBERNATE_START"
         self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
         self._pending_confirm_locale = locale
-        self._log_line(self._pending_confirm_prompt)
+        self._log_line(repl.public_text(self.loop.state, self._pending_confirm_prompt))
         return True
 
     def _continue_hibernate(self, parsed: Hibernate, wake_on_low_battery: bool) -> None:
@@ -1461,7 +1461,7 @@ class RetornoTextualApp(App):
                 self._pending_confirm_action = ("REPAIR_AUTO_MOVE_DEFERRED", deferred_prompt)
                 self._pending_confirm_prompt = prompt
                 self._pending_confirm_locale = state.os.locale.value
-                self._log_line(self._pending_confirm_prompt)
+                self._log_line(repl.public_text(self.loop.state, self._pending_confirm_prompt))
                 break
 
     def _startup_tips(self, locale: str) -> list[str]:
@@ -1585,7 +1585,7 @@ class RetornoTextualApp(App):
                     else:
                         resolved_action = confirm_payload
                     if resolved_action.__class__.__name__ == "Travel":
-                        self._log_line(f"> nav {getattr(resolved_action, 'node_id', '?')}", separate=True)
+                        self._log_line(repl.public_text(self.loop.state, f"> nav {getattr(resolved_action, 'node_id', '?')}"), separate=True)
                     else:
                         self._log_line(f"> {resolved_action.__class__.__name__.lower()}", separate=True)
                     ev = self.loop.apply_action(resolved_action)
@@ -1602,7 +1602,7 @@ class RetornoTextualApp(App):
                                             "en": f"(nav) confirmed: en route to {dest}",
                                             "es": f"(nav) confirmado: rumbo a {dest}",
                                         }
-                                        lines.append(msg.get(state.os.locale.value, msg["en"]))
+                                        lines.append(repl.public_text(state, msg.get(state.os.locale.value, msg["en"])))
                                         break
                         self._log_lines(lines)
                         if self._audio_manager is not None:
@@ -1652,6 +1652,8 @@ class RetornoTextualApp(App):
         self._log_line(f"> {text}", separate=True)
         try:
             parsed = parse_command(text)
+            with self.loop.with_lock() as state:
+                parsed = repl._resolve_parsed_locations(state, parsed)
         except ParseError as e:
             locale = self.loop.state.os.locale.value
             self._log_line(f"[ERROR] {format_parse_error(e, locale)}")
@@ -2228,7 +2230,7 @@ class RetornoTextualApp(App):
                                 "en": f"(nav) confirmed: en route to {dest}",
                                 "es": f"(nav) confirmado: rumbo a {dest}",
                             }
-                            lines.append(msg.get(state.os.locale.value, msg["en"]))
+                            lines.append(repl.public_text(state, msg.get(state.os.locale.value, msg["en"])))
                             break
             self._log_lines(lines)
             if self._audio_manager is not None:

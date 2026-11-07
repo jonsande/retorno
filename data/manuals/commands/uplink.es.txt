@@ -12,6 +12,8 @@ Requisitos (gating)
   - bloqueado en estado crítico de energía.
 
 Comportamiento operativo
+- Las referencias a instalaciones usan IDs públicos compactos, aceptados también por los comandos de navegación. Los archivos navegacionales conservan sus referencias originales y datos de integridad. Consulta: man navigation.
+
 - Las partidas nuevas consultan hasta tres registros navegacionales conservados y fijos de la instalación; una ruta ya conocida no recibe otro destino sustituto.
 - Una conexión histórica documentada y una solución navegacional calculada son distintas. Una ruta calculada no prueba tráfico histórico ni una red activa.
 - La primera lectura agota la tabla de rutas. Repetir uplink permite reintentar una entrega narrativa pendiente, sin reponer rutas ni logs.

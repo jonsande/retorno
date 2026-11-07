@@ -12,6 +12,8 @@ Requirements (gating)
   - blocked in critical power state.
 
 Operational behavior
+- Installation references use compact public IDs, also accepted by navigation commands. Retained navigation archives keep their original references and integrity data. See: man navigation.
+
 - New expeditions read up to three retained navigation records fixed by the installation; already known routes do not receive replacement destinations.
 - A documented historical connection and a calculated navigation solution are distinct. A calculated route does not prove historical traffic or an active network.
 - The first read exhausts the route table. Repeating uplink can retry a pending narrative delivery, without replenishing routes or logs.

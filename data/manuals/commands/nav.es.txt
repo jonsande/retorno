@@ -11,6 +11,8 @@ nav --no-cruise <node_id>
 nav abort
 
 Descripción
+- Los destinos de localización aceptan el ID público compacto de contactos/mapas; TAB ofrece destinos contextuales legítimos. Siguen siendo válidos los IDs completos archivados. Consulta: man navigation.
+
 - `nav map sectors`: lista sectores del mundo conocidos y coordenadas de sector.
 - `nav map galaxy [escala]`: muestra el mapa galáctico en la escala seleccionada (`sector=10ly`, `local=100ly`, `regional=10000ly`, `global=500000ly`) usando nodos conocidos + posición actual.
 - `nav map graph`: muestra el grafo global de nodos/rutas conocidas.

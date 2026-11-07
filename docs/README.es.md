@@ -89,3 +89,5 @@ Fase 4C-1 ya impide que `uplink_only` consuma un primary sin producir un efecto
 válido y conserva reintentos sin reabrir el pool de rutas. Las fases posteriores
 deberán mantener la matriz, la paridad EN/ES y la separación entre comportamiento
 implementado y propuestas.
+
+- [IDs públicos de localización](systems/public-location-ids.es.md): referencias operativas compactas, resolución y evidencia histórica original.

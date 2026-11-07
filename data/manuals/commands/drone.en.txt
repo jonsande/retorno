@@ -30,6 +30,8 @@ Requirements (gating)
   - if `scope=drone`, requirements: `docked` in `DRN-BAY`, `drone_bay=NOMINAL`, `energy_distribution!=OFFLINE`.
 
 Operational behavior
+- Location targets accept the compact public ID shown by contacts/maps; TAB offers legitimate contextual targets. Full archived IDs remain valid. See: man navigation.
+
 - In new expeditions, procedural archives retain fixed records. A recovered LINK may document a historical connection or supply data for a calculated route; its label distinguishes them.
 - Telemetry archives describe retained, possibly obsolete records. They do not verify current traffic, responsive contacts, working stations, or survivors.
 - The same retained mail may have English and Spanish copies. Recovering or rereading a copy does not create a new historical event.

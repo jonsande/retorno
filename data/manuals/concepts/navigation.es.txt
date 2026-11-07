@@ -30,6 +30,13 @@ Coordenadas vs IDs
 - `sector`: celda S{sx}_{sy}_{sz} derivada de x/y/z.
 - `node_id`: identificador operativo para `nav`, `dock`, `ship survey`.
 
+IDs públicos de localización
+- Contactos, mapas y registros navegacionales adquiridos muestran un ID compacto como P-1.2.0.1. Es un solo token: cópialo directamente o usa TAB.
+- Usa ese ID con nav, route solve, dock, ship survey, nav map path/graph y los destinos de localización del dron. Siguen siendo válidos los IDs de instalaciones con nombre y los IDs completos archivados.
+- TAB ofrece destinos adecuados al comando: contactos conocidos, rutas conocidas o la instalación local actual. Un prefijo compartido permite listar opciones; nunca selecciona un destino por ti.
+- Los IDs persisten al guardar esta travesía. No acreditan una ruta, actividad presente ni permiso para acceder a una instalación desconocida.
+- Lee un registro navegacional adquirido para registrar sus referencias. La vista abrevia las referencias a instalaciones; se conservan el archivo y sus datos de integridad.
+
 Notas operativas
 - Conocer un contacto no implica conocer ruta hacia él.
 - `nav map *` depende de `core_os` (no de `sensors` ni `data_core`).

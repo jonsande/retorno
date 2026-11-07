@@ -35,4 +35,6 @@ Notas
 - Puedes resolver un nodo físico cuyo id exacto esté disponible incluso antes de descubrirlo por scan; un nodo inexistente no es válido.
 
 Comandos relacionados
+- Los destinos de localización aceptan el ID público compacto de contactos/mapas; TAB ofrece destinos contextuales legítimos. Siguen siendo válidos los IDs completos archivados. Consulta: man navigation.
+
 - `nav map routes`, `nav map path <node_id>`, `nav <node_id>`, `scan`

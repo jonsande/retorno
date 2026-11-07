@@ -11,6 +11,8 @@ Formas alias aceptadas
 - `nav contacts sector` -> `nav map contacts sector`
 
 Comportamiento operativo
+- Las referencias a instalaciones usan IDs públicos compactos, aceptados también por los comandos de navegación. Los archivos navegacionales conservan sus referencias originales y datos de integridad. Consulta: man navigation.
+
 - Lista contactos conocidos relativos al contexto de navegación actual.
 - Muestra `sector` y `region` para cada contacto y ordena la salida por cercanía de sector.
 - `nav map contacts sector` agrupa por sector y muestra entre paréntesis los contactos conocidos de cada uno.

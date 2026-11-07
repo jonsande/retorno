@@ -88,3 +88,5 @@ Phase 4C-1 now prevents `uplink_only` from consuming a primary without a valid
 effect and preserves retries without reopening the route pool. Later phases
 must keep the matrix and EN/ES parity current while separating implemented
 behavior from proposals.
+
+- [Public location IDs](systems/public-location-ids.md): compact operational references, resolution and original historical evidence.

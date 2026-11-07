@@ -7,6 +7,8 @@ Purpose
 - Provide ship-level operational snapshots and survey workflows.
 
 Operational behavior
+- Location targets accept the compact public ID shown by contacts/maps; TAB offers legitimate contextual targets. Full archived IDs remain valid. See: man navigation.
+
 - `ship status`: condensed ship health/power overview.
 - `ship systems`: subsystem table with state/health/service context.
 - `ship sectors`: internal topology and placement.

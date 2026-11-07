@@ -95,6 +95,10 @@ from retorno.worldgen.generator import (
     sync_sector_state_for_node,
 )
 from retorno.util.timefmt import format_elapsed_long, format_elapsed_short
+from retorno.cli.location_ids import (
+    public_node_id, public_text, public_output, print_public as print,
+    resolve_public_id, resolve_public_path,
+)
 
 
 @dataclass
@@ -500,6 +504,10 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
             else:
                 lines.append(f"  {command}")
         lines.append("")
+    lines.append({
+        "en": "Locations: use the public ID shown by contacts/maps (e.g. P-1.2.0.1). TAB offers known targets; full internal IDs remain accepted.",
+        "es": "Localizaciones: usa el ID público de contactos/mapas (p. ej. P-1.2.0.1). TAB ofrece destinos conocidos; también se aceptan IDs internos completos.",
+    }.get(lang, "Locations: TAB offers known public IDs."))
     print("\n".join(lines).rstrip())
 
 
@@ -742,6 +750,7 @@ def _public_unknown_contact_message(state, event) -> str | None:
     return messages.get(state.os.locale.value, messages["en"])
 
 
+@public_output
 def render_events(state, events, origin_override: str | None = None) -> None:
     if not events:
         return
@@ -1970,6 +1979,7 @@ def _radiation_level_label(locale: str, level: str) -> str:
     return labels.get(locale, labels["en"]).get(level, level)
 
 
+@public_output
 def render_status(state) -> None:
     ship = state.ship
     p = ship.power
@@ -2155,6 +2165,7 @@ def render_status(state) -> None:
         print(line)
 
 
+@public_output
 def render_auth_status(state) -> None:
     ordered = ["GUEST", "MED", "ENG", "OPS", "SEC", "ROOT"]
     levels = [lvl for lvl in ordered if lvl in state.os.auth_levels]
@@ -2166,6 +2177,7 @@ def render_auth_status(state) -> None:
         print(f"- {lvl}")
 
 
+@public_output
 def render_power_status(state) -> None:
     ship = state.ship
     p = ship.power
@@ -2182,6 +2194,7 @@ def render_power_status(state) -> None:
     print(f"hull: {ship.hull_integrity:.2f}")
 
 
+@public_output
 def render_diag(state, system_id: str) -> None:
     sys = state.ship.systems.get(system_id)
     if not sys:
@@ -2232,6 +2245,7 @@ def render_diag(state, system_id: str) -> None:
             print("notes: no drone charging available.")
 
 
+@public_output
 def render_alerts(state) -> None:
     print("\n=== ALERTS (active) ===")
     active = [a for a in state.events.alerts.values() if a.is_active]
@@ -2251,6 +2265,7 @@ def render_alerts(state) -> None:
         print(f"- {a.severity.value.upper():8s} {a.alert_key:24s} unacked={_format_eta_short(a.unacked_s, locale)}")
 
 
+@public_output
 def render_logs(state, limit: int = 15) -> None:
     print("\n=== EVENTS (recent) ===")
     for e in state.events.recent[-limit:]:
@@ -2261,6 +2276,7 @@ def render_logs(state, limit: int = 15) -> None:
         print(f"- [{t_label}] [{e.severity.value.upper()}] {e.type.value}: {message}")
 
 
+@public_output
 def render_jobs(state, limit: int | None = 5) -> None:
     print("\n=== JOBS ===")
     jobs_state = state.jobs
@@ -2327,6 +2343,7 @@ def render_jobs(state, limit: int | None = 5) -> None:
             print(_format_job(job))
 
 
+@public_output
 def render_drone_status(state, drone_id: str | None = None) -> None:
     print("\n=== DRONES ===")
     locale = state.os.locale.value
@@ -2418,6 +2435,7 @@ def _set_drone_autorecall(state, drone_id: str, enabled: bool | None = None, thr
         print(msg.get(locale, msg["en"]))
 
 
+@public_output
 def render_inventory(state) -> None:
     print("\n=== INVENTORY ===")
     disp_scrap, disp_modules, dirty = _inventory_view(state.ship)
@@ -2490,6 +2508,7 @@ def _module_counts(module_ids: list[str]) -> dict[str, int]:
     return counts
 
 
+@public_output
 def render_modules_installed(state) -> None:
     print("\n=== MODULES ===")
     locale = state.os.locale.value
@@ -2570,6 +2589,7 @@ def render_modules_installed(state) -> None:
         print(note.get(locale, note["en"]))
 
 
+@public_output
 def render_module_inspect(state, module_id: str) -> None:
     modules = load_modules()
     info = modules.get(module_id)
@@ -2628,6 +2648,7 @@ def render_module_inspect(state, module_id: str) -> None:
         print(none.get(locale, none["en"]))
 
 
+@public_output
 def render_modules_catalog(state) -> None:
     print("\n=== MODULES CATALOG ===")
     modules = load_modules()
@@ -3794,6 +3815,7 @@ def _render_contact_sectors_table(state) -> None:
         )
 
 
+@public_output
 def render_nav_contacts(state, map_arg: str | None = None) -> None:
     if map_arg == "sector":
         _render_contact_sectors_table(state)
@@ -3801,11 +3823,13 @@ def render_nav_contacts(state, map_arg: str | None = None) -> None:
     _render_contacts_table(state)
 
 
+@public_output
 def render_contacts(state) -> None:
     # Legacy wrapper used by tests and old call sites.
     render_nav_contacts(state)
 
 
+@public_output
 def render_scan_results(state, node_ids: list[str]) -> None:
     print("\n=== SCAN ===")
     if not node_ids:
@@ -4110,6 +4134,7 @@ def _hibernate_soc_warning(state) -> str | None:
     return None
 
 
+@public_output
 def _handle_uplink(state) -> None:
     reason = uplink_blocked_reason(state)
     locale = state.os.locale.value
@@ -4580,7 +4605,9 @@ def _import_sector_intel(
     added_msgs.append(f"(intel) sector known: {sector_id}")
 
 
+@public_output
 def _handle_intel_import(state, path: str) -> None:
+    path = resolve_public_path(state, path)
     try:
         content = read_file(state.os.fs, path, state.os.auth_levels)
     except PermissionError as e:
@@ -4702,6 +4729,7 @@ def _auto_import_intel_from_text(state, text: str, source_path: str) -> list[str
         added_msgs.append(msg.get(locale, msg["en"]))
     return added_msgs
 
+@public_output
 def render_ship_sectors(state) -> None:
     print("\n=== RETORNO SHIP SECTORS ===")
     if not state.ship.sectors:
@@ -4714,6 +4742,7 @@ def render_ship_sectors(state) -> None:
         print(f"- {sid}: {visible_name} [{tags}]")
 
 
+@public_output
 def render_sectors(state) -> None:
     # Legacy wrapper used by existing call sites/tests.
     render_ship_sectors(state)
@@ -4905,7 +4934,9 @@ def _route_solve_origin_hint_lines(state, target_id: str) -> list[str]:
     return lines
 
 
+@public_output
 def render_map_graph(state, node_id: str | None = None) -> None:
+    node_id = (_resolve_node_id_from_input(state, node_id) or node_id) if node_id else None
     locale = state.os.locale.value
     current_id = state.world.current_node_id
     nodes = _map_known_nodes(state)
@@ -4939,7 +4970,9 @@ def render_map_graph(state, node_id: str | None = None) -> None:
         print(f"  links: {_map_preview(neighbors, max_items=8)}")
 
 
+@public_output
 def render_map_path(state, target_id: str) -> None:
+    target_id = _resolve_node_id_from_input(state, target_id) or target_id
     locale = state.os.locale.value
     current_id = state.world.current_node_id
     nodes = _map_known_nodes(state)
@@ -5008,6 +5041,7 @@ def _sector_coords_from_id(sector_id: str) -> tuple[int, int, int] | None:
         return None
 
 
+@public_output
 def render_nav_map_sectors(state) -> None:
     print("\n=== NAV MAP SECTORS ===")
     known_ids = _map_known_nodes(state)
@@ -5049,6 +5083,7 @@ def _iter_nodes_for_galaxy_map(state, include_all_loaded: bool) -> list[SpaceNod
     return out
 
 
+@public_output
 def render_nav_map_galaxy(state, scale: str | None = None, *, include_all_loaded: bool = False) -> None:
     scale_name = _normalize_galaxy_scale(scale)
     radius_ly = float(_GALAXY_MAP_SCALES[scale_name])
@@ -5207,6 +5242,7 @@ def render_nav_map_galaxy(state, scale: str | None = None, *, include_all_loaded
     print(txt["legend"])
 
 
+@public_output
 def render_nav_map(state, mode: str, map_arg: str | None = None) -> None:
     if mode == "graph":
         render_map_graph(state, node_id=map_arg)
@@ -5240,6 +5276,7 @@ def render_nav_map(state, mode: str, map_arg: str | None = None) -> None:
     print(msg.get(state.os.locale.value, msg["en"]))
 
 
+@public_output
 def render_locate(state, system_id: str) -> None:
     sys = state.ship.systems.get(system_id)
     if sys:
@@ -5264,6 +5301,7 @@ def render_locate(state, system_id: str) -> None:
     print(f"coords: {node.x_ly:.2f}, {node.y_ly:.2f}, {node.z_ly:.2f}")
 
 
+@public_output
 def render_nav_routes(state) -> None:
     print("\n=== NAV ROUTES ===")
     current_id = state.world.current_node_id
@@ -5342,6 +5380,7 @@ def render_nav_routes(state) -> None:
         print(hint.get(locale, hint["en"]))
 
 
+@public_output
 def render_nav(state) -> None:
     # Legacy wrapper used by old call sites.
     render_nav_routes(state)
@@ -5406,7 +5445,9 @@ def _ship_survey_blocked_message(state, reason: str) -> str:
     return localized.get(reason, messages["en"].get(reason, "ship survey blocked"))
 
 
+@public_output
 def render_ship_survey(state, target_id: str) -> None:
+    target_id = _resolve_node_id_from_input(state, target_id) or target_id
     reason = _ship_survey_blocked_reason(state)
     if reason:
         print(_ship_survey_blocked_message(state, reason))
@@ -5613,6 +5654,7 @@ def _handle_log_copy(state, amount: int | None) -> None:
         print(msg.get(locale, msg["en"]))
 
 
+@public_output
 def render_intel_list(state, limit: int | None = 20) -> None:
     print("\n=== INTEL ===")
     indexed_items = list(enumerate(state.world.intel))
@@ -5644,11 +5686,12 @@ def render_intel_list(state, limit: int | None = 20) -> None:
             what = f"{item.coord[0]:.2f},{item.coord[1]:.2f},{item.coord[2]:.2f}"
         else:
             what = "?"
+        what = public_text(state, what)
         if len(what) > what_w:
             what = what[: what_w - 3] + "..."
         source = item.source_kind
         if item.source_ref:
-            source = f"{item.source_kind}@{item.source_ref}"
+            source = public_text(state, f"{item.source_kind}@{item.source_ref}")
             if len(source) > 20:
                 source = source[:17] + "..."
         age = _format_age_short(now - item.t)
@@ -5661,6 +5704,7 @@ def render_intel_list(state, limit: int | None = 20) -> None:
     print(hint.get(locale, hint["en"]))
 
 
+@public_output
 def render_intel_show(state, intel_id: str) -> None:
     print("\n=== INTEL DETAIL ===")
     target = None
@@ -5693,6 +5737,7 @@ def render_intel_show(state, intel_id: str) -> None:
         print(f"note: {target.note}")
 
 
+@public_output
 def _handle_intel_export(state, path: str) -> None:
     path = normalize_path(path)
     if not (path.startswith("/logs/nav") or path.startswith("/data/nav")):
@@ -5860,7 +5905,7 @@ def _confirm_abandon_drones(state, action) -> bool:
         "en": f"WARNING: drones not aboard ({drone_ids}). Leaving {current_node} will abandon them. Continue? [y/N] ",
         "es": f"ADVERTENCIA: drones fuera de la nave ({drone_ids}). Al salir de {current_node} quedarán abandonados. ¿Continuar? [s/N] ",
     }.get(locale, "WARNING: drones not aboard. Continue? [y/N] ")
-    reply = input(msg).strip().lower()
+    reply = input(public_text(state, msg)).strip().lower()
     if locale == "es":
         return reply in {"s", "si", "sí", "y", "yes"}
     return reply in {"y", "yes"}
@@ -5872,7 +5917,7 @@ def _confirm_travel_abort(state) -> bool:
         "en": "WARNING: aborting travel. Continue? [y/N] ",
         "es": "ADVERTENCIA: abortar el viaje. ¿Continuar? [s/N] ",
     }.get(locale, "WARNING: aborting travel. Continue? [y/N] ")
-    reply = input(msg).strip().lower()
+    reply = input(public_text(state, msg)).strip().lower()
     if locale == "es":
         return reply in {"s", "si", "sí", "y", "yes"}
     return reply in {"y", "yes"}
@@ -5904,60 +5949,79 @@ def _confirm_nav(state, action) -> bool:
             "en": f"WARNING: confirm nav to {dest}. Continue? [y/N] ",
             "es": f"ADVERTENCIA: confirmar nav a {dest}. ¿Continuar? [s/N] ",
         }.get(locale, f"WARNING: confirm nav to {dest}. Continue? [y/N] ")
-    reply = input(msg).strip().lower()
+    reply = input(public_text(state, msg)).strip().lower()
     if locale == "es":
         return reply in {"s", "si", "sí", "y", "yes"}
     return reply in {"y", "yes"}
 
 
 def _resolve_node_id_from_input(state, token: str) -> str | None:
-    token_lower = token.lower()
-    # Dock aliases may only resolve acquired contacts, never the hidden catalog.
     known_ids = _map_known_nodes(state) | state.world.known_contacts
-    nodes = {nid: node for nid, node in state.world.space.nodes.items() if nid in known_ids}
-    if token in nodes:
-        return token
-    # Exact name match (case-insensitive)
-    for nid, node in nodes.items():
-        if node.name.lower() == token_lower:
-            return nid
-    # Alias: drop spaces/dashes in name (e.g., Relay-97)
-    normalized = token_lower.replace(" ", "").replace("-", "")
-    for nid, node in nodes.items():
-        name_norm = node.name.lower().replace(" ", "").replace("-", "")
-        if name_norm == normalized:
-            return nid
-    return None
+    resolved = resolve_public_id(state, token, known_ids)
+    if resolved is not None:
+        return resolved
+    # Retain acquired descriptive names, but never choose an ambiguous match.
+    normalized = token.casefold().replace(" ", "").replace("-", "")
+    matches = {nid for nid in known_ids if (node := state.world.space.nodes.get(nid))
+               and node.name.casefold().replace(" ", "").replace("-", "") == normalized}
+    return next(iter(matches)) if len(matches) == 1 else None
+
+
+def _resolve_parsed_locations(state, parsed):
+    """Resolve public locations before existing command gates/engine semantics."""
+    def resolve(token):
+        return (_resolve_node_id_from_input(state, token) or token) if token else token
+
+    if isinstance(parsed, Action):
+        if hasattr(parsed, "node_id"):
+            parsed.node_id = resolve(parsed.node_id)
+        elif parsed.__class__.__name__ == "DroneMove":
+            # Ship-sector IDs retain the engine's existing precedence.
+            if parsed.target_id not in state.ship.sectors:
+                parsed.target_id = resolve(parsed.target_id)
+        elif parsed.__class__.__name__ == "DroneDeploy":
+            if parsed.sector_id not in state.ship.sectors:
+                parsed.sector_id = resolve(parsed.sector_id)
+    elif isinstance(parsed, tuple):
+        if parsed[0] == "SHIP_SURVEY":
+            return (parsed[0], resolve(parsed[1]))
+        if parsed[0] == "NAV_MAP" and parsed[1] in {"graph", "path"}:
+            return (*parsed[:2], resolve(parsed[2]))
+        if parsed[0] in {"CAT", "LS", "INTEL_IMPORT"}:
+            return (parsed[0], resolve_public_path(state, parsed[1]))
+    return parsed
+
 
 def _resolve_localized_path(state, path: str) -> str:
-    path = normalize_path(path)
+    path = resolve_public_path(state, normalize_path(path))
     if path in state.os.fs:
         return path
     if not path.endswith(".txt"):
-        candidate = f"{path}.txt"
+        candidate = resolve_public_path(state, f"{path}.txt")
         if candidate in state.os.fs:
             return candidate
-        candidate = f"{path}.{state.os.locale.value}.txt"
+        candidate = resolve_public_path(state, f"{path}.{state.os.locale.value}.txt")
         if candidate in state.os.fs:
             return candidate
         fallback = "en" if state.os.locale.value == "es" else "es"
-        candidate = f"{path}.{fallback}.txt"
+        candidate = resolve_public_path(state, f"{path}.{fallback}.txt")
         if candidate in state.os.fs:
             return candidate
     else:
         base = path[:-4]
-        candidate = f"{base}.{state.os.locale.value}.txt"
+        candidate = resolve_public_path(state, f"{base}.{state.os.locale.value}.txt")
         if candidate in state.os.fs:
             return candidate
         fallback = "en" if state.os.locale.value == "es" else "es"
-        candidate = f"{base}.{fallback}.txt"
+        candidate = resolve_public_path(state, f"{base}.{fallback}.txt")
         if candidate in state.os.fs:
             return candidate
     return path
 
 
+@public_output
 def render_ls(state, path: str) -> None:
-    path = normalize_path(path)
+    path = resolve_public_path(state, normalize_path(path))
     entries = list_dir(state.os.fs, path)
     print(f"\n=== LS {path} ===")
     if not entries:
@@ -5975,6 +6039,7 @@ def render_ls(state, path: str) -> None:
         print(f"- {name}{suffix}{lock_tag}")
 
 
+@public_output
 def render_cat(state, path: str) -> None:
     path = _resolve_localized_path(state, path)
     try:
@@ -6036,6 +6101,7 @@ def _mail_path_for_base(state, box: str, base: str, entries: list[str]) -> str |
             return f"/mail/{box}/{candidate}"
     return None
 
+@public_output
 def render_mailbox(state, box: str) -> None:
     path = f"/mail/{box}"
     print(f"\n=== MAIL {box} ===")
@@ -6126,9 +6192,10 @@ def _list_mail_ids(state, box: str) -> list[str]:
         if name.endswith(".notice.txt"):
             continue
         ids.append(name[:-4])
-    return sorted(set(ids))
+    return sorted({public_text(state, ident) for ident in ids})
 
 
+@public_output
 def render_mail_read(state, mail_id: str) -> None:
     base = mail_id
     if mail_id == "latest":
@@ -6433,7 +6500,7 @@ def _confirm_hibernate_non_cruise(state) -> bool:
         "en": "WARNING: hibernating while not in CRUISE may increase wear. Continue? [y/N] ",
         "es": "ADVERTENCIA: hibernar fuera de CRUISE puede aumentar el desgaste. ¿Continuar? [s/N] ",
     }.get(locale, "WARNING: hibernating while not in CRUISE may increase wear. Continue? [y/N] ")
-    reply = input(msg).strip().lower()
+    reply = input(public_text(state, msg)).strip().lower()
     if locale == "es":
         return reply in {"s", "si", "sí", "y", "yes"}
     return reply in {"y", "yes"}
@@ -6451,7 +6518,7 @@ def _confirm_hibernate_start(state, parsed: Hibernate) -> bool:
             "en": f"WARNING: confirm hibernation for {parsed.years:g}y. Continue? [y/N] ",
             "es": f"ADVERTENCIA: confirmar hibernación durante {parsed.years:g} años. ¿Continuar? [s/N] ",
         }.get(locale, "WARNING: confirm hibernation. Continue? [y/N] ")
-    reply = input(msg).strip().lower()
+    reply = input(public_text(state, msg)).strip().lower()
     if locale == "es":
         return reply in {"s", "si", "sí", "y", "yes"}
     return reply in {"y", "yes"}
@@ -6471,7 +6538,7 @@ def _confirm_hibernate_drones(state) -> tuple[bool, bool]:
         "en": f"WARNING: drones deployed ({drone_ids}) may drain batteries during hibernation. Continue? [y/N] ",
         "es": f"ADVERTENCIA: drones desplegados ({drone_ids}) pueden agotar batería durante la hibernación. ¿Continuar? [s/N] ",
     }.get(locale, "WARNING: drones deployed may drain batteries during hibernation. Continue? [y/N] ")
-    reply = input(msg).strip().lower()
+    reply = input(public_text(state, msg)).strip().lower()
     if locale == "es":
         ok = reply in {"s", "si", "sí", "y", "yes"}
     else:
@@ -6490,6 +6557,7 @@ def _confirm_hibernate_drones(state) -> tuple[bool, bool]:
     return True, wake
 
 
+@public_output
 def render_about(state, system_id: str) -> None:
     path = _resolve_localized_path(state, f"/manuals/systems/{system_id}.txt")
     if path in state.os.fs:
@@ -6513,6 +6581,7 @@ def render_about(state, system_id: str) -> None:
     print("No manual available. Try: ls /manuals/systems")
 
 
+@public_output
 def render_man(state, topic: str) -> None:
     cmd_path = _resolve_localized_path(state, f"/manuals/commands/{topic}.txt")
     concept_path = _resolve_localized_path(state, f"/manuals/concepts/{topic}.txt")
@@ -6560,6 +6629,7 @@ def get_power_metrics(state) -> dict:
     }
 
 
+@public_output
 def render_alert_explain(state, alert_key: str) -> None:
     alert = state.events.alerts.get(alert_key)
     print(f"\n=== ALERT EXPLAIN: {alert_key} ===")
@@ -6689,10 +6759,11 @@ def render_alert_explain(state, alert_key: str) -> None:
         print("- Decontamination does not require positive net power or scrap")
 
 
-def _known_contact_ids_for_completion(state) -> list[str]:
+def _known_contact_ids_for_completion(state, *, public: bool = True) -> list[str]:
     known_ids = set(getattr(state.world, "known_nodes", set()) or set())
     known_ids.update(getattr(state.world, "known_contacts", set()) or set())
-    return sorted(c for c in known_ids if not _is_hidden_origin_contact_id(c))
+    ids = sorted(c for c in known_ids if not _is_hidden_origin_contact_id(c))
+    return [public_node_id(state, nid) for nid in ids] if public else ids
 
 
 def _dock_targets_for_completion(state) -> list[str]:
@@ -6702,7 +6773,7 @@ def _dock_targets_for_completion(state) -> list[str]:
     node = state.world.space.nodes.get(current_node_id)
     if not node or node.kind in {"origin", "transit"}:
         return []
-    return [current_node_id]
+    return [public_node_id(state, current_node_id)]
 
 
 def _route_solve_targets_for_completion(state) -> list[str]:
@@ -6712,8 +6783,8 @@ def _route_solve_targets_for_completion(state) -> list[str]:
     known_routes = reachable_from(state.world, current_node_id)
     sensors_range_ly = max(0.0, float(getattr(state.ship, "sensors_range_ly", Balance.SENSORS_RANGE_LY)))
     return [
-        node_id
-        for node_id in _known_contact_ids_for_completion(state)
+        public_node_id(state, node_id)
+        for node_id in _known_contact_ids_for_completion(state, public=False)
         if node_id not in known_routes
         and (
             (dist := _distance_ly_between_nodes(state, current_node_id, node_id)) is not None
@@ -6732,7 +6803,7 @@ def _travel_targets_for_completion(state) -> list[str]:
         for node_id in sorted(reachable_from(state.world, current_node_id))
         if node_id != current_node_id and node_id != "UNKNOWN"
     ]
-    return candidates
+    return [public_node_id(state, nid) for nid in candidates]
 
 
 def _drone_local_world_node_targets_for_completion(state) -> list[str]:
@@ -6750,7 +6821,7 @@ def _drone_local_world_node_targets_for_completion(state) -> list[str]:
         and docked_node_id in state.world.space.nodes
     ):
         candidates.append(docked_node_id)
-    return list(dict.fromkeys(candidates))
+    return list(dict.fromkeys(public_node_id(state, nid) for nid in candidates))
 
 
 def _drone_ship_sector_targets_for_completion(state) -> list[str]:
@@ -6970,7 +7041,7 @@ def main() -> None:
                     for sys in locked_state.ship.systems.values():
                         if sys.service and sys.service.is_installed:
                             services.append(sys.service.service_name)
-                    fs_paths = list(locked_state.os.fs.keys())
+                    fs_paths = [public_text(locked_state, path) for path in locked_state.os.fs]
                 music_track_ids = [track.track_id for track in audio_manager.list_music_tracks()] if audio_manager is not None else []
 
                 if len(tokens) == 1:
@@ -7400,6 +7471,7 @@ def main() -> None:
             continue
 
         with loop.with_lock() as locked_state:
+            parsed = _resolve_parsed_locations(locked_state, parsed)
             block_msg = _command_blocked_message(locked_state, parsed)
             audio_enabled = locked_state.os.audio.enabled
         if block_msg:
@@ -7974,7 +8046,7 @@ def main() -> None:
                             "en": f"(nav) confirmed: en route to {dest}",
                             "es": f"(nav) confirmado: rumbo a {dest}",
                         }
-                        print(msg.get(locale, msg["en"]))
+                        print(public_text(locked_state, msg.get(locale, msg["en"])))
                         break
         if audio_manager is not None:
             audio_manager.handle_event_batch(audio_enabled, ev)

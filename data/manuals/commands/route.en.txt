@@ -35,4 +35,6 @@ Notes
 - A physical node whose exact id is available can be solved even before scan discovery; a missing node cannot.
 
 Related commands
+- Location targets accept the compact public ID shown by contacts/maps; TAB offers legitimate contextual targets. Full archived IDs remain valid. See: man navigation.
+
 - `nav map routes`, `nav map path <node_id>`, `nav <node_id>`, `scan`

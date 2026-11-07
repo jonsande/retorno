@@ -11,6 +11,8 @@ Accepted alias forms
 - `nav contacts sector` -> `nav map contacts sector`
 
 Operational behavior
+- Installation references use compact public IDs, also accepted by navigation commands. Retained navigation archives keep their original references and integrity data. See: man navigation.
+
 - Lists known contacts relative to current navigation context.
 - Shows `sector` and `region` for each contact and orders output by sector proximity.
 - `nav map contacts sector` groups by sector and shows each sector's known contacts in parentheses.

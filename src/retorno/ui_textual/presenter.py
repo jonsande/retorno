@@ -42,7 +42,7 @@ def build_header(state) -> str:
         status_label = repl._orbit_status_label(state, loc_id)
         loc = f"{loc_id} ({node_name}) [{status_label}]"
     elapsed = format_elapsed_short(state.clock.t, include_seconds=True)
-    return f"{elapsed} | ship_mode={mode} | {loc}"
+    return repl.public_text(state, f"{elapsed} | ship_mode={mode} | {loc}")
 
 
 def build_power_lines(state) -> list[str]:

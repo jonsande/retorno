@@ -42,4 +42,6 @@ intel export <path>
 - Exports current intel to a file under /logs/nav or /data/nav.
 
 Related commands
+- Installation references use compact public IDs, also accepted by navigation commands. Retained navigation archives keep their original references and integrity data. See: man navigation.
+
 - `uplink`, `nav map routes`, `route solve <node_id>`, `cat <path>`

@@ -11,6 +11,8 @@ nav --no-cruise <node_id>
 nav abort
 
 Description
+- Location targets accept the compact public ID shown by contacts/maps; TAB offers legitimate contextual targets. Full archived IDs remain valid. See: man navigation.
+
 - `nav map sectors`: list known world sectors and their sector coordinates.
 - `nav map galaxy [scale]`: show galactic map at selected scale (`sector=10ly`, `local=100ly`, `regional=10000ly`, `global=500000ly`) using known nodes + current position.
 - `nav map graph`: show the global graph of known nodes/routes.
