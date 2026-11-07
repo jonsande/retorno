@@ -109,9 +109,9 @@ def records_for(state, kind, fallback):
     if not snapshot:
         return fallback()
     if not snapshot["declarations"] and not snapshot.get("radio_emitters"):
-        # Legacy loaders remain domain injection points. Guard real installed
-        # files before using them; templates do not become active by this path.
-        validate_catalog(state)
+        # Legacy loaders remain domain injection points; templates stay inactive.
+        # Full catalogue validation belongs to bootstrap and save/load, not
+        # every scheduler lookup (twice per simulated second during wait).
         return fallback()
     return deepcopy(snapshot[kind])
 

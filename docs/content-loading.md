@@ -6,6 +6,18 @@ Status: **implemented behavior, verified at commit `2ffb1ab`**.
 
 Spanish version: [content-loading.es.md](content-loading.es.md)
 
+Runtime performance correction (2026-11-07): full catalogue collection and
+fingerprinting run at new-world compilation and at save/load boundaries, not
+on each `records_for` lookup in the lore scheduler. This avoids rereading all
+referenced texts twice per simulated second during debug `wait`, and on each
+hibernation chunk. Legacy loader injection and compiled snapshot lookup remain
+available; changing installed content during a running session is unsupported
+and save/load still rejects a changed catalogue. Simulation steps, event
+processing and wake checks retain their existing granularity. The owning code
+is `src/retorno/worldgen/narrative.py` and `src/retorno/io/save_load.py`; regression
+coverage is `tests/time_advance_performance_smoke.py`. Command syntax, help and
+diegetic manuals are unchanged.
+
 This document records where RETORNO currently loads universe and narrative
 content from. It describes the implementation; it does not approve a permanent
 folder policy or declare inactive files disposable.

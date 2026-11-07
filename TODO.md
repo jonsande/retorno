@@ -2,6 +2,65 @@
 === NEW TODO ===
 ========================
 
+- [] Existe un límite de drones que se pueden tener? Limitar a 4.
+
+- [] Aumentar el tiempo que se tarda en acoplarse (dock).
+
+- [] Necesitamos un nuevo escenario de inicio: FAST_SANDBOX. La idea es empezar el juego con todos los sistemas reparados, todo el salvage disponible en ECHO_7 ya recuperado (incluida la información recuperable con uplink), el o los drones en su bahía y en perfecto estado, y la nave orbitando alrededor de ECHO_7, lista para iniciar el primer viaje.
+
+- [] Necesitamos un comando debug que imprima los nodos materializados (incluidos lo que no conoce aún el jugador), y otro que te permita teletransportarte inmediatamente a cualquier nodo.
+
+- [] Cada vez que cambia el estado de alguno de los sistemas de hardware recibo dos mensajes que en principio parecen redundates. Por ejemplo, tras un 'power on comms':
+
+[CMD] [WARN] system_state_changed :: comms: offline -> limited (cause=manual_restore, health=0.72)
+[CMD] Radio Communications Service (radiod): stopped (Try: boot radiod)                                                               
+[CMD] [INFO] system_power_restored :: Power restored: comms (offline -> limited)
+
+La primera línea y la tercera, ¿no son redundantes? Entiendo que el WARN está avisando cada vez que hay un cambio en el estado de un sistema de la nave. Esto es lo deseable en el caso de que el sistema cambie a un estado a peor (por ejemplo, de 'nominal' a 'limited'), pero no cuando cambia a mejor (por ejemplo de 'limited' a 'nominal'). Tampoco hace falta que se imprima un WARN cuando se enciende o apaga un sistema de la nave si el encendido o apagado lo ha ejecutado el jugador manualmente (en este caso, basta con la notificación INFO.
+
+- [] He recibido por primera vez una señal de radio. El archivo tiene el nombre "radio_0017.en.txt". Por qué el número 0017, si es la primera señal de radio que recibo?
+
+- [] Capturo de forma más o menos habitual señales de radio como esta:
+
+=== CAT /logs/broadcasts/radio_0017.en.txt ===                                                                                        
+  AUTOMATED NAVIGATION NOTICE                                                                                                           
+  Old data; present validity unverified.                                                                                                
+  Calculated navigation solution; no evidence of historical traffic.                                                                    
+  LINK: P-1.2.0.1 -> P-0.2.1.0
+                                                                                                                                        
+  (intel) route added: P-1.2.0.1 -> P-0.2.1.0
+
+Qué tipo de señar de radio se supone que es esta? Es decir, qué explicacón diegética tiene?
+
+- [] El otro tipo de señal de radio que suelo capturar es como esta:
+
+=== CAT /logs/broadcasts/radio_0018.en.txt ===                                                                                        
+  AUTOMATED ARCHIVE SIGNAL
+  Recording age and reliability uncertain. Reception does not establish present human activity.                                         
+  Historical distress recording: loss of control reported. Present situation and survival unknown.
+
+¿Son mensajes generados proceduralmente? ¿Qué tipos de señales procedurales existen actualmente en el juego? Me gustaría poder editarlos.
+
+- [] Si hago "cat logs/boot.log" obtengo este resultado:
+
+  Access denied: requires ENG
+  
+¿Qué quiere decir? ¿Cómo se consigue actualmente en el juego acceder a documentos de este tipo?
+
+- [] Al hacer un 'drone survey' obtengo una salida como esta:
+
+[AUTO] Survey completed at ECHO_7                                                                                                     
+  === SURVEY ===                                                                                                                        
+  scrap detected: 13
+  modules detected
+  no recoverable drones detected
+  possible recoverable data signatures detected
+  uplink-capable infrastructure detected
+  depletion: scrap=no, data=no, extras=no
+  node not cleaned
+  
+Me gustaría que el output no mostrara lo no detectado (como, en este caso "no recoverable drones detected"), sólo lo sí detectado (o lo posible, como en este caso "possible recoverable data signatures detected"). Por otra parte, las líneas "depletion: scrap=no, data=no, extras=no" y "node not cleaned" sólo deberían ser visibles en modo debug.
+  
 - [] El sistema temporal del juego. Los tres relojes (tiempo galáctico, tiempo de la nave y tiempo biológico del personaje). Hay una conversación al respecto guardada en chatGPT (dentro de la conversación "CANON de RETORNO", sino recuerdo mal). Checkear y partir de ahí.
 
 - [] Al hacer un ship survey, cuando la distancia del objetivo no llega a 1ly, hay que dar la distancia en alguna unidad menor, para que no aparezca simplemente 0.00ly.

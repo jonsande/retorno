@@ -6,6 +6,20 @@ Estado: **comportamiento implementado, verificado en el commit `2ffb1ab`**.
 
 Versión inglesa: [content-loading.md](content-loading.md)
 
+Corrección de rendimiento del runtime (2026-11-07): la recopilación y huella
+completas del catálogo se calculan al compilar un mundo nuevo y al guardar o
+cargar, no en cada consulta `records_for` del planificador narrativo. Esto evita
+releer todos los textos referenciados dos veces por segundo simulado durante
+`wait` de debug y en cada bloque de hibernación. Se conservan la inyección de
+loaders anteriores y la consulta del snapshot compilado; modificar el contenido
+instalado durante una sesión en marcha no está soportado y guardar/cargar sigue
+rechazando un catálogo modificado. Los pasos de simulación, el procesamiento de
+eventos y las comprobaciones de despertar conservan su granularidad. El código
+responsable está en `src/retorno/worldgen/narrative.py` y
+`src/retorno/io/save_load.py`; la regresión se verifica en
+`tests/time_advance_performance_smoke.py`. La sintaxis de órdenes, la ayuda y los
+manuales diegéticos no cambian.
+
 Este documento registra desde dónde carga RETORNO el contenido del universo y
 el contenido narrativo. Describe la implementación actual; no aprueba una
 política permanente de carpetas ni declara desechables los archivos inactivos.
