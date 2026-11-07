@@ -157,6 +157,18 @@ All installed `force=true` pieces are validated as essential. Optional
 policies and deadlines remain. Validation proves a host/channel at an eligible
 time; it does not guarantee player behaviour or an everlasting opportunity.
 
+Optional `constraints.anchor_distances` filters document hosts by inclusive 3D
+Euclidean bounds relative to certified authored IDs or unambiguous aliases,
+including hidden/lazy `world_requirements` entities. Each nonempty-list entry
+accepts only `anchor`, `min_ly`, `max_ly`; at least one finite nonnegative bound
+is required, minimum defaults to zero, and entries combine by AND. Bootstrap
+rejects invalid IDs, geometry, structure, booleans, nonfinite or reversed bounds
+for optional pieces and singles too. Existing origin distances and regions keep
+their meaning. `placement_rules.primary.host_selection: "seeded"` chooses an
+essential reservation deterministically from the finite certified viable set;
+default remains first sorted host. Runtime never substitutes another host for
+a reservation. See [relative placement contract](design/lore-placement-anchors.md).
+
 Historical queries use up to 64 sectors, including authored sites and a finite
 search near the start and declared distances. A certified opportunity can be
 reserved without materializing or revealing its host. If the search cannot

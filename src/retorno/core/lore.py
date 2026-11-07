@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 import hashlib
 import math
 import random
@@ -40,6 +40,7 @@ class LoreContext:
     region: str
     dist_from_origin_ly: float
     year_since_wake: float
+    anchor_distances: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -901,7 +902,15 @@ def build_lore_context(state, node_id: str) -> LoreContext:
         region = ""
         dist = 0.0
     year = state.clock.t / Balance.YEAR_S if Balance.YEAR_S else 0.0
-    return LoreContext(node_id=node_id, region=region, dist_from_origin_ly=dist, year_since_wake=year)
+    snapshot = state.world.narrative_snapshot
+    distances = {}
+    if node:
+        xyz = (node.x_ly, node.y_ly, node.z_ly)
+        positions = snapshot.get("positions", {})
+        distances = {token: math.dist(xyz, positions[ident])
+                     for token, ident in snapshot.get("aliases", {}).items() if ident in positions}
+    return LoreContext(node_id=node_id, region=region, dist_from_origin_ly=dist,
+                       year_since_wake=year, anchor_distances=distances)
 
 
 def _collect_base_files_for_node(state, node_id: str, node: SpaceNode | None) -> list[dict]:
@@ -1105,6 +1114,10 @@ def piece_constraints_ok(piece: dict, ctx: LoreContext) -> bool:
         return False
     if regions_any and ctx.region not in regions_any:
         return False
+    for rule in cons.get("anchor_distances", []):
+        distance = ctx.anchor_distances.get(rule["anchor"].casefold())
+        if distance is None or distance < rule.get("min_ly", 0) or distance > rule.get("max_ly", math.inf):
+            return False
     return True
 
 
@@ -1380,7 +1393,10 @@ def _candidate_nodes_for_piece(state, piece_entry: dict) -> list[str]:
     max_hops = int(rules.get("max_hops_from_start", 0) or 0)
 
     out: list[str] = []
+    reservation = state.world.narrative_snapshot.get("reservations", {}).get(piece_entry["piece_key"])
     for node_id, pool in sorted(state.world.node_pools.items()):
+        if reservation and node_id != reservation["node_id"]:
+            continue
         if emitter is not None and node_id != emitter.host_id:
             continue
         if not pool.window_open or pool.node_cleaned:
@@ -1479,6 +1495,50 @@ def _historical_candidates(state, piece_entry, definition=None, max_sectors=64):
     return _candidate_nodes_for_piece(view, piece_entry), nodes
 
 
+def _validate_relative_placement(state, definition, entry, source):
+    """Validate new fields for every piece, including optional singles."""
+    from retorno.worldgen.narrative import ContentError, _fields, _number
+    key, piece = entry["piece_key"], entry["piece"]
+    rules = entry.get("placement_rules", {})
+    if "host_selection" in rules and (entry["role"] != "primary" or rules["host_selection"] != "seeded"):
+        raise ContentError(source, key, "placement_rules.host_selection", "expected seeded on primary")
+    cons = piece.get("constraints", {})
+    if cons is None:
+        return
+    if not isinstance(cons, dict):
+        raise ContentError(source, key, "constraints", "object required")
+    if "anchor_distances" not in cons:
+        return
+    entries = cons["anchor_distances"]
+    at = "constraints.anchor_distances"
+    if not isinstance(entries, list) or not entries:
+        raise ContentError(source, key, at, "nonempty list required")
+    snapshot = state.world.narrative_snapshot
+    authored = {a.raw_id: a for a in definition.authored}
+    for index, rule in enumerate(entries):
+        path = f"{at}[{index}]"
+        _fields(rule, {"anchor", "min_ly", "max_ly"}, source, key, path)
+        token = rule.get("anchor")
+        ident = snapshot.get("aliases", {}).get(token.casefold()) if isinstance(token, str) else None
+        xyz = snapshot.get("positions", {}).get(ident)
+        if ident == "RETORNO_SHIP" or ident not in authored or not isinstance(xyz, (tuple, list)) or len(xyz) != 3:
+            raise ContentError(source, key, path + ".anchor", "certified authored geometry required")
+        location = next((loc for loc in snapshot.get("locations", []) if loc["node"]["node_id"] == ident), None)
+        if location is None or not all(axis + "_ly" in location["node"] for axis in "xyz"):
+            raise ContentError(source, key, path + ".anchor", "explicit three-axis geometry required")
+        for value in xyz:
+            _number(value, source, key, path + ".anchor.position")
+        if tuple(xyz) != tuple(authored[ident].position_ly):
+            raise ContentError(source, key, path + ".anchor", "geometry differs from manifest")
+        if not {"min_ly", "max_ly"} & rule.keys():
+            raise ContentError(source, key, path, "at least one bound required")
+        for bound in ("min_ly", "max_ly"):
+            if bound in rule and _number(rule[bound], source, key, path + "." + bound) < 0:
+                raise ContentError(source, key, path + "." + bound, "nonnegative bound required")
+        if rule.get("max_ly", math.inf) < rule.get("min_ly", 0):
+            raise ContentError(source, key, path, "inverted bounds")
+
+
 def validate_essential_opportunities(state, definition):
     """Reserve witnesses before any source can be consumed; never grant intel."""
     from copy import copy
@@ -1493,6 +1553,7 @@ def validate_essential_opportunities(state, definition):
         if key in seen:
             raise ContentError(source, key, "id", "duplicate piece identity")
         seen.add(key)
+        _validate_relative_placement(state, definition, entry, source)
         if not entry["force"] and not piece.get("essential", False):
             continue
         policy = piece.get("force_policy", "none")
@@ -1557,7 +1618,12 @@ def validate_essential_opportunities(state, definition):
             channels = entry.get("channels", [])
             status = "unsatisfiable" if closed or not any(c in {"salvage_data", "ship_os_mail", "captured_signal", "station_broadcast", "uplink_only"} for c in channels) else "not_evaluated"
             raise ContentError(source, key, "host/channels", "no verified legitimate essential opportunity (including file paths)", status)
-        nid, channel = sorted(viable)[0]
+        viable.sort()
+        if entry.get("placement_rules", {}).get("host_selection") == "seeded":
+            pick = _stable_seed64(state.meta.rng_seed, key, tuple(nodes[nid].historical_key for nid, _ in viable))
+            nid, channel = random.Random(pick).choice(viable)
+        else:
+            nid, channel = viable[0]
         if channel == "salvage_data":
             for lang in ("en", "es"):
                 reserved_paths.add((nid, normalize_path(_file_for_salvage_piece(entry, lang, state)["path"])))
@@ -1806,6 +1872,11 @@ def _register_arc_placement(state, piece_entry: dict, node_id: str, file_path: s
 
 def _assign_piece_to_node(state, piece_entry: dict, node_id: str) -> bool:
     piece_key = piece_entry["piece_key"]
+    reservation = state.world.narrative_snapshot.get("reservations", {}).get(piece_key)
+    if reservation and node_id != reservation["node_id"]:
+        return False
+    if not piece_constraints_ok(piece_entry["piece"], build_lore_context(state, node_id)):
+        return False
     if piece_key in state.world.lore_placements.piece_to_node:
         return False
 

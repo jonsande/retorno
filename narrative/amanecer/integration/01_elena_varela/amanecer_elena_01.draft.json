@@ -1,0 +1,146 @@
+{
+  "arc_id": "amanecer_elena_01",
+  "world_requirements": {
+    "version": "narrative-world-v1",
+    "entities": [
+      {
+        "id": "LIRIA",
+        "name": "Liria Civil Station",
+        "kind": "station",
+        "position": {
+          "offset_from": "HARBOR_12",
+          "offset_box_ly": [
+            [
+              6.0,
+              9.0
+            ],
+            [
+              -3.0,
+              3.0
+            ],
+            [
+              -0.5,
+              0.5
+            ]
+          ]
+        }
+      }
+    ],
+    "references": [
+      "HARBOR_12"
+    ],
+    "relations": [
+      {
+        "type": "near",
+        "from": "HARBOR_12",
+        "to": "LIRIA",
+        "min_ly": 6.0,
+        "max_ly": 9.6
+      }
+    ],
+    "claims": []
+  },
+  "primary_intel": {
+    "id": "liria_navigation_index",
+    "kind": "link",
+    "line": "LINK: HARBOR_12 -> LIRIA",
+    "force": true,
+    "force_policy": "hard",
+    "allowed_channels": [
+      "salvage_data"
+    ],
+    "path_template": "/logs/navigation/amanecer_liria_route.{lang}.txt",
+    "content_ref_en": "lore/packs/amanecer_elena_01/amanecer_liria_route.en.txt",
+    "content_ref_es": "lore/packs/amanecer_elena_01/amanecer_liria_route.es.txt",
+    "spatial_bindings": {
+      "version": "narrative-world-v1",
+      "values": {
+        "liria_sector": {
+          "entity": "LIRIA",
+          "field": "sector"
+        }
+      }
+    },
+    "constraints": {
+      "max_dist_ly": 30.0,
+      "anchor_distances": [
+        {
+          "anchor": "LIRIA",
+          "max_ly": 15.0
+        }
+      ]
+    }
+  },
+  "secondary_lore_docs": [
+    {
+      "id": "elena_01_escotilla_h3",
+      "force": true,
+      "force_policy": "hard",
+      "allowed_channels": [
+        "salvage_data"
+      ],
+      "path_template": "/data/amanecer/elena_01_escotilla_h3.{lang}.txt",
+      "content_ref_en": "lore/packs/amanecer_elena_01/elena_01_escotilla_h3.en.txt",
+      "content_ref_es": "lore/packs/amanecer_elena_01/elena_01_escotilla_h3.es.txt"
+    },
+    {
+      "id": "elena_02_diecinueve_personas",
+      "force": true,
+      "force_policy": "hard",
+      "allowed_channels": [
+        "salvage_data"
+      ],
+      "path_template": "/data/amanecer/elena_02_diecinueve_personas.{lang}.txt",
+      "content_ref_en": "lore/packs/amanecer_elena_01/elena_02_diecinueve_personas.en.txt",
+      "content_ref_es": "lore/packs/amanecer_elena_01/elena_02_diecinueve_personas.es.txt"
+    },
+    {
+      "id": "elena_03_manifiesto",
+      "force": true,
+      "force_policy": "hard",
+      "allowed_channels": [
+        "salvage_data"
+      ],
+      "path_template": "/data/amanecer/elena_03_manifiesto.{lang}.txt",
+      "content_ref_en": "lore/packs/amanecer_elena_01/elena_03_manifiesto.en.txt",
+      "content_ref_es": "lore/packs/amanecer_elena_01/elena_03_manifiesto.es.txt"
+    },
+    {
+      "id": "elena_04_capacidad_autorizada",
+      "force": true,
+      "force_policy": "hard",
+      "allowed_channels": [
+        "salvage_data"
+      ],
+      "path_template": "/data/amanecer/elena_04_capacidad_autorizada.{lang}.txt",
+      "content_ref_en": "lore/packs/amanecer_elena_01/elena_04_capacidad_autorizada.en.txt",
+      "content_ref_es": "lore/packs/amanecer_elena_01/elena_04_capacidad_autorizada.es.txt"
+    }
+  ],
+  "placement_rules": {
+    "primary": {
+      "candidates": [
+        "HARBOR_12",
+        "procedural_station",
+        "procedural_relay"
+      ],
+      "require_kind_any": [
+        "station",
+        "relay"
+      ],
+      "avoid_node_ids": [
+        "LIRIA"
+      ],
+      "host_selection": "seeded"
+    },
+    "secondary": {
+      "candidates": [
+        "LIRIA"
+      ],
+      "require_kind_any": [
+        "station"
+      ],
+      "count": 4
+    }
+  }
+}

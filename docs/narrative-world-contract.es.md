@@ -158,6 +158,18 @@ Todos los `force=true` instalados se validan como esenciales. El campo optativo
 políticas y deadlines. La validación prueba un instante temporal elegible y un
 host/canal; no garantiza la conducta del jugador ni una oportunidad eterna.
 
+El campo opcional `constraints.anchor_distances` filtra hosts por cotas inclusivas
+de distancia euclídea 3D respecto a IDs authored certificados o alias inequívocos,
+incluidas entidades ocultas/lazy de `world_requirements`. Cada entrada de una lista
+no vacía admite solo `anchor`, `min_ly`, `max_ly`; exige al menos una cota finita no
+negativa, el mínimo ausente vale cero y las entradas se combinan por AND. Bootstrap
+rechaza IDs, geometría o estructura inválidos, bool, números no finitos y cotas
+invertidas, también en piezas opcionales y singles. Distancias al inicio y regiones
+conservan su significado. `placement_rules.primary.host_selection: "seeded"` elige
+una reserva esencial de forma determinista entre testigos viables certificados
+del ámbito finito; el defecto sigue siendo el primer host ordenado. Runtime nunca
+sustituye el host reservado. Véase el [contrato relativo](design/lore-placement-anchors.es.md).
+
 La consulta histórica usa hasta 64 sectores, los authored y una búsqueda finita
 cerca del inicio y de las distancias declaradas. Una oportunidad certificada
 puede reservarse sin materializar ni revelar el host. Si la búsqueda no certifica

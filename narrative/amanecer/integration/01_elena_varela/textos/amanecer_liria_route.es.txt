@@ -1,0 +1,12 @@
+CATÁLOGO CIVIL DE NAVEGACIÓN — EXTRACTO REPLICADO
+REFERENCIA DE ARCHIVO: EVAC / LIRIA
+
+Entrada conservada en una copia regional del índice de navegación.
+La presencia de este registro no acredita viajes posteriores al archivo.
+
+Origen administrativo: HARBOR_12
+Destino administrativo: LIRIA
+Sector registrado: {{liria_sector}}
+
+LINK: HARBOR_12 -> LIRIA
+SECTOR: {{liria_sector}}
