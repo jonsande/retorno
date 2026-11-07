@@ -53,6 +53,7 @@ class InformationDefinition:
     rules_json: str
     authored_json: str
     rules_key: str
+    prologue_json: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,7 +91,7 @@ def _rules():
 
 
 def define_information(snapshot):
-    """Capture only stable authored archive/table data, never reservations/radio."""
+    """Capture authored data and the initial prologue contract, never radio."""
     authored = {}
     for location in snapshot["locations"]:
         node = location["node"]
@@ -138,14 +139,25 @@ def define_information(snapshot):
             authored[node["node_id"]]["navigation_policy"] = dict(
                 version=NAVIGATION_POLICY_VERSION, exclude_destinations=sorted(normalized))
     rules_json, authored_json = canonical(_rules()), canonical(authored)
-    key = fingerprint((VERSION, rules_json, authored_json))
-    return InformationDefinition(VERSION, rules_json, authored_json, key)
+    prologue = canonical(snapshot["prologue_chain"]) if snapshot.get("prologue_chain") else ""
+    key = fingerprint((VERSION, rules_json, authored_json, prologue)) if prologue else fingerprint((VERSION, rules_json, authored_json))
+    return InformationDefinition(VERSION, rules_json, authored_json, key, prologue)
 
 
 def validate_definition(definition, *, current=False):
+    parts = (VERSION, definition.rules_json, definition.authored_json) if isinstance(definition, InformationDefinition) else ()
+    if isinstance(definition, InformationDefinition) and definition.prologue_json:
+        parts += (definition.prologue_json,)
     if (not isinstance(definition, InformationDefinition) or definition.version != VERSION
-            or definition.rules_key != fingerprint((VERSION, definition.rules_json, definition.authored_json))):
+            or definition.rules_key != fingerprint(parts)):
         raise ValueError("Historical information definition mismatch / Definición de información histórica incompatible")
+    if definition.prologue_json:
+        chain = json.loads(definition.prologue_json)
+        if (not isinstance(chain, dict) or set(chain) != {"version", "host_id"}
+                or chain["version"] != manifest.PROLOGUE_VERSION
+                or not isinstance(chain["host_id"], str) or not chain["host_id"]
+                or canonical(chain) != definition.prologue_json):
+            raise ValueError("Invalid prologue contract / Contrato del prólogo no válido")
     rules, authored = json.loads(definition.rules_json), json.loads(definition.authored_json)
     fixed = _rules()
     if (not isinstance(rules, dict) or set(rules) != set(fixed)
@@ -172,7 +184,7 @@ def sampling_definition(definition):
     retain exactly the original v1 fingerprint and algorithms.
     """
     authored = json.loads(definition.authored_json)
-    if not any("navigation_policy" in host for host in authored.values()):
+    if not definition.prologue_json and not any("navigation_policy" in host for host in authored.values()):
         return definition
     for host in authored.values():
         host.pop("navigation_policy", None)
@@ -296,7 +308,7 @@ def _files(world, definition, host, records, neighbors, authored, rules):
     return files, mail
 
 
-def query_information(world, definition, node_id, *, budget=None):
+def query_information(world, definition, node_id, *, budget=None, include_prologue=True):
     """Complete fixed 3x3x3 physical domain + all incident historical edges.
 
     This is a historical record rule, not a claim about all sites within 45 ly.
@@ -347,6 +359,10 @@ def query_information(world, definition, node_id, *, budget=None):
         raise InformationIncomplete("Historical information site/cohort budget; no complete result")
     records, weights = {}, {}
     for site in sorted(sites.values(), key=lambda s: s.identity):
+        # An additive guardrail slot must not perturb existing weighted pools.
+        # Its incoming acquisition record is reserved explicitly below.
+        if world.prologue_fallback is not None and site.identity == world.prologue_fallback.identity:
+            continue
         if site.identity not in eligible or site.identity == host.identity or not information_capabilities(site.kind):
             continue
         distance = math.dist(host.position_ly, site.position_ly)
@@ -372,6 +388,29 @@ def query_information(world, definition, node_id, *, budget=None):
     excluded = set(authored.get(node_id, {}).get("navigation_policy", {}).get("exclude_destinations", ()))
     uplink = tuple(record for record in uplink if record.destination_id not in excluded)
     files = [entry for entry in files if entry.get("navigation_record", {}).get("destination_id") not in excluded]
+    if include_prologue and definition.prologue_json:
+        chain = json.loads(definition.prologue_json)
+        if chain["version"] != manifest.PROLOGUE_VERSION or world.prologue_version != chain["version"]:
+            raise ValueError("Incompatible prologue information contract / Contrato informativo del prólogo incompatible")
+        witness = manifest.lookup_site(world, world.prologue_identity, session=session).site
+        if witness is None or manifest.operative_id(world, witness) != chain["host_id"]:
+            raise ValueError("Prologue information/physical identity mismatch / Identidad física e informativa del prólogo incompatible")
+        if node_id == "ECHO_7":
+            dest = chain["host_id"]
+            if navigation_excluded(definition, node_id, dest):
+                raise ValueError("Prologue uplink excluded by host policy / Política del host excluye el uplink del prólogo")
+            if not any(r.destination_id == dest for r in uplink):
+                record = records.get(dest) or _record(world, sampling, host, witness, connections.get(witness.identity))
+                uplink = uplink[:maximum-1] + (record,) if len(uplink) >= maximum else uplink + (record,)
+        elif node_id == chain["host_id"]:
+            target = manifest.resolve_operative_id(world, "HARBOR_12", session=session)
+            record = records.get("HARBOR_12") or _record(world, sampling, host, target, connections.get(target.identity))
+            if navigation_excluded(definition, node_id, "HARBOR_12"):
+                raise ValueError("Prologue archive excluded by host policy / Política del host excluye el archivo del prólogo")
+            files.append(dict(path="/data/nav/waystation_solution.txt", access="guest",
+                content=navigation_content(record), navigation_record=asdict(record),
+                information_version=VERSION, information_rules_key=definition.rules_key,
+                historical_record_id=record.record_id, reservation_version=chain["version"]))
     return HistoricalInformation(host, node_id, definition.rules_key, uplink, canonical(files), mail,
         sectors, len(session.sectors))
 
@@ -395,6 +434,9 @@ def validate_information_state(state):
         raise ValueError("Authored information snapshot changed / Snapshot authored de información modificado")
     from retorno.worldgen.generator import universe_definition
     physical = universe_definition(state)
+    anchors = {a.raw_id for a in physical.authored}
+    if {"ECHO_7", "HARBOR_12"} <= anchors or physical.prologue_version or world.information_definition.prologue_json:
+        certify_prologue(state)
     authored = json.loads(world.information_definition.authored_json)
     for nid, pool in world.node_pools.items():
         if pool.information_version != VERSION or pool.information_rules_key != world.information_definition.rules_key:
@@ -409,3 +451,39 @@ def validate_information_state(state):
         # historical-information-v1 attribution.
         if any(entry.get("information_version") for entry in pool.injected_files):
             raise ValueError("Injected file claims historical provenance / Archivo inyectado atribuye procedencia histórica")
+
+
+def certify_prologue(state):
+    """Certify acquisition edges, not merely an existing physical path.
+
+    Runs before exploration and at save/load. No knowledge, pools, time or RNG
+    are changed. B2 explicitly uses the projection without these reservations.
+    """
+    from retorno.core.lore import disclosable_data_files, _locked_primary_targets
+    world = state.world.manifest_definition
+    witness = manifest.validate_prologue(world)
+    nid = manifest.operative_id(world, witness)
+    chain = dict(version=manifest.PROLOGUE_VERSION, host_id=nid)
+    definition = state.world.information_definition
+    if json.loads(definition.prologue_json) != chain:
+        raise ValueError("Invalid prologue information reservation / Reserva informativa del prólogo no válida")
+    reserved = {v["node_id"] for v in state.world.narrative_snapshot.get("reservations", {}).values()}
+    locked = _locked_primary_targets(state)
+    if nid in reserved | locked or "HARBOR_12" in locked:
+        raise ValueError("Prologue conflicts with narrative protection / El prólogo contradice una protección narrativa")
+    echo = query_information(world, definition, "ECHO_7")
+    archive = query_information(world, definition, nid)
+    if ("uplink" not in information_capabilities(echo.host.kind)
+            or "salvage_data" not in information_capabilities(witness.kind)
+            or not 1 <= len(echo.uplink) <= 3
+            or nid not in {r.destination_id for r in echo.uplink}
+            or "HARBOR_12" in {r.destination_id for r in echo.uplink}):
+        raise ValueError("Invalid public prologue acquisition chain / Cadena pública de adquisición del prólogo no válida")
+    files = [f for f in disclosable_data_files(state, archive.files)
+             if f.get("reservation_version") == manifest.PROLOGUE_VERSION]
+    if (len(files) != 1 or files[0]["access"] != "guest"
+            or files[0]["path"] != "/data/nav/waystation_solution.txt"
+            or files[0]["content"] != navigation_content(NavigationRecord(**files[0]["navigation_record"]))
+            or files[0]["navigation_record"]["destination_id"] != "HARBOR_12"):
+        raise ValueError("Prologue archive unavailable / Archivo del prólogo no disponible")
+    return chain

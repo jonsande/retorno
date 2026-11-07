@@ -28,6 +28,7 @@ from retorno.worldgen.generator import (
 
 PROTOTYPE_VERSION = "prototype-4d3e1b-v1"
 ALGORITHM_VERSION = "historical-world-v1"
+PROLOGUE_VERSION = "historical-prologue-chain-v1"
 MAX_SECTOR_INDEX = 2**48 - 32
 
 
@@ -79,6 +80,10 @@ class ManifestDefinition:
     scope: str
     rules_key: str = ""
     narrative_key: str = ""
+    prologue_version: str = ""
+    prologue_identity: SiteIdentity | None = None
+    prologue_fallback: HistoricalSite | None = None
+    prologue_excluded: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -318,6 +323,13 @@ class _Session:
                     self._add_edge(edges, site, others[rng.randrange(len(others))], "internal")
         result = SectorManifest(sid, region, archetype, tuple(sites), hub.identity if hub else None,
                                 tuple(edges[k] for k in sorted(edges)))
+        # Append after ordinary sampling/topology: no existing draw, hub or edge
+        # changes. The inverse inventory and normal materializer see this site.
+        fallback = self.d.prologue_fallback
+        if fallback is not None and fallback.generation_sector_id == sid:
+            if any(s.identity == fallback.identity for s in sites):
+                raise ValueError("Prologue fallback identity collision / Colisión de identidad del respaldo del prólogo")
+            result = replace(result, sites=result.sites + (fallback,))
         self.sectors[sid] = result
         return result
 
@@ -352,6 +364,65 @@ class _Session:
             cap = int(self.archetypes[self.sector(sid).archetype]["intersector_link_max"])
             self.rankings[sid] = tuple(viable[:cap])
         return self.rankings[sid]
+
+
+def reserve_prologue(definition, excluded=()):
+    """Finite initial construction, independent of exploration and mutable RNG.
+
+    Extension fields deliberately do not reseed the ordinary physical history.
+    A fallback is an extra canonical procedural slot, not a runtime rescue.
+    """
+    from retorno.model.world import information_capabilities
+    base = replace(definition, prologue_version="", prologue_identity=None,
+                   prologue_fallback=None, prologue_excluded=())
+    anchors = {a.raw_id: a for a in base.authored}
+    if not {"ECHO_7", "HARBOR_12"} <= anchors.keys():
+        raise ValueError("Prologue anchors missing / Faltan los anclajes del prólogo")
+    echo, harbor = (anchors[n].position_ly for n in ("ECHO_7", "HARBOR_12"))
+    excluded = tuple(sorted(set(excluded)))
+    session = new_session(base)
+    cohorts = _neighbor_sector_ids_2d(sector_id_for_pos(*echo))
+    sites = [s for sid in sorted(cohorts) for s in session.sector(sid).sites]
+    def eligible(site):
+        return (site.identity.namespace == "procedural"
+                and "salvage_data" in information_capabilities(site.kind)
+                and operative_id(base, site) not in excluded
+                and all(0 < math.dist(site.position_ly, p) <= base.hop_cap_ly for p in (echo, harbor)))
+    candidates = [s for s in sites if eligible(s)]
+    fallback = None
+    if candidates:
+        chosen = min(candidates, key=lambda s: (
+            _hash64(base.seed, PROLOGUE_VERSION + s.identity.local_id), s.identity))
+    else:
+        # The installed anchors admit this bounded box strictly inside the
+        # origin cohort and both 45 ly balls. Reject incompatible content;
+        # never retry seeds or silently omit the guarantee.
+        rng = random.Random(_hash64(base.seed, PROLOGUE_VERSION + ":fallback"))
+        pos = (echo[0]+4+rng.random()*2, echo[1]+1+rng.random()*2, echo[2]+.1+rng.random()*.1)
+        sid = sector_id_for_pos(*pos)
+        if sid not in cohorts:
+            raise ValueError("Prologue fallback outside initial cohorts / Respaldo del prólogo fuera de las cohortes iniciales")
+        indices = [json.loads(s.identity.local_id)[1] for s in sites
+                   if s.identity.namespace == "procedural" and s.generation_sector_id == sid]
+        index = max(indices, default=-1) + 1
+        identity = SiteIdentity(base.scope, "procedural", json.dumps((sid, index), separators=(",", ":")))
+        fallback = HistoricalSite(identity, sid, sid, pos, "derelict", region_for_pos(*pos),
+                                  False, False, f"DERELICT_{rng.getrandbits(24):06X}")
+        if not eligible(fallback):
+            raise ValueError("Incompatible prologue fallback / Respaldo del prólogo incompatible")
+        chosen = fallback
+    return replace(base, prologue_version=PROLOGUE_VERSION, prologue_identity=chosen.identity,
+                   prologue_fallback=fallback, prologue_excluded=excluded)
+
+
+def validate_prologue(definition):
+    if (definition.prologue_version != PROLOGUE_VERSION
+            or reserve_prologue(definition, definition.prologue_excluded) != definition):
+        raise ValueError("Invalid historical prologue reservation / Reserva histórica del prólogo no válida")
+    site = lookup_site(definition, definition.prologue_identity).site
+    if site is None:
+        raise ValueError("Missing prologue witness / Falta la fuente del prólogo")
+    return site
 
 
 def query_manifest(

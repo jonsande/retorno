@@ -1,3 +1,5 @@
+> **P3 implemented:** the `historical-prologue-chain-v1` extension reserves a procedural chain before exploration and may add one initial slot. Ordinary draws are preserved and the reservation is isolated from B2. See [Historical prologue guarantee](prologue-navigation.md) for these exceptions to the base rules below.
+
 # Historical procedural information — historical-information-v1
 
 [Español](historical-information.es.md). Implemented for external review in

@@ -36,6 +36,7 @@ def output(fn, *args):
 
 def unconfigured(snapshot):
     snapshot = deepcopy(snapshot)
+    snapshot.pop("prologue_chain", None)  # Compare the ordinary P1 projection.
     for loc in snapshot["locations"]:
         loc.pop("navigation_policy", None)
     return info.define_information(snapshot)
@@ -51,7 +52,8 @@ def test_subtraction_and_other_hosts():
         for record in catalog["records"]:
             if record["kind"] == "locations":
                 record["value"].pop("navigation_policy", None)
-        assert compile_catalog(seed, catalog)[0] == d  # Physical scope/geometry unchanged.
+        assert compile_catalog(seed, catalog)[0] == replace(d, prologue_version="", prologue_identity=None,
+            prologue_fallback=None, prologue_excluded=())  # Ordinary physical history unchanged.
         baseline = info.query_information(d, original, "ECHO_7")
         hosts = ["ECHO_7", "HARBOR_12", baseline.uplink[0].destination_id]
         if seed == 701:
@@ -59,7 +61,7 @@ def test_subtraction_and_other_hosts():
         frozen = pickle.dumps(s)
         for host in hosts:
             old = info.query_information(d, original, host)
-            new = info.query_information(d, definition, host)
+            new = info.query_information(d, definition, host, include_prologue=False)
             if host == "ECHO_7":
                 assert new.uplink == tuple(r for r in old.uplink if r.destination_id != "HARBOR_12")
                 assert new.files == old.files  # Authored testimony/contact stays intact.
@@ -72,7 +74,7 @@ def test_subtraction_and_other_hosts():
         assert pickle.dumps(s) == frozen
         if seed == 29:
             assert len(baseline.uplink) == 3
-            assert len(info.query_information(d, definition, "ECHO_7").uplink) == 2
+            assert len(info.query_information(d, definition, "ECHO_7", include_prologue=False).uplink) == 2
         for locale in (Locale.EN, Locale.ES):
             twin = deepcopy(s)
             twin.os.locale = locale
@@ -179,12 +181,12 @@ def test_normal_29_and_persistence():
         old_root = Path(folder) / "old-data"
         shutil.copytree(data._DATA_ROOT, old_root)
         path = old_root / "locations/echo_7.json"
-        value = json.loads(path.read_text()); value.pop("navigation_policy")
+        value = json.loads(path.read_text()); value["catalog_test_revision"] = "different catalogue"
         path.write_text(json.dumps(value))
         old_slot = Path(folder) / "old.dat"
         with patch.object(data, "_DATA_ROOT", old_root):
             old_state = create_initial_state_fast_sandbox(seed=29)
-            assert "HARBOR_12" in old_state.world.known_links["ECHO_7"]
+            assert "HARBOR_12" not in old_state.world.known_links["ECHO_7"]
             save_single_slot(old_state, old_slot)
             assert load_single_slot(old_slot).state.world.known_links == old_state.world.known_links
         content = old_slot.read_bytes()

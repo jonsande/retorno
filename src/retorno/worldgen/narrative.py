@@ -489,3 +489,17 @@ def prepare_new_world(state):
     state.world.universe_rules_key = definition.rules_key
     from retorno.core.lore import validate_essential_opportunities
     validate_essential_opportunities(state, definition)
+    # Resolve narrative reservations first, then freeze the two-stage public
+    # prologue history. No scheduler or exploration event can move its source.
+    from retorno.core.lore import _locked_primary_targets
+    from retorno.worldgen.manifest import reserve_prologue, operative_id, lookup_site, PROLOGUE_VERSION
+    from retorno.worldgen.information import certify_prologue
+    if {"ECHO_7", "HARBOR_12"} <= {a.raw_id for a in definition.authored}:
+        excluded = {v["node_id"] for v in snapshot["reservations"].values()} | _locked_primary_targets(state)
+        definition = reserve_prologue(definition, excluded)
+        state.world.manifest_definition = definition
+        witness = lookup_site(definition, definition.prologue_identity).site
+        snapshot["prologue_chain"] = dict(version=PROLOGUE_VERSION, host_id=operative_id(definition, witness))
+        state.world.information_definition = define_information(snapshot)
+        state.world.radio_definition = define_radio(snapshot, state.world.information_definition)
+        certify_prologue(state)

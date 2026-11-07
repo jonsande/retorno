@@ -1,3 +1,5 @@
+> **P3 implementado:** la extensión `historical-prologue-chain-v1` reserva una cadena procedural antes de explorar; puede añadir un único slot inicial. Conserva los sorteos ordinarios y aísla la reserva de B2. Véase [Garantía histórica del prólogo](prologue-navigation.es.md), que precisa estas excepciones a las reglas base descritas debajo.
+
 # Contrato `historical-radio-v1` — 4D-3e5c-B2
 
 [English](historical-radio.md). Implementado para revisión externa, 2026-11-07.

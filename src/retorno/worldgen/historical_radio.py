@@ -146,6 +146,8 @@ def query_host(world, definition, information_definition, host_id, *, session=No
     host = manifest.resolve_operative_id(world, host_id, session=session)
     if host is None or host.kind not in KINDS or host_id in definition.explicit_hosts:
         return None
+    if world.prologue_fallback is not None and host.identity == world.prologue_fallback.identity:
+        return None  # The added archive-only wreck declares no radio equipment.
     sampling_key = fingerprint(({k: v for k, v in rules.items() if k not in {"profile", "emission_probability"}},
         sampling_information.rules_key, definition.explicit_hosts))
     draw = lambda domain: _draw(world, sampling_key, host, domain)
@@ -170,7 +172,10 @@ def query_host(world, definition, information_definition, host_id, *, session=No
                 (rules["finite_duration_years"][1]-rules["finite_duration_years"][0]))*year)
         # B1 owns every navigation candidate; absence never causes replacement.
         if draw("navigation") < rules["navigation_probability"]:
-            archive = information.query_information(world, sampling_information, host_id)
+            # The prologue's new acquisition records belong to docked uplink
+            # and salvage only. Preserve the ordinary B1 radio pool and draws,
+            # including existing alternative navigation broadcasts.
+            archive = information.query_information(world, sampling_information, host_id, include_prologue=False)
             records = {r.record_id: r for r in archive.uplink}
             # Authored base files are testimony, even if they imitate B1 keys.
             # Only the B1 file producer's typed records certify a radio LINK.

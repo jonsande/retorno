@@ -53,6 +53,7 @@ def scene(spec=None, *, present=None, known=("A",), clean=True, seed=271828, rad
     s = create_initial_state_sandbox()
     s.meta.rng_seed = seed
     snap = deepcopy(s.world.narrative_snapshot)
+    snap.pop("prologue_chain", None)  # Synthetic scene replaces both anchors.
     snap.update(declarations=[{"test_scene": True}], arcs=[], singles=[], reservations={}, aliases={},
         locations=[{"node": {"node_id": nid, "kind": kind, "is_hub": kind in rec.HUBS,
             **dict(zip(("x_ly","y_ly","z_ly"),pos))}} for nid,kind,pos in spec])

@@ -1,3 +1,5 @@
+> **P3 implemented:** the `historical-prologue-chain-v1` extension reserves a procedural chain before exploration and may add one initial slot. Ordinary draws are preserved and the reservation is isolated from B2. See [Historical prologue guarantee](prologue-navigation.md) for these exceptions to the base rules below.
+
 # `historical-radio-v1` contract — 4D-3e5c-B2
 
 [Español](historical-radio.es.md). Implemented for external review, 2026-11-07.
