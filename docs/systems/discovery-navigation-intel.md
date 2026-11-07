@@ -8,6 +8,17 @@
 
 # Discovery, navigation, and intel
 
+## Prologue completion — P4
+
+`MetaState.prologue_complete` starts as `False`. The shared arrival handling
+in `Engine.tick()` sets it to `True` when transit to HARBOR_12 finishes and its
+physical node is confirmed, without requiring docking. Contact or route
+knowledge, starting a journey and consulting debug information do not activate
+it. Departure and existing save/load persistence preserve it. Assignment only
+occurs while completion is pending; it adds no events, scenes or other effects.
+Ordinary arrival and arrival during hibernation use the same handling, shared
+by CLI and Textual.
+
 ## Knowledge boundary — 4D-3e5a
 
 `C-DATA-004` distinguishes physical truth, engine internals, acquired observations,

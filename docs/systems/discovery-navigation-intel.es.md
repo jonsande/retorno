@@ -8,6 +8,17 @@
 
 # Descubrimiento, navegación e intel
 
+## Finalización del prólogo — P4
+
+`MetaState.prologue_complete` comienza en `False`. El tratamiento compartido
+de llegada en `Engine.tick()` lo establece en `True` cuando finaliza el tránsito
+a HARBOR_12 y se confirma su nodo físico, sin exigir atraque. Conocer contactos
+o rutas, iniciar un viaje o consultar información de debug no lo activa.
+Se conserva al partir y al guardar/cargar mediante la persistencia existente.
+La asignación solo se realiza si aún está pendiente; no añade eventos, escenas
+ni otros efectos. La llegada ordinaria y la llegada durante hibernación usan
+el mismo tratamiento, compartido por CLI y Textual.
+
 ## Frontera de conocimiento — 4D-3e5a
 
 `C-DATA-004` distingue verdad física, estado interno del motor, observaciones

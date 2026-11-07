@@ -126,6 +126,8 @@ class Engine:
                 if node.kind != "transit":
                     state.world.visited_nodes.add(node.node_id)
                     close_window_on_orbit_entry(state, node.node_id)
+                    if state.ship.transit_to == node.node_id == "HARBOR_12" and not state.meta.prologue_complete:
+                        state.meta.prologue_complete = True
             events.extend(self._clear_tmp_node(state))
             self._drop_initial_unknown_node(state)
             events.append(

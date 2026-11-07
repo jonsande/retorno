@@ -12,6 +12,7 @@ from retorno.bootstrap import create_initial_state_prologue, create_initial_stat
 from retorno.cli import repl
 from retorno.config.balance import Balance
 from retorno.core.engine import Engine
+from retorno.model.events import EventType
 from retorno.io.save_load import save_single_slot, load_single_slot
 from retorno.model.os import Locale
 from retorno.runtime.loop import GameLoop
@@ -161,6 +162,14 @@ def public_chain():
     # FAST_SANDBOX only skips ship preparation. Every chain action below uses
     # public commands; no debug, teleport, resource or knowledge edits.
     s, engine = create_initial_state_fast_sandbox(seed=1), Engine()
+    assert not create_initial_state_prologue(seed=1).meta.prologue_complete
+    assert not s.meta.prologue_complete
+    output(repl.render_cat, s, "/remote/ECHO_7/logs/echo_cache.en.txt")
+    assert "HARBOR_12" in s.world.known_nodes and not s.meta.prologue_complete
+    debug = deepcopy(s)
+    debug.os.debug_enabled = True
+    output(repl.render_debug_graph_all, debug)
+    assert not debug.meta.prologue_complete
     loop = GameLoop(engine, s)
     loop.set_auto_tick(False)
     paths = [p for p in s.os.fs if p.startswith("/logs/nav/uplink_ECHO_7_")]
@@ -177,9 +186,24 @@ def public_chain():
     def travel(target):
         run("nav " + target)
         assert s.ship.in_transit and repl._hibernate_blocked_message(s) is None
+        assert not s.meta.prologue_complete  # Starting either leg is insufficient.
+        if target == "HARBOR_12":
+            # Same legitimate journey, ordinary tick arrival instead of the
+            # hibernation driver. Two large ticks avoid a survival simulation.
+            ordinary = deepcopy(s)
+            remaining = ordinary.ship.arrival_t - ordinary.clock.t
+            engine.tick(ordinary, remaining / 2)
+            assert ordinary.ship.in_transit and not ordinary.meta.prologue_complete
+            arrived = engine.tick(ordinary, ordinary.ship.arrival_t - ordinary.clock.t)
+            assert sum(e.type == EventType.ARRIVED for e in arrived) == 1
+            assert ordinary.world.current_node_id == "HARBOR_12" and ordinary.ship.docked_node_id is None
+            assert ordinary.meta.prologue_complete
+            assert not any(e.type == EventType.ARRIVED for e in engine.tick(ordinary, 1))
+            assert ordinary.meta.prologue_complete
         result = repl._execute_hibernate(loop, (s.ship.arrival_t-s.clock.t+1)/Balance.YEAR_S)
         journal.append(dict(command="hibernate until_arrival", years=result.actual_years))
         assert not s.ship.in_transit and s.world.current_node_id == target
+        assert s.meta.prologue_complete == (target == "HARBOR_12")
     travel(host)
     run("dock " + host)
     run("power plan normal")
@@ -196,11 +220,13 @@ def public_chain():
         loaded = load_single_slot(slot).state
         assert loaded.world.manifest_definition == s.world.manifest_definition
         assert loaded.os.fs[path] == s.os.fs[path]
+        assert not loaded.meta.prologue_complete
         for locale in (Locale.EN, Locale.ES):
             twin = deepcopy(loaded)
             twin.os.locale = locale
             imported = output(repl.render_cat, twin, path)
             assert "LINK:" in imported and "HARBOR_12" in twin.world.known_links[host]
+            assert not twin.meta.prologue_complete  # Route knowledge is insufficient.
             files, links = deepcopy(twin.os.fs), deepcopy(twin.world.known_links)
             output(repl.render_cat, twin, path)
             assert twin.os.fs == files and twin.world.known_links == links
@@ -208,8 +234,25 @@ def public_chain():
         loop = GameLoop(engine, s)
         loop.set_auto_tick(False)
         journal.append(dict(command="cat " + path, output=output(repl.render_cat, s, path)))
+        assert not s.meta.prologue_complete
         run("undock")
         travel("HARBOR_12")
+        assert s.ship.docked_node_id is None  # Completion does not require docking.
+        for _ in range(3):
+            assert not any(e.type == EventType.ARRIVED for e in engine.tick(s, 1))
+            assert s.meta.prologue_complete
+        save_single_slot(s, slot)
+        assert load_single_slot(slot).state.meta.prologue_complete
+        run("nav " + host)
+        assert s.ship.in_transit and s.meta.prologue_complete
+        save_single_slot(s, slot)
+        departing = load_single_slot(slot).state
+        assert departing.ship.in_transit and departing.meta.prologue_complete
+        arrived = engine.tick(departing, departing.ship.arrival_t - departing.clock.t + 1)
+        assert sum(e.type == EventType.ARRIVED for e in arrived) == 1
+        assert departing.world.current_node_id == host and departing.meta.prologue_complete
+        save_single_slot(departing, slot)
+        assert load_single_slot(slot).state.meta.prologue_complete
     assert not s.os.debug_enabled and not s.os.god_active
     return journal
 
