@@ -51,6 +51,8 @@ def is_critical_system_id(system_id: str) -> bool:
 
 
 def is_critical_power_state(state) -> bool:
+    if state.os.god_active:
+        return False
     q = state.ship.power.power_quality
     if q < Balance.POWER_QUALITY_COLLAPSE_THRESHOLD:
         return True

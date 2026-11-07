@@ -31,9 +31,9 @@ def is_exploration_capable(state) -> bool:
         return False
     if state.os.terminal_lock:
         return False
-    if state.ship.power.brownout:
+    if not state.os.god_active and state.ship.power.brownout:
         return False
-    if state.ship.power.power_quality < float(Balance.POWER_QUALITY_BLOCK_THRESHOLD):
+    if not state.os.god_active and state.ship.power.power_quality < float(Balance.POWER_QUALITY_BLOCK_THRESHOLD):
         return False
 
     current_id = state.world.current_node_id
@@ -55,9 +55,9 @@ def is_exploration_capable(state) -> bool:
 def _uplink_system_blocked_reason(state) -> str | None:
     if state.ship.in_transit:
         return "in_transit"
-    if state.ship.power.brownout:
+    if not state.os.god_active and state.ship.power.brownout:
         return "brownout_active"
-    q = state.ship.power.power_quality
+    q = 1.0 if state.os.god_active else state.ship.power.power_quality
     if q < Balance.POWER_QUALITY_COLLAPSE_THRESHOLD:
         return "power_quality_collapse"
     if q < Balance.POWER_QUALITY_BLOCK_THRESHOLD:

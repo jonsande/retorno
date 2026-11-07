@@ -21,7 +21,7 @@ Comportamiento operativo
 - `debug god on|off|status` controla la protección contra daños solo durante la sesión. Activarlo requiere DEBUG; off y status funcionan en ambos modos.
 - La protección bloquea el nuevo desgaste del casco/sistemas, la dosis perjudicial de radiación en drones, sus daños de integridad y el consumo operativo de batería. No restaura daños previos, drones inutilizados ni baterías vacías.
 - `debug off`, una nueva sesión debug, reiniciar el escenario y cargar una partida dejan el modo dios desactivado. Repetir `debug on` en la misma sesión conserva su estado.
-- Las lecturas de radiación ambiental/interna siguen siendo reales. El mantenimiento habitual de bahía y las reparaciones solicitadas siguen funcionando; recursos, límites eléctricos, fallos de trabajos, descubrimiento y duraciones físicas mantienen sus reglas normales.
+- Las lecturas de radiación ambiental/interna siguen siendo reales. El mantenimiento habitual de bahía y las reparaciones solicitadas siguen funcionando; recursos, fallos de trabajos, descubrimiento y duraciones físicas mantienen sus reglas normales.
 - `debug on` detiene el tiempo automático; `wait N` avanza manualmente con los pasos existentes de un segundo. El modo dios no cambia los tiempos de viajes ni trabajos.
 - `debug on|off` alterna modo debug y control de auto-tick.
 - SANDBOX y FAST_SANDBOX están en principio pensados exclusivamente para depuración de errores y pruebas de diseño. FAST_SANDBOX recupera ECHO_7 por completo y comienza en órbita con los sistemas y drones completamente reparados en su bahía.
@@ -42,3 +42,5 @@ Notas de uso
 
 Comandos relacionados
 - `wait <seconds>`, `status`, `jobs`
+
+Mientras está activo, el modo dios proporciona energía ilimitada y estable a la nave (Q=1), omite las dependencias eléctricas y las desconexiones automáticas por carga, e impide el consumo de la batería de la nave. Conserva los daños físicos del generador y la distribución; los sistemas y servicios detenidos manualmente o averiados siguen necesitando activación o reparación normal. Al desactivarlo, las reglas eléctricas normales vuelven en el siguiente paso de simulación.

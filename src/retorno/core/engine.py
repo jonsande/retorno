@@ -152,6 +152,8 @@ class Engine:
         events.extend(self._enforce_distribution_collapse(state))
 
         p_load = self._compute_load_kw(state)
+        if state.os.god_active:
+            state.ship.power.p_gen_kw = self._compute_p_gen(state)
         p_gen = state.ship.power.p_gen_kw
         p_discharge_max = state.ship.power.p_discharge_max_kw
         soc = self._soc(state)
@@ -190,7 +192,7 @@ class Engine:
         state.ship.power.power_quality = power_quality
         soc = self._soc(state)
         available_discharge_kw = p_discharge_max if soc > 0.0 else 0.0
-        state.ship.power.brownout = p_load > (p_gen + available_discharge_kw)
+        state.ship.power.brownout = not state.os.god_active and p_load > (p_gen + available_discharge_kw)
         if state.ship.power.brownout:
             state.ship.power.brownout_sustained_s += dt
         else:
@@ -943,7 +945,7 @@ class Engine:
                 self._record_event(state.events, event)
                 return [event]
             distribution = state.ship.systems.get("energy_distribution")
-            if distribution and distribution.state == SystemState.OFFLINE:
+            if not state.os.god_active and distribution and distribution.state == SystemState.OFFLINE:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
@@ -1192,7 +1194,7 @@ class Engine:
                 self._record_event(state.events, event)
                 return [event]
             distribution = state.ship.systems.get("energy_distribution")
-            if distribution and distribution.state == SystemState.OFFLINE:
+            if not state.os.god_active and distribution and distribution.state == SystemState.OFFLINE:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
@@ -1804,8 +1806,8 @@ class Engine:
                 self._record_event(state.events, event)
                 return [event]
             effective_deps = self._system_dependencies_for_gating(system)
-            if self._dependencies_blocked(state.ship.systems, effective_deps):
-                dep_detail = self._first_unmet_dependency(state.ship.systems, effective_deps)
+            if self._dependencies_blocked(state.ship.systems, effective_deps, unlimited_power=state.os.god_active):
+                dep_detail = self._first_unmet_dependency(state.ship.systems, effective_deps, unlimited_power=state.os.god_active)
                 dep_target, dep_required, dep_current = dep_detail if dep_detail else ("?", "?", "?")
                 event = self._make_event(
                     state,
@@ -3247,8 +3249,8 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            if self._dependencies_blocked(state.ship.systems, system.dependencies):
-                dep_detail = self._first_unmet_dependency(state.ship.systems, system.dependencies)
+            if self._dependencies_blocked(state.ship.systems, system.dependencies, unlimited_power=state.os.god_active):
+                dep_detail = self._first_unmet_dependency(state.ship.systems, system.dependencies, unlimited_power=state.os.god_active)
                 if dep_detail:
                     dep_target, dep_required, dep_current = dep_detail
                     msg = (
@@ -3379,7 +3381,7 @@ class Engine:
             service_id = job.target.id if job.target else ""
             if (not system or not system.service or system.service.service_name != service_id
                     or not system.service.is_installed or self._boot_owner_unavailable(system)
-                    or self._dependencies_blocked(state.ship.systems, system.dependencies)
+                    or self._dependencies_blocked(state.ship.systems, system.dependencies, unlimited_power=state.os.god_active)
                     or self._service_power_unavailable(state, system)):
                 if system and system.service:
                     system.service.is_running = False
@@ -5019,6 +5021,8 @@ class Engine:
         return math.sqrt(dx * dx + dy * dy + dz * dz)
 
     def _auto_load_shed(self, state: GameState, p_capacity: float, p_load: float) -> list[Event]:
+        if state.os.god_active:
+            return []
         events: list[Event] = []
         systems_sorted = sorted(
             state.ship.systems.values(),
@@ -5482,7 +5486,7 @@ class Engine:
             )
             active_keys.add(EventType.LOW_SOC_NOTICE.value)
 
-        if distribution and distribution.state == SystemState.OFFLINE:
+        if not state.os.god_active and distribution and distribution.state == SystemState.OFFLINE:
             events.extend(
                 self._ensure_alert(
                     state,
@@ -6029,8 +6033,9 @@ class Engine:
     def _drone_bay_support_snapshot(self, state: GameState) -> dict[str, float | bool | int | SystemState]:
         bay_state = self._drone_bay_state(state)
         distribution = state.ship.systems.get("energy_distribution")
-        distribution_offline = bool(distribution and distribution.state == SystemState.OFFLINE)
-        net_kw = state.ship.power.p_gen_kw - state.ship.power.p_load_kw
+        distribution_offline = bool(not state.os.god_active and distribution and distribution.state == SystemState.OFFLINE)
+        net_kw = (self._compute_p_gen(state) - self._compute_load_kw(state) if state.os.god_active
+                  else state.ship.power.p_gen_kw - state.ship.power.p_load_kw)
         soc = (
             state.ship.power.e_batt_kwh / state.ship.power.e_batt_max_kwh
             if state.ship.power.e_batt_max_kwh > 0.0
@@ -6195,10 +6200,12 @@ class Engine:
         ]
 
     def _dependencies_blocked(
-        self, systems: dict[str, ShipSystem], dependencies: list[Dependency]
+        self, systems: dict[str, ShipSystem], dependencies: list[Dependency], *, unlimited_power: bool = False
     ) -> bool:
         for dep in dependencies:
             if dep.dep_type != "system_state_at_least":
+                continue
+            if unlimited_power and dep.target_id in {"energy_distribution", "power_core"}:
                 continue
             target = systems.get(dep.target_id)
             if not target or target.forced_offline:
@@ -6209,10 +6216,12 @@ class Engine:
         return False
 
     def _first_unmet_dependency(
-        self, systems: dict[str, ShipSystem], dependencies: list[Dependency]
+        self, systems: dict[str, ShipSystem], dependencies: list[Dependency], *, unlimited_power: bool = False
     ) -> tuple[str, str, str] | None:
         for dep in dependencies:
             if dep.dep_type != "system_state_at_least":
+                continue
+            if unlimited_power and dep.target_id in {"energy_distribution", "power_core"}:
                 continue
             target = systems.get(dep.target_id)
             if not target:
@@ -6245,7 +6254,7 @@ class Engine:
 
     def _service_power_unavailable(self, state: GameState, system: ShipSystem) -> bool:
         return bool(state.os.terminal_lock or (
-            self._is_noncritical_system(system) and (
+            not state.os.god_active and self._is_noncritical_system(system) and (
                 is_critical_power_state(state)
                 or state.ship.power.power_quality < Balance.POWER_QUALITY_CRITICAL_THRESHOLD
             )
@@ -6263,7 +6272,7 @@ class Engine:
             if not svc.is_installed:
                 status = "not_installed"
             elif (self._boot_owner_unavailable(owner)
-                  or self._dependencies_blocked(state.ship.systems, owner.dependencies)
+                  or self._dependencies_blocked(state.ship.systems, owner.dependencies, unlimited_power=state.os.god_active)
                   or self._service_power_unavailable(state, owner)):
                 status = "blocked"
             events.append(self._make_event(
@@ -6486,6 +6495,8 @@ class Engine:
         return True
 
     def _auto_shed_one_noncritical(self, state: GameState) -> list[Event]:
+        if state.os.god_active:
+            return []
         events: list[Event] = []
         systems_sorted = sorted(
             state.ship.systems.values(),
@@ -6522,6 +6533,8 @@ class Engine:
         return events
 
     def _shed_all_noncritical(self, state: GameState) -> list[Event]:
+        if state.os.god_active:
+            return []
         events: list[Event] = []
         systems_sorted = sorted(
             state.ship.systems.values(),
@@ -6614,9 +6627,11 @@ class Engine:
     def _enforce_distribution_collapse(self, state: GameState) -> list[Event]:
         events: list[Event] = []
         distribution = state.ship.systems.get("energy_distribution")
-        if not distribution or distribution.state != SystemState.OFFLINE:
+        if state.os.god_active or not distribution or distribution.state != SystemState.OFFLINE:
             for system in state.ship.systems.values():
-                if system.auto_offline_reason != "energy_distribution_offline":
+                if system.auto_offline_reason != "energy_distribution_offline" and not (
+                    state.os.god_active and system.auto_offline_reason == "load_shed"
+                ):
                     continue
                 system.auto_offline_reason = None
                 system.forced_offline = False
@@ -6676,7 +6691,7 @@ class Engine:
         return event
 
     def _check_power_action_block(self, state: GameState, action: Action) -> Event | None:
-        power_quality = state.ship.power.power_quality
+        power_quality = 1.0 if state.os.god_active else state.ship.power.power_quality
 
         if state.os.terminal_lock:
             return self._power_blocked_event(
@@ -6745,6 +6760,8 @@ class Engine:
         return None
 
     def _update_battery(self, state: GameState, dt: float, p_gen: float, p_load: float) -> None:
+        if state.os.god_active:
+            return
         p_charge_max = state.ship.power.p_charge_max_kw
         p_discharge_max = state.ship.power.p_discharge_max_kw
         net = p_gen - p_load
@@ -6764,6 +6781,9 @@ class Engine:
             )
 
     def _compute_power_quality(self, state: GameState, p_gen: float, p_load: float) -> float:
+        if state.os.god_active:
+            state.ship.power.deficit_ratio = 0.0
+            return 1.0
         if state.ship.power.e_batt_max_kwh > 0:
             soc = state.ship.power.e_batt_kwh / state.ship.power.e_batt_max_kwh
         else:
@@ -6790,6 +6810,8 @@ class Engine:
         return self._clamp(power_quality)
 
     def _compute_p_gen(self, state: GameState) -> float:
+        if state.os.god_active:
+            return self._compute_load_kw(state) + max(0.0, state.ship.power.p_charge_max_kw, Balance.DRONE_CHARGE_KW)
         base = state.ship.power.p_gen_base_kw + state.ship.power.p_gen_bonus_kw
         core = state.ship.systems.get("power_core")
         if not core or core.forced_offline or core.state == SystemState.OFFLINE:

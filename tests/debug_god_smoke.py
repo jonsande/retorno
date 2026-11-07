@@ -151,6 +151,43 @@ def main():
     assert state.ship.hull_integrity < old_hull
     assert repl._terminal_state_allows(('DEBUG_GOD', 'off'))
 
+    # Unlimited ship supply must survive an empty battery, dead generator,
+    # offline distribution and loads beyond the physical discharge capacity.
+    electrical = create_initial_state_sandbox()
+    electrical.os.set_debug(True)
+    power = electrical.ship.power
+    power.e_batt_kwh = 0.0
+    power.p_gen_base_kw = power.p_gen_bonus_kw = 0.0
+    power.p_discharge_max_kw = 0.0
+    power.quality_offset = -10.0
+    power.power_quality = 0.0
+    power.brownout = True
+    for sid in ('power_core', 'energy_distribution'):
+        electrical.ship.systems[sid].state = SystemState.OFFLINE
+    sensors = electrical.ship.systems['sensors']
+    sensors.state = SystemState.NOMINAL
+    sensors.forced_offline = False
+    command(electrical, 'on')
+    from retorno.core.actions import Scan
+    from retorno.core.power_policy import is_critical_power_state
+    assert not is_critical_power_state(electrical)
+    assert engine._check_power_action_block(electrical, Scan()) is None
+    assert not engine._dependencies_blocked(electrical.ship.systems, sensors.dependencies,
+                                            unlimited_power=electrical.os.god_active)
+    assert not engine._service_power_unavailable(electrical, sensors)
+    for _ in range(3):
+        engine.tick(electrical, 1.0)
+        assert sensors.state == SystemState.NOMINAL and not sensors.forced_offline
+        assert power.power_quality == 1.0 and not power.brownout
+        assert power.deficit_ratio == 0.0 and power.brownout_sustained_s == 0.0
+        assert power.e_batt_kwh == 0.0
+        assert power.p_gen_kw >= power.p_load_kw
+    command(electrical, 'off')
+    engine.tick(electrical, 1.0)
+    assert sensors.state == SystemState.OFFLINE
+    assert power.power_quality < Balance.POWER_QUALITY_BLOCK_THRESHOLD
+    assert engine._compute_p_gen(electrical) == 0.0
+
     # Legacy payloads default off; actual loading clears even a saved true flag.
     legacy = OSState.__new__(OSState)
     legacy.__setstate__((None, {'debug_enabled': True}))

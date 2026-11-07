@@ -41,9 +41,7 @@ this is a configuration change, not damage or operational exhaustion.
 Activation does not repair health/integrity, revive disabled drones, refill
 batteries, remove existing dose, enable failed systems or create resources.
 Ordinary paid bay repair, charging, decontamination and requested repair jobs
-continue under their existing rules. Power generation, ship energy use, load
-shedding, system dependencies, job failure probabilities and resource costs
-remain normal. Risk rolls still occur even when their damage is blocked.
+continue under their existing rules. Job failure probabilities and resource costs remain normal. Risk rolls still occur even when their damage is blocked.
 
 Ambient radiation and internal ingress calculations/readings remain normal.
 God mode never writes worldgen, history, B1/B2, contacts, known routes, lore,
@@ -78,3 +76,5 @@ No general damage refactor, scheduler changes or extended exploration runs.
   independently checks protected and normal hull/system/drone radiation wear.
 
 Stopped for external review; no staging, commit or push.
+
+While active, god mode supplies unlimited stable ship power (Q=1), bypasses electrical dependencies and automatic load shedding, and prevents ship battery consumption. Physical generation and distribution damage is preserved; manually stopped or damaged systems and services still need normal activation or repair. Switching it off restores normal electrical rules on the next simulation tick.

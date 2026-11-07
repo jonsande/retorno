@@ -43,9 +43,7 @@ operativo.
 Activarlo no repara salud/integridad, revive drones, rellena baterías, elimina
 dosis previa, habilita sistemas averiados ni crea recursos. La reparación
 ordinaria pagada en bahía, la carga, descontaminación y los trabajos de reparación
-solicitados siguen sus reglas existentes. Generación eléctrica, consumo
-energético de nave, desconexión por carga, dependencias de sistemas,
-probabilidades de fallo de trabajos y costes de recursos siguen normales.
+solicitados siguen sus reglas existentes. Las probabilidades de fallo de trabajos y costes de recursos siguen normales.
 Las tiradas de riesgo se realizan aunque se bloquee su daño.
 
 La radiación ambiental, los cálculos de penetración interna y sus lecturas siguen
@@ -82,3 +80,5 @@ Sin refactorización general de daños, cambios del scheduler ni exploraciones l
   casco/sistemas/drones por radiación.
 
 Detenido para revisión externa; sin staging, commit ni push.
+
+Mientras está activo, el modo dios proporciona energía ilimitada y estable a la nave (Q=1), omite las dependencias eléctricas y las desconexiones automáticas por carga, e impide el consumo de la batería de la nave. Conserva los daños físicos del generador y la distribución; los sistemas y servicios detenidos manualmente o averiados siguen necesitando activación o reparación normal. Al desactivarlo, las reglas eléctricas normales vuelven en el siguiente paso de simulación.

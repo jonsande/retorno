@@ -157,6 +157,8 @@ def radio_block_reason(state, opportunity: RadioOpportunity | None = None) -> st
         return "comms_damaged"
     for dep in comms.dependencies:
         if dep.dep_type == "system_state_at_least":
+            if state.os.god_active and dep.target_id in {"energy_distribution", "power_core"}:
+                continue
             target = systems.get(dep.target_id)
             order = list(SystemState)
             if (target is None or target.forced_offline
@@ -167,7 +169,7 @@ def radio_block_reason(state, opportunity: RadioOpportunity | None = None) -> st
     core = systems.get("core_os")
     if core is None or core.forced_offline or core.state not in RECEIVING_STATES:
         return "core_unavailable"
-    if state.ship.power.brownout or state.ship.power.power_quality < Balance.POWER_QUALITY_BLOCK_THRESHOLD:
+    if not state.os.god_active and (state.ship.power.brownout or state.ship.power.power_quality < Balance.POWER_QUALITY_BLOCK_THRESHOLD):
         return "power_unavailable"
     # Reuse the engine's read-only electrical kernels, including cruise and job
     # loads. Cached Q/brownout may precede a manual power transition this tick.
