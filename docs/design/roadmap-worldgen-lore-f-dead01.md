@@ -1,3 +1,7 @@
+## Follow-up decision — 2026-11-07
+
+[Exploration continuity investigation](exploration-softlock-research.md): aim to avoid unintended structural exploration deadlocks in all viable games, without implying guaranteed survival or silently changing D04/D08. Validate during 4D-3e6; defer F-DEAD-01 level 2 until evidence warrants it. The arcs/singles review and integral playthrough remain next priorities.
+
 ## 4D-3e5c-B2 — implemented for external review
 
 [historical-radio-v1](../systems/historical-radio.md) separates original hardware, conservation, energy, emission programs and propagating waves. It reuses the manifest, B1, radio physics and reception ledger; authored declarations override whole hosts. Local lazy discovery, persistence and certified F-DEAD-01 sources are implemented. Exceptional physical repair and prolonged e6 validation remain future work. Previous B2-pending statements below describe earlier phases.

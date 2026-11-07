@@ -1,3 +1,5 @@
+> **Pending investigation (2026-11-07).** [Exploration continuity and deadlocks](../design/exploration-softlock-research.md): the objective of avoiding unintended structural deadlocks in every viable game is not proven. F-DEAD-01 level 2 is deferred; this file remains the current implementation contract.
+
 > **B2 update.** [Historical radio](historical-radio.md) supplies certified procedural emissions through the same resolver, selector and ledger. Existing first-stage, open-ended continuous, coverage, payload and protection requirements remain. Later stages can reuse prior procedural receipts. Selection has an additional bounded radio-host budget; no transmitter repair is implemented.
 
 > **4D-3e5c-B1 — historical archive sources.** F-DEAD-01 can inspect a fixed [v1 procedural archive](historical-information.md) before pool preparation, with exact file/payload evidence and no materialization, injection or disclosure. Per-search information host queries have an explicit budget. Legacy source/plan provenance and the first declared radio-emission requirement remain unchanged.

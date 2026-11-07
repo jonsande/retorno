@@ -91,3 +91,4 @@ deberán mantener la matriz, la paridad EN/ES y la separación entre comportamie
 implementado y propuestas.
 
 - [IDs públicos de localización](systems/public-location-ids.es.md): referencias operativas compactas, resolución y evidencia histórica original.
+- [Investigación de bloqueos exploratorios](design/exploration-softlock-research.es.md): objetivo de continuidad, límites de F-DEAD-01 nivel 1, criterios de validación y nivel 2 aplazado.

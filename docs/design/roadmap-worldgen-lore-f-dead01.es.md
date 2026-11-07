@@ -1,3 +1,7 @@
+## Decisión de seguimiento — 2026-11-07
+
+[Investigación de continuidad exploratoria](exploration-softlock-research.es.md): se desea evitar bloqueos exploratorios estructurales involuntarios en todas las partidas viables, sin confundirlo con supervivencia garantizada ni alterar D04/D08 por suposición. Pendiente de validar en 4D-3e6; F-DEAD-01 nivel 2 se aplaza hasta disponer de evidencia. La revisión de arcos/singles y la partida integral siguen siendo las próximas prioridades.
+
 ## 4D-3e5c-B2 — implementada para revisión externa
 
 [historical-radio-v1](../systems/historical-radio.es.md) separa hardware original, conservación, energía, programación y ondas en propagación. Reutiliza manifiesto, B1, física y ledger de recepción; authored explícito prevalece para todo su host. Se implementan descubrimiento lazy local, persistencia y fuentes certificadas para F-DEAD-01. La reparación física excepcional y la validación e6 prolongada quedan pendientes. Las menciones inferiores a B2 pendiente describen fases anteriores.

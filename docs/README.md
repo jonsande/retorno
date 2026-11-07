@@ -90,3 +90,4 @@ must keep the matrix and EN/ES parity current while separating implemented
 behavior from proposals.
 
 - [Public location IDs](systems/public-location-ids.md): compact operational references, resolution and original historical evidence.
+- [Exploration deadlock research](design/exploration-softlock-research.md): continuity objective, level-1 F-DEAD-01 limits, validation criteria and deferred level 2.
