@@ -1,0 +1,25 @@
+TRANSPORTE ASTERIÓN / MANIFIESTO DE PASAJEROS
+Copia compuesta a partir de dos lecturas parciales. Datación de embarque no recuperada.
+
+CABECERA A: «Programa de establecimiento / contingente de tránsito».
+CABECERA B: «Traslado protegido / prioridad de evacuación».
+No se puede determinar si las cabeceras describen fases sucesivas de una misma operación o si corresponden a listas reunidas después.
+
+Pasajeros nominales: 318. Plazas asignadas: 344. Hay identificadores repetidos y veintiséis plazas sin nombre. Entre las profesiones constan agrónomos, soldadores, docentes y técnicos de medicina neonatal. También figuran personas sin capacitación para colonización prolongada y veintidós menores de cuatro años.
+
+ORIGEN (campo dañado): ...ERMA / ...RMA / ...IMA.
+PUERTO DE SALIDA: ...L-17, confirmado solamente en una segunda copia.
+DESTINO DE TRANSPORTE: ...SA / ESTACIÓN ...SA.
+DESTINO DE ASENTAMIENTO: no consignado en la copia de seguridad.
+
+[ANEXO DE EMBARQUE, SIN FIRMA]
+A los titulares de pasaje de retorno se les ha informado que el trayecto no dispone de garantía de retorno. Los contratos emitidos antes de la reasignación seguirán siendo reconocidos por la autoridad de destino. La autoridad de destino no consta en el margen que queda.
+
+[FRAGMENTO DE UNA PETICIÓN]
+No salimos para fundar una ciudad. Nos dijeron que habría otra nave esperándonos allí. Si han cambiado el plan, quiero saber quién tiene derecho a cambiarlo por mi hija.
+
+[REGISTRO DE RECEPCIÓN, SELLO PARCIAL]
+El equipo de carga confirma treinta y siete contenedores de hábitat, de los cuales ocho no corresponden al manifiesto inicial.
+
+NOTA DE TALEN OSS / CICLO 206:
+El mismo viaje puede haber sido colonización para algunos, evacuación para otros y traslado laboral para quienes viajaban bajo contrato. Ninguna cabecera autoriza a decidir cuál era el propósito de todos los pasajeros. Tampoco hay base suficiente para fijar el sistema de origen o el destino exacto de Asterión.

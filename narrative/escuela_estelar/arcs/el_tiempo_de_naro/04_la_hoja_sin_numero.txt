@@ -1,0 +1,22 @@
+ARCHIVO CIVIL / ANEXO DE SEGURIDAD DE LA NAVE
+Documento extraído de un conjunto de siete revisiones. Una de ellas carece de número de versión.
+
+En la tabla destinada al consejo figura:
+«Probabilidad de trayectoria dentro del volumen de llegada: ALTA».
+
+En el cálculo original de Naro Sen figura:
+«Dispersión de trayectoria no caracterizada. El volumen de llegada depende de posiciones históricas sin baliza reciente».
+
+N. SEN, declaración adjunta:
+No cambié yo esa celda. Tampoco detuve la circulación del informe cuando vi que había cambiado. Pensé que quien lo leyera sabría que «alta» no tenía sustento. Después escuché a la consejera de abastecimiento repetir la palabra en una reunión pública.
+
+S. NEMET, respuesta:
+La revisión no pretendía cuantificar el encuentro con personas. Resumía la estabilidad del motor en una ruta nominal. Nadie me preguntó qué significaba «llegada».
+
+ANOTACIÓN DEL REVISOR:
+Ambas explicaciones pueden ser compatibles con los registros. Ninguna resuelve por qué se eliminó la advertencia sobre la incertidumbre de las coordenadas.
+
+Se ordena adjuntar las dos formulaciones a la documentación pública. La palabra «alta» se mantiene en el archivo por trazabilidad, no por validación.
+
+En el reverso, sin firma:
+La dificultad no era mentir. Era decir una frase que todos querían entender de otro modo.

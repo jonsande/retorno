@@ -1,0 +1,24 @@
+COMISIÓN DE SEGURIDAD / ACTA DE INCIDENTE 7
+Asterión, anillo de acoplamiento y almacén de soportes.
+Integridad del archivo: 61 %. Tres declaraciones recuperadas de seis.
+
+HECHOS COMUNES A LAS TRES DECLARACIONES:
+Se produjo una desconexión no autorizada de la línea térmica que alimentaba la cámara de reacción. El almacén de módulos de hábitat quedó sin refrigeración durante diecinueve minutos. Un operario llamado Solen Fera murió al intentar devolver manualmente la presión al circuito. Resultaron inutilizables dos conjuntos de sellado. Después del incidente, tanto el plan de descenso como el de partida tuvieron que revisarse.
+
+DECLARACIÓN DE D. VENN:
+La desconexión fue intencionada. Habían anunciado que se llevarían la cámara de síntesis sin esperar el recuento. Solen quiso impedir que nos dejasen sin aire para la superficie.
+
+DECLARACIÓN DE M. ARO:
+La cámara estaba aislada antes de que mi equipo entrara. Solen sabía que el cierre de emergencia no debía accionarse contra la presión residual. Estaba intentando salvar el reactor; no se enfrentaba a nosotros.
+
+DECLARACIÓN DE L. OSS, RESPONSABLE DE INVENTARIO:
+Yo firmé la orden de traslado de los dos sellos, pero no la orden de cortar la línea. Los sellos figuraban a la vez en el presupuesto del reactor y en el del hábitat. No hice duplicados: hice dos listas porque dos comisiones me las pidieron.
+
+ANEXO MÉDICO:
+La causa inmediata de muerte fue una lesión por sobrepresión. No se puede inferir intención de la causa mecánica.
+
+ANEXO DE ARCHIVO:
+Una copia antigua contiene la frase «el primer muerto de la separación»; otra, «el accidente que permitió la colonia». Ambas expresiones se añadieron después. Ninguna figura en las declaraciones.
+
+DICTAMEN:
+No emitido. La comisión se disolvió al transferirse el control del anillo a la autoridad provisional.
