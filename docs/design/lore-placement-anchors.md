@@ -1,6 +1,6 @@
 # C2a — relative lore-placement filters
 
-**STATUS: IMPLEMENTED for external review, based on HEAD 0bd02fa (2026-11-07).** Runtime ownership: `src/retorno/core/lore.py`; focused verification: `tests/lore_relative_placement_integration.py`. AMANECER remains outside the production catalogue.
+**STATUS: IMPLEMENTED in C2a, based on HEAD 0bd02fa (2026-11-07).** Runtime ownership: `src/retorno/core/lore.py`; focused verification: `tests/lore_relative_placement_integration.py`. C2b prepares AMANECER in the working-tree catalogue; [exploratory access remains under review](../testing/amanecer-productive-review.md).
 
 ## Goal and optional syntax
 Support deterministic, bounded 3D Euclidean distance constraints on lore **host placement** relative to physical historical identities, including per-seed authored positions and lazy sites, without changing existing origin-based `min_dist_ly`, `max_dist_ly`, `regions_any`, candidate, channel or temporal rules:

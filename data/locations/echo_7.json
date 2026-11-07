@@ -10,6 +10,10 @@
     "z_ly": 0.0
   },
   "known_on_start": false,
+  "navigation_policy": {
+    "version": "host-navigation-exclusions-v1",
+    "exclude_destinations": ["HARBOR_12"]
+  },
   "salvage": {
     "scrap_min": 10,
     "scrap_max": 30,

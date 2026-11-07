@@ -16,7 +16,11 @@ import termios
 import time
 import tty
 from pathlib import Path
-from retorno.bootstrap import create_initial_state_prologue, create_initial_state_sandbox
+from retorno.bootstrap import (
+    create_initial_state_prologue,
+    create_initial_state_sandbox,
+    create_initial_state_fast_sandbox,
+)
 from retorno.audio.config import AudioConfigError, load_audio_config
 from retorno.audio.manager import AudioManager
 from retorno.core.engine import Engine
@@ -484,6 +488,7 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
             "Debug",
             [
                 ("debug on|off|status", "toggle debug mode", "activa o desactiva modo debug"),
+                ("wait <seconds>", "advance simulation time manually (DEBUG mode only)", "avanza el tiempo de simulación manualmente (solo en modo DEBUG)"),
                 ("debug radio", "inspect internal radio ledger (debug mode)", "inspecciona el ledger interno de radio (modo debug)"),
                 ("debug recovery", "inspect stored structural searches and plans (debug mode)", "inspecciona búsquedas y planes estructurales guardados (modo debug)"),
                 ("debug galaxy", "show worldgen and galaxy summary", "muestra resumen de galaxia y worldgen"),
@@ -6894,8 +6899,12 @@ def main() -> None:
     play_startup_sequence = False
     startup_message = ""
     startup_audio_context = "load_game"
-    if scenario in {"sandbox", "dev"}:
-        state = create_initial_state_sandbox()
+    if scenario in {"sandbox", "dev", "fast_sandbox"}:
+        state = (
+            create_initial_state_fast_sandbox()
+            if scenario == "fast_sandbox"
+            else create_initial_state_sandbox()
+        )
         play_startup_sequence = True
         startup_audio_context = "new_game"
         startup_message = f"[INFO] Scenario '{scenario}' started as new game (save slot bypassed)."
@@ -7157,7 +7166,7 @@ def main() -> None:
                             if c.startswith(text)
                         ]
                     elif len(tokens) == 3 and tokens[1] == "scenario":
-                        candidates = [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
+                        candidates = [c for c in ["prologue", "sandbox", "fast_sandbox", "dev"] if c.startswith(text)]
                     elif len(tokens) == 3 and tokens[1] == "add":
                         candidates = [c for c in ["scrap", "module", "drone", "drones"] if c.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] == "add" and tokens[2] == "module":
@@ -7742,8 +7751,12 @@ def main() -> None:
             loop.stop()
             with loop.with_lock() as locked_state:
                 keep_debug = locked_state.os.debug_enabled
-            if scenario in {"sandbox", "dev"}:
-                new_state = create_initial_state_sandbox()
+            if scenario in {"sandbox", "dev", "fast_sandbox"}:
+                new_state = (
+                    create_initial_state_fast_sandbox()
+                    if scenario == "fast_sandbox"
+                    else create_initial_state_sandbox()
+                )
             else:
                 new_state = create_initial_state_prologue()
             new_state.os.debug_enabled = keep_debug

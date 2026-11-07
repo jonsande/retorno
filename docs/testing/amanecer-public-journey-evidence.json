@@ -1,0 +1,6733 @@
+{
+  "seed": 701,
+  "transcript": [
+    {
+      "command": "power off security",
+      "t": 0.0,
+      "output": "Manual power shed: security -> OFFLINE\n"
+    },
+    {
+      "command": "power off data_core",
+      "t": 0.0,
+      "output": "Manual power shed: data_core -> OFFLINE\n"
+    },
+    {
+      "command": "drone deploy D1 PWR-A1",
+      "t": 0.0,
+      "output": "Job queued: deploy_drone -> ship_sector:PWR-A1 (ETA 13s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1.0,
+      "output": "System state changed: sensors\nLow power quality\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 3.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 4.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 5.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 6.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 7.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 8.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 9.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 10.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 11.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 12.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 13.0,
+      "output": "Drone deployed to PWR-A1\n"
+    },
+    {
+      "command": "drone repair D1 power_core",
+      "t": 13.0,
+      "output": "Job queued: repair_system -> ship_system:power_core (ETA 45s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 14.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 15.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 16.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 17.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 18.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 19.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 20.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 21.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 22.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 23.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 24.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 25.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 26.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 27.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 28.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 29.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 30.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 31.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 32.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 33.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 34.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 35.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 36.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 37.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 38.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 39.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 40.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 41.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 42.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 43.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 44.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 45.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 46.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 47.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 48.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 49.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 50.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 51.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 52.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 53.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 54.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 55.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 56.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 57.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 58.0,
+      "output": "System state changed: power_core\nRepair completed for power_core\n"
+    },
+    {
+      "command": "drone repair D1 power_core",
+      "t": 58.0,
+      "output": "Job queued: repair_system -> ship_system:power_core (ETA 45s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 59.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 60.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 61.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 62.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 63.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 64.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 65.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 66.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 67.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 68.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 69.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 70.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 71.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 72.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 73.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 74.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 75.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 76.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 77.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 78.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 79.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 80.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 81.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 82.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 83.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 84.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 85.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 86.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 87.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 88.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 89.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 90.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 91.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 92.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 93.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 94.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 95.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 96.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 97.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 98.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 99.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 100.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 101.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 102.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 103.0,
+      "output": "System state changed: power_core\nRepair completed for power_core\n"
+    },
+    {
+      "command": "drone repair D1 power_core",
+      "t": 103.0,
+      "output": "Job queued: repair_system -> ship_system:power_core (ETA 45s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 104.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 105.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 106.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 107.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 108.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 109.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 110.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 111.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 112.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 113.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 114.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 115.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 116.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 117.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 118.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 119.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 120.0,
+      "output": "Power bus instability due to damaged distribution\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 121.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 122.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 123.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 124.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 125.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 126.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 127.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 128.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 129.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 130.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 131.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 132.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 133.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 134.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 135.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 136.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 137.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 138.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 139.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 140.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 141.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 142.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 143.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 144.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 145.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 146.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 147.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 148.0,
+      "output": "Repair failed for power_core. Consumed 0/2 scrap and refunded 2.\n"
+    },
+    {
+      "command": "drone move D1 BUS-A2",
+      "t": 148.0,
+      "output": "Job queued: move_drone -> ship_sector:BUS-A2 (ETA 13s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 149.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 150.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 151.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 152.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 153.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 154.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 155.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 156.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 157.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 158.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 159.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 160.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 161.0,
+      "output": "Drone moved to BUS-A2\n"
+    },
+    {
+      "command": "drone repair D1 energy_distribution",
+      "t": 161.0,
+      "output": "Job queued: repair_system -> ship_system:energy_distribution (ETA 45s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 162.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 163.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 164.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 165.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 166.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 167.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 168.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 169.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 170.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 171.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 172.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 173.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 174.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 175.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 176.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 177.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 178.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 179.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 180.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 181.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 182.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 183.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 184.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 185.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 186.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 187.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 188.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 189.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 190.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 191.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 192.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 193.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 194.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 195.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 196.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 197.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 198.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 199.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 200.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 201.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 202.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 203.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 204.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 205.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 206.0,
+      "output": "System state changed: energy_distribution\nService radiod: blocked\nService securityd: blocked\nService datad: blocked\nService sensord: blocked\nRepair completed for energy_distribution\n"
+    },
+    {
+      "command": "drone repair D1 energy_distribution",
+      "t": 206.0,
+      "output": "Job queued: repair_system -> ship_system:energy_distribution (ETA 45s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 207.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 208.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 209.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 210.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 211.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 212.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 213.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 214.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 215.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 216.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 217.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 218.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 219.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 220.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 221.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 222.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 223.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 224.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 225.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 226.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 227.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 228.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 229.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 230.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 231.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 232.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 233.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 234.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 235.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 236.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 237.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 238.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 239.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 240.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 241.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 242.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 243.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 244.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 245.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 246.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 247.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 248.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 249.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 250.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 251.0,
+      "output": "System state changed: energy_distribution\nRepair completed for energy_distribution\nPower deficit detected\n"
+    },
+    {
+      "command": "drone move D1 BRG-01",
+      "t": 251.0,
+      "output": "Job queued: move_drone -> ship_sector:BRG-01 (ETA 13s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 252.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 253.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 254.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 255.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 256.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 257.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 258.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 259.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 260.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 261.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 262.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 263.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 264.0,
+      "output": "Drone moved to BRG-01\n"
+    },
+    {
+      "command": "drone repair D1 comms",
+      "t": 264.0,
+      "output": "Job queued: repair_system -> ship_system:comms (ETA 45s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 265.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 266.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 267.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 268.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 269.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 270.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 271.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 272.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 273.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 274.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 275.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 276.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 277.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 278.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 279.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 280.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 281.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 282.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 283.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 284.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 285.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 286.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 287.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 288.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 289.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 290.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 291.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 292.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 293.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 294.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 295.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 296.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 297.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 298.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 299.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 300.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 301.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 302.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 303.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 304.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 305.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 306.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 307.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 308.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 309.0,
+      "output": "Repair completed for comms\n"
+    },
+    {
+      "command": "drone recall D1",
+      "t": 309.0,
+      "output": "Job queued: recall_drone -> drone:D1 (ETA 25s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 310.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 311.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 312.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 313.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 314.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 315.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 316.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 317.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 318.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 319.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 320.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 321.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 322.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 323.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 324.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 325.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 326.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 327.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 328.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 329.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 330.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 331.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 332.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 333.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 334.0,
+      "output": "Drone recalled: D1\n"
+    },
+    {
+      "command": "power on comms",
+      "t": 334.0,
+      "output": "System state changed: comms\nService radiod: stopped\nManual power restored: comms\n"
+    },
+    {
+      "command": "boot radiod",
+      "t": 334.0,
+      "output": "Job queued: boot_service -> service:radiod (ETA 5s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 335.0,
+      "output": "Drone bay maintenance blocked: docked drones cannot recover battery or integrity\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 336.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 337.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 338.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 339.0,
+      "output": "Service booted: radiod\n"
+    },
+    {
+      "command": "power on sensors",
+      "t": 339.0,
+      "output": "\n"
+    },
+    {
+      "command": "boot sensord",
+      "t": 339.0,
+      "output": "Job queued: boot_service -> service:sensord (ETA 8s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 340.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 341.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 342.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 343.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 344.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 345.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 346.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 347.0,
+      "output": "Service booted: sensord\nSignal detected: ECHO-7\n"
+    },
+    {
+      "command": "scan",
+      "t": 347.0,
+      "output": "Job queued: scan -> world_node:UNKNOWN (ETA 8s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 348.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 349.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 350.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 351.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 352.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 353.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 354.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 355.0,
+      "output": "Scan completed at UNKNOWN\n"
+    },
+    {
+      "command": "power on data_core",
+      "t": 355.0,
+      "output": "System state changed: data_core\nService datad: stopped\nManual power restored: data_core\n"
+    },
+    {
+      "command": "boot datad",
+      "t": 355.0,
+      "output": "Job queued: boot_service -> service:datad (ETA 5s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 356.0,
+      "output": "Low power quality\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 357.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 358.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 359.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 360.0,
+      "output": "Service booted: datad\n"
+    },
+    {
+      "command": "route solve ECHO_7",
+      "t": 360.0,
+      "output": "Job queued: route_solve -> world_node:ECHO_7 (ETA 100s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 361.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 362.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 363.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 364.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 365.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 366.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 367.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 368.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 369.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 370.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 371.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 372.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 373.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 374.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 375.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 376.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 377.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 378.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 379.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 380.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 381.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 382.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 383.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 384.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 385.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 386.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 387.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 388.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 389.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 390.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 391.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 392.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 393.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 394.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 395.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 396.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 397.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 398.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 399.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 400.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 401.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 402.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 403.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 404.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 405.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 406.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 407.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 408.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 409.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 410.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 411.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 412.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 413.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 414.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 415.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 416.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 417.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 418.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 419.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 420.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 421.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 422.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 423.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 424.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 425.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 426.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 427.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 428.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 429.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 430.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 431.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 432.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 433.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 434.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 435.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 436.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 437.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 438.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 439.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 440.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 441.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 442.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 443.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 444.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 445.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 446.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 447.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 448.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 449.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 450.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 451.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 452.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 453.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 454.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 455.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 456.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 457.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 458.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 459.0,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 460.0,
+      "output": "Route solved: UNKNOWN -> ECHO_7\n"
+    },
+    {
+      "command": "nav ECHO_7",
+      "t": 460.0,
+      "output": "Travel profile set: CRUISE (auto). Use 'nav --no-cruise <dest>' to override.\nTravel started to ECHO_7 ETA 0.00y\n"
+    },
+    {
+      "command": "wait 1663.1149999999998",
+      "t": 2123.115,
+      "output": "Radiation level changed (env) low -> elevated\nArrived at ECHO_7\n"
+    },
+    {
+      "command": "dock ECHO_7",
+      "t": 2123.115,
+      "output": "Job queued: dock -> world_node:ECHO_7 (ETA 60s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2124.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2125.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2126.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2127.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2128.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2129.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2130.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2131.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2132.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2133.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2134.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2135.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2136.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2137.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2138.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2139.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2140.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2141.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2142.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2143.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2144.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2145.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2146.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2147.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2148.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2149.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2150.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2151.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2152.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2153.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2154.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2155.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2156.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2157.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2158.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2159.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2160.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2161.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2162.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2163.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2164.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2165.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2166.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2167.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2168.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2169.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2170.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2171.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2172.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2173.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2174.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2175.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2176.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2177.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2178.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2179.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2180.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2181.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2182.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2183.115,
+      "output": "Docked at ECHO_7\n"
+    },
+    {
+      "command": "power plan normal",
+      "t": 2183.115,
+      "output": "System state changed: sensors\nSystem state changed: security\nSystem state changed: data_core\nSystem state changed: drone_bay\n"
+    },
+    {
+      "command": "power on data_core",
+      "t": 2183.115,
+      "output": "\n"
+    },
+    {
+      "command": "boot datad",
+      "t": 2183.115,
+      "output": "Job queued: boot_service -> service:datad (ETA 5s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2184.115,
+      "output": "Power deficit detected\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2185.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2186.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2187.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2188.115,
+      "output": "Service booted: datad\n"
+    },
+    {
+      "command": "uplink",
+      "t": 2188.115,
+      "output": "[INFO] Battery low: SoC=0.40. Consider reducing load.\nuplink_complete :: routes added: P-0.0.2.0, P-0.1.2.0, P-2.2.1.0\nLog written to /logs/nav/uplink_ECHO_7_00072.txt\n\n"
+    },
+    {
+      "command": "power off data_core",
+      "t": 2188.115,
+      "output": "Manual power shed: data_core -> OFFLINE\n"
+    },
+    {
+      "command": "power on drone_bay",
+      "t": 2188.115,
+      "output": "\n"
+    },
+    {
+      "command": "drone deploy D1 ECHO_7",
+      "t": 2188.115,
+      "output": "Job queued: deploy_drone -> world_node:ECHO_7 (ETA 13s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2189.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2190.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2191.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2192.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2193.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2194.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2195.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2196.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2197.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2198.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2199.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2200.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2201.115,
+      "output": "Drone deployed to ECHO_7\n"
+    },
+    {
+      "command": "drone salvage data D1",
+      "t": 2201.115,
+      "output": "Job queued: salvage_data -> world_node:ECHO_7 (ETA 40s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2202.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2203.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2204.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2205.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2206.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2207.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2208.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2209.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2211.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2212.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2213.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2214.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2215.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2216.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2217.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2218.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2219.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2220.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2221.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2222.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2223.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2224.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2225.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2226.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2227.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2228.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2229.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2230.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2231.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2232.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2233.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2234.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2235.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2236.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2237.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2238.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2239.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2240.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2241.115,
+      "output": "Data salvaged at /remote/ECHO_7/: new=2, already_mounted=0, total=2\n"
+    },
+    {
+      "command": "drone recall D1",
+      "t": 2241.115,
+      "output": "Job queued: recall_drone -> drone:D1 (ETA 25s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2242.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2243.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2244.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2245.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2246.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2247.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2248.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2249.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2250.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2251.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2252.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2253.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2254.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2255.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2256.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2257.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2258.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2259.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2260.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2261.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2262.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2263.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2264.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2265.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2266.115,
+      "output": "Drone recalled: D1\nDrone bay maintenance blocked: docked drones cannot recover battery or integrity\n"
+    },
+    {
+      "command": "cat /remote/ECHO_7/logs/echo_cache.en.txt",
+      "t": 2266.115,
+      "output": "\n=== CAT /remote/ECHO_7/logs/echo_cache.en.txt ===\nECHO-7 RELAY \u2014 CACHE REPORT (RECOVERED)\nRef: E7/OPS/CACHE/0007\nAccess: ENG (read-only)\nIntegrity: degraded (partial reconstruction)\n\nThis report was compiled by the shipboard AI MINERVA_02L53 from a capture of operational notes extracted from the cached routes of ECHO-7. The report was generated automatically from housekeeping buffers and later reconstructed from incomplete storage blocks. A copy of this report was left on ECHO-7 on 19520dd, according to the internal clock of MINERVA_02L53.\n\nTimestamps are unreliable. The most recent records date to 12520dd. During the last recorded period, the relay devoted most of its duty cycle to low-bandwidth protocol negotiation and short routing announcements. Long-range operators were frequently unavailable, whether due to upstream silence or local amplification faults. As a result, the route cache is weighted toward nearby waystations and repeated corridor handoffs.\n\nThe token [INTEL] HARBOR_12 [/INTEL] appears with unusual frequency in the cached tables. Between 12003 and 12519dd, many routes were being passed through it. Ships that still had functioning navigation hardware were instructed to route through HARBOR-12 rather than attempt long direct legs or rely on relays that were already failing intermittently.\n\nA brief operator note was found embedded in the payload of a routing packet. The relay preserved it because it matched a checksum profile. The text is reproduced verbatim:\n\n\u201cRoute maps are out of date. Don\u2019t waste time chasing noise. If a station answers, use it. Harbor-12 is still answering (for now). If you\u2019re late, follow the corridor tables. If you\u2019re early, don\u2019t wait.\u201d\n\nEnd of report.\n(intel) node known: HARBOR_12\n\n"
+    },
+    {
+      "command": "power on sensors",
+      "t": 2266.115,
+      "output": "\n"
+    },
+    {
+      "command": "boot sensord",
+      "t": 2266.115,
+      "output": "Job queued: boot_service -> service:sensord (ETA 8s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2267.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2268.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2269.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2270.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2271.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2272.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2273.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2274.115,
+      "output": "Service booted: sensord\n"
+    },
+    {
+      "command": "scan",
+      "t": 2274.115,
+      "output": "Job queued: scan -> world_node:ECHO_7 (ETA 8s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2275.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2276.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2277.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2278.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2279.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2280.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2281.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2282.115,
+      "output": "Scan completed at ECHO_7\n"
+    },
+    {
+      "command": "undock",
+      "t": 2282.115,
+      "output": "Job queued: undock -> world_node:ECHO_7 (ETA 45s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2283.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2284.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2285.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2286.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2287.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2288.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2289.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2290.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2291.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2292.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2293.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2294.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2295.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2296.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2297.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2298.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2299.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2300.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2301.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2302.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2303.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2304.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2305.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2306.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2307.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2308.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2309.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2310.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2311.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2312.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2313.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2314.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2315.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2316.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2317.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2318.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2319.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2320.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2321.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2322.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2323.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2324.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2325.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2326.115,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2327.115,
+      "output": "Undocked from ECHO_7\n"
+    },
+    {
+      "command": "route solve S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "t": 2327.115,
+      "output": "Route solve skipped: already known route to S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0\n"
+    },
+    {
+      "command": "nav S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "t": 2327.115,
+      "output": "Travel profile set: CRUISE (auto). Use 'nav --no-cruise <dest>' to override.\nTravel started to S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0 ETA 20.37y\n"
+    },
+    {
+      "command": "hibernate until_arrival",
+      "t": 642389865.6977913,
+      "output": "hibernate None 20.36997522142286\nHibernation for 20.37 years\nHibernation ended after 20.37 years\nArrived at S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0\n"
+    },
+    {
+      "command": "dock S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "t": 642389865.6977913,
+      "output": "Job queued: dock -> world_node:S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0 (ETA 60s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389866.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389867.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389868.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389869.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389870.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389871.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389872.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389873.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389874.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389875.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389876.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389877.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389878.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389879.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389880.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389881.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389882.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389883.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389884.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389885.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389886.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389887.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389888.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389889.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389890.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389891.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389892.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389893.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389894.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389895.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389896.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389897.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389898.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389899.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389900.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389901.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389902.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389903.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389904.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389905.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389906.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389907.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389908.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389909.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389910.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389911.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389912.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389913.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389914.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389915.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389916.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389917.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389918.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389919.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389920.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389921.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389922.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389923.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389924.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389925.6977913,
+      "output": "Docked at S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0\n"
+    },
+    {
+      "command": "power plan normal",
+      "t": 642389925.6977913,
+      "output": "System state changed: sensors\nSystem state changed: security\nSystem state changed: data_core\nSystem state changed: drone_bay\n"
+    },
+    {
+      "command": "power on data_core",
+      "t": 642389925.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "boot datad",
+      "t": 642389925.6977913,
+      "output": "Job queued: boot_service -> service:datad (ETA 5s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389926.6977913,
+      "output": "Power deficit detected\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389927.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389928.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389929.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389930.6977913,
+      "output": "Service booted: datad\n"
+    },
+    {
+      "command": "uplink",
+      "t": 642389930.6977913,
+      "output": "uplink_complete :: routes added: P-0.0.1.1, P-0.4.0.0, P-2.2.1.2\nLog written to /logs/nav/uplink_P-2.2.1.0_00109.txt\n\n"
+    },
+    {
+      "command": "power off data_core",
+      "t": 642389930.6977913,
+      "output": "Manual power shed: data_core -> OFFLINE\n"
+    },
+    {
+      "command": "power on drone_bay",
+      "t": 642389930.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "drone deploy D1 S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "t": 642389930.6977913,
+      "output": "Warning: drone bay degraded; operation will be slower\nJob queued: deploy_drone -> world_node:S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0 (ETA 19s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389931.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389932.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389933.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389934.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389935.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389936.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389937.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389938.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389939.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389940.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389941.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389942.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389943.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389944.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389945.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389946.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389947.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389948.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389949.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389950.6977913,
+      "output": "Drone deployed to S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0\n"
+    },
+    {
+      "command": "drone salvage data D1",
+      "t": 642389950.6977913,
+      "output": "Job queued: salvage_data -> world_node:S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0 (ETA 40s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389951.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389952.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389953.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389954.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389955.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389956.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389957.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389958.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389959.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389960.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389961.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389962.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389963.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389964.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389965.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389966.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389967.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389968.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389969.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389970.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389971.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389972.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389973.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389974.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389975.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389976.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389977.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389978.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389979.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389980.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389981.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389982.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389983.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389984.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389985.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389986.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389987.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389988.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389989.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389990.6977913,
+      "output": "Data salvaged at /remote/S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0/: new=1, already_mounted=0, total=1\nDrone low battery: D1\nWarning: drone bay degraded; operation will be slower\nJob queued: recall_drone -> drone:D1 (ETA 37s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389991.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389992.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389993.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389994.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389995.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389996.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389997.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389998.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642389999.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390000.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390001.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390002.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390003.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390004.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390005.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390006.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390007.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390008.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390009.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390010.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390011.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390012.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390013.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390014.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390015.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390016.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390017.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390018.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390019.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390020.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390021.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390022.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390023.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390024.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390025.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390026.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390027.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390028.6977913,
+      "output": "Drone recalled: D1\nDrone bay maintenance blocked: docked drones cannot recover battery or integrity\n"
+    },
+    {
+      "command": "drone recall D1",
+      "t": 642390028.6977913,
+      "output": "Recall blocked: D1 not deployed\n"
+    },
+    {
+      "command": "power on sensors",
+      "t": 642390028.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "boot sensord",
+      "t": 642390028.6977913,
+      "output": "Job queued: boot_service -> service:sensord (ETA 8s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390029.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390030.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390031.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390032.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390033.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390034.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390035.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390036.6977913,
+      "output": "Service booted: sensord\n"
+    },
+    {
+      "command": "scan",
+      "t": 642390036.6977913,
+      "output": "Job queued: scan -> world_node:S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0 (ETA 8s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390037.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390038.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390039.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390040.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390041.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390042.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390043.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390044.6977913,
+      "output": "Scan completed at S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0\n"
+    },
+    {
+      "command": "undock",
+      "t": 642390044.6977913,
+      "output": "Job queued: undock -> world_node:S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0 (ETA 45s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390045.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390046.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390047.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390048.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390049.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390050.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390051.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390052.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390053.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390054.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390055.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390056.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390057.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390058.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390059.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390060.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390061.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390062.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390063.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390064.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390065.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390066.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390067.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390068.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390069.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390070.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390071.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390072.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390073.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390074.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390075.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390076.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390077.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390078.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390079.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390080.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390081.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390082.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390083.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390084.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390085.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390086.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390087.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390088.6977913,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 642390089.6977913,
+      "output": "Undocked from S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0\n"
+    },
+    {
+      "command": "route solve S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "t": 642390089.6977913,
+      "output": "Route solve skipped: already known route to S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0\n"
+    },
+    {
+      "command": "nav S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "t": 642390089.6977913,
+      "output": "Travel profile set: CRUISE (auto). Use 'nav --no-cruise <dest>' to override.\nTravel started to S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0 ETA 17.97y\n"
+    },
+    {
+      "command": "hibernate until_arrival",
+      "t": 1209098133.9361537,
+      "output": "hibernate None 17.970194198324528\nHibernation for 17.97 years\nHibernation ended after 17.97 years\nArrived at S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0\n"
+    },
+    {
+      "command": "dock S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "t": 1209098133.9361537,
+      "output": "Job queued: dock -> world_node:S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0 (ETA 60s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098134.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098135.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098136.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098137.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098138.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098139.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098140.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098141.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098142.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098143.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098144.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098145.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098146.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098147.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098148.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098149.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098150.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098151.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098152.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098153.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098154.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098155.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098156.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098157.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098158.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098159.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098160.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098161.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098162.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098163.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098164.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098165.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098166.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098167.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098168.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098169.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098170.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098171.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098172.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098173.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098174.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098175.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098176.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098177.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098178.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098179.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098180.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098181.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098182.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098183.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098184.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098185.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098186.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098187.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098188.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098189.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098190.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098191.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098192.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098193.9361537,
+      "output": "Docked at S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0\n"
+    },
+    {
+      "command": "power plan normal",
+      "t": 1209098193.9361537,
+      "output": "System state changed: sensors\nSystem state changed: security\nSystem state changed: data_core\nSystem state changed: drone_bay\n"
+    },
+    {
+      "command": "power on data_core",
+      "t": 1209098193.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "boot datad",
+      "t": 1209098193.9361537,
+      "output": "Job queued: boot_service -> service:datad (ETA 5s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098194.9361537,
+      "output": "Power deficit detected\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098195.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098196.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098197.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098198.9361537,
+      "output": "Service booted: datad\n"
+    },
+    {
+      "command": "uplink",
+      "t": 1209098198.9361537,
+      "output": "uplink_complete :: routes added: P-0.2.1.1, P-0.6.2.2, P-2.4.0.0\nLog written to /logs/nav/uplink_P-0.4.0.0_00147.txt\n\n"
+    },
+    {
+      "command": "power off data_core",
+      "t": 1209098198.9361537,
+      "output": "Manual power shed: data_core -> OFFLINE\n"
+    },
+    {
+      "command": "power on drone_bay",
+      "t": 1209098198.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "drone deploy D1 S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "t": 1209098198.9361537,
+      "output": "Warning: drone bay degraded; operation will be slower\nJob queued: deploy_drone -> world_node:S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0 (ETA 19s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098199.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098200.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098201.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098202.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098203.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098204.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098205.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098206.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098207.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098208.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098209.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098210.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098211.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098212.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098213.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098214.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098215.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098216.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098217.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098218.9361537,
+      "output": "Drone deployed to S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0\n"
+    },
+    {
+      "command": "drone salvage data D1",
+      "t": 1209098218.9361537,
+      "output": "Salvage blocked: D1 battery too low\n"
+    },
+    {
+      "command": "drone recall D1",
+      "t": 1209098218.9361537,
+      "output": "Recall blocked: D1 battery too low\n"
+    },
+    {
+      "command": "power on sensors",
+      "t": 1209098218.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "boot sensord",
+      "t": 1209098218.9361537,
+      "output": "Job queued: boot_service -> service:sensord (ETA 8s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098219.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098220.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098221.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098222.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098223.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098224.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098225.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098226.9361537,
+      "output": "Service booted: sensord\n"
+    },
+    {
+      "command": "scan",
+      "t": 1209098226.9361537,
+      "output": "Job queued: scan -> world_node:S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0 (ETA 8s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098227.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098228.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098229.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098230.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098231.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098232.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098233.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098234.9361537,
+      "output": "Scan completed at S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0\n"
+    },
+    {
+      "command": "undock",
+      "t": 1209098234.9361537,
+      "output": "Job queued: undock -> world_node:S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0 (ETA 45s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098235.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098236.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098237.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098238.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098239.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098240.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098241.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098242.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098243.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098244.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098245.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098246.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098247.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098248.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098249.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098250.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098251.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098252.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098253.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098254.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098255.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098256.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098257.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098258.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098259.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098260.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098261.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098262.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098263.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098264.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098265.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098266.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098267.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098268.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098269.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098270.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098271.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098272.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098273.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098274.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098275.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098276.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098277.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098278.9361537,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1209098279.9361537,
+      "output": "Undocked from S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0\n"
+    },
+    {
+      "command": "route solve S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1",
+      "t": 1209098279.9361537,
+      "output": "Route solve skipped: already known route to S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1\n"
+    },
+    {
+      "command": "nav S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1",
+      "t": 1209098279.9361537,
+      "output": "Travel profile set: CRUISE (auto). Use 'nav --no-cruise <dest>' to override.\nTravel started to S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1 ETA 16.77y\n"
+    },
+    {
+      "command": "hibernate until_arrival",
+      "t": 1737830170.3267715,
+      "output": "hibernate None 16.76597825946911\nHibernation for 16.77 years\nHibernation ended after 16.77 years\nRadiation level changed (drone_dose) low -> extreme\nArrived at S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1\n"
+    },
+    {
+      "command": "dock S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1",
+      "t": 1737830170.3267715,
+      "output": "Job queued: dock -> world_node:S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1 (ETA 60s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830171.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830172.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830173.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830174.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830175.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830176.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830177.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830178.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830179.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830180.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830181.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830182.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830183.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830184.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830185.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830186.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830187.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830188.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830189.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830190.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830191.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830192.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830193.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830194.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830195.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830196.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830197.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830198.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830199.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830200.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830201.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830202.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830203.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830204.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830205.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830206.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830207.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830208.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830209.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830210.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830211.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830212.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830213.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830214.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830215.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830216.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830217.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830218.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830219.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830220.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830221.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830222.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830223.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830224.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830225.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830226.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830227.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830228.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830229.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830230.3267715,
+      "output": "Docked at S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1\n"
+    },
+    {
+      "command": "power plan normal",
+      "t": 1737830230.3267715,
+      "output": "System state changed: sensors\nSystem state changed: security\nSystem state changed: data_core\nSystem state changed: drone_bay\n"
+    },
+    {
+      "command": "power on data_core",
+      "t": 1737830230.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "boot datad",
+      "t": 1737830230.3267715,
+      "output": "Job queued: boot_service -> service:datad (ETA 5s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830231.3267715,
+      "output": "Power deficit detected\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830232.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830233.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830234.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830235.3267715,
+      "output": "Service booted: datad\n"
+    },
+    {
+      "command": "uplink",
+      "t": 1737830235.3267715,
+      "output": "uplink_complete :: routes added: P-0.2.3.0, P-2.2.0.0, P-1.4.3.0\nLog written to /logs/nav/uplink_P-0.2.1.1_00181.txt\n\n"
+    },
+    {
+      "command": "power off data_core",
+      "t": 1737830235.3267715,
+      "output": "Manual power shed: data_core -> OFFLINE\n"
+    },
+    {
+      "command": "power on drone_bay",
+      "t": 1737830235.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "drone deploy D1 S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1",
+      "t": 1737830235.3267715,
+      "output": "Drone deploy blocked: D1 disabled\n"
+    },
+    {
+      "command": "drone salvage data D1",
+      "t": 1737830235.3267715,
+      "output": "Salvage blocked: D1 not deployed\n"
+    },
+    {
+      "command": "drone recall D1",
+      "t": 1737830235.3267715,
+      "output": "Recall blocked: D1 not deployed\n"
+    },
+    {
+      "command": "power on sensors",
+      "t": 1737830235.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "boot sensord",
+      "t": 1737830235.3267715,
+      "output": "Job queued: boot_service -> service:sensord (ETA 8s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830236.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830237.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830238.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830239.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830240.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830241.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830242.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830243.3267715,
+      "output": "Service booted: sensord\n"
+    },
+    {
+      "command": "scan",
+      "t": 1737830243.3267715,
+      "output": "Job queued: scan -> world_node:S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1 (ETA 8s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830244.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830245.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830246.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830247.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830248.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830249.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830250.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830251.3267715,
+      "output": "Scan completed at S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1\n"
+    },
+    {
+      "command": "undock",
+      "t": 1737830251.3267715,
+      "output": "Job queued: undock -> world_node:S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1 (ETA 45s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830252.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830253.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830254.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830255.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830256.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830257.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830258.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830259.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830260.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830261.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830262.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830263.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830264.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830265.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830266.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830267.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830268.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830269.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830270.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830271.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830272.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830273.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830274.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830275.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830276.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830277.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830278.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830279.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830280.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830281.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830282.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830283.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830284.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830285.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830286.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830287.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830288.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830289.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830290.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830291.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830292.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830293.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830294.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830295.3267715,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 1737830296.3267715,
+      "output": "Undocked from S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1\n"
+    },
+    {
+      "command": "route solve S+001_+001_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "t": 1737830296.3267715,
+      "output": "Route solve skipped: already known route to S+001_+001_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0\n"
+    },
+    {
+      "command": "nav S+001_+001_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "t": 1737830296.3267715,
+      "output": "Travel profile set: CRUISE (auto). Use 'nav --no-cruise <dest>' to override.\nTravel started to S+001_+001_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0 ETA 14.98y\n"
+    },
+    {
+      "command": "hibernate until_arrival",
+      "t": 2210348962.4344587,
+      "output": "hibernate None 14.98346861072066\nHibernation for 14.98 years\nHibernation ended after 14.98 years\nArrived at S+001_+001_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0\n"
+    },
+    {
+      "command": "dock S+001_+001_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "t": 2210348962.4344587,
+      "output": "Job queued: dock -> world_node:S+001_+001_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0 (ETA 60s)\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348963.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348964.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348965.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348966.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348967.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348968.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348969.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348970.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348971.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348972.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348973.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348974.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348975.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348976.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348977.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348978.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348979.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348980.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348981.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348982.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348983.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348984.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348985.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348986.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348987.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348988.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348989.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348990.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348991.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348992.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348993.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348994.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348995.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348996.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348997.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348998.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210348999.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349000.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349001.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349002.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349003.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349004.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349005.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349006.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349007.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349008.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349009.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349010.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349011.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349012.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349013.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349014.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349015.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349016.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349017.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349018.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349019.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349020.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349021.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "wait 1",
+      "t": 2210349022.4344587,
+      "output": "Docked at S+001_+001_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0\n"
+    },
+    {
+      "command": "power plan normal",
+      "t": 2210349022.4344587,
+      "output": "System state changed: sensors\nSystem state changed: security\nSystem state changed: data_core\nSystem state changed: drone_bay\n"
+    },
+    {
+      "command": "power on data_core",
+      "t": 2210349022.4344587,
+      "output": "System on blocked: data_core requires energy_distribution>=nominal (current=limited)\n"
+    },
+    {
+      "command": "boot datad",
+      "t": 2210349022.4344587,
+      "output": "Boot blocked: datad requires energy_distribution>=nominal (current=limited)\n"
+    },
+    {
+      "command": "uplink",
+      "t": 2210349022.4344587,
+      "output": "Uplink blocked: datad not running. Try: boot datad\n\n"
+    },
+    {
+      "command": "power off data_core",
+      "t": 2210349022.4344587,
+      "output": "Manual power shed: data_core -> OFFLINE\n"
+    },
+    {
+      "command": "power on drone_bay",
+      "t": 2210349022.4344587,
+      "output": "\n"
+    },
+    {
+      "command": "drone deploy D1 S+001_+001_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "t": 2210349022.4344587,
+      "output": "Drone deploy blocked: D1 disabled\n"
+    },
+    {
+      "command": "drone salvage data D1",
+      "t": 2210349022.4344587,
+      "output": "Salvage blocked: D1 not deployed\n"
+    },
+    {
+      "command": "drone recall D1",
+      "t": 2210349022.4344587,
+      "output": "Recall blocked: D1 not deployed\n"
+    },
+    {
+      "command": "power on sensors",
+      "t": 2210349022.4344587,
+      "output": "System on blocked: sensors requires energy_distribution>=nominal (current=limited)\n"
+    },
+    {
+      "command": "boot sensord",
+      "t": 2210349022.4344587,
+      "output": "Boot blocked: sensord requires energy_distribution>=nominal (current=limited)\n"
+    },
+    {
+      "command": "scan",
+      "t": 2210349022.4344587,
+      "output": "Scan blocked: sensord not running. Try: boot sensord\n"
+    }
+  ],
+  "clock": 2210349022.4344587,
+  "current": "S+001_+001_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+  "host": "S+002_-001_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1",
+  "host_known": false,
+  "host_materialized": true,
+  "liria_known": false,
+  "delivered": [],
+  "known_links": {
+    "ECHO_7": [
+      "S+000_+000_+001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "S+000_-001_+001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0"
+    ],
+    "S+000_-001_+001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0": [
+      "ECHO_7"
+    ],
+    "S+000_+000_+001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0": [
+      "ECHO_7"
+    ],
+    "S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0": [
+      "ECHO_7",
+      "S+000_+000_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1",
+      "S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_2"
+    ],
+    "S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0": [
+      "S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1",
+      "S+000_+003_+001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_2",
+      "S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "S+001_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0"
+    ],
+    "S+000_+000_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1": [
+      "S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0"
+    ],
+    "S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_2": [
+      "S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0"
+    ],
+    "S+001_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0": [
+      "S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0"
+    ],
+    "S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1": [
+      "S+000_+001_-002:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "S+001_+001_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+      "S-001_+002_-002:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0"
+    ],
+    "S+000_+003_+001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_2": [
+      "S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0"
+    ],
+    "S+000_+001_-002:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0": [
+      "S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1"
+    ],
+    "S+001_+001_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0": [
+      "S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1"
+    ],
+    "S-001_+002_-002:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0": [
+      "S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1"
+    ]
+  },
+  "known_nodes": [
+    "ECHO_7",
+    "HARBOR_12",
+    "S+000_+000_+001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+    "S+000_+000_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1",
+    "S+000_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1",
+    "S+000_+001_-002:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+    "S+000_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+    "S+000_+003_+001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_2",
+    "S+000_-001_+001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+    "S+001_+001_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+    "S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+    "S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_2",
+    "S+001_+002_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+    "S-001_+002_-002:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0"
+  ],
+  "positions": {
+    "ARCHIVE_01": [
+      14.2,
+      6.1,
+      0.1
+    ],
+    "ECHO_7": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "HARBOR_12": [
+      12.0,
+      4.0,
+      0.0
+    ],
+    "RETORNO_SHIP": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "UNKNOWN": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "LIRIA": [
+      19.347705909283917,
+      6.477133928262818,
+      -0.20203085018464717
+    ]
+  },
+  "debug": false
+}

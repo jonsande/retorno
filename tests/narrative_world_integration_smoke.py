@@ -133,7 +133,7 @@ def test_03_seed_variability_and_bound_clues():
             station, wreck = (snap["positions"][i] for i in ("TEST_STATION", "TEST_WRECK"))
             distance = math.dist(station, wreck)
             assert 0.5 <= distance <= 1.2
-            piece = lore._iter_all_pieces(s)[0]["piece"]
+            piece = next(e["piece"] for e in lore._iter_all_pieces(s) if e["piece_key"] == KEY)
             text = lore._content_from_ref(piece["content_ref_en"], s)
             assert f"SECTOR: {sector_id_for_pos(*wreck)}" in text
             assert "{{" not in text and "NODE: TEST_WRECK" in text
@@ -291,7 +291,7 @@ def test_08_repeated_saves_and_catalog_changes():
             raise AssertionError("Changed package must not reinterpret the save")
         assert slot.read_bytes() == original
         # Already running games still read their frozen compiled text.
-        piece = lore._iter_all_pieces(s)[0]["piece"]
+        piece = next(e["piece"] for e in lore._iter_all_pieces(s) if e["piece_key"] == KEY)
         assert "A different identity" not in lore._content_from_ref(piece["content_ref_en"], s)
         content.write_text(previous)
         assert load_single_slot(slot)
@@ -344,7 +344,7 @@ def test_09_negative_declarations():
 
 
 def test_10_current_catalogue_and_impact_measurement():
-    assert data.load_arcs() == [] and len(data.load_singles()) == 5
+    assert [a["arc_id"] for a in data.load_arcs()] == ["amanecer_elena_01"] and len(data.load_singles()) == 5
     assert len(data.load_locations()) == 5
     baseline = {seed: m.define_manifest(seed) for seed in range(4)}
     rows = []
@@ -563,7 +563,7 @@ def test_19_reserved_tokens_are_validated_without_bindings():
         expect_error(lambda: create_initial_state_prologue(seed=0), "invalid", "unknown_token")
     with installed():
         s = create_initial_state_prologue(seed=0)
-        piece = lore._iter_all_pieces(s)[0]["piece"]
+        piece = next(e["piece"] for e in lore._iter_all_pieces(s) if e["piece_key"] == KEY)
         content = lore._content_from_ref(piece["content_ref_en"], s)
         assert "{{" not in content and "NODE: TEST_WRECK" in content
 
@@ -644,7 +644,7 @@ def test_20_essential_payload_matches_real_delivery_and_language_fallback():
     with installed(mutate=files_fallback) as root:
         (root / "lore/synthetic_alpha.en.txt").write_text("Fallback through files.")
         s = create_initial_state_prologue(seed=0)
-        piece = lore._iter_all_pieces(s)[0]
+        piece = next(e for e in lore._iter_all_pieces(s) if e["piece_key"] == KEY)
         assert lore._file_for_salvage_piece(piece, "es", s)["content"].strip() == "Fallback through files."
 
     def optional_empty(alpha, beta):
@@ -656,7 +656,7 @@ def test_20_essential_payload_matches_real_delivery_and_language_fallback():
         for lang in ("en", "es"):
             (root / f"lore/synthetic_alpha.{lang}.txt").write_text("")
         s = create_initial_state_prologue(seed=0)
-        piece = lore._iter_all_pieces(s)[0]
+        piece = next(e for e in lore._iter_all_pieces(s) if e["piece_key"] == KEY)
         assert lore._file_for_salvage_piece(piece, "en", s)["content"] == ""
 
 

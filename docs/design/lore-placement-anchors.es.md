@@ -1,6 +1,6 @@
 # C2a — filtros de colocación relativa de lore
 
-**ESTADO: IMPLEMENTADO para revisión externa, sobre HEAD 0bd02fa (2026-11-07).** Implementación: `src/retorno/core/lore.py`; prueba focal: `tests/lore_relative_placement_integration.py`. AMANECER permanece fuera del catálogo de producción.
+**ESTADO: IMPLEMENTADO en C2a, sobre HEAD 0bd02fa (2026-11-07).** Implementación: `src/retorno/core/lore.py`; prueba focal: `tests/lore_relative_placement_integration.py`. C2b prepara AMANECER en el catálogo del árbol de trabajo; [el acceso exploratorio sigue en revisión](../testing/amanecer-productive-review.es.md).
 
 ## Necesidad
 Permitir colocar una pieza de un arco o single en emplazamientos históricos certificados que satisfagan cotas de distancia euclídea 3D respecto a **una o varias identidades físicas**, aunque su ubicación sea lazy o variable por semilla. Mantener `min_dist_ly`, `max_dist_ly`, `regions_any` y las reglas existentes sin alteración.

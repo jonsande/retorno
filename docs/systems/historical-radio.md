@@ -40,6 +40,13 @@ to communications; it does not remove the physical site or its B1 archives.
 
 ## Identity, determinism and provenance
 
+P1 adds a subtractive [host navigation policy](historical-information.md#p1-fixed-host-navigation-exclusions).
+Original B1/B2 sampling is preserved independently of the policy-aware full
+fingerprints. If the original selected navigation record is excluded at that
+host, its procedural emission is absent; no other destination or environmental
+payload replaces it. Equipment, energy, epochs and other hosts retain their
+original projections. This adds no guarantee of a receivable prologue solution.
+
 `RadioDefinition` pins version, canonical rule JSON, B1 fingerprint and explicitly
 overridden hosts. Physical seed, manifest scope and certified identity enter
 separate SHA-256 domains. No mutable RNG, Python hash, player clock, knowledge,

@@ -229,7 +229,7 @@ def test_11_authored_precedence_including_silent_explicit_hardware():
 
 
 def dense():
-    spec = [('A' if i == 0 else f'H{i:03}', 'relay', (1000.+i*.001,1000.,1000.)) for i in range(260)]
+    spec = [('A' if i == 0 else f'H{i:03}', 'relay', (1000.+i*.001,1000.,1000.)) for i in range(300)]
     s = scene(spec,radio_links=(),known=('A',),clean=False)
     s.world.information_version = information.VERSION
     s.world.information_definition = information.define_information(s.world.narrative_snapshot)
@@ -250,7 +250,7 @@ def test_12_crowded_cell_resume_no_loss_over_128_and_finite_pages():
             found[r.emitter.host_id] = r
         counts.append(p.examined_sites);cursor=p.cursor
         if cursor['cell'] > 0: break
-    ids = ['A' if i == 0 else f'H{i:03}' for i in range(260)]
+    ids = ['A' if i == 0 else f'H{i:03}' for i in range(300)]
     expected = {nid for nid in ids if host(s,nid).emissions}
     assert set(found) == expected and len(counts) > 4 and len(found) > 128
     assert pickle.dumps(s) == before
@@ -308,7 +308,7 @@ def test_15_live_primary_filter_and_hidden_outputs_en_es():
     e=row.emissions[0];op=prepare(s,row)
     arc=dict(arc_id='protected_b2',primary_intel=dict(kind='link',line=f'LINK: {row.emitter.host_id} -> {e.navigation_link_to}'))
     before=host(s,row.emitter.host_id)
-    with patch.object(lore,'load_arcs',return_value=[arc]):
+    with patch.object(lore,'load_arcs',return_value=[arc]), patch.dict(s.world.narrative_snapshot, arcs=[arc]):
         assert comms.capture_radio_opportunity(s,op) is None
         assert host(s,row.emitter.host_id)==before
     for locale in Locale:
@@ -472,7 +472,7 @@ def test_22_reuse_procedural_later_receipt_without_rewriting_file():
 def test_23_authored_and_procedural_listening_share_capture_ledger():
     from radio_spacetime_smoke import installed
     with installed():
-        s=create_initial_state_sandbox();ready(s);w=universe_definition(s)
+        s=create_initial_state_sandbox(seed=1);ready(s);w=universe_definition(s)
         tx,authored=hr.resolve_emission(s,'fixture-history')
         source=manifest.resolve_operative_id(w,tx.host_id)
         sites=manifest.query_physical_sectors(w,SECTORS).sites

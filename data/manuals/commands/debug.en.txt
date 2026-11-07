@@ -1,5 +1,5 @@
 debug on|off|status
-debug scenario prologue|sandbox|dev
+debug scenario prologue|sandbox|fast_sandbox|dev
 debug seed <n>
 debug arcs
 debug lore
@@ -18,6 +18,7 @@ Purpose
 
 Operational behavior
 - `debug on|off` toggles debug mode and auto-tick control.
+- SANDBOX and FAST_SANDBOX are initially intended exclusively for debugging and design testing. FAST_SANDBOX recovers ECHO_7 completely and starts in orbit with fully repaired systems and drones in the bay.
 - `debug scenario ...` resets world state to preset.
 - `debug seed <n>` sets RNG seed before the historical universe is fixed by generation or saving. Later changes require a new scenario.
 - listing commands expose internal debug registries.

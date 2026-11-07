@@ -15,7 +15,11 @@ from textual.widgets import Static, Input, RichLog
 
 from retorno.audio.config import AudioConfigError, load_audio_config
 from retorno.audio.manager import AudioManager
-from retorno.bootstrap import create_initial_state_prologue, create_initial_state_sandbox
+from retorno.bootstrap import (
+    create_initial_state_prologue,
+    create_initial_state_sandbox,
+    create_initial_state_fast_sandbox,
+)
 from retorno.cli.parser import ParseError, parse_command, format_parse_error
 from retorno.cli import repl
 from retorno.core.engine import Engine
@@ -209,8 +213,12 @@ class RetornoTextualApp(App):
         self._play_startup_sequence = False
         self._startup_audio_context = "load_game"
         scenario = os.getenv("RETORNO_SCENARIO", "prologue").lower()
-        if scenario in {"sandbox", "dev"}:
-            state = create_initial_state_sandbox()
+        if scenario in {"sandbox", "dev", "fast_sandbox"}:
+            state = (
+                create_initial_state_fast_sandbox()
+                if scenario == "fast_sandbox"
+                else create_initial_state_sandbox()
+            )
             self._play_startup_sequence = True
             self._startup_audio_context = "new_game"
             self._console_messages.append(f"[INFO] Scenario '{scenario}' started as new game (save slot bypassed).")
@@ -948,7 +956,7 @@ class RetornoTextualApp(App):
                     if c.startswith(text)
                 ]
             if len(tokens) == 3 and tokens[1] == "scenario":
-                return [c for c in ["prologue", "sandbox", "dev"] if c.startswith(text)]
+                return [c for c in ["prologue", "sandbox", "fast_sandbox", "dev"] if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] == "add":
                 return [c for c in ["scrap", "module", "drone", "drones"] if c.startswith(text)]
             if len(tokens) == 4 and tokens[1] == "add" and tokens[2] == "module":
@@ -2155,8 +2163,12 @@ class RetornoTextualApp(App):
             self.loop.stop()
             with self.loop.with_lock() as state:
                 keep_debug = state.os.debug_enabled
-            if scenario in {"sandbox", "dev"}:
-                new_state = create_initial_state_sandbox()
+            if scenario in {"sandbox", "dev", "fast_sandbox"}:
+                new_state = (
+                    create_initial_state_fast_sandbox()
+                    if scenario == "fast_sandbox"
+                    else create_initial_state_sandbox()
+                )
             else:
                 new_state = create_initial_state_prologue()
             new_state.os.debug_enabled = keep_debug

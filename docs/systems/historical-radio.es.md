@@ -42,6 +42,13 @@ no elimina el emplazamiento físico ni sus archivos B1.
 
 ## Identidad, determinismo y procedencia
 
+P1 añade una [política navegacional sustractiva por host](historical-information.es.md#p1-exclusiones-navegacionales-fijas-por-host).
+El muestreo original B1/B2 se conserva separado de las huellas completas con
+política. Si el registro navegacional seleccionado original está excluido en ese
+host, no hay emisión procedural; no se sustituye por otro destino ni payload
+ambiental. Equipo, energía, épocas y otros hosts conservan sus proyecciones
+originales. No se añade garantía de una solución del prólogo que pueda recibirse.
+
 `RadioDefinition` fija versión, JSON canónico de reglas, huella de B1 y hosts
 con precedencia explícita. La semilla física, el ámbito del manifiesto y la
 identidad certificada entran en dominios SHA-256 separados. No se usa RNG mutable,

@@ -20,16 +20,16 @@ VERSION = "radio-emitters-v1"
 
 
 def physical_catalog(catalog):
-    """Strip only the additive radio contract before hashing physical content.
+    """Strip additive radio and host information policies from physical content.
 
     For pre-radio catalogues this is byte-for-byte the old canonical input.
-    Emission changes still participate in the full installed catalogue hash.
+    Both still participate in the full installed catalogue hash.
     """
     def strip(value):
         if isinstance(value, list):
             return [strip(v) for v in value]
         if isinstance(value, dict):
-            return {k: strip(v) for k, v in value.items() if k not in {"radio_emitters", "radio_emission"}}
+            return {k: strip(v) for k, v in value.items() if k not in {"radio_emitters", "radio_emission", "navigation_policy"}}
         return value
     return strip(catalog)
 

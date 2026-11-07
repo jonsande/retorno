@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import redirect_stdout
+from contextlib import contextmanager, redirect_stdout
 from copy import deepcopy
 from dataclasses import asdict, replace
 import hashlib
@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import pickle
 import random
+import shutil
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -23,6 +24,7 @@ from retorno.core import lore, structural_recovery as recovery
 from retorno.core.engine import Engine
 from retorno.io import save_load
 from retorno.model.os import Locale, mount_files
+from retorno.runtime import data_loader as data
 from retorno.worldgen import information as info, manifest
 from retorno.worldgen.generator import ensure_sector_generated, universe_definition, ensure_historical_node
 from retorno.worldgen.narrative import canonical, fingerprint
@@ -170,7 +172,7 @@ def test_06_primary_disclosure_filters_delivery_without_rewriting_or_replacement
     targets = set(pool.uplink_route_pool) | {nav["navigation_record"]["destination_id"]}
     arcs = [dict(arc_id=f"locked_{i}", primary_intel=dict(id="primary", kind="link", line=f"LINK: {host} -> {dest}"))
         for i, dest in enumerate(sorted(targets))]
-    with patch.object(lore, "load_arcs", return_value=arcs):
+    with patch.object(lore, "load_arcs", return_value=arcs), patch.dict(state.world.narrative_snapshot, arcs=arcs):
         assert signature(query(state, host)) == historical
         assert not lore.disclosable_uplink_destinations(state, pool)
         assert not any(f.get("navigation_record") for f in lore.collect_node_salvage_data_files(state, host))
@@ -192,6 +194,7 @@ def test_07_primary_protection_does_not_ban_natural_sensor_discovery():
     state.world.known_contacts.clear()
     arc = dict(arc_id="sensor_exception", primary_intel=dict(kind="node", line="NODE: ECHO_7"))
     with patch.object(lore, "load_arcs", return_value=[arc]), \
+         patch.dict(state.world.narrative_snapshot, arcs=[arc]), \
          patch("retorno.config.balance.Balance.SENSORS_DETECT_P_NEAR", 1.0), \
          patch("retorno.config.balance.Balance.SENSORS_DETECT_P_FAR", 1.0):
         assert "ECHO_7" in lore._locked_primary_targets(state)
@@ -227,6 +230,22 @@ def test_08_recovery_queries_preexisting_lazy_archives_without_creating_them():
         raise AssertionError("Recovery source evaluation must retain incomplete status")
 
 
+@contextmanager
+def pre_b1_catalogue():
+    """The genuine save requires its original installed catalogue, not C2b/P1."""
+    with TemporaryDirectory(prefix="retorno-pre-b1-") as folder:
+        root = Path(folder) / "data"
+        shutil.copytree(data._DATA_ROOT, root)
+        (root / "arcs/amanecer_elena_01.json").unlink()
+        echo = root / "locations/echo_7.json"
+        value = json.loads(echo.read_text())
+        value.pop("navigation_policy", None)
+        echo.write_text(json.dumps(value))
+        with patch.object(data, "_DATA_ROOT", root):
+            yield
+
+
+@pre_b1_catalogue()
 def test_09_genuine_pre_b1_slots_save_retains_pools_and_uninitialized_legacy_rules():
     path = FIXTURE / "B0-schema3.dat"
     expected = json.loads((FIXTURE / "B0-schema3.json").read_text())
@@ -374,6 +393,8 @@ def test_14_authored_tables_select_certified_destinations_before_player_state():
     state = create_initial_state_prologue(seed=0)
     snapshot = deepcopy(state.world.narrative_snapshot)
     table = dict(min_authored=1, max_authored=1, authored_candidates=[dict(node_id="HARBOR_12", weight=5)])
+    # Quota fixture without the production host's subtractive puzzle policy.
+    next(loc for loc in snapshot["locations"] if loc["node"]["node_id"] == "ECHO_7").pop("navigation_policy", None)
     next(loc for loc in snapshot["locations"] if loc["node"]["node_id"] == "ECHO_7")["uplink_table"] = table
     definition = info.define_information(snapshot)
     result = info.query_information(universe_definition(state), definition, "ECHO_7")
@@ -426,7 +447,7 @@ def test_16_authorized_scheduler_primary_delivers_without_rewriting_historical_r
     key = "arc:authorized_fixture:primary"
     entry = dict(piece_key=key, piece_id="primary", piece=piece,
         arc_id="authorized_fixture", role="primary", channels=["uplink_only"])
-    with patch.object(lore, "load_arcs", return_value=[arc]):
+    with patch.object(lore, "load_arcs", return_value=[arc]), patch.dict(state.world.narrative_snapshot, arcs=[arc]):
         assert dest not in lore.disclosable_uplink_destinations(state, pool)
         assert lore._assign_piece_to_node(state, entry, "ECHO_7")
         output(repl._handle_uplink, state)

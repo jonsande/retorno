@@ -9,15 +9,17 @@ from dataclasses import asdict, dataclass
 import json
 import math
 import random
+import re
 
 from retorno.config.balance import Balance
 from retorno.model.world import information_capabilities
 from retorno.worldgen import manifest
 from retorno.worldgen.generator import _parse_sector_id
-from retorno.worldgen.narrative import canonical, fingerprint
+from retorno.worldgen.narrative import ContentError, canonical, fingerprint
 
 VERSION = "historical-information-v1"
 LEGACY_VERSION = "legacy-information-v0"
+NAVIGATION_POLICY_VERSION = "host-navigation-exclusions-v1"
 PROBABILITIES = (
     "SALVAGE_DATA_LOG_P_STATION_SHIP", "SALVAGE_DATA_LOG_P_OTHER",
     "SALVAGE_DATA_MAIL_P_STATION_SHIP", "SALVAGE_DATA_MAIL_P_OTHER",
@@ -103,6 +105,38 @@ def define_information(snapshot):
         authored[node["node_id"]] = dict(name=node.get("name", node["node_id"]),
             radiation=float(node.get("radiation_rad_per_s", 0)), files=files,
             uplink_table=location.get("uplink_table", {}))
+        if "navigation_policy" in location:
+            policy = location["navigation_policy"]
+            source = snapshot.get("sources", {}).get("location:" + node["node_id"], "locations")
+            def invalid(cause):
+                raise ContentError(source, node["node_id"], "navigation_policy", cause)
+            if (not isinstance(policy, dict) or set(policy) != {"version", "exclude_destinations"}
+                    or policy.get("version") != NAVIGATION_POLICY_VERSION):
+                invalid("expected host-navigation-exclusions-v1 object / objeto de exclusiones requerido")
+            excluded = policy["exclude_destinations"]
+            if not isinstance(excluded, list) or not excluded:
+                invalid("nonempty destination list required / lista no vacía de destinos requerida")
+            normalized = []
+            aliases = snapshot.get("aliases", {})
+            for token in excluded:
+                ident = aliases.get(token.casefold()) if isinstance(token, str) else None
+                if ident is None or ident == node["node_id"] or ident == "RETORNO_SHIP":
+                    invalid("distinct authored destination required / destino authored distinto requerido")
+                if ident in normalized:
+                    invalid("duplicate destination / destino duplicado")
+                normalized.append(ident)
+            # Authored testimony is never silently rewritten. Reject a conflicting
+            # operative LINK, including reverse links and explicit INTEL blocks.
+            for entry in files:
+                text = entry.get("content", "")
+                for match in re.finditer(r"(?:^|\[INTEL\])\s*LINK:\s*(.*?)\s*(?=\[/INTEL\]|$)", text, re.M | re.I):
+                    payload = match[1]
+                    endpoints = payload.split("->", 1) if "->" in payload else (node["node_id"], payload)
+                    pair = [aliases.get(v.strip().casefold(), v.strip()) for v in endpoints]
+                    if any(set(pair) == {node["node_id"], dest} for dest in normalized):
+                        invalid("authored LINK conflicts with exclusion / LINK authored contradice la exclusión")
+            authored[node["node_id"]]["navigation_policy"] = dict(
+                version=NAVIGATION_POLICY_VERSION, exclude_destinations=sorted(normalized))
     rules_json, authored_json = canonical(_rules()), canonical(authored)
     key = fingerprint((VERSION, rules_json, authored_json))
     return InformationDefinition(VERSION, rules_json, authored_json, key)
@@ -129,6 +163,27 @@ def validate_definition(definition, *, current=False):
 
 def _seed(*parts):
     return int(fingerprint(parts), 16)
+
+
+def sampling_definition(definition):
+    """Keep pre-policy records/draws stable; full definition still pins policy.
+
+    Policies are subtractive, not a new random-history input. No-policy inputs
+    retain exactly the original v1 fingerprint and algorithms.
+    """
+    authored = json.loads(definition.authored_json)
+    if not any("navigation_policy" in host for host in authored.values()):
+        return definition
+    for host in authored.values():
+        host.pop("navigation_policy", None)
+    raw = canonical(authored)
+    return InformationDefinition(definition.version, definition.rules_json, raw,
+        fingerprint((VERSION, definition.rules_json, raw)))
+
+
+def navigation_excluded(definition, host_id, destination_id):
+    host = json.loads(definition.authored_json).get(host_id, {})
+    return destination_id in host.get("navigation_policy", {}).get("exclude_destinations", ())
 
 
 def _record(world, rules, host, destination, edge):
@@ -249,6 +304,7 @@ def query_information(world, definition, node_id, *, budget=None):
     """
     budget = budget or InformationBudget()
     rules, authored = validate_definition(definition)
+    sampling = sampling_definition(definition)
     if world.algorithm_version != manifest.ALGORITHM_VERSION:
         raise ValueError("Historical information requires the certified production manifest")
     session = manifest.new_session(world)
@@ -296,7 +352,7 @@ def query_information(world, definition, node_id, *, budget=None):
         distance = math.dist(host.position_ly, site.position_ly)
         if not 0 < distance <= world.hop_cap_ly:
             continue
-        record = _record(world, definition, host, site, connections.get(site.identity))
+        record = _record(world, sampling, host, site, connections.get(site.identity))
         records[record.destination_id] = record
         weights[record.destination_id] = (rules["weights"]["connection"] if record.relation
             else rules["weights"]["hub"] if site.is_hub
@@ -304,14 +360,18 @@ def query_information(world, definition, node_id, *, budget=None):
             else rules["weights"]["vessel"])
     selected = []
     maximum = rules["max_destinations"]
-    rng = random.Random(_seed(VERSION, definition.rules_key, host.identity.encoded, "uplink"))
+    rng = random.Random(_seed(VERSION, sampling.rules_key, host.identity.encoded, "uplink"))
     authored_weights = {nid: weight for nid, weight in authored_weights.items() if nid in records}
     count = max(int(table.get("min_authored", 0) or 0), int(table.get("max_authored", 0) or 0))
     selected.extend(_select(rng, authored_weights, min(maximum, max(0, count))))
     selected.extend(_select(rng, {nid: weight for nid, weight in weights.items() if nid not in selected}, maximum-len(selected)))
     uplink = tuple(records[nid] for nid in selected) if "uplink" in information_capabilities(host.kind) else ()
     neighbors = tuple(sites[i] for i in sorted(connections))
-    files, mail = _files(world, definition, host, list(records.values()), neighbors, authored, rules)
+    files, mail = _files(world, sampling, host, list(records.values()), neighbors, authored, rules)
+    # Remove only selected records/files. Never re-roll or fill a vacated slot.
+    excluded = set(authored.get(node_id, {}).get("navigation_policy", {}).get("exclude_destinations", ()))
+    uplink = tuple(record for record in uplink if record.destination_id not in excluded)
+    files = [entry for entry in files if entry.get("navigation_record", {}).get("destination_id") not in excluded]
     return HistoricalInformation(host, node_id, definition.rules_key, uplink, canonical(files), mail,
         sectors, len(session.sectors))
 

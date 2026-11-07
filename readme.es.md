@@ -67,6 +67,43 @@ Notas:
 - También puedes definir RETORNO_USER para seleccionar perfil por entorno.
 - Formato de usuario válido: 1-32 caracteres en minúscula (a-z, 0-9, '.', '_' o '-').
 
+### Escenarios de inicio
+
+Ejecuta estos comandos desde la raíz del repositorio, con el entorno virtual del
+proyecto (`/home/jon/prog/retorno_case/retorno_venv/bin/python` en este checkout;
+adapta la ruta del intérprete en otros checkouts):
+
+```bash
+# PROLOGUE: inicio normal, comenzando una partida nueva
+RETORNO_SCENARIO=PROLOGUE PYTHONPATH=src /home/jon/prog/retorno_case/retorno_venv/bin/python -m retorno.ui_textual.app --new-game
+# SANDBOX (DEV es un alias)
+RETORNO_SCENARIO=SANDBOX PYTHONPATH=src /home/jon/prog/retorno_case/retorno_venv/bin/python -m retorno.ui_textual.app
+# FAST_SANDBOX
+RETORNO_SCENARIO=FAST_SANDBOX PYTHONPATH=src /home/jon/prog/retorno_case/retorno_venv/bin/python -m retorno.ui_textual.app
+```
+
+Sustituye `retorno.ui_textual.app` por `retorno.cli.repl` para usar el REPL de
+terminal. `RETORNO_SCENARIO` acepta mayúsculas y minúsculas. PROLOGUE es el escenario
+predeterminado; sin `--new-game`, carga la partida guardada seleccionada si existe.
+
+**SANDBOX y FAST_SANDBOX están en principio pensados exclusivamente para depuración
+de errores y pruebas de diseño.** SANDBOX comienza en ECHO_7 con reparaciones
+básicas y los servicios de datos/sensores activos; su salvage sigue disponible.
+FAST_SANDBOX comienza en órbita de ECHO_7, desacoplada y lista para el primer viaje:
+todos los sistemas están completamente reparados y alimentados, los servicios
+activos, la batería llena y el presupuesto energético permite mantener todos los
+sistemas. Se han recuperado toda la chatarra, módulos, drones recuperables y datos
+locales, incluidas las rutas y la información del uplink. Los archivos recuperados
+quedan en `/remote/ECHO_7/` y el registro del uplink en `/logs/nav/`. Todos los drones
+están completamente reparados, cargados y descontaminados en su bahía. Los módulos
+recuperados quedan en la carga.
+
+Ambos escenarios de pruebas siempre empiezan de cero y omiten la carga del slot
+guardado. El guardado normal sigue activo: usa otro `--user` o `--save-path` para
+separar las pruebas de tu partida principal. No activan automáticamente el modo
+debug. En ambas interfaces, `debug scenario prologue|sandbox|fast_sandbox|dev`
+reinicia el mundo actual con el escenario elegido.
+
 ## Basic commands
 
 Some common in-game commands:
@@ -91,6 +128,7 @@ Some common in-game commands:
 - **ls**
 - **cat <path>**
 - **intel import <path>**
+- **wait <seconds>** — avanza el tiempo de simulación manualmente; requiere **debug on**.
 
 Dentro del juego, usa **help** para ver el listado actualizado de comandos.
 

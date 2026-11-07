@@ -1,0 +1,322 @@
+{
+  "normal29": [
+    {
+      "command": "power off security",
+      "wait_seconds": 0,
+      "output": [
+        "Manual power shed: security -> OFFLINE"
+      ]
+    },
+    {
+      "command": "power off data_core",
+      "wait_seconds": 0,
+      "output": [
+        "Manual power shed: data_core -> OFFLINE"
+      ]
+    },
+    {
+      "command": "drone deploy D1 PWR-A1",
+      "wait_seconds": 13,
+      "output": [
+        "Job queued: deploy_drone -> ship_sector:PWR-A1 (ETA 13s)",
+        "System state changed: sensors",
+        "Low power quality",
+        "Drone deployed to PWR-A1"
+      ]
+    },
+    {
+      "command": "drone repair D1 power_core",
+      "wait_seconds": 45,
+      "output": [
+        "Job queued: repair_system -> ship_system:power_core (ETA 45s)",
+        "System state changed: power_core",
+        "Repair completed for power_core"
+      ]
+    },
+    {
+      "command": "drone repair D1 power_core",
+      "wait_seconds": 45,
+      "output": [
+        "Job queued: repair_system -> ship_system:power_core (ETA 45s)",
+        "System state changed: power_core",
+        "Repair completed for power_core"
+      ]
+    },
+    {
+      "command": "drone move D1 BUS-A2",
+      "wait_seconds": 13,
+      "output": [
+        "Job queued: move_drone -> ship_sector:BUS-A2 (ETA 13s)",
+        "Drone moved to BUS-A2"
+      ]
+    },
+    {
+      "command": "drone repair D1 energy_distribution",
+      "wait_seconds": 45,
+      "output": [
+        "Job queued: repair_system -> ship_system:energy_distribution (ETA 45s)",
+        "Power bus instability due to damaged distribution",
+        "Repair failed for energy_distribution. Consumed 1/3 scrap and refunded 2."
+      ]
+    },
+    {
+      "command": "drone repair D1 energy_distribution",
+      "wait_seconds": 45,
+      "output": [
+        "Job queued: repair_system -> ship_system:energy_distribution (ETA 45s)",
+        "Repair failed for energy_distribution. Consumed 1/3 scrap and refunded 2."
+      ]
+    },
+    {
+      "command": "drone repair D1 energy_distribution",
+      "wait_seconds": 45,
+      "output": [
+        "Job queued: repair_system -> ship_system:energy_distribution (ETA 45s)",
+        "System state changed: energy_distribution",
+        "Service radiod: blocked",
+        "Service securityd: blocked",
+        "Service datad: blocked",
+        "Service sensord: blocked",
+        "Repair completed for energy_distribution"
+      ]
+    },
+    {
+      "command": "drone repair D1 energy_distribution",
+      "wait_seconds": 45,
+      "output": [
+        "Job queued: repair_system -> ship_system:energy_distribution (ETA 45s)",
+        "System state changed: energy_distribution",
+        "Repair completed for energy_distribution",
+        "Power deficit detected"
+      ]
+    },
+    {
+      "command": "drone recall D1",
+      "wait_seconds": 25,
+      "output": [
+        "Job queued: recall_drone -> drone:D1 (ETA 25s)",
+        "Drone recalled: D1"
+      ]
+    },
+    {
+      "command": "power on sensors",
+      "wait_seconds": 0,
+      "output": []
+    },
+    {
+      "command": "boot sensord",
+      "wait_seconds": 8,
+      "output": [
+        "Job queued: boot_service -> service:sensord (ETA 8s)",
+        "Service booted: sensord",
+        "Signal detected: ECHO-7"
+      ]
+    },
+    {
+      "command": "scan",
+      "wait_seconds": 8,
+      "output": [
+        "Job queued: scan -> world_node:UNKNOWN (ETA 8s)",
+        "Scan completed at UNKNOWN"
+      ]
+    },
+    {
+      "command": "route solve ECHO_7",
+      "wait_seconds": 100,
+      "output": [
+        "Job queued: route_solve -> world_node:ECHO_7 (ETA 100s)",
+        "Route solved: UNKNOWN -> ECHO_7"
+      ]
+    },
+    {
+      "command": "nav ECHO_7",
+      "wait_seconds": 0,
+      "output": [
+        "Travel profile set: CRUISE (auto). Use 'nav --no-cruise <dest>' to override.",
+        "Travel started to ECHO_7 ETA 0.00y"
+      ]
+    },
+    {
+      "command": "dock ECHO_7",
+      "wait_seconds": 60,
+      "output": [
+        "Job queued: dock -> world_node:ECHO_7 (ETA 60s)",
+        "Docked at ECHO_7"
+      ]
+    },
+    {
+      "command": "power plan normal",
+      "wait_seconds": 0,
+      "output": [
+        "System state changed: sensors",
+        "System state changed: security",
+        "System state changed: data_core",
+        "System state changed: drone_bay"
+      ]
+    },
+    {
+      "command": "power on data_core",
+      "wait_seconds": 0,
+      "output": []
+    },
+    {
+      "command": "boot datad",
+      "wait_seconds": 5,
+      "output": [
+        "Job queued: boot_service -> service:datad (ETA 5s)",
+        "Power deficit detected",
+        "Service booted: datad"
+      ]
+    },
+    {
+      "command": "uplink",
+      "output": "[INFO] Battery low: SoC=0.36. Consider reducing load.\nuplink_complete :: routes added: P-2.1.1.0, P-1.2.2.0\nLog written to /logs/nav/uplink_ECHO_7_00058.txt\n"
+    },
+    {
+      "command": "power on drone_bay",
+      "wait_seconds": 0,
+      "output": []
+    },
+    {
+      "command": "drone deploy D1 ECHO_7",
+      "wait_seconds": 13,
+      "output": [
+        "Job queued: deploy_drone -> world_node:ECHO_7 (ETA 13s)",
+        "Drone deployed to ECHO_7"
+      ]
+    },
+    {
+      "command": "drone salvage data D1",
+      "wait_seconds": 40,
+      "output": [
+        "Job queued: salvage_data -> world_node:ECHO_7 (ETA 40s)",
+        "Data salvaged at /remote/ECHO_7/: new=2, already_mounted=0, total=2"
+      ]
+    },
+    {
+      "command": "drone recall D1",
+      "wait_seconds": 25,
+      "output": [
+        "Job queued: recall_drone -> drone:D1 (ETA 25s)",
+        "Drone recalled: D1",
+        "Drone bay maintenance blocked: docked drones cannot recover battery or integrity"
+      ]
+    }
+  ],
+  "public1": [
+    {
+      "command": "nav S+001_+001_+001:WG1_6c18fb9f34b55c5239e58ca6fe855730a55a869f1fad89a4753be241f43545cb_0",
+      "wait_seconds": 0,
+      "output": [
+        "Travel profile set: CRUISE (auto). Use 'nav --no-cruise <dest>' to override.",
+        "Travel started to S+001_+001_+001:WG1_6c18fb9f34b55c5239e58ca6fe855730a55a869f1fad89a4753be241f43545cb_0 ETA 24.14y"
+      ]
+    },
+    {
+      "command": "hibernate until_arrival",
+      "years": 24.14383704263864,
+      "wake": null
+    },
+    {
+      "command": "dock S+001_+001_+001:WG1_6c18fb9f34b55c5239e58ca6fe855730a55a869f1fad89a4753be241f43545cb_0",
+      "wait_seconds": 60,
+      "output": [
+        "Job queued: dock -> world_node:S+001_+001_+001:WG1_6c18fb9f34b55c5239e58ca6fe855730a55a869f1fad89a4753be241f43545cb_0 (ETA 60s)",
+        "broadcast_received :: Station broadcast: /logs/broadcasts/radio_0016.en.txt",
+        "broadcast_received :: Station broadcast: /logs/broadcasts/radio_0017.en.txt",
+        "broadcast_received :: Station broadcast: /logs/broadcasts/radio_0018.en.txt",
+        "Docked at S+001_+001_+001:WG1_6c18fb9f34b55c5239e58ca6fe855730a55a869f1fad89a4753be241f43545cb_0"
+      ]
+    },
+    {
+      "command": "power plan normal",
+      "wait_seconds": 0,
+      "output": [
+        "System state changed: sensors",
+        "System state changed: security",
+        "System state changed: data_core",
+        "System state changed: drone_bay"
+      ]
+    },
+    {
+      "command": "power on data_core",
+      "wait_seconds": 0,
+      "output": []
+    },
+    {
+      "command": "boot datad",
+      "wait_seconds": 5,
+      "output": [
+        "Job queued: boot_service -> service:datad (ETA 5s)",
+        "Service booted: datad"
+      ]
+    },
+    {
+      "command": "uplink",
+      "output": "uplink_complete :: routes added: HARBOR_12, P-0.0.0.0, P-0.4.0.0\nLog written to /logs/nav/uplink_P-2.2.2.0_00026.txt\n"
+    },
+    {
+      "command": "undock",
+      "wait_seconds": 45,
+      "output": [
+        "Job queued: undock -> world_node:S+001_+001_+001:WG1_6c18fb9f34b55c5239e58ca6fe855730a55a869f1fad89a4753be241f43545cb_0 (ETA 45s)",
+        "Undocked from S+001_+001_+001:WG1_6c18fb9f34b55c5239e58ca6fe855730a55a869f1fad89a4753be241f43545cb_0"
+      ]
+    },
+    {
+      "command": "nav HARBOR_12",
+      "wait_seconds": 0,
+      "output": [
+        "Travel profile set: CRUISE (auto). Use 'nav --no-cruise <dest>' to override.",
+        "Travel started to HARBOR_12 ETA 17.43y"
+      ]
+    },
+    {
+      "command": "hibernate until_arrival",
+      "years": 17.42565111120326,
+      "wake": null
+    }
+  ],
+  "original_producer_comparison": [
+    {
+      "seed": 1,
+      "physical_identical": true,
+      "hosts_compared": [
+        "ECHO_7",
+        "HARBOR_12",
+        "S+001_+001_+001:WG1_6c18fb9f34b55c5239e58ca6fe855730a55a869f1fad89a4753be241f43545cb_0",
+        "S-001_+000_+000:WG1_6c18fb9f34b55c5239e58ca6fe855730a55a869f1fad89a4753be241f43545cb_0",
+        "S+001_-001_+000:WG1_6c18fb9f34b55c5239e58ca6fe855730a55a869f1fad89a4753be241f43545cb_0"
+      ],
+      "b1_only_excluded_slot_removed": true,
+      "b2_identical_except_definition_fingerprint": true
+    },
+    {
+      "seed": 29,
+      "physical_identical": true,
+      "hosts_compared": [
+        "ECHO_7",
+        "HARBOR_12",
+        "S+001_-001_-001:WG1_f8da113d7bb9c5053dec10474389866be24b2d22b648039603a3cb20ec733818_0",
+        "HARBOR_12",
+        "S-001_+001_+001:WG1_f8da113d7bb9c5053dec10474389866be24b2d22b648039603a3cb20ec733818_0"
+      ],
+      "b1_only_excluded_slot_removed": true,
+      "b2_identical_except_definition_fingerprint": true
+    },
+    {
+      "seed": 701,
+      "physical_identical": true,
+      "hosts_compared": [
+        "ECHO_7",
+        "HARBOR_12",
+        "S+000_-001_+001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+        "S+000_+000_+001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+        "S+001_+001_-001:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0",
+        "S+001_-001_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_0"
+      ],
+      "b1_only_excluded_slot_removed": true,
+      "b2_identical_except_definition_fingerprint": true
+    }
+  ]
+}

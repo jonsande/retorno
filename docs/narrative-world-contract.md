@@ -223,10 +223,13 @@ identities and consumed resources remain.
 | --- | --- |
 | Supported | Tábano wreck as `ship` with stable identity and seeded position; documents restricted by ID; sector bindings; existing destination and validated edges. |
 | Pending data adaptation | Optional JSON, EN/ES texts, regions/boxes, relations and real channels; making the destination reachable needs a specific certified route. |
-| Editorial decision | Bruma's present state, playable Liria, destination's nature, fate of the seven people. |
+| Editorial decision | Bruma's present state, destination's nature, fate of the seven people. |
 | Unimplemented system | VAELOR as a star system with planets/components; dynamic physical conservation, chronology and community simulation. |
 
 Bruma's existence can only be mapped to a playable kind after an editorial
 decision; no wreck is imposed. Names alone do not turn VAELOR or its planets
-into nodes. AMANECER remains untouched and inactive. There is no editor,
+into nodes. C2b installs only Elena Varela's arc and its approved historical Liria
+in the working-tree catalogue. The bounded public journey did not discover its
+clue; see the [C2b review](testing/amanecer-productive-review.md). Other AMANECER
+arcs and singles remain inactive, with their original manuscripts preserved. There is no editor,
 universal mod manager, new channel, new scan or general rebalance.

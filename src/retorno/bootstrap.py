@@ -222,8 +222,8 @@ def create_initial_state_prologue(*, seed: int | None = None) -> GameState:
     return state
 
 
-def create_initial_state_sandbox() -> GameState:
-    state = create_initial_state_prologue()
+def create_initial_state_sandbox(*, seed: int | None = None) -> GameState:
+    state = create_initial_state_prologue(seed=seed)
 
     # Sandbox overrides: systems healthy, services running, known contacts.
     for sys in state.ship.systems.values():
@@ -260,6 +260,81 @@ def create_initial_state_sandbox() -> GameState:
     state.ship.manifest_dirty = True
     apply_retorno_canonical_layout(state)
 
+    return state
+
+def create_initial_state_fast_sandbox(*, seed: int | None = None) -> GameState:
+    """Skip ECHO_7 preparation using the normal recovery effects, without ticking."""
+    from contextlib import redirect_stdout
+    from io import StringIO
+
+    from retorno.cli.repl import _handle_uplink
+    from retorno.core.engine import Engine
+    from retorno.core.lore import initialize_node_pool, recompute_node_completion
+    from retorno.model.drones import compute_drone_effective_profile
+    from retorno.model.jobs import Job, JobStatus, JobType, TargetRef
+
+    state = create_initial_state_sandbox(seed=seed)
+    for system in state.ship.systems.values():
+        system.health = system.health_max_effective
+        system.state = SystemState.NOMINAL
+        system.state_locked = False
+        system.forced_offline = False
+        system.auto_offline_reason = None
+        if system.service:
+            system.service.is_running = True
+            system.service.last_boot_error = None
+
+    # Keep every repaired system powered; the prologue budget cannot do so.
+    power = state.ship.power
+    power.p_load_kw = sum(system.p_effective_kw() for system in state.ship.systems.values())
+    power.p_gen_base_kw = max(power.p_gen_base_kw, power.p_load_kw)
+    power.p_gen_kw = power.p_gen_base_kw + power.p_gen_bonus_kw
+    power.e_batt_kwh = power.e_batt_max_kwh
+    state.events.recent.clear()
+    state.events.alerts.clear()
+
+    node_id = "ECHO_7"
+    node = state.world.space.nodes[node_id]
+    state.world.known_contacts.add(node_id)
+    state.world.known_nodes.add(node_id)
+    initialize_node_pool(state, node_id)
+    state.ship.cargo_scrap += node.salvage_scrap_available
+    state.ship.cargo_modules.extend(node.salvage_modules_available)
+    node.salvage_scrap_available = 0
+    node.salvage_modules_available.clear()
+    node.salvage_dry = True
+
+    engine = Engine()
+    for job_type in (JobType.SALVAGE_DRONE, JobType.SALVAGE_DATA):
+        engine._apply_job_effect(state, Job(
+            job_id=f"bootstrap_{job_type.value}", job_type=job_type,
+            status=JobStatus.COMPLETED, eta_s=0,
+            target=TargetRef(kind="world_node", id=node_id),
+            params={"node_id": node_id},
+        ))
+    # Uplink currently lives in the shared CLI command layer (also used by
+    # Textual). Run that same command while temporarily docked, before any
+    # simulation thread starts, so its intel, lore and logs stay identical.
+    state.ship.docked_node_id = node_id
+    with redirect_stdout(StringIO()):
+        _handle_uplink(state)
+    state.ship.docked_node_id = None
+    recompute_node_completion(state, node_id)
+
+    modules = load_modules()
+    for drone in state.ship.drones.values():
+        profile = compute_drone_effective_profile(drone, modules)
+        drone.status = DroneStatus.DOCKED
+        drone.location = DroneLocation(kind="ship_sector", id=state.ship.systems["drone_bay"].sector_id)
+        drone.integrity = profile.integrity_max_effective
+        drone.battery = profile.battery_max_effective
+        drone.dose_rad = 0.0
+        drone.radiation_level = "low"
+        drone.low_battery_warned = False
+    state.ship.manifest_scrap = state.ship.cargo_scrap
+    state.ship.manifest_modules = list(state.ship.cargo_modules)
+    state.ship.manifest_dirty = False
+    state.ship.manifest_last_sync_t = state.clock.t
     return state
 
 def _bootstrap_locations(state: GameState, rng: random.Random, module_ids: list[str]) -> None:

@@ -1,0 +1,50 @@
+[
+  {
+    "seed": 701,
+    "locale": "en",
+    "host": "S+002_-001_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1",
+    "host_path_in_certified_view": null,
+    "liria_path_in_certified_view": null,
+    "liria": [
+      19.347705909283917,
+      6.477133928262818,
+      -0.20203085018464717
+    ]
+  },
+  {
+    "seed": 701,
+    "locale": "es",
+    "host": "S+002_-001_+000:WG1_4660da0245673f5dc02b9a3b022d06ab211426082b622819b03ed777df1225b2_1",
+    "host_path_in_certified_view": null,
+    "liria_path_in_certified_view": null,
+    "liria": [
+      19.347705909283917,
+      6.477133928262818,
+      -0.20203085018464717
+    ]
+  },
+  {
+    "seed": 1,
+    "locale": "en",
+    "host": "S+001_+001_-001:WG1_6c18fb9f34b55c5239e58ca6fe855730a55a869f1fad89a4753be241f43545cb_0",
+    "host_path_in_certified_view": null,
+    "liria_path_in_certified_view": null,
+    "liria": [
+      18.94252981191878,
+      6.646774840117149,
+      -0.16252078851990104
+    ]
+  },
+  {
+    "seed": 29,
+    "locale": "en",
+    "host": "S+001_-001_+000:WG1_f8da113d7bb9c5053dec10474389866be24b2d22b648039603a3cb20ec733818_0",
+    "host_path_in_certified_view": null,
+    "liria_path_in_certified_view": null,
+    "liria": [
+      20.87867744438681,
+      6.367300500416981,
+      0.3443508701210213
+    ]
+  }
+]

@@ -57,6 +57,41 @@ PYTHONPATH=src python -m retorno.ui_textual.app --new-game
 ```
 
 
+### Starting scenarios
+
+Run these commands from the repository root, using the project's virtual
+environment (`/home/jon/prog/retorno_case/retorno_venv/bin/python` in this checkout;
+adjust the interpreter path in other checkouts):
+
+```bash
+# PROLOGUE: normal opening, starting a new game
+RETORNO_SCENARIO=PROLOGUE PYTHONPATH=src /home/jon/prog/retorno_case/retorno_venv/bin/python -m retorno.ui_textual.app --new-game
+# SANDBOX (DEV is an alias)
+RETORNO_SCENARIO=SANDBOX PYTHONPATH=src /home/jon/prog/retorno_case/retorno_venv/bin/python -m retorno.ui_textual.app
+# FAST_SANDBOX
+RETORNO_SCENARIO=FAST_SANDBOX PYTHONPATH=src /home/jon/prog/retorno_case/retorno_venv/bin/python -m retorno.ui_textual.app
+```
+
+Replace `retorno.ui_textual.app` with `retorno.cli.repl` for the terminal REPL.
+Scenario names in `RETORNO_SCENARIO` are case insensitive. PROLOGUE is the default;
+without `--new-game`, it loads the selected save when available.
+
+**SANDBOX and FAST_SANDBOX are initially intended exclusively for debugging and
+design testing.** SANDBOX starts at ECHO_7 with basic system repairs and data/sensor
+services running; its salvage remains available. FAST_SANDBOX starts in orbit
+around ECHO_7, undocked and ready for the first trip: every system is fully repaired
+and powered, services are running, the battery is full, and the power budget
+supports all systems. All local scrap, modules, recoverable drones and data have
+been recovered, including uplink routes and information. Recovered files remain
+under `/remote/ECHO_7/` and the uplink log under `/logs/nav/`. All drones are fully
+repaired, charged and decontaminated in their bay. Recovered modules are cargo.
+
+Both test scenarios always start fresh and bypass loading the save slot. Normal
+saving still applies: use a separate `--user` or `--save-path` to keep test progress
+apart from your main game. They do not enable debug mode automatically. In either
+interface, `debug scenario prologue|sandbox|fast_sandbox|dev` resets the current
+world to the chosen preset.
+
 ## Basic commands
 
 Some common in-game commands:
@@ -81,6 +116,7 @@ Some common in-game commands:
 - **ls**
 - **cat <path>**
 - **intel import <path>**
+- **wait <seconds>** — advance simulation time manually; requires **debug on**.
 
 Use **help** in-game for the current and complete command list.
 

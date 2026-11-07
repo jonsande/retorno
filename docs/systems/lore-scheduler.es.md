@@ -119,10 +119,14 @@ de secundarios asignados del arco, pero no define orden narrativo.
 - secundarios asignados por id, nodo y ruta;
 - ids `discovered` tras importar el intel primary correspondiente.
 
-Actualmente los cuatro JSON existentes están bajo `data/arcs/templates/`.
-Como el loader sólo hace `glob("*.json")` en `data/arcs/`, `load_arcs()` devuelve
-una lista vacía. Sus recursos narrativos también permanecen inactivos aunque
-existan en disco.
+Los cuatro JSON históricos de plantilla siguen bajo `data/arcs/templates/`
+y no se cargan. C2b añade `data/arcs/amanecer_elena_01.json` como único arco
+activo en el árbol de trabajo, con diez recursos EN/ES. Esto sustituye la
+observación anterior de catálogo vacío. Pasan las comprobaciones estructurales
+productivas, pero el recorrido público acotado no descubrió el host de la pista;
+véase la [revisión C2b](../testing/amanecer-productive-review.es.md). Los cinco
+singles activos no cambian. Los filtros relativos y reservas seeded usan el
+[contrato de colocación](../design/lore-placement-anchors.es.md) existente.
 
 ### 4.2 Singles
 

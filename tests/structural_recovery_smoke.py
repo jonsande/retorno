@@ -61,7 +61,7 @@ def scene(spec=None, *, present=None, known=("A",), clean=True, seed=271828, rad
         cfg.update(node_count_min=0, node_count_max=0)
     authored = tuple(m.AuthoredSite(nid, kind, pos, kind in rec.HUBS) for nid,kind,pos in spec)
     definition = m.define_manifest(seed, templates=templates, archetypes=archetypes,
-        authored=authored, narrative_key=snap["catalog_key"])
+        authored=authored, narrative_key=snap.get("physical_catalog_key", snap["catalog_key"]))
     s.world = WorldState(manifest_definition=definition, narrative_snapshot=snap,
         universe_rules_key=definition.rules_key, rng_seed=seed)
     present = {nid for nid,_,_ in spec} if present is None else set(present)

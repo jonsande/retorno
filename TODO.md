@@ -2,13 +2,19 @@
 === NEW TODO ===
 ========================
 
+- [x] Actualmente, a la hora de configurar dónde pueden aparecer los documentos de un arco y/o las estaciones/pecios/etc. relativos a él, podemos configurar el rango de distancia, con respecto al origen de la partida, a la que pueden aparecer esos documentos. No podemos configurarlo para que los documentos aparezcan dentro de un rango de distancia con respecto a una estación o nodo en particular. Si quisiéramos distribuir documentos a un máximo de 15 años luz de Liria, por ejemplo, necesitaríamos diseñar una solución concreta; no existe un parámetro genérico equivalente a max_dist_from_node: "LIRIA". Necesitamos desarrollar esa solución.
+
+- [!] LORE — Mejorar la búsqueda de emplazamientos mediante anclas espaciales. Actualmente, la búsqueda de hosts históricos para documentos esenciales examina un conjunto limitado de sectores (presupuesto de 64). Aunque existan estaciones que cumplan una restricción como anchor_distances (por ejemplo, a menos de 15 ly de Liria), pueden quedar fuera de la búsqueda. Solución propuesta: implementar una búsqueda centrada en el volumen espacial alrededor de las entidades de referencia, con presupuestos progresivos y resultados que distingan entre ausencia real de candidatos y búsqueda incompleta. No crear nodos ni rutas artificiales.
+
+- [!] LORE — Optimizar el cálculo de distancias relativas. Actualmente, al evaluar posibles emplazamientos, se calculan distancias a entidades authored incluso para documentos que no utilizan anchor_distances. Este trabajo innecesario podría afectar al rendimiento cuando aumente el número de localizaciones y piezas narrativas. Solución propuesta: calcular únicamente las distancias a las anclas referenciadas por cada documento y reutilizar resultados cuando sea posible, manteniendo el determinismo y sin alterar las reglas de colocación.
+
 - [] Existe un límite de drones que se pueden tener? Limitar a 4.
 
 - [] Aumentar el tiempo que se tarda en acoplarse (dock).
 
-- [] Necesitamos un nuevo escenario de inicio: FAST_SANDBOX. La idea es empezar el juego con todos los sistemas reparados, todo el salvage disponible en ECHO_7 ya recuperado (incluida la información recuperable con uplink), el o los drones en su bahía y en perfecto estado, y la nave orbitando alrededor de ECHO_7, lista para iniciar el primer viaje.
+- [x] Quiero un nuevo escenario de inicio: FAST_SANDBOX. La idea es empezar el juego con todos los sistemas reparados, todo el salvage disponible en ECHO_7 ya recuperado (incluida la información recuperable con uplink), el o los drones en su bahía y en perfecto estado, y la nave orbitando alrededor de ECHO_7, lista para iniciar el primer viaje. Quiero también incluir en el readme las instrucciones para ejecutar el juego desde los distintos escenarios, pero aclarando que el escenario SANDBOX y FAST_SANDBOX están en principio pensados exclusivamente para depuración de errores y pruebas de diseño.
 
-- [] Necesitamos un comando debug que imprima los nodos materializados (incluidos lo que no conoce aún el jugador), y otro que te permita teletransportarte inmediatamente a cualquier nodo.
+- [!] Si no existen ya, necesitamos un comando debug que imprima los nodos materializados (incluidos lo que no conoce aún el jugador), y otro que te permita teletransportarte inmediatamente a cualquier nodo.
 
 - [] Cada vez que cambia el estado de alguno de los sistemas de hardware recibo dos mensajes que en principio parecen redundates. Por ejemplo, tras un 'power on comms':
 
@@ -19,6 +25,8 @@
 La primera línea y la tercera, ¿no son redundantes? Entiendo que el WARN está avisando cada vez que hay un cambio en el estado de un sistema de la nave. Esto es lo deseable en el caso de que el sistema cambie a un estado a peor (por ejemplo, de 'nominal' a 'limited'), pero no cuando cambia a mejor (por ejemplo de 'limited' a 'nominal'). Tampoco hace falta que se imprima un WARN cuando se enciende o apaga un sistema de la nave si el encendido o apagado lo ha ejecutado el jugador manualmente (en este caso, basta con la notificación INFO.
 
 - [] He recibido por primera vez una señal de radio. El archivo tiene el nombre "radio_0017.en.txt". Por qué el número 0017, si es la primera señal de radio que recibo?
+
+- [] Si no existe ya, necesitamos un comando 'delete' para borrar documentos.
 
 - [] Capturo de forma más o menos habitual señales de radio como esta:
 
@@ -63,7 +71,7 @@ Me gustaría que el output no mostrara lo no detectado (como, en este caso "no r
   
 - [] El sistema temporal del juego. Los tres relojes (tiempo galáctico, tiempo de la nave y tiempo biológico del personaje). Hay una conversación al respecto guardada en chatGPT (dentro de la conversación "CANON de RETORNO", sino recuerdo mal). Checkear y partir de ahí.
 
-- [] Al hacer un ship survey, cuando la distancia del objetivo no llega a 1ly, hay que dar la distancia en alguna unidad menor, para que no aparezca simplemente 0.00ly.
+- [!] Al hacer un ship survey, cuando la distancia del objetivo no llega a 1ly, hay que dar la distancia en alguna unidad menor, para que no aparezca simplemente 0.00ly.
 
 - [!] Situado en WAYSTATION_679A8E, a unos 25.35ly de distancia de ARCHIVE_01 (es decir, estando ARCHIVE_01 muy lejos del rango de los sensores), veo que puedo ejecutar sin problema la orden "ship survey ARCHIVE_01", y además que el comando "ship survey" me autocompleta el nombre de todos los destinos conocidos. Entiendo que esto no es correcto. Si la operación "ship survey" requiere tener encendidos data_core y sensors entiendo que es porque para obtener esa información hace falta usar ambos sistemas. Pero aquí hace falta distinguir dos cosas: a) la obtención de información NUEVA (mediante "ship survey") de un objetivo que se encuentra dentro del rango de los sensores, y b) la recuperación de la información ANTIGUA obtenida por ese mismo procedimiento. Para "b" no tiene sentido necesitar tener encendido el sistema sensors (y data_core tampoco). Se supone que simplemente se está recuperando información ya obtenida en el pasado. Para la recuperación de información archivada quizá haría falta un comando diferente a "ship survey", y reservar "ship survey" únicamente para la operación de obtener información de un objetivo en torno al cuál se está orbitando (y, en consecuencia, sólo debe autocompletar el nombre del objeto en torno al cuál se está orbitando). Además, actualmente la operación "ship survey" es inmediata (no tiene ETA). No debería ser así. Debería llevar un tiempo llevar a cabo esa operación.
 
@@ -71,7 +79,7 @@ Me gustaría que el output no mostrara lo no detectado (como, en este caso "no r
 
 - [] El sistema de descubrimiento tiene oportunidades finitas. Un uplink puede agotarse. Un nodo puede no tener enlaces útiles. Un scan puede no encontrar contactos nuevos. Y F-DEAD-01 tampoco garantiza una salida universal. Por tanto, no podemos concluir simplemente por la existencia de estos sistemas que todas las semillas permitan una exploración prolongada y satisfactoria. Necesitamos alguna manera de comprobar cómo de probable es una bloqueo exploratorio, y desarrollar las contramedidas necesarias para evitarlo o minimizarlo en lo posible (existe documentación en el repositorio explicando en detalle qué es un bloqueo exploratorio y qué está pendiente de investigar en este sentido).
 
-- [] Para **calcular una ruta nueva**, los requisitos actuales son:
+- [!] Para **calcular una ruta nueva**, los requisitos actuales son:
 
 | Sistema o servicio | Requisito |
 |---|---|
@@ -83,27 +91,46 @@ Me gustaría que el output no mostrara lo no detectado (como, en este caso "no r
 
 No exige `data_core`/`datad` ni `comms`/`radiod`. Tampoco exige un estado concreto de `power_core`: debe proporcionar alimentación suficiente para cumplir las condiciones anteriores. Durante el cálculo deben mantenerse **`sensors ≥ LIMITED` y `sensord` en ejecución**; si dejan de cumplirlo, el trabajo falla. Me gustaría que, para calcular una nueva ruta ("route solve"), además de los requisitos actuales, se requiera tener data_core LIMITED o superior y encendido, así como "datad" instalado y en ejecución.
 
-- [] Desde los últimos cambios la hibernación ahora tarda mucho en ejecutarse. Pasa lo mismo con la orden wait del modo debug: si haces wait 5 no se nota, pero wait 300 tarda unos 15s en ejecutarse, y wait 3000 tarda demasiado (no sé cuánto porque no he tenido paciencia y he matado el proceso del juego, pensando que podría haberse bloqueado el programa). Un viaje de 15.23ly hibernando tarda 1 minuto y 21 segundos aproximadamente en ejecutarse. Me parece excesivo. Antes de los últimos cambios esto no sucedía. El salto era prácticamente inmediato. ¿A qué se debe? Si no fuera posible reducir el tiempo de espera, haría falta indicárselo al jugador de alguna manera, pues de otro modo parece simplemente que el juego se ha quedado bloqueado.
+- [x] Desde los últimos cambios la hibernación ahora tarda mucho en ejecutarse. Pasa lo mismo con la orden wait del modo debug: si haces wait 5 no se nota, pero wait 300 tarda unos 15s en ejecutarse, y wait 3000 tarda demasiado (no sé cuánto porque no he tenido paciencia y he matado el proceso del juego, pensando que podría haberse bloqueado el programa). Un viaje de 15.23ly hibernando tarda 1 minuto y 21 segundos aproximadamente en ejecutarse. Me parece excesivo. Antes de los últimos cambios esto no sucedía. El salto era prácticamente inmediato. ¿A qué se debe? Si no fuera posible reducir el tiempo de espera, haría falta indicárselo al jugador de alguna manera, pues de otro modo parece simplemente que el juego se ha quedado bloqueado.
 
 - [BUG] Haciendo algunas pruebas, he apagado core_os a ver qué pasa. Tras apagarlo he tratado de encender el sistema security y el juego a crasheado. He vuelto a cargar la partida, y al cargar core_os estaba encendido. Lo he vuelto a apagar, y he tratado de encender sensors, y de nuevo crasheo.
+
 - [BUG?] El survey me dice que "possible recoverable data signatures detected" y en "depletion" dice "data=no". Sin embargo cuando hago un "drone salvage data" sale el mensaje "Salvage blocked: node WAYSTATION 679A8E has no data interfaces".
+
 - [] He recibido el mensaje "Battery low: SoC=0.40. Consider reducing load". Hay que estar seguros de que ese mensaje no sale si la batería se está cargando. Es decir, debe salir cuando se cruza hacia abajo cierto umbral (o sea, si la batería se está descargando), pero no si se cruza hacia arriba (la batería se está cargando), pues de otro modo puede resultar confuso.
+
 - [] Cuando sale la alerta de que la radiación del drone desplegado es elevada, es difícil saber qué hacer. Quizá no estaría mal una sugerencia de mandar el drone a su baía para limpiarlo de radiación.
+
 - [] En el output de drone survey, las líneas "depletion:" y "node cleaned" o "node not cleaned" entiendo que deberían ser exclusivas del modo debug, no? Lo digo porque esa es una información que en principio el jugador no tendría que conocer. Como mucho, podría salir un mensaje diciendo "node cleaned" pero que advirtiera de que el informe del drone puede no ser completo/exacto.
+
 - [!] Hace falta un comando que te liste qué destinos sin ruta conocida (desde la posición actual) cumplen las condiciones como para hallar una ruta hacia ellos mediante un "route solve" exitoso. Es decir, el jugador debe poder sabe qué destinos pueden ser alcanzables desde su posición mediante un "route solve" y cuáles no.
-- [!] Tras escribir "nav map galaxy local " (o su versión abreviada "nav galaxy local "), si le doy a tab admite el autocompletado del nombre de varios nodos, pero por sintaxis no es correcto: el comando "nav map galaxy local" no admite ningún argumento más. Lo mismo pasa con "nav galaxy global", "nav galaxy regional", y "nav galaxy sector". Podríamos incluir la funcionalidad de imprimir el mapa conocido local o sectorial o regional del <node_id> que se introduzca como parámetro. Pero no tiene sentido "nav galaxy global <node_id>. 
+
+- [!] Tras escribir "nav map galaxy local " (o su versión abreviada "nav galaxy local "), si le doy a tab admite el autocompletado del nombre de varios nodos, pero por sintaxis no es correcto: el comando "nav map galaxy local" no admite ningún argumento más. Lo mismo pasa con "nav galaxy global", "nav galaxy regional", y "nav galaxy sector". Podríamos incluir la funcionalidad de imprimir el mapa conocido local o sectorial o regional del <node_id> que se introduzca como parámetro. Pero no tiene sentido "nav galaxy global <node_id>.
+ 
 - [] Cada vez que se despierta de una hibernación, debería sonar el sonido que suena al iniciar una partida nueva. Los sonidos son parte esencial de la inmersión de RETORNO.
+
 - [] Parece que 'module inspect' autocompleta todos los módulos existentes del juego, pero debería autocompletar únicamente el nombre de los módulos que disponga el jugador.
+
 - [] Cuando el viaje va a durar varios meses, quizá estaría bien un mensaje sugiriendo la posibilidad de hibernar. Al introducir la orden de hibernación, debería también salir un mensaje advirtiendo de los peligros de viajes largos (deterioro de la nave, daño por radiación, eventos imprevistos, etc.), así como sugiriendo revisar antes la disponibilidad de recursos suficientes (por ahora, scrap; más adelante habrá más recursos en el juego) para llevar a cabo las operaciones de reparación/mantenimiento al despertar.
+
 - [] Sería importante un comando que imprimiera la ruta que se ha seguido, es decir, todos los lugares (en orden) a los que se ha viajado, con fecha de llegada, etc. Es decir, una especie de cuaderno de bitácora.
+
 - [] El comando "nav map path" no autocompleta todos los destinos conocidos. Debería.
+
 - [] Hay actualmente alguna manera de arreglar el hull de la nave?
+
 - [] No me gusta que cuando entra una notificación nueva en la ventana de logs o en la de jobs el scroll baje automáticamente hasta la última línea impresa. Si estoy leyendo un texto quiero poder seguir leyéndolo sin interrupciones. Para saber que hay alguna novedad ya están las notificaciones sonoras.
+
 - [] Al hibernar la música debería detenerse.
+
 - [!] Si se ordena apagar manualmente sensors, pero hay un trabajo en proceso que depende de sensors, como "route solve", debería aparecer un mensaje de confirmación. Lo mismo al intentar apagar manualmente otros sistemas mientras hay pendiente o en proceso un trabajo o tarea que depende de él. Esto evitaría perder por error el tiempo invertido en una operación.
+
 - [] Estaría bien que en algún lugar se indicase cuál es el "sensor range" del comando "route solve" (y que existiera un módulo que lo ampliara, si no existe ya).
+
 - [] La radiación se acumula? Hay alguna manera de limpiar la radiación de la nave?
+
 - [] ¿Qué pasa si desatraco de una nave/estación y me dejo un dron en ella? Podría recuperarlo si vuelvo a atracar en la misma nave/estación y le queda batería al dron? Perdería la comunicación con el dron al marcharme de ese nodo?
+
 - [] ¿Cómo funcionan actualmente los sistemas core_os y life_support? ¿Qué pasa si se apagan? ¿Qué cosas dependen de ellos?
 
 == CAMBIOS PARA HACER EL JUEGO MÁS ACCESIBLE ==

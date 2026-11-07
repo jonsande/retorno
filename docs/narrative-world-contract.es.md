@@ -226,10 +226,14 @@ checksum, backups, progreso, identidades y recursos consumidos se conservan.
 | --- | --- |
 | Soportado | Pecio Tábano como `ship` con identidad estable y posición por semilla; documentos restringidos por ID; bindings de sector; un destino existente y enlaces validados. |
 | Adaptación de datos pendiente | JSON optativos, textos EN/ES, regiones/cajas, relaciones y canales reales; hacer alcanzable el destino requiere una ruta certificada concreta. |
-| Decisión editorial | Estado presente de Bruma, Liria jugable, naturaleza del destino, suerte de las siete personas. |
+| Decisión editorial | Estado presente de Bruma, naturaleza del destino, suerte de las siete personas. |
 | Sistema no implementado | VAELOR como sistema estelar y sus planetas/componentes; conservación física dinámica, cronología y simulación de comunidades. |
 
 La existencia de Bruma solo puede concretarse en un kind jugable tras decisión
 editorial; no se fuerza un pecio. VAELOR y sus planetas no se convierten en nodos
-por mencionar sus nombres. AMANECER permanece intacto e inactivo. No hay editor,
+por mencionar sus nombres. C2b instala solo el arco de Elena Varela y su Liria
+histórica aprobada en el catálogo del árbol de trabajo. El recorrido público
+acotado no descubrió la pista; véase la [revisión C2b](testing/amanecer-productive-review.es.md).
+Los otros arcos y singles de AMANECER siguen inactivos y se conservan los
+manuscritos originales. No hay editor,
 gestor universal de mods, nuevos canales, nuevo scan ni rebalance general.

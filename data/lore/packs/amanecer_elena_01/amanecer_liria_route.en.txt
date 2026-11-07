@@ -1,0 +1,12 @@
+CIVIL NAVIGATION CATALOGUE — REPLICATED EXTRACT
+ARCHIVE REFERENCE: EVAC / LIRIA
+
+Entry preserved in a regional navigation index replica.
+The presence of this record does not establish that any vessel used the route after it was archived.
+
+Administrative origin: HARBOR_12
+Administrative destination: LIRIA
+Recorded sector: {{liria_sector}}
+
+LINK: HARBOR_12 -> LIRIA
+SECTOR: {{liria_sector}}

@@ -71,6 +71,52 @@ lugar. No se enumera la galaxia completa.
 
 ## Registros navegacionales y uplink finito
 
+### P1: exclusiones navegacionales fijas por host
+
+Una localización authored puede declarar:
+
+```json
+"navigation_policy": {
+  "version": "host-navigation-exclusions-v1",
+  "exclude_destinations": ["HARBOR_12"]
+}
+```
+
+`define_information` captura esta política opcional y sustractiva antes de jugar.
+Los destinos se normalizan a IDs authored o alias inequívocos. Se rechazan objetos,
+versiones, claves o listas vacías inválidos, destinos desconocidos, el propio host,
+la nave del jugador y duplicados. Los LINK operativos authored contradictorios
+(inversos, con host implícito o en INTEL incluidos) se rechazan, nunca se reescriben.
+Las menciones de testimonio/contacto siguen siendo válidas.
+
+El productor original selecciona primero sus registros/archivos finitos; después
+se retiran los registros de uplink seleccionados excluidos y archivos navegacionales
+tipados completos. No se repiten sorteos, rellenan huecos ni sustituyen archivos.
+B2 conserva el registro seleccionado original: un payload excluido no produce
+emisión procedural, ni LINK o mensaje ambiental sustitutivo. Historia del equipo,
+telemetría y otros hosts permanecen iguales. No regula emisores authored
+independientes ni piezas del scheduler.
+
+ECHO-7 configura HARBOR_12 en `data/locations/echo_7.json`. Su caché original EN/ES
+conserva el contacto al leerla, sin la ruta. En la semilla 29 sus tres registros
+de uplink pasan a dos; las rutas obtenidas en otros hosts siguen siendo válidas.
+La política no depende del reloj, conocimiento, visitas, progreso o recuperación.
+Scan y route solve no cambian; no se añade garantía general de accesibilidad.
+
+La huella informativa completa incluye la política. `sampling_definition` retira
+solo este campo nuevo para conservar sorteos v1, IDs, textos y procedencia
+archivística retenida originales; las huellas de pools fijan la definición
+completa con política. B2 separa igualmente el muestreo original de su huella
+completa. La política no física se excluye de la huella del catálogo físico,
+conservando ámbito, posiciones, topología e IDs operativos.
+
+La política tiene versión propia; versiones B1/B2 y esquema de guardado no cambian.
+Sin política, la producción v1 anterior es idéntica. Instalar este cambio de ECHO-7
+modifica las huellas de catálogo/B1/B2 completas: se rechazan sin alterarlos los
+guardados del catálogo anterior. Restaurar su catálogo permite cargarlos; no hay
+migración ni retirada de rutas adquiridas. Prueba: `tests/prologue_navigation_policy_smoke.py`.
+Véase la [revisión P1](../testing/prologue-navigation-policy-review.es.md).
+
 Cada destino seleccionado está certificado, difiere del host, queda a distancia
 positiva y no supera 45 ly. Se distinguen dos tipos:
 

@@ -36,7 +36,7 @@ def installed(mutate=None):
         if mutate:
             mutate(arc, root)
         (root / "arcs/amanecer_elena_01.json").write_text(json.dumps(arc))
-        shutil.copytree(DRAFT / "textos", root / "lore/packs/amanecer_elena_01")
+        shutil.copytree(DRAFT / "textos", root / "lore/packs/amanecer_elena_01", dirs_exist_ok=True)
         with patch.object(data, "_DATA_ROOT", root):
             yield root
 

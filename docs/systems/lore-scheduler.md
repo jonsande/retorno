@@ -117,10 +117,14 @@ secondary pieces in the arc but establishes no narrative order.
 - assigned secondary ids with their node and path;
 - `discovered` ids after importing the corresponding primary intel.
 
-All four existing JSON files currently live under `data/arcs/templates/`.
-Because the loader only runs `glob("*.json")` in `data/arcs/`, `load_arcs()`
-returns an empty list. Their narrative resources remain inactive as well even
-though those files exist on disk.
+The four historical template JSON files remain under `data/arcs/templates/`
+and are not loaded. C2b adds `data/arcs/amanecer_elena_01.json` as the sole
+active arc in the working tree, with ten EN/ES resources. This supersedes the
+earlier empty-catalogue observation. Productive structural checks pass, while
+the bounded public journey did not discover the clue host; see the
+[C2b review](../testing/amanecer-productive-review.md). The five active singles
+are unchanged. Relative filters and seeded reservations use the existing
+[placement contract](../design/lore-placement-anchors.md).
 
 ### 4.2 Singles
 

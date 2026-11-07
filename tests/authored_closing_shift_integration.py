@@ -276,9 +276,10 @@ def test_public_journey():
 
 
 def main():
-    assert data.load_arcs() == [] and len(data.load_singles()) == 5 and len(data.load_locations()) == 5
+    original = collect_catalog()
+    assert [a["arc_id"] for a in data.load_arcs()] == ["amanecer_elena_01"] and len(data.load_singles()) == 5 and len(data.load_locations()) == 5
     evidence = {"compilation": test_compilation_and_hidden_knowledge(), "public": test_public_journey()}
-    assert data.load_arcs() == [] and len(data.load_singles()) == 5 and len(data.load_locations()) == 5
+    assert collect_catalog() == original
     target = Path("/tmp/retorno-c1-evidence.json")
     target.write_text(json.dumps(evidence, indent=2), encoding="utf-8")
     print("AUTHORED CLOSING SHIFT PASSED", target)

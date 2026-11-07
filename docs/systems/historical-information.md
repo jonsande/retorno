@@ -70,6 +70,51 @@ enumeration occurs.
 
 ## Navigation records and finite uplink
 
+### P1: fixed host navigation exclusions
+
+An authored location may declare:
+
+```json
+"navigation_policy": {
+  "version": "host-navigation-exclusions-v1",
+  "exclude_destinations": ["HARBOR_12"]
+}
+```
+
+`define_information` captures this optional subtractive policy before play.
+Destinations are normalized authored IDs or unambiguous aliases. Invalid objects,
+versions, keys, empty lists, unknown/self/player-ship or duplicate destinations
+fail before play. Conflicting authored operative LINKs (including reverse,
+implicit-host and INTEL forms) are rejected, never rewritten. Testimony/contact
+mentions remain valid.
+
+The original producer selects its finite records/files first; then excluded
+selected uplink records and whole typed navigation files are removed. No re-roll,
+slot refill or replacement file occurs. B2 retains its original selected record;
+an excluded payload produces no procedural emission, with no replacement LINK or
+ambient message. Equipment history, telemetry and other hosts remain unchanged.
+This does not govern independent authored emitters or scheduler-owned pieces.
+
+ECHO-7 configures HARBOR_12 in `data/locations/echo_7.json`. Its original EN/ES
+cache still grants the contact when read, without the route. In seed 29 its three
+uplink records become two; routes to HARBOR_12 obtained elsewhere remain valid.
+No clock, knowledge, visits, progression or recovery request selects this policy.
+Scan and route solve are unchanged; no general reachability guarantee is added.
+
+The full information fingerprint includes the policy. `sampling_definition`
+strips only this new field to preserve original v1 draws, record IDs, text and
+retained archive provenance; pool fingerprints pin the full policy-aware
+definition. B2 similarly separates original sampling from its full fingerprint.
+The nonphysical policy is excluded from the physical catalogue hash, preserving
+scope, positions, topology and operative IDs.
+
+The policy has its own version; B1/B2 versions and save schema remain unchanged.
+Without policy, prior v1 production is identical. Installing this ECHO-7 change
+changes catalogue/full B1/B2 fingerprints: old-catalogue saves are rejected
+nondestructively. Restore their original catalogue to load them; no migration or
+removal of acquired routes occurs. Test: `tests/prologue_navigation_policy_smoke.py`.
+See the [P1 review](../testing/prologue-navigation-policy-review.md).
+
 Every selected destination is certified, different from the host, at positive
 distance and at most 45 ly away. Two record types remain distinct:
 

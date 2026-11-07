@@ -1,5 +1,5 @@
 debug on|off|status
-debug scenario prologue|sandbox|dev
+debug scenario prologue|sandbox|fast_sandbox|dev
 debug seed <n>
 debug arcs
 debug lore
@@ -18,6 +18,7 @@ Propósito
 
 Comportamiento operativo
 - `debug on|off` alterna modo debug y control de auto-tick.
+- SANDBOX y FAST_SANDBOX están en principio pensados exclusivamente para depuración de errores y pruebas de diseño. FAST_SANDBOX recupera ECHO_7 por completo y comienza en órbita con los sistemas y drones completamente reparados en su bahía.
 - `debug scenario ...` reinicia estado del mundo a preset.
 - `debug seed <n>` fija la semilla RNG antes de que la generación o el guardado fijen el universo histórico. Los cambios posteriores requieren otro escenario.
 - Los comandos de listado exponen registros internos de depuración.
