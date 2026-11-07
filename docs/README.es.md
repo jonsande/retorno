@@ -49,6 +49,8 @@ ni la compilación narrativa D21–D24, que sigue en e4.
 
 ## Guías existentes
 
+**Guía práctica vigente de autoría:** [arcos, singles y localizaciones](authoring-current.es.md) / [EN](authoring-current.md). Contratos actuales, precauciones de activación y prueba mínima para 4D-3e5c-C.
+
 Fase 4D-3e1: [Preexistencia procedural](design/procedural-preexistence.es.md) /
 [EN](design/procedural-preexistence.md) documenta el catálogo acotado de sólo lectura,
 dependencias del orden de worldgen demostradas y trabajo pendiente e2/e3/e4.

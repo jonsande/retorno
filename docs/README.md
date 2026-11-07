@@ -49,6 +49,8 @@ or D21–D24 narrative compilation, which remains e4.
 
 ## Existing guides
 
+**Current practical authoring guide:** [arcs, singles and locations](authoring-current.md) / [ES](authoring-current.es.md). Current contracts, activation safeguards and minimum 4D-3e5c-C test.
+
 Phase 4D-3e1: [Procedural preexistence](design/procedural-preexistence.md) /
 [ES](design/procedural-preexistence.es.md) documents the bounded read-only catalog,
 characterized worldgen order dependencies and pending e2/e3/e4 work. This is a
