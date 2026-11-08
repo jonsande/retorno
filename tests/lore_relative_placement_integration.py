@@ -130,11 +130,8 @@ def test_amanecer():
             for locale in (Locale.EN, Locale.ES):
                 s = deepcopy(loaded)
                 s.os.locale = locale
-                # Scheduler-created files retain the locale at assignment.
-                s.world.lore_placements.piece_to_node.clear()
-                s.world.arc_placements.clear()
-                for pool in s.world.node_pools.values():
-                    pool.injected_files.clear()
+                # Both variants already exist; switching locale must not need
+                # placement resets, reinjection or a second narrative identity.
                 lore.run_lore_scheduler_tick(s)
                 salvage(s, host)
                 path = f"/remote/{host}/logs/navigation/amanecer_liria_route.{locale.value}.txt"

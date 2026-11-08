@@ -13,6 +13,29 @@
 
 # Lore scheduler, arcs, and singles
 
+## Bilingual salvage availability — P5c
+
+`_assign_piece_to_node()` prepares EN and ES together when resolved resources
+differ and produce distinct normalized paths. Both paths are checked against
+base and injected files before changing placement; a collision rejects the
+whole assignment. Both variants use existing texts and rendering without
+changing content or host-selection rules.
+
+The two paths belong to one `piece_key`, host, channel and delivery. Secondary
+limits count documents, not variants; reading both navigation clues preserves
+a single discovery. Arc path metadata retains the representation of the active
+locale at assignment. A later `config set lang` needs no replacement or repeat
+delivery. Repeated salvage preserves mounted files without duplicating delivery;
+operational action counters retain their ordinary behavior.
+
+Monolingual content, shared resources and single-path pieces retain their
+previous active-locale representation. Other channels are unchanged. Existing
+persistence preserves both variants for new assignments; old saved placements
+are neither migrated nor backfilled.
+
+Focused verification: `tests/bilingual_salvage_smoke.py`, using real drone jobs
+and the existing service fixture; navigation journeys are not repeated.
+
 > Canonical English technical reference. It describes the implementation
 > observed in the working tree based on `3b99bf4`. The `docs/arcs*` and
 > `docs/intel_lore*` guides are historical and do not override this document.

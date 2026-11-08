@@ -13,6 +13,30 @@
 
 # Scheduler de lore, arcos y singles
 
+## Disponibilidad bilingüe de salvage — P5c
+
+`_assign_piece_to_node()` prepara conjuntamente EN y ES cuando los recursos
+resueltos son distintos y producen rutas normalizadas diferentes. Comprueba
+ambas rutas contra archivos base e inyectados antes de modificar la colocación;
+una colisión impide toda la asignación. Ambas variantes usan los textos y el
+renderer existentes, sin modificar contenido ni reglas de selección del host.
+
+Las dos rutas pertenecen a una única `piece_key`, emplazamiento, canal y entrega.
+El límite de secundarios cuenta documentos, no variantes; leer ambas pistas
+de navegación conserva un único descubrimiento. El metadato de ruta del arco
+mantiene la representación del idioma activo al colocarse. Cambiar después
+`config set lang` no requiere recolocar ni volver a entregar las piezas.
+El salvamento repetido conserva los archivos ya montados y no duplica entregas;
+los contadores operativos de acciones mantienen su comportamiento ordinario.
+
+Los contenidos monolingües, con un recurso compartido o una ruta única conservan
+la representación anterior del idioma activo. Otros canales no cambian.
+La persistencia existente conserva ambas variantes de asignaciones nuevas;
+no se migran ni se rellenan colocaciones de partidas antiguas.
+
+Validación focalizada: `tests/bilingual_salvage_smoke.py`, con trabajos reales
+de dron y la fixture de servicios existente; no repite recorridos de navegación.
+
 > Referencia técnica canónica en español. Describe la implementación observada
 > en el árbol de trabajo basado en `3b99bf4`. Las guías `docs/arcs*` y
 > `docs/intel_lore*` son históricas y no prevalecen sobre este documento.

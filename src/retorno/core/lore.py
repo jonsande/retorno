@@ -1895,22 +1895,35 @@ def _assign_piece_to_node(state, piece_entry: dict, node_id: str) -> bool:
         return False
 
     salvage_file = _file_for_salvage_piece(piece_entry, state.os.locale.value, state) if channel == "salvage_data" else None
-    if salvage_file:
-        path = normalize_path(salvage_file["path"])
-        if not path.startswith(("/logs/", "/data/", "/mail/")) or any(
-            normalize_path(f.get("path", "")) == path for f in pool.base_files + pool.injected_files
-        ):
-            return False
+    salvage_files = [salvage_file] if salvage_file else []
+    if channel == "salvage_data":
+        en_ref = _content_ref_for_piece(piece_entry["piece"], "en")
+        es_ref = _content_ref_for_piece(piece_entry["piece"], "es")
+        if en_ref and es_ref and en_ref != es_ref:
+            variants = [_file_for_salvage_piece(piece_entry, lang, state) for lang in ("en", "es")]
+            if all(variants) and len({
+                normalize_path(entry["path"]) for entry in variants
+            }) == 2:
+                if not all(entry["content"].strip() for entry in variants):
+                    return False
+                salvage_files = variants
+        # Validate the entire assignment before committing either language or
+        # its single narrative identity. Shared-path/monolingual pieces retain
+        # the existing active-locale representation.
+        occupied = {normalize_path(f.get("path", "")) for f in pool.base_files + pool.injected_files}
+        for entry in salvage_files:
+            path = normalize_path(entry["path"])
+            if not path.startswith(("/logs/", "/data/", "/mail/")) or path in occupied:
+                return False
 
     state.world.lore_placements.piece_to_node[piece_key] = node_id
     state.world.lore_placements.piece_channel_bindings[piece_key] = channel
 
     file_path: str | None = None
     if channel == "salvage_data":
-        entry = salvage_file
-        if entry:
-            pool.injected_files.append(entry)
-            file_path = str(entry.get("path", ""))
+        pool.injected_files.extend(salvage_files)
+        if salvage_file:
+            file_path = str(salvage_file.get("path", ""))
     else:
         pool.pending_push_piece_ids.add(piece_key)
 
