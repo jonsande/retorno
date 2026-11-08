@@ -2,6 +2,52 @@
 === NEW TODO ===
 ========================
 
+=== BALANCE ===
+
+El adecuado balance de la dificultad debe ser un objetivo prioritario del desarrollo de RETORNO. No se puede esperar a que el juego esté muy desarrollado para empezar a tratar este asunto, pues resulta muy difícil lograr un equilibrio satisfactorio (divertido y que mantenga la tensión) cuando ya hay demasiadas variables. Hay que preocuparse de este equilibrio desde el principio. Empezando por la economía del juego. 
+
+En el juego hay varios recursos actualmente, pero hacen falta más, a fin de encontrar tensiones más interesantes. Ahora mismo los recursos son: el scrap, el tiempo de juego real, el tiempo de juego diegético (y, en breve, está previsto introducir el tiempo biológico del PJ) y la energía. Por ahora la energía forma parte de su propio sistema/juego de economía, así que quizá no convenga mezclar con los otros (la economía energética tendrá más relevancia en el momento en que haya combate o situaciones en las que haya que reaccionar rápido y se dependa de un sistema en particular para sobrevivir). En efecto, comom dice chatGPT, en RETORNO se da una peculiaridad interesante: EL BALANCE ENERGÉTICO ES UN PROBLEMA DISTINTO DEL BALANCE DE MATERIALES.
+
+La cuestión interesante de diseño es que la energía no tiene por qué funcionar únicamente como una cuenta atrás hasta la muerte. Puede ser una herramienta para crear decisiones estratégicas. Por ejemplo, el jugador podría apagar sensores para ahorrar energía, pero eso reduciría su conocimiento del entorno. Podría desconectar un sistema de reparación automática y destinar la energía a los motores. O quizá tenga que posponer una operación de salvamento para conservar una reserva de emergencia. Lo fundamental es que cada alternativa tenga un beneficio y un coste reconocibles. Y aquí aparece otra variable fundamental: el tiempo. Si recuperar recursos, viajar, reparar o investigar consume tiempo, y durante ese tiempo la nave sigue consumiendo energía, entonces el tiempo también se convierte en un recurso económico. Este tipo de interdependencias permite construir sistemas estratégicamente ricos a partir de unas pocas mecánicas.
+
+En RETORNO buscamos que el jugador experimente escasez, incertidumbre, vulnerabilidad, satisfacción al recuperar una nave deteriorada y una sensación de conquista cuando consigue operar sistemas que antes eran inviables. El balance debería estar al servicio de esas experiencias.
+
+Una idea crucial: una economía sostenible no es necesariamente una economía equilibrada en términos de diversión. Podríamos diseñar una economía perfectamente sostenible que fuera aburridísima: el jugador siempre consigue exactamente la cantidad de recursos que necesita y jamás tiene que elegir. Y podríamos diseñar una economía deficitaria que resultara fascinante: el jugador sabe que sus recursos se agotarán y necesita encontrar una solución antes de que eso suceda. En el caso del tiempo biológico del PJ, buscamos claramente una economía deficitaria: el jugador sabe que se le agota el tiempo, y eso presiona (al principio no mucho), pero poco a poco cada vez más, para encontrar una solución. La economía del resto de recursos, sin embargo, deberá ser una economía en la que tendrá que tomar decisiones y luchar a fin de conseguir la sostenibilidad. A veces la sostenibilidad de un subsistema será en detrimento de la de otro.
+
+Tiene que haber zonas totalmente innaccesibles para el jugador hasta que no esté lo bastante preparado.
+
+Para RETORNO, parece que son más apropiadas las retroalimentaciones negativas que las positivas. Por ejemplo: Más drones operativos → mayor coste de mantenimiento → menor excedente disponible para adquirir nuevos drones. El sistema dispone de un mecanismo que limita su propio crecimiento. Otro ejemplo: Menos energía disponible → desactivación de sistemas secundarios → reducción del consumo → mayor autonomía restante. Esta segunda posibilidad es especialmente interesante. El sistema no devuelve gratuitamente energía al jugador: le permite conservarla si acepta operar con menos capacidades.
+
+Los bucles positivos tienden a amplificar diferencias, mientras que los negativos pueden estabilizar los sistemas. Esta distinción aparece expresamente en la literatura de diseño de juegos, incluyendo Rules of Play: Game Design Fundamentals.
+
+PRINCIPIOS de diseño para RETORNO
+
+Las malas decisiones deben poder tener consecuencias graves, incluso irreversibles, pero el jugador debería disponer de oportunidades razonables para anticiparlas y evitarlas. (Política frente a espirales de muerte)
+
+El juego debería ser exigente en la planificación, la gestión de la incertidumbre y la administración de recursos, pero procurar que el esfuerzo rutinario tenga una función concreta y no sustituya a la dificultad estratégica.
+
+La recuperación de capacidades debe producir satisfacción real, sin eliminar permanentemente la necesidad de tomar decisiones difíciles.
+
+
+
+Hay que hacer estudios de balance. Empezando por un estudio del scrap. Tiene que haber scrap suficiente pero no de sobra. La buena administración del scrap tiene que ser vital para la supervivencia. El equilibrio entre el ingreso y el gasto del scrap tiene que ser tenso. Aumentar ingresos tiene que ser en detrimento de algo. Reducir gasto debe ser también en detrimento de algo. Ahora mismo, lo que presiona al jugador es el desgaste de la nave (creo que el desgaste se produce únicamente por radiación, o quizá tenga un desgaste por envejecimiento añadido). Por otra parte, cuando desarrollemos el sistema avanzado de salvage, el jugador tendrá la opción de ejecutar salvage automatizado (como el actual), que lleva menos tiempo de juego y tiempo real, pero recupera menos scrap, o salvage automatizado, que lleva más tiempo de juego y de tiempo real, y es más arriesgado, pero más lucrativo en scrap y otros recursos.
+
+Los módulos o mejoras para la nave y drones deben formar parte del balance de dificultad del juego. Actualmente no tienen un gran impacto. Cuando diseñemos el sistema de salvage avanzado lo empezarán a tener mayor, pero no podemos esperar a ello para empezar a hacer tareas de balance en este sentido. Propongo que el juego, con sistema de salvage automatizado, tenga que ser un juego a su modo completo en sí mismo, divertido y tenso de jugar, con necesidad de tener que tomar decisiones estratégicas y tácticas.
+
+- [] Viajar debe consumir algún recurso, además de tiempo y deterioro de la nave (e.e. scrap indirectamente). Algún combustible.
+
+- [] La reparación de drones de debe ser gratuita.
+Pero esto tiene que dar lugar a decisiones, como por ejemplo (es un ejemplo que para nuestro caso no aplica, pero bueno): si tienes 80 scrap, tienes que decidir entre reparar generadores (y mejorar la autonomía de la nave) o reparar el dron (y mejorar la capacidad de obtención de recursos). No es necesario que todas las opciones tengan exactamente el mismo valor. Lo deseable es que su valor dependa de las circunstancias, los objetivos y las prioridades del jugador.
+
+En diseño económico, un concepto fundamental es el coste de oportunidad: aquello a lo que renunciamos al elegir una opción. Si la chatarra es tan abundante que podemos repararlo todo sin esfuerzo, el coste de oportunidad desaparece. Y con él, buena parte del interés estratégico. El problema actual en este sentido en RETORNO es que no hay verdadero coste de oportunidad de nada porque no hay nada a lo que el jugador pueda renunciar (que yo sepa). Todo es vital.
+
+La escasez no es únicamente un obstáculo. Es también el mecanismo que hace que nuestras decisiones importen. Pero tampoco queremos llevarla al extremo. Si los recursos son tan escasos que el jugador solo puede permitirse una estrategia viable, volvemos a perder diversidad de decisiones. Por tanto, tanto la abundancia excesiva como la escasez extrema pueden empobrecer el juego.
+
+
+=== SIN CLASIFICAR ===
+
+- [] Ahora mismo los sensores solo sirven para route solve y para scan. Hace falta añadir algún tipo de sensor pasivo o sonar pasivo/activo, que sirva para detectar peligros, para que así la decisión de apagar los sensores (y ganar energía) no sea gratis.
+
 - [x] Actualmente, a la hora de configurar dónde pueden aparecer los documentos de un arco y/o las estaciones/pecios/etc. relativos a él, podemos configurar el rango de distancia, con respecto al origen de la partida, a la que pueden aparecer esos documentos. No podemos configurarlo para que los documentos aparezcan dentro de un rango de distancia con respecto a una estación o nodo en particular. Si quisiéramos distribuir documentos a un máximo de 15 años luz de Liria, por ejemplo, necesitaríamos diseñar una solución concreta; no existe un parámetro genérico equivalente a max_dist_from_node: "LIRIA". Necesitamos desarrollar esa solución.
 
 - [!] LORE — Mejorar la búsqueda de emplazamientos mediante anclas espaciales. Actualmente, la búsqueda de hosts históricos para documentos esenciales examina un conjunto limitado de sectores (presupuesto de 64). Aunque existan estaciones que cumplan una restricción como anchor_distances (por ejemplo, a menos de 15 ly de Liria), pueden quedar fuera de la búsqueda. Solución propuesta: implementar una búsqueda centrada en el volumen espacial alrededor de las entidades de referencia, con presupuestos progresivos y resultados que distingan entre ausencia real de candidatos y búsqueda incompleta. No crear nodos ni rutas artificiales.
@@ -19,7 +65,7 @@
 - [] Cada vez que cambia el estado de alguno de los sistemas de hardware recibo dos mensajes que en principio parecen redundates. Por ejemplo, tras un 'power on comms':
 
 [CMD] [WARN] system_state_changed :: comms: offline -> limited (cause=manual_restore, health=0.72)
-[CMD] Radio Communications Service (radiod): stopped (Try: boot radiod)                                                               
+[CMD] Radio Communications Service (radiod): stopped (Try: boot radiod)
 [CMD] [INFO] system_power_restored :: Power restored: comms (offline -> limited)
 
 La primera línea y la tercera, ¿no son redundantes? Entiendo que el WARN está avisando cada vez que hay un cambio en el estado de un sistema de la nave. Esto es lo deseable en el caso de que el sistema cambie a un estado a peor (por ejemplo, de 'nominal' a 'limited'), pero no cuando cambia a mejor (por ejemplo de 'limited' a 'nominal'). Tampoco hace falta que se imprima un WARN cuando se enciende o apaga un sistema de la nave si el encendido o apagado lo ha ejecutado el jugador manualmente (en este caso, basta con la notificación INFO.

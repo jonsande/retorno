@@ -545,6 +545,11 @@ its destinations are not restricted to the previous endpoints.
 
 For very local distances in the same sector, `fine_ranges_km` permits travel
 time in kilometers; other travel uses light-year distance and cruise speed.
+New ships start at 0.5 ly per 365-day year (0.5c in the game's units), stored in
+`ShipState.cruise_speed_ly_per_year`. Navigation and route estimates use that
+ship attribute; local travel retains its independent 20 km/s speed. Cruise
+speed is fixed during current gameplay; propulsion damage and upgrades do not
+change it yet. No relativistic timing is applied.
 There is no discrete fuel charge on hop start. Transit advances time and thus
 the energy and environmental models.
 

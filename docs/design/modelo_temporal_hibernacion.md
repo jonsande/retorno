@@ -13,6 +13,15 @@
 
 # RETORNO — Modelo temporal, hibernación y edad biológica
 
+> **T-02 (2026-11-08), actualización implementada / implemented update:**
+> `ShipState.cruise_speed_ly_per_year` inicia ahora en `0.5`; navegación y
+> estimaciones usan ese atributo. El viaje local sigue a 20 km/s. No se añaden
+> relatividad, relojes ni cambios de hibernación. Las referencias inferiores a
+> `1.0` describen la auditoría histórica anterior. / The ship attribute now
+> defaults to `0.5`; navigation and estimates use it. Local travel remains at
+> 20 km/s. No relativity, clocks or hibernation changes are introduced. References
+> to `1.0` below describe the earlier historical audit.
+
 **ID:** `RET-DESIGN-TIME`  
 **Versión:** `0.1.0` (borrador de diseño, sin implementación)  
 **Fecha:** 2026-11-05  

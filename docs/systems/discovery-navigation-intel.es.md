@@ -562,7 +562,13 @@ sus destinos no se limitan a los extremos anteriores.
 
 Para distancias muy locales del mismo sector, `fine_ranges_km` permite calcular
 el tiempo en kilómetros; el resto usa distancia en años luz y velocidad de
-crucero. No existe un gasto de combustible discreto al iniciar el salto. El
+crucero. Las naves nuevas parten de 0,5 años luz por año de 365 días (0,5c en
+las unidades del juego), almacenados en `ShipState.cruise_speed_ly_per_year`.
+La navegación y las estimaciones de rutas usan ese atributo de la nave; el
+viaje local conserva su velocidad independiente de 20 km/s. La velocidad de
+crucero es fija durante el juego actual; el daño de propulsión y las mejoras
+todavía no la modifican. No se aplica corrección temporal relativista.
+No existe un gasto de combustible discreto al iniciar el salto. El
 tránsito hace avanzar el tiempo y, con él, el modelo energético y ambiental.
 
 Al llegar, el nodo pasa a `visited_nodes`, se actualiza la posición, se cierra

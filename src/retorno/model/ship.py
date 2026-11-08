@@ -55,7 +55,7 @@ class ShipState:
     transit_to: str = ""
     arrival_t: float = 0.0
     transit_start_t: float = 0.0
-    cruise_speed_ly_per_year: float = 1.0
+    cruise_speed_ly_per_year: float = 0.5  # Current ship cruise speed; ly per 365-day year.
     last_travel_distance_ly: float = 0.0
     last_travel_distance_km: float = 0.0
     last_travel_is_local: bool = False
