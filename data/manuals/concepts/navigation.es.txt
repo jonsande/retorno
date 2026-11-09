@@ -38,6 +38,9 @@ IDs públicos de localización
 - Lee un registro navegacional adquirido para registrar sus referencias. La vista abrevia las referencias a instalaciones; se conservan el archivo y sus datos de integridad.
 
 Notas operativas
+- La velocidad de salida interestelar depende del motor. engine_speed_upgrade_01 permite UPGRADED con integridad nominal; engine_efficiency_upgrade_01 reduce el consumo de cápsulas de forma independiente. Consulta man engines y ambos dosieres.
+- El crucero es inercial: velocidad, ETA y velocidad usada por los relojes de a bordo se fijan al salir. Los cambios del motor afectan a futuras salidas. La velocidad local sigue a 20 km/s.
+- status y diag engines muestran velocidad disponible y real en tránsito; nav map routes y la confirmación incluyen estimaciones de duración galáctica.
 - Conocer un contacto no implica conocer ruta hacia él.
 - `nav map *` depende de `core_os` (no de `sensors` ni `data_core`).
 - La semántica de regiones (bulge/disk/halo) se evalúa en la capa física galáctica.

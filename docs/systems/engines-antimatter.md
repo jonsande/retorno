@@ -1,4 +1,4 @@
-# Engines and antimatter — implementation 1
+# Engines, antimatter and cruise speed
 
 Implemented against CANON v0.5.0, C-TECH-001–007 and provisional
 P-TECH-001–002. The canon commit is
@@ -73,11 +73,79 @@ same Engine actions. Public commands:
   engine_efficiency_upgrade_01`: existing module flow when a cargo copy exists.
 - `man engines`, `man engine_efficiency_upgrade_01`: bilingual manuals.
 
-Existing travel times, waypoints, hibernation, relativity and hop limits are
-unchanged. Earlier player configurations are rejected by save validation;
+Waypoints, hibernation rules, proper-time formula and hop limits are unchanged.
+T-04A adds the state-dependent departure speeds and inertial cruise below. Earlier player configurations are rejected by save validation;
 there is no migration to the new engines/fuel state. Capsule salvage,
 procedural capsule supply and fuel-exhaustion recovery are outside this phase.
 The existing module pool can supply the efficiency module as a rare ship module.
+
+## T-04A: state-dependent speed and inertial cruise
+
+`ShipState.cruise_speed_ly_per_year` remains the configurable nominal reference
+(initially 0.5). `Balance.ENGINE_SPEED_MULTIPLIERS` owns the initial profile:
+
+| State | Multiplier | Initial speed |
+| --- | --- | --- |
+| UPGRADED | 1.6 | 0.8c |
+| NOMINAL | 1.0 | 0.5c |
+| LIMITED | 0.8 | 0.4c |
+| DAMAGED | 0.6 | 0.3c |
+| CRITICAL / OFFLINE | no departure | unavailable |
+
+`ShipState.engine_operating_state()` centralizes engine-specific state, using
+existing absolute health bands from Balance: nominal at health >= 0.85, limited
+at >= 0.60, damaged at >= 0.35, critical above zero, offline at zero or when
+forced off. Only an installed `engine_speed_upgrade_01` permits UPGRADED with
+nominal health. Health alone never grants it. Wear, repairs, manual power
+restoration and module completion use the same rule; other systems keep their
+existing state logic. `effective_cruise_speed()` applies the configured profile
+and caps finite positive speeds at `math.nextafter(1.0, 0.0)`; nonpositive or
+nonfinite results block interstellar departure. Local travel stays at 20 km/s,
+with the existing engine gate, independently of the interstellar multipliers.
+
+The speed module uses the existing ship module catalogue and rare pool, 18 scrap,
+and ordinary drone installation/removal. Its Boolean catalogue effect describes
+activation of this state capability. Repeated copies do not compound; removing
+the last copy restores the health-appropriate state. Both speed and efficiency
+modules can coexist. Speed does not change health, effective maximum, electrical
+bonuses or antimatter price. For engines only, UPGRADED draws the same auxiliary
+power as NOMINAL, avoiding the generic UPGRADED 1.10 power multiplier.
+
+Accepted interstellar departure calculates effective speed and duration, records
+`transit_speed_ly_per_year` and fixes arrival time. `Engine._tick_interval` uses
+that frozen value for `proper_time_interval`: dt * sqrt(1 - beta²). Later engine
+wear, repair, power changes, nominal configuration or module completion affect
+future departures, never the ongoing speed, ETA or proper time. Arrival still
+splits moving/rest intervals; abort ends movement without a refund. No acceleration
+or braking is simulated. Electrical generation, wear, radiation, jobs and
+hibernation retain their existing galactic time integration.
+
+Save/load persists both modules and frozen speed without reconstructing it from
+current engine state. Active interstellar saves without a valid positive frozen
+speed below c are rejected; no old-save migration is implemented.
+
+`Engine.estimate_travel_duration` returns galactic seconds or None for an unknown,
+invalid or currently unavailable hop. It shares the acquired direct-route boundary
+with fuel queries and computes missing local ranges without caching or RNG use.
+The planner uses the same effective-speed query. CLI/REPL and Textual share
+`speed_readout` through status, diag engines, routes and navigation confirmation;
+Textual's systems panel includes it. Telemetry distinguishes available departure
+speed, nominal reference and actual transit speed; route estimates are prospective,
+not revisions to the active ETA. Module inspect and installed counts describe both
+independent effects. `help --verbose` and manuals cover the updated queries;
+plain help retains the same command syntax.
+
+Use `module inspect engine_speed_upgrade_01`, `drone install D1
+engine_speed_upgrade_01`, `drone uninstall D1 engine_speed_upgrade_01`, and
+`man engine_speed_upgrade_01`. Ordinary task gates remain: CRUISE isolates the
+drone bay; restore its support to install/repair. New removal requests are blocked
+in transit, while a previously queued removal can complete in flight.
+
+Focused coverage is in `tests/test_engine_speed_upgrade.py`, existing speed/clocks
+and antimatter tests. [T-04A verification](../testing/engine-speed-upgrade-review.md)
+records actual checks and limitations. Catalogue additions change the existing
+world fingerprint; fresh games are required for old catalogue-dependent saves.
+The historical prologue fixture explicitly excludes both newer engine modules.
 
 Verification lives in `tests/engines_antimatter_smoke.py`, supplemented by
 existing prologue, route, power, persistence, localization and Textual tests.

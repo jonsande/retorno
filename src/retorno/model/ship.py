@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import MISSING, dataclass, field, fields
+import math
 
 from retorno.model.drones import DroneState, Inventory
-from retorno.model.systems import ShipSystem
+from retorno.model.systems import ShipSystem, SystemState
 from retorno.config.balance import Balance
 
 
@@ -55,7 +56,8 @@ class ShipState:
     transit_to: str = ""
     arrival_t: float = 0.0
     transit_start_t: float = 0.0
-    cruise_speed_ly_per_year: float = 0.5  # Current ship cruise speed; ly per 365-day year.
+    cruise_speed_ly_per_year: float = 0.5  # Nominal reference; ly per 365-day year.
+    transit_speed_ly_per_year: float = 0.0  # Frozen interstellar departure speed.
     last_travel_distance_ly: float = 0.0
     last_travel_distance_km: float = 0.0
     last_travel_is_local: bool = False
@@ -99,6 +101,35 @@ class ShipState:
     sensors_range_ly: float = Balance.SENSORS_RANGE_LY
     # Time elapsed while life_support remains OFFLINE (used for viability grace countdown).
     life_support_offline_s: float = 0.0
+
+    def engine_operating_state(self) -> SystemState:
+        """Engine-specific state, shared by transitions and read-only telemetry.
+
+        Keep the existing absolute health bands; only nominal-capable engines
+        can use the speed package. Other systems retain their own state rules.
+        """
+        system = self.systems.get("engines")
+        if not system or system.forced_offline or system.health <= Balance.SYSTEM_HEALTH_OFFLINE:
+            return SystemState.OFFLINE
+        if not math.isfinite(system.health):
+            return SystemState.OFFLINE
+        if system.health < Balance.SYSTEM_HEALTH_CRITICAL:
+            return SystemState.CRITICAL
+        if system.health < Balance.SYSTEM_HEALTH_DAMAGED:
+            return SystemState.DAMAGED
+        if system.health < Balance.SYSTEM_HEALTH_LIMITED:
+            return SystemState.LIMITED
+        if "engine_speed_upgrade_01" in self.installed_modules:
+            return SystemState.UPGRADED
+        return SystemState.NOMINAL
+
+    def effective_cruise_speed(self) -> float:
+        """Available interstellar beta; zero blocks departure, always below c."""
+        multiplier = Balance.ENGINE_SPEED_MULTIPLIERS.get(self.engine_operating_state().value, 0.0)
+        speed = self.cruise_speed_ly_per_year * multiplier
+        if not math.isfinite(speed) or speed <= 0.0:
+            return 0.0
+        return min(speed, math.nextafter(1.0, 0.0))
 
     def __setstate__(self, state) -> None:
         """Backward-compatible unpickle for renamed fields.

@@ -28,6 +28,7 @@ def main() -> None:
         state.clock.t = 1234.5
         state.meta.rng_counter = 77
         state.ship.in_transit = True
+        state.ship.transit_speed_ly_per_year = state.ship.effective_cruise_speed()
         state.ship.arrival_t = 4567.0
         ensure_sector_generated(state, "S+000_+000_+000")
         engine = Engine()
@@ -41,6 +42,7 @@ def main() -> None:
         assert loaded.state.clock.t == 1234.5, f"Unexpected clock value: {loaded.state.clock.t}"
         assert loaded.state.meta.rng_counter == 77, f"Unexpected rng_counter: {loaded.state.meta.rng_counter}"
         assert loaded.state.ship.in_transit is True, "Transit flag should persist across save/load"
+        assert loaded.state.ship.transit_speed_ly_per_year == state.ship.transit_speed_ly_per_year
         assert loaded.state.ship.arrival_t == 4567.0, "Arrival ETA should persist across save/load"
         assert loaded.state.jobs.active_job_ids, "Active jobs should persist across save/load"
         assert loaded.state.world.sparse_guardrail_done is True, "Sparse guardrail flag should persist across save/load"

@@ -25,7 +25,7 @@ class TemporalClockTests(unittest.TestCase):
         ship.transit_from = ship.transit_to = ship.current_node_id
         ship.transit_start_t = self.state.clock.t
         ship.arrival_t = self.state.clock.t + remaining
-        ship.cruise_speed_ly_per_year = beta
+        ship.transit_speed_ly_per_year = beta
         ship.last_travel_is_local = local
 
     def test_initial_clocks(self):

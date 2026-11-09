@@ -127,6 +127,10 @@ def _pack_state(state: GameState) -> bytes:
         if ("engines" not in state.ship.systems or "security" in state.ship.systems
                 or not math.isfinite(state.ship.antimatter_capsules) or state.ship.antimatter_capsules < 0):
             raise ValueError("Invalid engines/fuel state / Estado de motores/combustible no válido")
+        if state.ship.in_transit and not state.ship.last_travel_is_local:
+            speed = state.ship.transit_speed_ly_per_year
+            if not math.isfinite(speed) or not 0.0 < speed < 1.0:
+                raise ValueError("Invalid frozen transit speed / Velocidad de tránsito congelada no válida")
         from retorno.worldgen.generator import pin_universe, validate_universe_state
         from retorno.worldgen.narrative import validate_catalog
         validate_catalog(state)
@@ -191,6 +195,10 @@ def _load_from_file(path: Path) -> GameState:
         if ("engines" not in loaded.ship.systems or "security" in loaded.ship.systems
                 or not math.isfinite(loaded.ship.antimatter_capsules) or loaded.ship.antimatter_capsules < 0):
             raise ValueError("Incompatible engines/fuel state / Estado de motores/combustible incompatible")
+        if loaded.ship.in_transit and not loaded.ship.last_travel_is_local:
+            speed = loaded.ship.transit_speed_ly_per_year
+            if not math.isfinite(speed) or not 0.0 < speed < 1.0:
+                raise ValueError("Invalid frozen transit speed / Velocidad de tránsito congelada no válida")
         if not loaded.world.narrative_snapshot:
             raise ValueError("Narrative catalog snapshot missing / Falta el snapshot del catálogo narrativo")
         validate_catalog(loaded)

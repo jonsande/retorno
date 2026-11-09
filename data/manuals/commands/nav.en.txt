@@ -53,6 +53,9 @@ Dependencies and gating
   - `OFFLINE`: minimal survival terminal only.
 
 Propulsion and fuel
+- Standard cruise speed depends on engines: NOMINAL 0.5c, LIMITED 0.4c, DAMAGED 0.3c. engine_speed_upgrade_01 enables UPGRADED at 0.8c only with nominal integrity; it leaves antimatter consumption unchanged.
+- Interstellar speed and ETA are fixed on departure, including the speed used by onboard clocks. Subsequent wear, repair or module changes affect future departures. Local travel remains at 20 km/s.
+- status and diag engines show available and actual transit speed. Route listings and confirmation show estimated galactic duration.
 - Requires powered engines at DAMAGED or better. CRUISE preserves their electrical auxiliaries.
 - nav map routes shows current capsule cost and reserve for known direct routes; confirmation repeats it.
 - Accepted interstellar departure charges once; insufficient antimatter leaves navigation unchanged.

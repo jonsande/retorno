@@ -10,6 +10,17 @@
     "pool": "rare",
     "effects": { "engine_fuel_mult": 0.8 }
   },
+  "engine_speed_upgrade_01": {
+    "scope": "ship",
+    "name": "Engine Speed Upgrade",
+    "name_en": "Engine Speed Upgrade",
+    "name_es": "Mejora de velocidad de motores",
+    "desc_en": "Enables UPGRADED cruise speed with nominal engine integrity. Independent of antimatter efficiency; no integrity or electrical effects.",
+    "desc_es": "Habilita velocidad de crucero UPGRADED con integridad nominal del motor. Independiente de la eficiencia de antimateria; sin efectos en integridad ni electricidad.",
+    "scrap_cost": 18,
+    "pool": "rare",
+    "effects": { "engine_speed_upgrade": true }
+  },
   "bus_stabilizer": {
     "scope": "ship",
     "name": "Bus Stabilizer",

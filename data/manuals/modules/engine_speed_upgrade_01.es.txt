@@ -1,0 +1,19 @@
+DOSSIER DE MÓDULO — engine_speed_upgrade_01
+
+Rol
+- Paquete de velocidad de crucero de los motores de la nave, independiente del paquete de eficiencia de antimateria.
+
+Efecto operativo
+- Habilita UPGRADED solo con engines alimentado e integridad nominal. El perfil estándar ofrece 0.8c, frente a NOMINAL a 0.5c, LIMITED a 0.4c y DAMAGED a 0.3c.
+- El desgaste suspende la mejora por debajo de integridad nominal; reparar la restaura mientras quede una copia instalada. Los motores críticos o apagados bloquean nuevas salidas.
+- No cambia consumo de antimateria, integridad, integridad máxima ni demanda eléctrica auxiliar. Varias copias no acumulan la mejora.
+- El viaje local conserva su velocidad independiente de 20 km/s y los requisitos existentes del motor.
+- Cada salida interestelar fija velocidad de crucero, llegada y velocidad usada por los relojes de a bordo durante todo el trayecto. El desgaste, las reparaciones o los cambios de módulos posteriores afectan a futuras salidas.
+
+Notas de integración
+- Requiere una copia en bodega, 18 de chatarra y un dron desplegado dentro de la nave con batería y soporte de drone_bay.
+- drone install <drone_id> engine_speed_upgrade_01 activa el paquete al completarse la instalación.
+- drone uninstall <drone_id> engine_speed_upgrade_01 devuelve una copia a bodega. Retirar la última restaura NOMINAL si la integridad lo permite, o el estado de daño correspondiente.
+- engine_efficiency_upgrade_01 puede permanecer instalado simultáneamente; solo cambia el coste de antimateria.
+- Compara nav map routes y diag engines; status distingue velocidad disponible de velocidad real en tránsito.
+- Instalar y desinstalar conserva las restricciones ordinarias de tareas de drones, incluidas las restricciones para solicitar tareas nuevas durante el tránsito.

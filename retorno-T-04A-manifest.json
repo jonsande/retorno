@@ -1,0 +1,239 @@
+{
+  "task": "RETORNO T-04A",
+  "archive": "retorno-T-04A.zip",
+  "base_head": "a5b044102c6d5a2fe79a1dad06c68f8ff313ceb6",
+  "paths_en": "All paths are relative to the repository root.",
+  "paths_es": "Todas las rutas son relativas a la raíz del repositorio.",
+  "files": [
+    {
+      "path": "data/manuals/commands/nav.en.txt",
+      "status": "modified",
+      "bytes": 4338,
+      "sha256": "6e3a19de82d5a764eb68a552093eb5b6db65db85dedb888ca8f76b69df18449c"
+    },
+    {
+      "path": "data/manuals/commands/nav.es.txt",
+      "status": "modified",
+      "bytes": 4559,
+      "sha256": "d1bc9c7123efab2aafb5e721c3b918b608765bb9dd220019439276b25356f7ba"
+    },
+    {
+      "path": "data/manuals/concepts/navigation.en.txt",
+      "status": "modified",
+      "bytes": 3900,
+      "sha256": "3d7b5f64542b448b0c3af96bab221565db7881447b507917c9a4368493cbe6a0"
+    },
+    {
+      "path": "data/manuals/concepts/navigation.es.txt",
+      "status": "modified",
+      "bytes": 4160,
+      "sha256": "7bb9581a9ab8308e62f0f0716061b081976a3c49ed5257c920b0accd6648cb37"
+    },
+    {
+      "path": "data/manuals/modules/engine_efficiency_upgrade_01.en.txt",
+      "status": "modified",
+      "bytes": 1147,
+      "sha256": "c2a62c33bc856420d70e382695e540108174cdd685772220701bfa0af9455e7e"
+    },
+    {
+      "path": "data/manuals/modules/engine_efficiency_upgrade_01.es.txt",
+      "status": "modified",
+      "bytes": 1215,
+      "sha256": "c1b92750c8943725dc022ec2d3f4f5ed587f60b5160503d4c62b6b2993f1512c"
+    },
+    {
+      "path": "data/manuals/modules/engine_speed_upgrade_01.en.txt",
+      "status": "added",
+      "bytes": 1643,
+      "sha256": "69c3de207256dfb271f8b7098eda2f1e0d61d271eeb20e8bde7a6285b4fa2d60"
+    },
+    {
+      "path": "data/manuals/modules/engine_speed_upgrade_01.es.txt",
+      "status": "added",
+      "bytes": 1815,
+      "sha256": "03b2c04efbc9c331251ac02e427fc26db4606638a3f0d4abc89ee02f201564cd"
+    },
+    {
+      "path": "data/manuals/systems/engines.en.txt",
+      "status": "modified",
+      "bytes": 3754,
+      "sha256": "452cc5a39e35cb6fcad3e94f272d334a5f65af09e51fac503a68e610f5e5afa9"
+    },
+    {
+      "path": "data/manuals/systems/engines.es.txt",
+      "status": "modified",
+      "bytes": 4027,
+      "sha256": "e0378b565e12548b5924a5bf9463fd78f89a35320d58bda2f65de30471845366"
+    },
+    {
+      "path": "data/modules.json",
+      "status": "modified",
+      "bytes": 5517,
+      "sha256": "bfa9a389b8ae1680ad3424e400218036551cb012696ae308b7a0c2528f1cfd71"
+    },
+    {
+      "path": "docs/README.es.md",
+      "status": "modified",
+      "bytes": 10239,
+      "sha256": "7574c2da3603a6042a6e6a2a0e93430bca5ece65863bb007d8ff0cce0051cd15"
+    },
+    {
+      "path": "docs/README.md",
+      "status": "modified",
+      "bytes": 9677,
+      "sha256": "b87977fcb8ab6959b51100268fd2ff1569f9425279319f906964fd7c92f68db7"
+    },
+    {
+      "path": "docs/design/deadnode-chain-planner.es.md",
+      "status": "modified",
+      "bytes": 34313,
+      "sha256": "3b09b8de02810ff79b13e392f5ee4c2093b80eb8d4dfba111b6ce9c636cae5df"
+    },
+    {
+      "path": "docs/design/deadnode-chain-planner.md",
+      "status": "modified",
+      "bytes": 32466,
+      "sha256": "e3756f53209ef73a6df448ee23ad4b717089dd89dbfff2d9e853b9d5cc584d3e"
+    },
+    {
+      "path": "docs/design/modelo_temporal_hibernacion.md",
+      "status": "modified",
+      "bytes": 16373,
+      "sha256": "d58fa612786959dd2e404c64128e62285db46ff60baee8c7e83aa1abb0dea6da"
+    },
+    {
+      "path": "docs/systems/discovery-navigation-intel.es.md",
+      "status": "modified",
+      "bytes": 58596,
+      "sha256": "f4d0b0019c15b152905abd4e6dcb788e3c7b04a8cb9058eb26b15cc84a3cd0ce"
+    },
+    {
+      "path": "docs/systems/discovery-navigation-intel.md",
+      "status": "modified",
+      "bytes": 54056,
+      "sha256": "50e1a91d87b496932a2a80edcc0b63da97daa9401821d193ec73bae71c578cc6"
+    },
+    {
+      "path": "docs/systems/engines-antimatter.es.md",
+      "status": "modified",
+      "bytes": 10316,
+      "sha256": "1f2a2fa48617d54dee3fa2960b9ab21a7568713222e26e796557a6d35974d754"
+    },
+    {
+      "path": "docs/systems/engines-antimatter.md",
+      "status": "modified",
+      "bytes": 9605,
+      "sha256": "94d5c586caaaf3a2b5a0e1e01a5fb921d4e1de6500f9259812017e3003349a98"
+    },
+    {
+      "path": "docs/testing/engine-speed-upgrade-results.json",
+      "status": "added",
+      "bytes": 9107,
+      "sha256": "e2146a939b913edfd143ed06e3256af32d7685d80548864e33299f952034bbaa"
+    },
+    {
+      "path": "docs/testing/engine-speed-upgrade-review.es.md",
+      "status": "added",
+      "bytes": 3959,
+      "sha256": "a37544377f6d7e34f66d82ef4f70289e7325c74fff714a511d4036253aaef6f4"
+    },
+    {
+      "path": "docs/testing/engine-speed-upgrade-review.md",
+      "status": "added",
+      "bytes": 3709,
+      "sha256": "dbc24b3bd72d10e57d8168403db01badb20affb0a70f2d715f6786ddeecda303"
+    },
+    {
+      "path": "retorno-T-04A-manifest.json",
+      "status": "added",
+      "note_en": "This manifest lists itself without a recursive hash.",
+      "note_es": "El manifiesto se enumera sin hash recursivo."
+    },
+    {
+      "path": "src/retorno/cli/repl.py",
+      "status": "modified",
+      "bytes": 364390,
+      "sha256": "543d234bebd93245ce5d133f6d0dbb7900247fe6f3629f29a492effe08dc5062"
+    },
+    {
+      "path": "src/retorno/config/balance.py",
+      "status": "modified",
+      "bytes": 15942,
+      "sha256": "ebf55f8d85c16e1562a32224ac1ef42ad50bc61660a41eabbaafa1ef2efc9473"
+    },
+    {
+      "path": "src/retorno/core/deadnode_opportunities.py",
+      "status": "modified",
+      "bytes": 25485,
+      "sha256": "6b7377b995346a79bc8e8dedcd6fa5152943612692590a273ec227a57a03d260"
+    },
+    {
+      "path": "src/retorno/core/engine.py",
+      "status": "modified",
+      "bytes": 343120,
+      "sha256": "66308a44ff144cfe912fbf012854fa0f9b7855383cfa6249da9febaab8f52f16"
+    },
+    {
+      "path": "src/retorno/io/save_load.py",
+      "status": "modified",
+      "bytes": 10691,
+      "sha256": "5caa4693d1d3f1eb74b876f1bf8e95266997e288cd567bd8a4a2f635174e631d"
+    },
+    {
+      "path": "src/retorno/model/ship.py",
+      "status": "modified",
+      "bytes": 7268,
+      "sha256": "eebd965fa555ba9fd12eb7c4baebd2b807ec5b292d60631cbe3463a66a4b2586"
+    },
+    {
+      "path": "src/retorno/model/systems.py",
+      "status": "modified",
+      "bytes": 3674,
+      "sha256": "7c3dc82167d3417119b6ac9cfab97005e6cf50f8deb56d79fa327172b2ea7ca3"
+    },
+    {
+      "path": "src/retorno/ui_textual/app.py",
+      "status": "modified",
+      "bytes": 106856,
+      "sha256": "44878a1bb62f463d21e736766963aac4876a13967183205e12f98081d9b88734"
+    },
+    {
+      "path": "src/retorno/ui_textual/presenter.py",
+      "status": "modified",
+      "bytes": 4395,
+      "sha256": "b44e1d19f9b56dae7a8644372df68d5224888583fed1ef2e2bf8b4cd31bd10a0"
+    },
+    {
+      "path": "tests/prologue_navigation_policy_smoke.py",
+      "status": "modified",
+      "bytes": 13115,
+      "sha256": "f61314a52b8d07c9125e925e07515071ea599baddf89cd0a832404794918d856"
+    },
+    {
+      "path": "tests/save_load_smoke.py",
+      "status": "modified",
+      "bytes": 5210,
+      "sha256": "972dfb55d22269180457179452b80441086fe1aac8131823ebee1c34e0989199"
+    },
+    {
+      "path": "tests/test_engine_speed_upgrade.py",
+      "status": "added",
+      "bytes": 20832,
+      "sha256": "1f6ca3a5457d7a96c76626cd68893b6449eb42754966c5959269b31d57ad5dbd"
+    },
+    {
+      "path": "tests/test_temporal_clocks.py",
+      "status": "modified",
+      "bytes": 7166,
+      "sha256": "8d449af40b5765dc6a861f212d89175fcc4633d221ebe2dd0513f9741685a285"
+    }
+  ],
+  "renamed": [],
+  "deleted": [],
+  "excluded_preexisting_changes": [
+    "TODO.md"
+  ],
+  "exclusions_en": "No .git, virtual environments, caches, saved games or unrelated files included.",
+  "exclusions_es": "Sin .git, entornos virtuales, cachés, partidas guardadas ni archivos ajenos.",
+  "validation_evidence": "docs/testing/engine-speed-upgrade-results.json"
+}

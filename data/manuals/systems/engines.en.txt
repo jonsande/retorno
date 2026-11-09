@@ -16,6 +16,9 @@ Operational dependencies
 - Navigation still requires a known direct route, a hop within 45 ly, valid ship power and Core OS, and an undocked ship.
 
 Command impact by state
+- Standard departure speeds: UPGRADED 0.8c, NOMINAL 0.5c, LIMITED 0.4c, DAMAGED 0.3c. UPGRADED requires engine_speed_upgrade_01 and nominal integrity; repair restores the improvement while installed.
+- Every interstellar journey freezes its speed and arrival time at departure; onboard clocks keep using that speed despite later engine damage, repairs, shutdown or module changes. Local travel stays at 20 km/s.
+- status and diag engines distinguish available departure speed from actual transit speed; nav map routes and confirmation include estimated galactic duration.
 - OFFLINE, forced off or CRITICAL: departure blocked. Use power on engines or repair as indicated by diag engines.
 - DAMAGED or better: departure allowed when other requirements are met.
 - Wear reduces efficiency continuously, including within a state band; repair recovers efficiency.
@@ -41,4 +44,4 @@ Recovery pattern
 Related commands
 - diag engines, locate engines, power on engines, power status, inventory
 - drone deploy <drone_id> ENG-R1, drone repair <drone_id> engines
-- nav map routes, nav <node_id>, nav abort, man engine_efficiency_upgrade_01
+- nav map routes, nav <node_id>, nav abort, man engine_efficiency_upgrade_01, man engine_speed_upgrade_01

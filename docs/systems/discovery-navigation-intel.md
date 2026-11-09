@@ -547,15 +547,17 @@ its destinations are not restricted to the previous endpoints.
 
 For very local distances in the same sector, `fine_ranges_km` permits travel
 time in kilometers; other travel uses light-year distance and cruise speed.
-New ships start at 0.5 ly per 365-day year (0.5c in the game's units), stored in
-`ShipState.cruise_speed_ly_per_year`. Navigation and route estimates use that
-ship attribute; local travel retains its independent 20 km/s speed. Cruise
-speed is fixed during current gameplay; propulsion damage and upgrades do not
-change it yet. Travel duration still uses distance divided by speed; separate
-ship and biological clocks now accumulate relativistic proper time without
-changing navigation ETAs or the time passed to other subsystems.
-There is no discrete fuel charge on hop start. Transit advances time and thus
-the energy and environmental models.
+`ShipState.cruise_speed_ly_per_year` is the configurable nominal reference,
+initially 0.5 ly per 365-day year. `ShipState.effective_cruise_speed()` applies
+the engine state profile: initially 0.8c UPGRADED (speed module required), 0.5c
+NOMINAL, 0.4c LIMITED and 0.3c DAMAGED. CRITICAL/OFFLINE block departure.
+Effective speed always remains below c. Local travel retains its independent
+20 km/s speed and existing engine gates. Duration is distance divided by speed.
+Departure records `transit_speed_ly_per_year`; ETA and the speed used for proper
+time stay fixed until arrival/abort, despite subsequent engine changes.
+Antimatter is charged once at interstellar departure, with no abort refund;
+see [engines and antimatter](engines-antimatter.md). Other subsystems retain
+their existing galactic time domain.
 
 On arrival, the node enters `visited_nodes`, position is updated, its pool
 window closes, and the initial `UNKNOWN` placeholder is dropped when relevant.

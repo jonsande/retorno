@@ -421,7 +421,7 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ),
                 ("nav map graph [node_id]", "show known route graph", "muestra grafo de rutas conocido"),
                 ("nav map path <node_id>", "show best known path", "muestra mejor camino conocido"),
-                ("nav map routes", "list direct routes and antimatter estimates", "lista rutas directas y estimaciones de antimateria"),
+                ("nav map routes", "list direct routes, speed, duration and antimatter estimates", "lista rutas directas, velocidad, duración y estimaciones de antimateria"),
                 ("nav map contacts", "list known contacts", "lista contactos conocidos"),
                 ("nav <node_id>", "start transit with operational engines and sufficient antimatter", "inicia tránsito con motores operativos y antimateria suficiente"),
                 ("nav --no-cruise <node_id>", "start transit without cruise profile", "inicia tránsito sin perfil cruise"),
@@ -443,7 +443,7 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
             "Systems / Power",
             "Sistemas / Energía",
             [
-                ("diag <system_id>", "inspect system diagnostics", "inspecciona diagnóstico del sistema"),
+                ("diag <system_id>", "inspect system diagnostics (engines: available and transit speed)", "inspecciona diagnóstico del sistema (engines: velocidad disponible y en tránsito)"),
                 ("boot <service_name>", "start system service", "arranca servicio de sistema"),
                 ("power on comms", "activate passive radio hardware; then boot radiod", "activa el receptor pasivo; después boot radiod"),
                 ("boot radiod", "listen automatically within physical range and signal arrival time", "escucha automática según alcance físico y llegada de la señal"),
@@ -842,8 +842,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
     }
     travel_templates = {
         "travel_started": {
-            "en": "[{sev}] travel_started :: To {to} dist={distance_ly:.2f}ly ETA={eta} antimatter cost={fuel_cost} remaining={fuel_remaining} equivalent capsules (hint: nav abort)",
-            "es": "[{sev}] travel_started :: A {to} dist={distance_ly:.2f}ly ETA={eta} antimateria coste={fuel_cost} restante={fuel_remaining} cápsulas equivalentes (pista: nav abort)",
+            "en": "[{sev}] travel_started :: To {to} dist={distance_ly:.2f}ly speed={speed_ly_per_year}c ETA={eta} antimatter cost={fuel_cost} remaining={fuel_remaining} equivalent capsules (hint: nav abort)",
+            "es": "[{sev}] travel_started :: A {to} dist={distance_ly:.2f}ly velocidad={speed_ly_per_year}c ETA={eta} antimateria coste={fuel_cost} restante={fuel_remaining} cápsulas equivalentes (pista: nav abort)",
         },
         "arrived": {
             "en": "[{sev}] arrived :: Arrived at {to} (from {from})",
@@ -938,6 +938,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             parts.append(f"Q+{float(effects['power_quality_offset']):.2f}")
         if "engine_fuel_mult" in effects:
             parts.append(_format_module_effect("engine_fuel_mult", effects["engine_fuel_mult"], locale))
+        if "engine_speed_upgrade" in effects:
+            parts.append(_format_module_effect("engine_speed_upgrade", effects["engine_speed_upgrade"], locale))
         return ", ".join(parts)
     boot_blocked_reasons = {
         **_AUTORECALL_BLOCK_MESSAGES,
@@ -1794,6 +1796,7 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                 "from": e.data.get("from", "?"),
                 "distance_ly": e.data.get("distance_ly", 0.0),
                 "eta_years": e.data.get("eta_years", 0.0),
+                "speed_ly_per_year": e.data.get("speed_ly_per_year", 0.0),
                 "eta": _format_eta_short((e.data.get("eta_years", 0.0) or 0.0) * Balance.YEAR_S, locale),
                 "years": e.data.get("years", 0.0),
                 "duration": _format_eta_short((e.data.get("years", 0.0) or 0.0) * Balance.YEAR_S, locale),
@@ -2031,6 +2034,7 @@ def render_status(state) -> None:
     headroom = p.p_discharge_max_kw - deficit
     print("\n=== STATUS ===")
     print(f"time: {format_elapsed_long(state.clock.t)}")
+    print(speed_readout(state))
     if ship.op_mode == "CRUISE":
         source = ship.op_mode_source or "manual"
         print(f"ship_mode: {ship.op_mode} ({source})")
@@ -2263,7 +2267,10 @@ def render_diag(state, system_id: str) -> None:
         print(f"location: {sector_id} ({ship_sector_name_for_locale(sector_id, locale, fallback=sector.name)})")
     else:
         print(f"location: {sector_id}")
-    print(f"state: {sys.state.value}")
+    operating_state = state.ship.engine_operating_state() if system_id == "engines" else sys.state
+    print(f"state: {operating_state.value}")
+    if system_id == "engines":
+        print(speed_readout(state))
     print(f"health: {sys.health:.2f}")
     print(f"p_nom: {sys.p_nom_kw:.2f} kW  p_eff: {sys.p_effective_kw():.2f} kW")
     print(f"priority: {sys.priority}")
@@ -2516,6 +2523,27 @@ def render_inventory(state) -> None:
         print("(cargo changes pending; run 'cargo audit' to refresh)")
 
 
+def speed_readout(state, destination_id: str | None = None) -> str:
+    """Shared public engine telemetry and read-only galactic duration quotes."""
+    ship = state.ship
+    es = state.os.locale.value == "es"
+    speed = ship.effective_cruise_speed()
+    available = f"{speed}c" if speed > 0.0 else ("no disponible" if es else "unavailable")
+    text = (f"engines: {ship.engine_operating_state().value}; "
+            + (f"velocidad disponible={available}; nominal={ship.cruise_speed_ly_per_year:.6g}c" if es
+               else f"available speed={available}; nominal={ship.cruise_speed_ly_per_year:.6g}c"))
+    if ship.in_transit:
+        actual = (f"{Balance.LOCAL_TRAVEL_SPEED_KM_S:g} km/s" if ship.last_travel_is_local
+                  else f"{ship.transit_speed_ly_per_year}c")
+        text += f"; {'velocidad en tránsito' if es else 'transit speed'}={actual}"
+    if destination_id is not None:
+        duration = Engine().estimate_travel_duration(state, destination_id)
+        if duration is None:
+            return ""
+        text += f"; {'duración estimada (galáctica)' if es else 'estimated duration (galactic)'}={_format_eta_short(duration, state.os.locale.value)}"
+    return text
+
+
 def fuel_readout(state, destination_id: str | None = None) -> str:
     """Shared CLI/Textual telemetry; str(float) preserves the priced amount."""
     locale = state.os.locale.value
@@ -2547,6 +2575,9 @@ def _module_effects(info: dict) -> dict:
 
 
 def _format_module_effect(effect_key: str, value, locale: str) -> str:
+    if effect_key == "engine_speed_upgrade":
+        return ("Habilita UPGRADED con integridad nominal" if locale == "es"
+                else "Enables UPGRADED with nominal integrity")
     labels = {
         "integrity_max_add": {"en": "max integrity", "es": "integridad máxima"},
         "battery_max_add": {"en": "max battery", "es": "batería máxima"},
@@ -2695,6 +2726,8 @@ def render_module_inspect(state, module_id: str) -> None:
     print(f"id: {module_id}")
     print(f"name: {name}")
     print(f"scope: {scope}")
+    if module_id == "engine_speed_upgrade_01":
+        print(speed_readout(state))
     if scope == "drone":
         print(f"slots: {slot_cost}")
     else:
@@ -5400,6 +5433,7 @@ def render_locate(state, system_id: str) -> None:
 def render_nav_routes(state) -> None:
     print("\n=== NAV ROUTES ===")
     print(fuel_readout(state))
+    print(speed_readout(state))
     current_id = state.world.current_node_id
     player_ship_id = getattr(state.ship, "ship_id", "RETORNO_SHIP")
     routes = {
@@ -5447,6 +5481,9 @@ def render_nav_routes(state) -> None:
                 estimate = fuel_readout(state, nid)
                 if estimate:
                     print(f"  {estimate}")
+                duration = speed_readout(state, nid)
+                if duration:
+                    print(f"  {duration}")
             else:
                 print(f"- id={nid}")
     else:
@@ -6029,6 +6066,9 @@ def _confirm_nav(state, action) -> bool:
     estimate = fuel_readout(state, dest)
     if estimate:
         print(estimate)
+    duration = speed_readout(state, dest)
+    if duration:
+        print(duration)
     out = []
     for d in state.ship.drones.values():
         if d.status in {DroneStatus.DEPLOYED, DroneStatus.DISABLED} and d.location.kind == "world_node":

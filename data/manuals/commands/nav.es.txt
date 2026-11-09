@@ -53,6 +53,9 @@ Dependencias y gating
   - `OFFLINE`: terminal mínima de supervivencia.
 
 Propulsión y combustible
+- La velocidad estándar de crucero depende de engines: NOMINAL 0.5c, LIMITED 0.4c, DAMAGED 0.3c. engine_speed_upgrade_01 habilita UPGRADED a 0.8c solo con integridad nominal; no cambia el consumo de antimateria.
+- Velocidad interestelar y ETA se fijan al salir, incluida la velocidad usada por los relojes de a bordo. El desgaste, las reparaciones o los cambios de módulos posteriores afectan a futuras salidas. El viaje local sigue a 20 km/s.
+- status y diag engines muestran velocidad disponible y real en tránsito. Rutas y confirmación muestran duración galáctica estimada.
 - Requiere engines alimentado en DAMAGED o superior. CRUISE preserva sus auxiliares eléctricos.
 - nav map routes muestra coste actual de cápsulas y reserva para rutas directas conocidas; la confirmación lo repite.
 - La salida interestelar aceptada cobra una vez; con antimateria insuficiente la navegación no cambia.

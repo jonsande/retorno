@@ -207,6 +207,7 @@ def test_public_seed_1():
         modules = root / "modules.json"
         catalog = json.loads(modules.read_text())
         catalog.pop("engine_efficiency_upgrade_01", None)
+        catalog.pop("engine_speed_upgrade_01", None)
         modules.write_text(json.dumps(catalog))
         with patch.object(data, "_DATA_ROOT", root):
             return _public_seed_1_historical_catalogue()

@@ -149,7 +149,7 @@ class Engine:
             if moving_dt > 0.0:
                 beta = (Balance.LOCAL_TRAVEL_SPEED_KM_S / SPEED_OF_LIGHT_KM_S
                         if state.ship.last_travel_is_local
-                        else state.ship.cruise_speed_ly_per_year)
+                        else state.ship.transit_speed_ly_per_year)
         dt_ship = proper_time_interval(moving_dt, beta) + proper_time_interval(dt - moving_dt, 0.0)
         dt_bio = biological_time_interval(dt_ship, state.ship.is_hibernating)
 
@@ -402,9 +402,10 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
-            engines = state.ship.systems.get("engines")
-            if (not engines or engines.forced_offline or engines.health <= 0.0
-                    or engines.state in {SystemState.OFFLINE, SystemState.CRITICAL}):
+            is_local = self._is_local_hop(state, current_id, action.node_id, distance_ly)
+            speed = state.ship.effective_cruise_speed()
+            if (state.ship.engine_operating_state() in {SystemState.OFFLINE, SystemState.CRITICAL}
+                    or (not is_local and speed <= 0.0)):
                 event = self._make_event(
                     state, EventType.BOOT_BLOCKED, Severity.WARN,
                     SourceRef(kind="ship", id=state.ship.ship_id),
@@ -414,7 +415,6 @@ class Engine:
                 self._record_event(state.events, event)
                 return [event]
             # Validate and price before mutating even the local range cache.
-            is_local = self._is_local_hop(state, current_id, action.node_id, distance_ly)
             fuel_cost = 0.0 if is_local else self.engine_fuel_cost(state, distance_ly)
             if (not math.isfinite(state.ship.antimatter_capsules)
                     or state.ship.antimatter_capsules < fuel_cost):
@@ -442,7 +442,6 @@ class Engine:
                 travel_s = fine_km / max(0.1, Balance.LOCAL_TRAVEL_SPEED_KM_S)
                 years = travel_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
             else:
-                speed = max(0.001, state.ship.cruise_speed_ly_per_year)
                 years = distance_ly / speed
                 travel_s = years * Balance.YEAR_S
             state.ship.antimatter_capsules -= fuel_cost
@@ -451,6 +450,7 @@ class Engine:
             state.ship.transit_to = action.node_id
             state.ship.arrival_t = state.clock.t + travel_s
             state.ship.transit_start_t = state.clock.t
+            state.ship.transit_speed_ly_per_year = 0.0 if is_local else speed
             state.ship.last_travel_distance_ly = distance_ly
             state.ship.last_travel_distance_km = fine_km or 0.0
             state.ship.last_travel_is_local = is_local
@@ -534,6 +534,7 @@ class Engine:
                     "local": is_local,
                     "distance_km": fine_km,
                     "eta_s": travel_s,
+                    "speed_ly_per_year": state.ship.transit_speed_ly_per_year,
                     "fuel_cost": fuel_cost,
                     "fuel_remaining": state.ship.antimatter_capsules,
                 },
@@ -4941,6 +4942,7 @@ class Engine:
                 state.ship.manifest_dirty = True
                 state.ship.installed_modules.append(module_id)
                 self._recompute_ship_module_effects(state, previous_installed_modules=prev_installed)
+                self._apply_health_state(state.ship.systems["engines"], state, events, cause="module_install")
             events.append(
                 self._make_job_outcome_event(
                     state,
@@ -4980,6 +4982,7 @@ class Engine:
                 state.ship.cargo_modules.append(module_id)
                 state.ship.manifest_dirty = True
                 self._recompute_ship_module_effects(state, previous_installed_modules=prev_installed)
+                self._apply_health_state(state.ship.systems["engines"], state, events, cause="module_uninstall")
             events.append(
                 self._make_job_outcome_event(
                     state,
@@ -5189,6 +5192,33 @@ class Engine:
         None means no estimable known hop, rather than a free journey. Does not
         populate ranges, generate sectors, consume RNG or change navigation.
         """
+        distance = self._known_hop_distance(state, destination_id)
+        if distance is None:
+            return None
+        if self._is_local_hop(state, state.world.current_node_id, destination_id, distance):
+            return 0.0
+        return self.engine_fuel_cost(state, distance)
+
+    def estimate_travel_duration(self, state: GameState, destination_id: str) -> float | None:
+        """Read-only galactic seconds for an acquired direct hop, at current speed.
+
+        Does not promise departure permission or sufficient fuel. Unavailable
+        engines have no duration estimate; an active transit keeps its own ETA.
+        """
+        distance = self._known_hop_distance(state, destination_id)
+        if distance is None or state.ship.engine_operating_state() in {SystemState.OFFLINE, SystemState.CRITICAL}:
+            return None
+        origin = state.world.current_node_id
+        if self._is_local_hop(state, origin, destination_id, distance):
+            fine = state.world.fine_ranges_km.get(destination_id)
+            if fine is None:
+                fine = self._compute_fine_range_km(state, origin, destination_id)
+            return fine / max(0.1, Balance.LOCAL_TRAVEL_SPEED_KM_S)
+        speed = state.ship.effective_cruise_speed()
+        return distance / speed * Balance.YEAR_S if speed > 0.0 else None
+
+    def _known_hop_distance(self, state: GameState, destination_id: str) -> float | None:
+        """Acquired route boundary shared by public fuel and duration queries."""
         world = state.world
         origin = world.current_node_id
         if (destination_id == origin or "engines" not in state.ship.systems
@@ -5199,9 +5229,7 @@ class Engine:
         distance = distance_between_nodes_ly(world, origin, destination_id)
         if distance is None or not math.isfinite(distance) or distance < 0.0:
             return None
-        if self._is_local_hop(state, origin, destination_id, distance):
-            return 0.0
-        return self.engine_fuel_cost(state, distance)
+        return distance
 
     def _distance_between_nodes(self, state: GameState, from_id: str, to_id: str) -> float:
         nodes = state.world.space.nodes
@@ -7070,11 +7098,13 @@ class Engine:
                 system.state = (SystemState.DAMAGED if system.health >= Balance.SYSTEM_HEALTH_CRITICAL
                                 else SystemState.CRITICAL)
             return
-        if system.state_locked:
+        if system.state_locked and system.system_id != "engines":
             return
         old_state = system.state
         h = system.health
-        if h <= Balance.SYSTEM_HEALTH_OFFLINE:
+        if system.system_id == "engines":
+            new_state = state.ship.engine_operating_state()
+        elif h <= Balance.SYSTEM_HEALTH_OFFLINE:
             new_state = SystemState.OFFLINE
         elif h < Balance.SYSTEM_HEALTH_CRITICAL:
             new_state = SystemState.CRITICAL

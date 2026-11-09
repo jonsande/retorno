@@ -76,7 +76,7 @@ def build_status_lines(state) -> list[str]:
             parts = [p for p in compact.split() if not (p.startswith("svc=") or p.startswith("running="))]
             compact = " ".join(parts)
             sys_lines.append(compact)
-    return sys_lines if sys_lines else lines
+    return [repl.public_text(state, repl.speed_readout(state)), *sys_lines] if sys_lines else lines
 
 
 def build_alerts_lines(state) -> list[str]:

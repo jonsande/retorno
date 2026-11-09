@@ -379,7 +379,7 @@ información/materialización/recepción.
 
 | Evidencia/estimación | Autoridad canónica y límites |
 | --- | --- |
-| Segundos nominales de tránsito | `Engine.Travel`: distancia dividida por `max(0.001, cruise_speed_ly_per_year)` por `Balance.YEAR_S`; viaje local usa km finos divididos por `max(0.1, LOCAL_TRAVEL_SPEED_KM_S)`. `_compute_fine_range_km` de sólo lectura aporta un rango local ausente. |
+| Segundos nominales de tránsito | `Engine.Travel`: distancia dividida por `ShipState.effective_cruise_speed()` por `Balance.YEAR_S` (velocidad cero no tiene estimación); viaje local usa km finos divididos por `max(0.1, LOCAL_TRAVEL_SPEED_KM_S)`. `_compute_fine_range_km` de sólo lectura aporta un rango local ausente. |
 | Energía CRUISE condicionada | `Engine._compute_load_kw` y `Engine._compute_p_gen` de sólo lectura sobre vista independiente de sistemas auto-CRUISE, excluyendo jobs. kW constantes × segundos nominales / 3600 dan kWh brutos de demanda/generación. |
 | Evolución real de batería/red | Desconocida: `Engine._update_battery` limita carga/descarga y aplica eficiencias; calidad, shedding, cambios de estado y jobs futuros afectan el viaje. No se ejecutan esos helpers mutantes. |
 | Scrap directo de tránsito | Cero calculable: `Travel` no cobra scrap por salto. Excluye reparaciones, mantenimiento y trabajo informativo. |

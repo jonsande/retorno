@@ -1,4 +1,4 @@
-# Motores y antimateria — implementación 1
+# Motores, antimateria y velocidad de crucero
 
 Implementado según CANON v0.5.0, C-TECH-001–007 y los parámetros provisionales
 P-TECH-001–002. El commit canónico es
@@ -76,12 +76,82 @@ así como las mismas acciones de Engine. Comandos públicos:
   engine_efficiency_upgrade_01`: flujo existente si hay copia en bodega.
 - `man engines`, `man engine_efficiency_upgrade_01`: manuales bilingües.
 
-Se conservan tiempos de viaje, waypoints, hibernación, relatividad y límites
-de salto. La validación de guardado rechaza configuraciones anteriores del
+Se conservan waypoints, reglas de hibernación, fórmula de tiempo propio y límites
+de salto. T-04A añade las velocidades de salida por estado y el crucero inercial siguientes. La validación de guardado rechaza configuraciones anteriores del
 jugador; no existe migración al nuevo estado de motores/combustible. Recuperar
 cápsulas por salvage, su distribución procedural y resolver el agotamiento
 quedan fuera de esta fase. El pool existente puede proporcionar el módulo de
 eficiencia como módulo raro de nave.
+
+## T-04A: velocidad por estado y crucero inercial
+
+`ShipState.cruise_speed_ly_per_year` sigue siendo la referencia nominal
+configurable (inicialmente 0.5). `Balance.ENGINE_SPEED_MULTIPLIERS` define el perfil:
+
+| Estado | Multiplicador | Velocidad inicial |
+| --- | --- | --- |
+| UPGRADED | 1.6 | 0.8c |
+| NOMINAL | 1.0 | 0.5c |
+| LIMITED | 0.8 | 0.4c |
+| DAMAGED | 0.6 | 0.3c |
+| CRITICAL / OFFLINE | sin salida | no disponible |
+
+`ShipState.engine_operating_state()` centraliza el estado específico del motor,
+con las bandas absolutas existentes de Balance: nominal con salud >= 0.85,
+limitado con >= 0.60, dañado con >= 0.35, crítico por encima de cero y apagado
+con cero o aislamiento forzado. Solo `engine_speed_upgrade_01` instalado permite
+UPGRADED con salud nominal. La salud por sí sola nunca lo concede. Desgaste,
+reparación, restauración eléctrica manual y finalización de módulos usan la misma
+regla; los demás sistemas conservan sus reglas de estado.
+`effective_cruise_speed()` aplica el perfil y limita velocidades finitas positivas
+a `math.nextafter(1.0, 0.0)`; resultados no positivos o no finitos bloquean salidas
+interestelares. El viaje local sigue a 20 km/s, con los requisitos existentes de
+motor, independientemente de los multiplicadores interestelares.
+
+El módulo de velocidad usa catálogo, pool raro, coste de 18 de chatarra y tareas
+ordinarias de instalación/retirada mediante drones. Su efecto booleano en catálogo
+describe la activación de esta capacidad de estado. Varias copias no acumulan
+beneficios; retirar la última restaura el estado apropiado para la salud.
+Puede coexistir con el módulo de eficiencia. No cambia salud, máximo efectivo,
+bonificaciones eléctricas ni precio de antimateria. Solo para engines, UPGRADED
+consume la misma potencia auxiliar que NOMINAL, evitando el multiplicador eléctrico
+genérico 1.10 de UPGRADED.
+
+La salida interestelar aceptada calcula velocidad efectiva y duración, registra
+`transit_speed_ly_per_year` y fija llegada. `Engine._tick_interval` usa ese valor
+congelado para `proper_time_interval`: dt * sqrt(1 - beta²). Desgaste, reparación,
+alimentación, configuración nominal o finalización de módulos posteriores afectan
+a futuras salidas, nunca a velocidad, ETA o tiempo propio del viaje en curso.
+La llegada sigue separando movimiento y reposo; abortar termina el movimiento sin
+reembolso. No se simula aceleración ni frenado. Generación eléctrica, desgaste,
+radiación, trabajos e hibernación conservan su integración temporal galáctica.
+
+Guardar/cargar persiste ambos módulos y la velocidad congelada sin reconstruirla
+con el estado actual del motor. Se rechazan guardados interestelares activos sin
+velocidad congelada positiva válida inferior a c; no se implementan migraciones.
+
+`Engine.estimate_travel_duration` devuelve segundos galácticos o None para saltos
+desconocidos, inválidos o actualmente no disponibles. Comparte con combustible
+el límite de rutas directas adquiridas y calcula rangos locales ausentes sin
+caché ni uso de RNG. El planificador usa la misma consulta de velocidad efectiva.
+CLI/REPL y Textual comparten `speed_readout` en status, diag engines, rutas y
+confirmación; el panel de sistemas de Textual también lo incluye. Distingue
+velocidad disponible, referencia nominal y velocidad real en tránsito; las
+estimaciones son para futuras salidas, no revisiones de la ETA activa. Module
+inspect y los contadores de instalación describen ambos efectos independientes.
+`help --verbose` y los manuales cubren las consultas; help simple conserva sintaxis.
+
+Usa `module inspect engine_speed_upgrade_01`, `drone install D1
+engine_speed_upgrade_01`, `drone uninstall D1 engine_speed_upgrade_01` y
+`man engine_speed_upgrade_01`. Se conservan las restricciones ordinarias:
+CRUISE aísla drone_bay; restaura su soporte para instalar/reparar. No se permiten
+solicitudes nuevas de retirada en tránsito; una retirada ya encolada puede terminar.
+
+Las pruebas focalizadas están en `tests/test_engine_speed_upgrade.py`, junto con
+las existentes de velocidad, relojes y antimateria. La [validación T-04A](../testing/engine-speed-upgrade-review.es.md)
+registra comprobaciones y límites. Añadir al catálogo cambia su huella existente;
+los guardados dependientes del catálogo anterior requieren partida nueva. La
+fixture histórica del prólogo excluye explícitamente ambos módulos nuevos.
 
 La validación está en `tests/engines_antimatter_smoke.py`, complementada por
 las pruebas existentes de prólogo, rutas, energía, persistencia, traducciones

@@ -47,6 +47,7 @@ La escasez no es únicamente un obstáculo. Es también el mecanismo que hace qu
 
 === SIN CLASIFICAR ===
 
+- [] Implementar medios interlestelares: ya tenemos la radiación ambiental en los esencial, pero interesa añadir riesgos ligados al movimiento relativista, como partículas energéticas incidentes, colisiones con polvo y erosión del blindaje. Estos efectos dependerían de la velocidad, del medio interestelar atravesado y de las protecciones de la nave.
 
 - [] Que el jugador pueda decidir la velocidad de viaje (0.3c o 0.5 si tiene 'engines' en 'nominal', y posibilidad de viajar a 0.8c si tiene el módulo que le permite 'upgraded').
 

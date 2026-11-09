@@ -564,17 +564,18 @@ sus destinos no se limitan a los extremos anteriores.
 
 Para distancias muy locales del mismo sector, `fine_ranges_km` permite calcular
 el tiempo en kilómetros; el resto usa distancia en años luz y velocidad de
-crucero. Las naves nuevas parten de 0,5 años luz por año de 365 días (0,5c en
-las unidades del juego), almacenados en `ShipState.cruise_speed_ly_per_year`.
-La navegación y las estimaciones de rutas usan ese atributo de la nave; el
-viaje local conserva su velocidad independiente de 20 km/s. La velocidad de
-crucero es fija durante el juego actual; el daño de propulsión y las mejoras
-todavía no la modifican. La duración del viaje sigue siendo distancia dividida
-por velocidad; los relojes separados de nave y biológico acumulan ahora tiempo
-propio relativista sin cambiar las ETA de navegación ni el tiempo que reciben
-los demás subsistemas.
-No existe un gasto de combustible discreto al iniciar el salto. El
-tránsito hace avanzar el tiempo y, con él, el modelo energético y ambiental.
+crucero. `ShipState.cruise_speed_ly_per_year` es la referencia nominal
+configurable, inicialmente 0,5 años luz por año de 365 días.
+`ShipState.effective_cruise_speed()` aplica el perfil de estado: inicialmente
+0.8c UPGRADED (requiere módulo de velocidad), 0.5c NOMINAL, 0.4c LIMITED y
+0.3c DAMAGED. CRITICAL/OFFLINE bloquean salidas. La velocidad efectiva siempre
+es inferior a c. El viaje local mantiene 20 km/s y los requisitos de motor
+existentes. La duración sigue siendo distancia dividida por velocidad.
+La salida registra `transit_speed_ly_per_year`; ETA y velocidad usada por el
+tiempo propio quedan fijas hasta llegada/aborto, pese a cambios posteriores del
+motor. Se cobra antimateria una vez al salir hacia un destino interestelar,
+sin reembolso por aborto; véase [motores y antimateria](engines-antimatter.es.md).
+Los demás subsistemas conservan su dominio de tiempo galáctico existente.
 
 Al llegar, el nodo pasa a `visited_nodes`, se actualiza la posición, se cierra
 su ventana de pool y se elimina el placeholder inicial `UNKNOWN` cuando

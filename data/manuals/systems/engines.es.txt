@@ -16,6 +16,9 @@ Dependencias operativas
 - La navegación sigue exigiendo ruta directa conocida, salto máximo de 45 ly, potencia y Core OS válidos y nave desacoplada.
 
 Impacto en comandos por estado
+- Velocidades estándar de salida: UPGRADED 0.8c, NOMINAL 0.5c, LIMITED 0.4c, DAMAGED 0.3c. UPGRADED requiere engine_speed_upgrade_01 e integridad nominal; reparar restaura la mejora mientras siga instalado.
+- Cada trayecto interestelar fija velocidad y llegada al salir; los relojes de a bordo siguen usando esa velocidad pese a daño, reparación, apagado o cambios de módulos posteriores. El viaje local sigue a 20 km/s.
+- status y diag engines distinguen velocidad disponible para salir y velocidad real en tránsito; nav map routes y la confirmación incluyen duración galáctica estimada.
 - OFFLINE, apagado forzado o CRITICAL: salida bloqueada. Usa power on engines o repara según diag engines.
 - DAMAGED o superior: salida permitida si se cumplen los demás requisitos.
 - El desgaste reduce la eficiencia continuamente, incluso dentro de una banda de estado; reparar recupera eficiencia.
@@ -41,4 +44,4 @@ Recuperación típica
 Comandos relacionados
 - diag engines, locate engines, power on engines, power status, inventory
 - drone deploy <drone_id> ENG-R1, drone repair <drone_id> engines
-- nav map routes, nav <node_id>, nav abort, man engine_efficiency_upgrade_01
+- nav map routes, nav <node_id>, nav abort, man engine_efficiency_upgrade_01, man engine_speed_upgrade_01

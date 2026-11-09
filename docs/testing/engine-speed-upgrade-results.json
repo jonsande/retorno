@@ -1,0 +1,175 @@
+{
+  "task": "T-04A",
+  "date": "2026-11-09",
+  "base_head": "a5b044102c6d5a2fe79a1dad06c68f8ff313ceb6",
+  "scope_en": "Focused checks only; no repository-wide audit or suite rerun.",
+  "scope_es": "Solo comprobaciones focalizadas; sin auditoría ni batería global del repositorio.",
+  "checks": [
+    {
+      "name": "drone_autorecall_reserve_smoke",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/drone_autorecall_reserve_smoke.py"
+      ],
+      "exit_code": 0,
+      "seconds": 15.97,
+      "output": "............../usr/lib/python3.12/subprocess.py:1127: ResourceWarning: subprocess 324 is still running\n  _warn(\"subprocess %s is still running\" % self.pid,\nResourceWarning: Enable tracemalloc to get the object allocation traceback\n/usr/lib/python3.12/threading.py:1010: ResourceWarning: unclosed file <_io.FileIO name=9 mode='rb' closefd=True>\n  self._target(*self._args, **self._kwargs)\nResourceWarning: Enable tracemalloc to get the object allocation traceback\n/usr/lib/python3.12/subprocess.py:1127: ResourceWarning: subprocess 367 is still running\n  _warn(\"subprocess %s is still running\" % self.pid,\nResourceWarning: Enable tracemalloc to get the object allocation traceback\n...\n----------------------------------------------------------------------\nRan 17 tests in 15.515s\n\nOK\nsys:1: ResourceWarning: unclosed file <_io.FileIO name=9 mode='rb' closefd=True>",
+      "pythonpath": "src",
+      "classification": "pass"
+    },
+    {
+      "name": "energy_policy_smoke",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/energy_policy_smoke.py"
+      ],
+      "exit_code": 0,
+      "seconds": 15.48,
+      "output": "ENERGY POLICY SMOKE PASSED",
+      "pythonpath": "src",
+      "classification": "pass"
+    },
+    {
+      "name": "focused_pytest",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_engine_speed_upgrade.py",
+        "tests/test_cruise_speed.py",
+        "tests/test_temporal_clocks.py",
+        "tests/engines_antimatter_smoke.py"
+      ],
+      "exit_code": 0,
+      "seconds": 47.76,
+      "output": "...................... [ 55%]\n..................                                                       [100%]\n40 passed, 50 subtests passed in 46.84s",
+      "pythonpath": "src",
+      "classification": "pass"
+    },
+    {
+      "name": "known_routes_integrity_smoke",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/known_routes_integrity_smoke.py"
+      ],
+      "exit_code": 0,
+      "seconds": 10.69,
+      "output": "PASS _assert_hops_and_publication\nPASS _assert_import_history_and_locales\nPASS _assert_components_and_views\nPASS _assert_recovery_frontier\nPASS _assert_deadnode_candidates\nPASS _assert_lazy_sector\nPASS _assert_solve_and_travel\nPASS _assert_job_endpoint_disappears\nPASS _assert_waypoint_is_inert_after_removal\nPASS _assert_persistence\nKNOWN ROUTES INTEGRITY SMOKE PASSED (seed=271828)",
+      "pythonpath": "src",
+      "classification": "pass"
+    },
+    {
+      "name": "manuals_style_check",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/manuals_style_check.py"
+      ],
+      "exit_code": 0,
+      "seconds": 0.16,
+      "output": "MANUAL STYLE CHECK PASSED",
+      "pythonpath": "src",
+      "classification": "pass"
+    },
+    {
+      "name": "prologue_navigation_policy_smoke",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/prologue_navigation_policy_smoke.py"
+      ],
+      "exit_code": 0,
+      "seconds": 36.87,
+      "output": "PASS subtraction, physical invariance, seeds 1/29/701\nPASS authored validation, files and B2 no replacement\nPASS normal 29, contact, save/load and old-catalogue rejection\nPASS public seed 1: ECHO_7 -> intermediate -> HARBOR_12",
+      "pythonpath": "src",
+      "classification": "pass"
+    },
+    {
+      "name": "public_location_ids_smoke",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/public_location_ids_smoke.py"
+      ],
+      "exit_code": 0,
+      "seconds": 21.86,
+      "output": "PASS test_01_injective_addresses_seeds_and_discovery_order\nPASS test_02_independent_processes_and_hash_seeds\nPASS test_03_authored_collisions_escape_without_discovery_dependence\nPASS test_04_save_load_authored_and_legacy_inputs\nPASS test_05_action_semantics_match_canonical_engine_requests\nPASS test_06_cli_completion_context_and_public_projection\nPASS test_07_link_view_reverses_exactly_without_changing_archive_or_provenance\nPASS test_08_mounted_path_projection_keeps_access_controls\nPASS test_09_negative_disclosure_across_cli_textual_and_commands\nPASS test_10_radio_view_reception_link_import_and_uplink_history\nPASS test_11_real_textual_tab_shared_prefix_and_dispatch_en_es\nPASS test_12_actual_readline_callback_and_cli_dispatch\nPASS test_13_successful_route_computation_with_public_contact_id\nPUBLIC LOCATION IDS: 13 GROUPS PASS",
+      "pythonpath": "src",
+      "classification": "pass"
+    },
+    {
+      "name": "route_hop_cap_smoke",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/route_hop_cap_smoke.py"
+      ],
+      "exit_code": 0,
+      "seconds": 1.32,
+      "output": "ROUTE HOP CAP SMOKE PASSED",
+      "pythonpath": "src",
+      "classification": "pass"
+    },
+    {
+      "name": "save_load_smoke",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/save_load_smoke.py"
+      ],
+      "exit_code": 0,
+      "seconds": 1.24,
+      "output": "SAVE/LOAD SMOKE PASSED",
+      "pythonpath": "src",
+      "classification": "pass"
+    },
+    {
+      "name": "textual_active_jobs_job_id_smoke",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/textual_active_jobs_job_id_smoke.py"
+      ],
+      "exit_code": 0,
+      "seconds": 1.0,
+      "output": "TEXTUAL ACTIVE JOBS JOB ID SMOKE PASSED",
+      "pythonpath": "src",
+      "classification": "pass"
+    },
+    {
+      "name": "textual_completion_context_smoke",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/textual_completion_context_smoke.py"
+      ],
+      "exit_code": 0,
+      "seconds": 2.3,
+      "output": "TEXTUAL COMPLETION CONTEXT SMOKE PASSED",
+      "pythonpath": "src",
+      "classification": "pass"
+    },
+    {
+      "name": "textual_theme_smoke",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/textual_theme_smoke.py"
+      ],
+      "exit_code": 0,
+      "seconds": 4.88,
+      "output": "TEXTUAL THEME SMOKE PASSED",
+      "pythonpath": "src",
+      "classification": "pass"
+    },
+    {
+      "name": "worldgen_modules_pool_smoke",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/worldgen_modules_pool_smoke.py"
+      ],
+      "exit_code": 1,
+      "seconds": 1.2,
+      "output": "Traceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/worldgen_modules_pool_smoke.py\", line 246, in <module>\n    main()\n  File \"/home/jon/prog/retorno_case/retorno/tests/worldgen_modules_pool_smoke.py\", line 240, in main\n    _assert_regions()\n  File \"/home/jon/prog/retorno_case/retorno/tests/worldgen_modules_pool_smoke.py\", line 113, in _assert_regions\n    state, authored = _generate(seed)\n                      ^^^^^^^^^^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/tests/worldgen_modules_pool_smoke.py\", line 96, in _generate\n    generate(state, sector_id)\n  File \"/home/jon/prog/retorno_case/retorno/src/retorno/worldgen/generator.py\", line 661, in ensure_sector_generated\n    _ensure_sector_cluster_generated(state,[sector_id])\n  File \"/home/jon/prog/retorno_case/retorno/src/retorno/worldgen/generator.py\", line 656, in _ensure_sector_cluster_generated\n    _ensure_sector_generated_core(state,targets)\n  File \"/home/jon/prog/retorno_case/retorno/src/retorno/worldgen/generator.py\", line 538, in _ensure_sector_generated_core\n    definition = universe_definition(state)\n                 ^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/jon/prog/retorno_case/retorno/src/retorno/worldgen/generator.py\", line 516, in universe_definition\n    raise ValueError(\"Historical universe seed/version changed\")\nValueError: Historical universe seed/version changed",
+      "pythonpath": "src:.",
+      "classification": "documented_historical_failure",
+      "baseline_evidence": "docs/testing/drone-autorecall-results.json",
+      "initial_invocation": "PYTHONPATH=src failed at tests.fixtures import; corrected to src:."
+    }
+  ],
+  "new_failures": [],
+  "historical_failure": "worldgen_modules_pool_smoke: ValueError: Historical universe seed/version changed; same exception documented in drone-autorecall-results.json and engines-antimatter-results.json"
+}

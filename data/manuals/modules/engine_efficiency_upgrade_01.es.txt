@@ -14,3 +14,4 @@ Notas de integración
 - drone uninstall <drone_id> engine_efficiency_upgrade_01 devuelve una copia a bodega; el modificador desaparece al retirar la última copia.
 - Compara nav map routes antes y después de instalar; inspecciona con module inspect engine_efficiency_upgrade_01.
 - El combustible ya cobrado en un tránsito activo no cambia al instalar o retirar el módulo.
+- engine_speed_upgrade_01 puede instalarse simultáneamente. Habilita velocidad mejorada de forma independiente; este paquete de eficiencia solo cambia el consumo.

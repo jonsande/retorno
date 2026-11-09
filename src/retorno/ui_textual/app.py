@@ -1197,6 +1197,9 @@ class RetornoTextualApp(App):
         estimate = repl.fuel_readout(state, dest)
         if estimate:
             self._log_line(repl.public_text(state, estimate))
+        duration = repl.speed_readout(state, dest)
+        if duration:
+            self._log_line(repl.public_text(state, duration))
         out = []
         for d in state.ship.drones.values():
             if d.status in {DroneStatus.DEPLOYED, DroneStatus.DISABLED} and d.location.kind == "world_node":

@@ -363,7 +363,7 @@ materialization/reception dependencies are explicit.
 
 | Evidence/estimate | Canonical owner and limits |
 | --- | --- |
-| Nominal transit seconds | `Engine.Travel`: distance divided by `max(0.001, cruise_speed_ly_per_year)` times `Balance.YEAR_S`; local travel uses fine km divided by `max(0.1, LOCAL_TRAVEL_SPEED_KM_S)`. The read-only `_compute_fine_range_km` supplies a missing local range. |
+| Nominal transit seconds | `Engine.Travel`: distance divided by `ShipState.effective_cruise_speed()` times `Balance.YEAR_S` (zero speed has no estimate); local travel uses fine km divided by `max(0.1, LOCAL_TRAVEL_SPEED_KM_S)`. The read-only `_compute_fine_range_km` supplies a missing local range. |
 | Conditional cruise energy | Read-only `Engine._compute_load_kw` and `Engine._compute_p_gen` on a detached auto-CRUISE system view, excluding jobs. Constant kW × nominal seconds / 3600 gives gross load/generation kWh. |
 | Actual battery and grid evolution | Unknown: `Engine._update_battery` clamps charge/discharge and applies efficiencies; quality, shedding, state changes and future jobs affect the trip. The evaluator does not run those mutating helpers. |
 | Direct transit scrap | Calculable zero: `Travel` charges no scrap per hop. This excludes repairs, maintenance and information work. |

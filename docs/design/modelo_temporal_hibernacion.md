@@ -13,19 +13,30 @@
 
 # RETORNO — Modelo temporal, hibernación y edad biológica
 
+> **T-04A (2026-11-09), velocidad inercial implementada / implemented inertial speed:**
+> El atributo de crucero es ahora referencia nominal; `effective_cruise_speed()`
+> aplica el estado de engines y el módulo independiente de velocidad. Cada salida
+> congela `transit_speed_ly_per_year` para ETA y tiempo propio hasta llegada/aborto.
+> Daño, reparación o módulos posteriores no cambian el trayecto en curso.
+> / The cruise attribute is now the nominal reference; effective speed follows
+> engine state and the independent speed module. Departure freezes the transit
+> speed for ETA and proper time until arrival/abort. Later damage, repair or
+> module changes cannot change the active journey. Local travel remains 20 km/s.
+> [ES](../systems/engines-antimatter.es.md) · [EN](../systems/engines-antimatter.md).
+
 > **T-03 (2026-11-08), núcleo implementado / implemented core:**
 > `ClockState.t` y `last_dt` conservan segundos galácticos; `ship_elapsed_s` y
 > `bio_elapsed_s` empiezan en cero y se persisten en guardados nuevos, sin migración.
 > `core/temporal.py` calcula `dt_ship = dt_galactic * sqrt(1 - beta²)`, con
 > velocidad finita `0 <= beta < 1`. En reposo `beta=0`; en tránsito interestelar
-> se usa el atributo de crucero; en viaje local, `20 / 299792.458`.
+> se usa la velocidad congelada de salida (T-04A); en viaje local, `20 / 299792.458`.
 > `Engine.tick` separa movimiento hasta llegada y reposo posterior únicamente
 > para estos acumuladores. La edad suma tiempo propio despierto o lo multiplica
 > por `Balance.HIBERNATION_BIO_AGE_RATE_NOMINAL` (0.005) hibernando.
 > / `t` and `last_dt` retain galactic seconds; the two new accumulators start at
 > zero and persist in new saves, without migration. Proper time uses the formula
 > above and rejects invalid speeds. Rest uses zero speed, interstellar transit
-> uses the ship attribute, and local transit uses 20 km/s divided by c. Arrival
+> uses the frozen departure speed (T-04A), and local transit uses 20 km/s divided by c. Arrival
 > splits moving/rest intervals for clocks only. Biological ageing equals proper
 > time awake, or proper time times the configurable nominal rate when hibernating.
 >

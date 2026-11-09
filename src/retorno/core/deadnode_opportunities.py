@@ -194,7 +194,7 @@ class _OpportunityContext:
         key = left, right
         if key not in self.edge_times:
             distance = math.dist(left.position_ly, right.position_ly)
-            speed = self.state.ship.cruise_speed_ly_per_year
+            speed = self.state.ship.effective_cruise_speed()
             if not math.isfinite(speed) or not math.isfinite(distance):
                 duration = None
             elif left.sector_id == right.sector_id and distance <= Balance.LOCAL_TRAVEL_RADIUS_LY:
@@ -203,7 +203,7 @@ class _OpportunityContext:
                     fine = self.engine._compute_fine_range_km(self.state, left.node_id, right.node_id)
                 duration = fine / max(0.1, Balance.LOCAL_TRAVEL_SPEED_KM_S)
             else:
-                duration = distance / max(0.001, speed) * Balance.YEAR_S
+                duration = distance / speed * Balance.YEAR_S if speed > 0.0 else None
             self.edge_times[key] = duration if duration is not None and math.isfinite(duration) and duration >= 0 else None
         return self.edge_times[key]
 

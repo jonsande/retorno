@@ -14,3 +14,4 @@ Integration notes
 - drone uninstall <drone_id> engine_efficiency_upgrade_01 returns a copy to cargo; the modifier disappears when the last copy is removed.
 - Compare nav map routes before and after installation; inspect with module inspect engine_efficiency_upgrade_01.
 - Fuel already charged for an active transit is unchanged by installation or removal.
+- engine_speed_upgrade_01 can be installed simultaneously. It enables upgraded speed independently; this efficiency package only changes consumption.

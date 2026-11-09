@@ -38,6 +38,9 @@ Public location IDs
 - Read an acquired navigation record to register its references. The display abbreviates installation references; the retained archive and its integrity data are preserved.
 
 Operational notes
+- Interstellar departure speed follows engine condition. engine_speed_upgrade_01 permits UPGRADED with nominal integrity; engine_efficiency_upgrade_01 independently reduces capsule consumption. See man engines and both module dossiers.
+- Cruise is inertial: speed, ETA and the speed used by onboard clocks are fixed at departure. Engine changes affect future departures. Local speed stays at 20 km/s.
+- status and diag engines show available and actual transit speed; nav map routes and confirmation include galactic duration estimates.
 - Knowing a contact is not the same as knowing a route to it.
 - `nav map *` depends on `core_os` only (not on `sensors` or `data_core`).
 - Region semantics (bulge/disk/halo) are evaluated on the physical galactic layer.

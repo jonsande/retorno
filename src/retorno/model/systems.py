@@ -78,7 +78,9 @@ class ShipSystem:
     def p_effective_kw(self) -> float:
         if self.forced_offline:
             return 0.0
-        return self.p_nom_kw * power_multiplier(self.state)
+        # The engine speed package has no electrical effect.
+        state = SystemState.NOMINAL if self.system_id == "engines" and self.state == SystemState.UPGRADED else self.state
+        return self.p_nom_kw * power_multiplier(state)
 
 
 def build_communications_system() -> ShipSystem:

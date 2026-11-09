@@ -275,6 +275,14 @@ class Balance:
     # False restores legacy process-dependent behavior for lore seed derivation and set iteration order.
     DETERMINISTIC_LORE_INTEL = True
     
+    # Relative to ShipState.cruise_speed_ly_per_year (nominal reference).
+    ENGINE_SPEED_MULTIPLIERS = {
+        "upgraded": 1.6,
+        "nominal": 1.0,
+        "limited": 0.8,
+        "damaged": 0.6,
+    }
+
     # Local (low scale) movement
     # Travel speed for local (km/mi) hops inside the same sector.
     LOCAL_TRAVEL_SPEED_KM_S = 20.0
