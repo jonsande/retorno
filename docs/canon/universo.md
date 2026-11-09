@@ -1,8 +1,8 @@
 # RETORNO — Canon del universo
 
 **ID:** `RET-CAN`  
-**Versión:** `0.4.0`<br>
-**Fecha:** 2026-11-06<br>
+**Versión:** `0.5.0`<br>
+**Fecha:** 2026-11-09<br>
 **Estado:** base canónica inicial, revisable mediante decisión explícita  
 **Destinatarios:** diseño narrativo, sistemas, programación, pruebas y asistentes de desarrollo  
 **Documento complementario:** [`guia_coherencia.md`](guia_coherencia.md)  
@@ -62,11 +62,11 @@ En la experiencia de RETORNO, los desplazamientos interestelares duran periodos 
 - Deben distinguirse **distancia recorrida**, **tiempo exterior transcurrido** y, cuando resulte pertinente, **tiempo experimentado por el viajero**.
 - Las naves con masa se desplazan a velocidades **inferiores a la de la luz** (`C-TIME-002`). Se contempla una velocidad de crucero **provisional** de `0,5c` (`P-TIME-005`).
 - Se distinguen tres magnitudes temporales: tiempo galáctico, tiempo propio de la nave y envejecimiento biológico (`C-TIME-003`).
-- No se deducen viajes o comunicaciones instantáneos; el sistema de propulsión, las fases de aceleración/frenado y el cálculo relativista definitivo siguen pendientes.
+- No se deducen viajes o comunicaciones instantáneos. La tecnología general de `engines` se establece en `C-TECH-003`–`006`; siguen abiertos los perfiles físicos de aceleración/frenado y el cálculo relativista definitivo.
 
 ### C-TIME-002 — Viaje estrictamente sublumínico [C]
 
-Una nave con masa **no alcanza ni supera la velocidad de la luz**. La duración de los trayectos debe ser compatible con esta restricción. La existencia de rutas de navegación no implica un atajo superlumínico ni una alteración arbitraria de la causalidad. La propulsión concreta y sus perfiles de aceleración, frenado y consumo energético permanecen abiertos.
+Una nave con masa **no alcanza ni supera la velocidad de la luz**. La duración de los trayectos debe ser compatible con esta restricción. La existencia de rutas de navegación no implica un atajo superlumínico ni una alteración arbitraria de la causalidad. La arquitectura tecnológica general de propulsión de la nave del jugador queda fijada en `C-TECH-003`–`006`; los perfiles de aceleración y frenado, el tratamiento físico preciso de la masa de reacción y el consumo energético realista continúan abiertos. La fórmula de consumo jugable descrita en `P-TECH-001` es provisional.
 
 ### C-TIME-003 — Tres magnitudes temporales diferenciadas [C]
 
@@ -94,7 +94,7 @@ El personaje **acumula edad biológica incluso cuando hiberna**. Este envejecimi
 
 ### P-TIME-005 — Velocidad de crucero candidata: `0,5c` [P]
 
-La candidata principal para el equilibrio interestelar es **la mitad de la velocidad de la luz**, aproximadamente `0,5 años luz/año` en el marco galáctico de referencia, durante la fase de crucero. El valor exacto, la aceleración, la desaceleración y su relación con el balance general **se verificarán antes de implementarse**. La velocidad actual del prototipo no se redefine por el hecho de documentar esta preferencia.
+La candidata principal para el equilibrio interestelar es **la mitad de la velocidad de la luz**, aproximadamente `0,5 años luz/año` en el marco galáctico de referencia, durante la fase de crucero. El valor definitivo, las fases de aceleración/desaceleración y su relación con el balance general **siguen abiertos**. Que el prototipo utilice esta velocidad no convierte la cifra en un principio físico canónico definitivo.
 
 ### P-BIO-001 — Tasa nominal de envejecimiento en hibernación: `0,5 %` [P]
 
@@ -128,7 +128,116 @@ Permanecen sin resolver su causa o causas definitivas, hitos y fechas precisos, 
 
 La **esperanza del protagonista** (`C-NAR-003`) es un hecho narrativo; la **existencia efectiva de su objetivo** permanece abierta.
 
-## 4. Conservación y desaparición de infraestructura
+## 4. Arquitectura tecnológica de la nave RETORNO
+
+Esta sección fija la **verdad de diseño** de la nave del jugador. Los identificadores de sistemas y sectores son los nombres canónicos para el desarrollo, pero describir aquí una función no significa que esté implementada. El mapa distingue **sectores físicos**, **sistemas funcionales** y **componentes internos**: no son conceptos intercambiables.
+
+### C-TECH-001 — Sectores físicos y distribución funcional [C]
+
+La nave RETORNO dispone de diez sectores identificados de forma estable. Los sistemas pueden compartir sector y un sector puede albergar equipos sin constituir por sí mismo un sistema gestionable.
+
+| Sector | Denominación funcional | Instalaciones y función principal |
+|---|---|---|
+| `DCK-A1` | Dársena / esclusa | Acoplamiento, acceso y operaciones de tránsito hacia el exterior. |
+| `STS-BAY` | Bahía de estasis | Equipamiento de hibernación y conservación del ocupante. |
+| `LFS-01` | Soporte vital | `life_support`, condiciones ambientales y apoyo a la estasis. |
+| `PWR-A1` | Núcleo de potencia | `power_core`, generación eléctrica primaria. |
+| `BUS-A2` | Distribución de energía | `energy_distribution`, distribución y estabilidad de la red. |
+| `ENG-R1` | Sala de máquinas | `engines`, conjunto de propulsión por materia-antimateria. |
+| `BRG-01` | Puente / mando | `core_os`, `data_core` y `comms`, control, datos y comunicaciones. |
+| `SNS-R1` | Sala de sensores | `sensors`, observación y detección. |
+| `DRN-BAY` | Bahía de drones | `drone_bay`, despliegue, recuperación y mantenimiento de drones. |
+| `CRG-01` | Bodega de carga | Materiales recuperados, módulos y almacenamiento de cápsulas de antimateria. |
+
+El sector `ENG-R1` es una instalación física existente en el plano de la nave; se le asigna ahora el nuevo **sistema funcional `engines`**. La arquitectura no obliga a convertir cada componente del motor en un `ShipSystem` independiente.
+
+### C-TECH-002 — Generación eléctrica independiente de la propulsión [C]
+
+`power_core` es un **reactor compacto de fusión nuclear** que suministra electricidad a la nave. Dispone de reservas internas selladas de combustible apropiadas para operaciones de muy larga duración. Son **finitas en la ficción**, pero su consumo **no se contabiliza como un recurso administrable por el jugador** dentro del modelo de juego previsto. La dificultad de la supervivencia energética procede de averías, limitaciones de generación, distribución, baterías y demanda, no de buscar periódicamente un segundo combustible nuclear.
+
+`energy_distribution` recibe y distribuye esa electricidad mediante la red de potencia; su función es distinta de la generación. `power_core` y `energy_distribution` siguen siendo sistemas susceptibles de deterioro, reparación y mejora. El motor `engines` puede utilizar electricidad para sus equipos auxiliares y de control, pero el **combustible empleado para impulsar la nave** es independiente del reactor de fusión.
+
+Por tanto, **las cápsulas de antimateria no alimentan `power_core`**. Tampoco se presupone que el reactor eléctrico impulse por sí solo la nave durante los viajes interestelares.
+
+### C-TECH-003 — Sistema funcional `engines` y propulsión sublumínica [C]
+
+El nombre canónico del sistema jugable de motores es **`engines`**, ubicado en `ENG-R1`. Es el conjunto destinado a producir empuje para el desplazamiento de la nave mediante **aniquilación controlada de materia y antimateria**. El término `propulsion` puede designar la función de propulsión o, más específicamente, el **componente de empuje**; no sustituye a `engines` como identificador del sistema completo.
+
+La arquitectura de motor de antimateria se integra en el principio de viaje **estrictamente sublumínico** (`C-TIME-002`). Su existencia no implica viaje superlumínico, salto instantáneo, aceleración ilimitada ni cancelación de los costes temporales del viaje.
+
+### C-TECH-004 — Tres componentes principales de `engines` [C]
+
+1. **Alimentador de antimateria.** Recibe el contenido de las cápsulas y regula su transferencia y dosificación hacia la reacción, preservando el confinamiento y evitando el contacto prematuro con la materia ordinaria.
+2. **Cámara de aniquilación.** Introduce cantidades controladas de materia ordinaria y antimateria; la aniquilación libera energía que el sistema debe gestionar, incluida la protección térmica y radiológica.
+3. **Sistema de empuje (`propulsion`).** Aprovecha una parte de la energía y de los productos de reacción para producir empuje dirigido; se prevé tecnología de guiado y tobera magnética, sin fijar todavía su rendimiento físico definitivo.
+
+El conjunto requiere controles, protecciones y gestión térmica, pero **no se establece una cuarta mecánica de mantenimiento** por cada elemento auxiliar. La estructura de tres componentes permite en el futuro **auditorías detalladas** que distingan el estado del alimentador, la cámara y el sistema de empuje. Por ahora se mantendrá una integridad operativa global de `engines`.
+
+La materia ordinaria necesaria para la aniquilación procede inicialmente de **reservas internas de reactivos del motor**, sin inventario jugable independiente. También podría requerirse masa de reacción adicional. La procedencia, composición exacta, agotamiento y tratamiento de esas reservas no quedan fijados como mecánicas; véanse `A-TECH-002` y `A-TECH-003`.
+
+### C-TECH-005 — Cápsulas de antimateria: confinamiento, carga y recuperación [C]
+
+El combustible de propulsión recuperable es la **cápsula de antimateria**. Cada cápsula dispone de **trampas electromagnéticas y sistemas de alto vacío** que mantienen la antimateria aislada de la materia convencional. Su confinamiento cuenta con alimentación y protección **autónomas respecto de la red eléctrica general de RETORNO**, concebidas para conservaciones prolongadas. Esto no significa duración infinita, ausencia de averías ni que una cápsula encontrada tras siglos sea necesariamente segura o aprovechable.
+
+Las cápsulas pueden transportarse como carga y almacenarse en `CRG-01`. Pueden recuperarse de otras instalaciones o restos cuando sus condiciones lo permitan. El motor dosifica su contenido, por lo que **una cápsula puede consumirse parcialmente** y conservarse el resto. La representación técnica del inventario puede utilizar **cápsulas equivalentes** como cantidad divisible sin exigir simular individualmente cada contenedor.
+
+La antimateria es, en esta etapa, el **único recurso nuevo de combustible que el jugador debe gestionar**. La posibilidad futura de administrar también materia ordinaria sigue abierta, no se descarta.
+
+### C-TECH-006 — Deterioro, reparación y mejoras de `engines` [C]
+
+`engines` es un sistema susceptible de **degradación, diagnóstico, reparación y mejoras**. Su deterioro reduce la eficiencia: realizar un mismo desplazamiento requiere más antimateria, mientras la reparación recupera eficiencia al restaurar integridad. Los daños pueden interpretarse como anomalías de cualquiera de los tres componentes principales, aunque inicialmente se representen mediante un estado global.
+
+La **integridad** del sistema y su **nivel tecnológico de eficiencia** son conceptos distintos. Un **módulo de mejora de eficiencia de motores** permite consumir menos antimateria que un motor sin esa mejora, con la misma integridad. La instalación del módulo debe beneficiar la autonomía de expedición y permitir rutas o cadenas de viajes que de otro modo no serían viables con las reservas disponibles. El identificador, el coste, las restricciones y el modificador numérico definitivos del módulo pertenecen a la implementación y al balance, no quedan establecidos como hechos físicos del universo.
+
+La investigación pormenorizada de los componentes mediante auditorías se contempla para una fase futura; el canon **no afirma que exista actualmente un comando de auditoría**.
+
+### C-TECH-007 — Alcance de los sistemas de seguridad interna [C]
+
+La nave del jugador **no tendrá un sistema funcional independiente `security`** en su configuración objetivo. Esto sustituye su presencia en el estado inicial actual del prototipo y **no prohíbe** que otras naves, estaciones o instalaciones dispongan de seguridad interior, contramedidas, controles de acceso o defensas, especialmente al desarrollar salvage avanzado. No se atribuye una mecánica de seguridad a esas instalaciones hasta que se diseñe explícitamente.
+
+### P-TECH-001 — Consumo interestelar experimental y eficiencia [P]
+
+Se adopta la siguiente **fórmula inicial de balance para pruebas**, no una ley física ni un valor canónico irreversible:
+
+```text
+consumo_equivalente = (0.5 + distancia_ly / 10)
+                      * (1 + 1.5 * (1 - integridad_normalizada)^2)
+                      * multiplicador_mejora
+```
+
+- `consumo_equivalente`: contenido consumido, medido en cápsulas equivalentes; admite fracciones.
+- `distancia_ly`: distancia interestelar expresada en años luz.
+- `integridad_normalizada`: integridad efectiva de `engines` en el intervalo `0..1`; esto no define umbrales mínimos para poder encenderlo o viajar.
+- `multiplicador_mejora`: `1.0` sin mejora y, como hipótesis inicial, `0.8` con el primer módulo de eficiencia (ahorro del 20 %).
+- `0.5` es un coste fijo de balance asociado de forma simplificada a las maniobras de un viaje; `distancia_ly / 10` es una aproximación jugable, **no** una afirmación de proporcionalidad física entre combustible y distancia en una trayectoria relativista.
+
+**Referencias de prueba, con motor íntegro y sin mejora:** 2 años luz → 0,70 cápsulas equivalentes; 10 → 1,50; 20 → 2,50; 45 → 5,00. El deterioro eleva los consumos; las reparaciones y mejoras los reducen. El consumo y las restricciones de las maniobras locales **no se integran aún en esta fórmula**; provisionalmente no exigirán gastar cápsulas de antimateria.
+
+La cantidad exacta de combustible se debe **estimar y mostrar antes de iniciar un viaje**. Quedan por resolver la deducción o reserva del combustible, los abortos, los efectos de daños durante el trayecto y los casos límite de redondeo y agotamiento. Ninguna de estas reglas se considera implementada por escribirla aquí.
+
+### P-TECH-002 — Reserva inicial y módulo de eficiencia de referencia [P]
+
+Para iniciar pruebas de autonomía se propone **12 cápsulas equivalentes de antimateria** como reserva de una partida nueva; no es una cifra física definitiva. El primer módulo de eficiencia utilizaría el multiplicador **`0.8`** descrito en `P-TECH-001`. La disponibilidad de cápsulas en la generación procedural, la frecuencia de recuperación por salvage y el balance con distancias y deterioro deberán comprobarse mediante recorridos jugables.
+
+Los parámetros anteriores pueden ajustarse sin cambiar el hecho canónico de que `engines` consume antimateria, se deteriora, puede repararse y admite mejoras de eficiencia.
+
+### A-TECH-001 — Perfiles de viaje, desgaste y semántica de consumo [A]
+
+Quedan por concretar la aceleración y frenado, la dependencia entre empuje, masa, velocidad y tiempo galáctico/propio, el tratamiento del combustible ante `nav abort`, el desgaste durante tránsito y los fallos de `engines` en ruta. No modificar indirectamente el modelo temporal existente al implementar el combustible.
+
+### A-TECH-002 — Posible economía separada de materia ordinaria [A]
+
+No se decide todavía si el jugador podrá recuperar, refinar y gestionar materia ordinaria como segundo recurso de propulsión. Solo tendría sentido si origina decisiones jugables propias y una logística distinguible de la recuperación de antimateria. Hasta esa decisión, las reservas internas de materia ordinaria **no generan otro contador de combustible**.
+
+### A-TECH-003 — Física de detalle y durabilidad de las reservas [A]
+
+Permanecen abiertos el mecanismo exacto de la tobera y del aprovechamiento de productos de reacción, la cantidad de masa de reacción necesaria, los límites físicos de aceleración, la vida de las trampas de confinamiento, las protecciones activas y las tasas reales de agotamiento del combustible de fusión. Ninguna reserva debe considerarse físicamente infinita por el hecho de no modelarse como recurso.
+
+### A-TECH-004 — Abastecimiento y agotamiento total de antimateria [A]
+
+Quedan pendientes las probabilidades y ubicaciones de recuperación, las alternativas disponibles cuando no quedan cápsulas y los mecanismos de prevención o resolución de bloqueos de exploración por combustible. **No se adopta todavía una solución específica**. El futuro diseño deberá comprobar sus efectos sobre las rutas y el desarrollo narrativo.
+
+## 5. Conservación y desaparición de infraestructura
 
 ### C-INF-001 — Diseño para escalas temporales muy largas [C]
 
@@ -167,7 +276,7 @@ La degradación debe resultar compatible con el entorno y la historia del objeto
 
 Estos factores todavía no constituyen un simulador físico ni un conjunto cerrado de reglas numéricas.
 
-## 5. Cuatro estados de conservación
+## 6. Cuatro estados de conservación
 
 ### C-DEC-001 — Taxonomía de cuatro estados [C]
 
@@ -195,7 +304,7 @@ Cuando una instalación excepcionalmente antigua conserva una capacidad relevant
 
 No es necesario explicar esa causa al jugador, ni en cada documento; sí debe poder sostenerse durante el desarrollo.
 
-## 6. Información, señales y memoria
+## 7. Información, señales y memoria
 
 ### C-DATA-001 — La información puede sobrevivir separada de sus sistemas [C]
 
@@ -237,7 +346,7 @@ Distinguish five layers: (1) physical and historical truth; (2) internal engine 
 
 The principle concerns universe facts and knowledge attributed to the protagonist or ship. Menus, controls, save/load and general help may provide ordinary system information without artificial fictional explanations. Explicit development commands may expose omniscient engine state; enabling debug does not change public queries. Survivors, galactic chronology and `A-COM-001` remain open.
 
-## 7. Cómo interpretar la generación procedural
+## 8. Cómo interpretar la generación procedural
 
 ### C-WORLD-001 — Descubrir no es crear físicamente [C]
 
@@ -247,11 +356,15 @@ Esta misma lectura debe aplicarse al contenido narrativo asignado durante la par
 
 **Excepción futura posible:** si se diseña expresamente un evento de construcción o desplazamiento de una instalación, se documentará como tal; no debe deducirse del generador actual.
 
-## 8. Preguntas abiertas que no deben resolverse por accidente
+## 9. Preguntas abiertas que no deben resolverse por accidente
 
 | ID | Cuestión | Decisión pendiente |
 |---|---|---|
-| **A-TIME-002** | Propulsión y perfil real de velocidad | Aceleración/frenado, velocidad efectiva en cada fase, energía y velocidad definitiva (candidata `0,5c`). |
+| **A-TIME-002** | Perfiles físicos de viaje | La tecnología general de motores antimateria está fijada (`C-TECH-003`–`006`); permanecen abiertos aceleración/frenado, velocidad efectiva por fase, masa de reacción y velocidad definitiva (candidata `0,5c`). |
+| **A-TECH-001** | Viajes y combustible | Aborto, desgaste en tránsito, daños en ruta, perfiles físicos y semántica de consumo. |
+| **A-TECH-002** | Segundo recurso de materia ordinaria | Posibilidad futura, aún no decidida, de recuperar y consumir también materia ordinaria. |
+| **A-TECH-003** | Física de detalle | Masa de reacción, tobera, confinamiento de largo plazo y límites de las reservas. |
+| **A-TECH-004** | Abastecimiento y agotamiento | Recuperación procedural y alternativas ante la falta total de antimateria, deliberadamente pendientes. |
 | **A-TIME-003** | Modelo matemático de los relojes | Convención del tiempo galáctico, integración del tiempo propio y tratamiento coherente de la relatividad. |
 | **A-BIO-001** | Químicos y condiciones de hibernación | Existencias, consumo, suministro, carencias y sus efectos mecánicos. |
 | **A-BIO-002** | Daño y eficacia de `life_support` | Fórmula efectiva, umbrales, comportamiento en fallos y consulta al jugador. |
@@ -269,7 +382,7 @@ Esta misma lectura debe aplicarse al contenido narrativo asignado durante la par
 
 Una historia o implementación puede trabajar con una de estas incógnitas, pero debe señalar su tratamiento como **hipótesis**, **perspectiva de un personaje** o **propuesta de nueva decisión canónica**.
 
-## 9. Registro de decisiones y cambios
+## 10. Registro de decisiones y cambios
 
 | Versión | ID | Resolución | Estado |
 |---|---|---|---|
@@ -293,10 +406,13 @@ Una historia o implementación puede trabajar con una de estas incógnitas, pero
 | **0.3** | `P-NAR-007` | Escala orientativa de 200 años galácticos entre grandes hitos. | Provisional |
 | **0.4 — 2026-11-06** | `C-DATA-004` | Conocimiento limitado, cinco capas y procedencia legítima; diagnósticos explícitos de desarrollo separados. / Limited knowledge, five layers and legitimate provenance; explicit development diagnostics kept separate. | Establecido / Established |
 | **0.3** | `C-GRAV-001` | Agujeros negros y dilatación gravitatoria intensa previstos para una fase futura. | Establecido como objetivo de mundo |
+| **0.5 — 2026-11-09** | `C-TECH-001`–`007` | Mapa de diez sectores; reactor de fusión independiente; `engines` por aniquilación materia-antimateria con tres componentes; cápsulas confinadas en vacío y trampas electromagnéticas; degradación, reparación y mejoras; retirada prevista de `security` del jugador. | Establecido como diseño, pendiente de implementación |
+| **0.5 — 2026-11-09** | `P-TECH-001`–`002` | Fórmula de consumo experimental, módulo de eficiencia al 20 % y 12 cápsulas iniciales. | Provisional, sujeto a pruebas |
+| **0.5 — 2026-11-09** | `A-TECH-001`–`004`, `A-TIME-002` | Perfiles y física detallada, segundo recurso de materia, semántica de consumo y alternativas al agotamiento permanecen abiertos. | Abierto |
 
-Las referencias narrativas a miles de años son compatibles con el **colapso milenario** establecido; **ninguna fecha exacta, porcentaje de supervivencia, duración de viaje o final posible** se vuelve canónico por figurar en un ejemplo de lore. Las tasas `0,5c` y `0,5 %` son **hipótesis de balance** hasta su validación.
+Las referencias narrativas a miles de años son compatibles con el **colapso milenario** establecido; **ninguna fecha exacta, porcentaje de supervivencia, duración de viaje o final posible** se vuelve canónico por figurar en un ejemplo de lore. Las tasas `0,5c` y `0,5 %`, así como las cifras de consumo, eficiencia y reservas de `P-TECH-001`–`002`, son **hipótesis de balance** hasta su validación.
 
-## 10. Mantenimiento del documento
+## 11. Mantenimiento del documento
 
 1. Toda decisión nueva debe indicar si **añade**, **precisa** o **sustituye** un principio existente.
 2. Mantener identificadores estables; no reutilizar un ID retirado para otra idea.
