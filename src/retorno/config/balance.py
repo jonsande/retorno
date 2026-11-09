@@ -23,6 +23,7 @@ class Balance:
     GALAXY_OP_ORIGIN_PHYSICAL_Y_LY = 0.0
     GALAXY_OP_ORIGIN_PHYSICAL_Z_LY = 0.0
     HIBERNATE_CHUNK_S = 7 * DAY_S
+    HIBERNATION_BIO_AGE_RATE_NOMINAL = 0.005
     HIBERNATE_WAKE_CHECK_S = 1 * 60 * 60
     HIBERNATE_WAKE_EVENT_TYPES = {"drone_low_battery"}
     # Startup sequence (new game only)

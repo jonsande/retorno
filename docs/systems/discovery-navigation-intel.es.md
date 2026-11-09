@@ -567,7 +567,10 @@ las unidades del juego), almacenados en `ShipState.cruise_speed_ly_per_year`.
 La navegación y las estimaciones de rutas usan ese atributo de la nave; el
 viaje local conserva su velocidad independiente de 20 km/s. La velocidad de
 crucero es fija durante el juego actual; el daño de propulsión y las mejoras
-todavía no la modifican. No se aplica corrección temporal relativista.
+todavía no la modifican. La duración del viaje sigue siendo distancia dividida
+por velocidad; los relojes separados de nave y biológico acumulan ahora tiempo
+propio relativista sin cambiar las ETA de navegación ni el tiempo que reciben
+los demás subsistemas.
 No existe un gasto de combustible discreto al iniciar el salto. El
 tránsito hace avanzar el tiempo y, con él, el modelo energético y ambiental.
 

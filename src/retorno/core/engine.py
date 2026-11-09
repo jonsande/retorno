@@ -6,6 +6,8 @@ from typing import Iterable
 import difflib
 import math
 
+from retorno.core.temporal import SPEED_OF_LIGHT_KM_S, biological_time_interval, proper_time_interval
+
 from retorno.core.actions import (
     Action,
     AuthRecover,
@@ -105,8 +107,23 @@ class Engine:
         if dt <= 0:
             return []
 
+        # Integrate clocks from the initial transit state, before arrival changes it.
+        # All existing subsystem updates below continue to use galactic dt.
+        moving_dt = 0.0
+        beta = 0.0
+        if state.ship.in_transit:
+            moving_dt = min(dt, max(0.0, state.ship.arrival_t - state.clock.t))
+            if moving_dt > 0.0:
+                beta = (Balance.LOCAL_TRAVEL_SPEED_KM_S / SPEED_OF_LIGHT_KM_S
+                        if state.ship.last_travel_is_local
+                        else state.ship.cruise_speed_ly_per_year)
+        dt_ship = proper_time_interval(moving_dt, beta) + proper_time_interval(dt - moving_dt, 0.0)
+        dt_bio = biological_time_interval(dt_ship, state.ship.is_hibernating)
+
         state.clock.last_dt = dt
         state.clock.t += dt
+        state.clock.ship_elapsed_s += dt_ship
+        state.clock.bio_elapsed_s += dt_bio
 
         events: list[Event] = []
 

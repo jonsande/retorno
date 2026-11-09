@@ -1,4 +1,4 @@
-"""Focused checks for ship-owned cruise speed and independent local travel."""
+"""T-02: ship-owned cruise speed and independent local travel (discoverable)."""
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest

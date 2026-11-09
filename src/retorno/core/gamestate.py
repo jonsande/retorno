@@ -23,6 +23,8 @@ class MetaState:
 class ClockState:
     t: float = 0.0          # seconds since game start; provisional radio coordinate time
     last_dt: float = 1.0
+    ship_elapsed_s: float = 0.0
+    bio_elapsed_s: float = 0.0
 
 
 @dataclass(slots=True)

@@ -1,4 +1,4 @@
-> **4D-3e5b — convención implementada solo para radio / implemented radio convention.**
+> **Nota histórica 4D-3e5b — convención inicial de radio / historical initial radio convention.**
 > `radio_coordinate_time(state)` usa provisionalmente `state.clock.t` como segundos
 > de coordenadas galácticas desde t=0; `game-coordinate-seconds-v1` identifica la
 > referencia persistida y `Balance.YEAR_S` el año de 365 días. Offsets negativos
@@ -12,6 +12,36 @@
 > [ES](../systems/radio-spacetime.es.md) · [EN](../systems/radio-spacetime.md).
 
 # RETORNO — Modelo temporal, hibernación y edad biológica
+
+> **T-03 (2026-11-08), núcleo implementado / implemented core:**
+> `ClockState.t` y `last_dt` conservan segundos galácticos; `ship_elapsed_s` y
+> `bio_elapsed_s` empiezan en cero y se persisten en guardados nuevos, sin migración.
+> `core/temporal.py` calcula `dt_ship = dt_galactic * sqrt(1 - beta²)`, con
+> velocidad finita `0 <= beta < 1`. En reposo `beta=0`; en tránsito interestelar
+> se usa el atributo de crucero; en viaje local, `20 / 299792.458`.
+> `Engine.tick` separa movimiento hasta llegada y reposo posterior únicamente
+> para estos acumuladores. La edad suma tiempo propio despierto o lo multiplica
+> por `Balance.HIBERNATION_BIO_AGE_RATE_NOMINAL` (0.005) hibernando.
+> / `t` and `last_dt` retain galactic seconds; the two new accumulators start at
+> zero and persist in new saves, without migration. Proper time uses the formula
+> above and rejects invalid speeds. Rest uses zero speed, interstellar transit
+> uses the ship attribute, and local transit uses 20 km/s divided by c. Arrival
+> splits moving/rest intervals for clocks only. Biological ageing equals proper
+> time awake, or proper time times the configurable nominal rate when hibernating.
+>
+> **T-04 pendiente / pending:** energía, trabajos, desgaste y demás consumidores
+> conservan su tiempo galáctico actual. Una emergencia detectada al final de un
+> bloque de hibernación aún contabiliza todo el bloque como hibernado; no se
+> reconstruye el instante físico del fallo ni se cambia el margen de 300 s.
+> Eficacia según `life_support`, interfaces y gravedad quedan pendientes.
+> / Existing consumers retain galactic time. An emergency detected at a block's
+> end still counts the whole block as hibernation; the physical failure instant
+> is not reconstructed and the 300-second grace is unchanged. Life-support
+> effectiveness, clock displays and gravity remain pending.
+>
+> El resto del borrador conserva las propuestas y auditorías históricas;
+> esta nota identifica el alcance implementado. / The remaining draft retains
+> historical proposals and audits; this note identifies implemented scope.
 
 > **T-02 (2026-11-08), actualización implementada / implemented update:**
 > `ShipState.cruise_speed_ly_per_year` inicia ahora en `0.5`; navegación y
