@@ -35,8 +35,7 @@ _IMPORT_PATH = "/logs/nav/route-integrity.txt"
 
 
 def _state():
-    state = create_initial_state_sandbox()
-    state.meta.rng_seed = _SEED
+    state = create_initial_state_sandbox(seed=_SEED)
     # Fix this synthetic world's definition before persistence snapshots.
     pin_universe(state)
     world = state.world

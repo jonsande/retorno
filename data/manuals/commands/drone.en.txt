@@ -45,6 +45,16 @@ Operational behavior
 - Docked maintenance (charge/passive repair) respects effective maxima (`battery_max_effective`, `integrity_max_effective`).
 - `drone salvage scrap` ETA scales with requested load vs drone effective cargo capacity.
 
+Automatic return and battery reserve
+- With autorecall ON, each new deploy, move, repair, ship-module operation, survey or salvage task must leave enough energy for the configured threshold and safe return. Pending work, remaining task duration, idle draw, effective battery capacity and bay/movement modifiers are included.
+- Admission is checked immediately, including while DEBUG time is paused, and checked again when work starts. Later battery or equipment changes can stop unsafe unfinished work before its task debit.
+- A rejected task requests early return. Pending work for that drone is cancelled and reserved repair scrap is refunded in full. Safe running work finishes before return; no additional work starts ahead of it.
+- Return is one ordinary recall job, not an instant docking. DEBUG requires wait to advance it. Long waits still check battery thresholds and relevant job boundaries.
+- A configured threshold below the return minimum is raised internally to protect the minimum battery gate plus estimated return duration and a short scheduling margin.
+- drone status shows an automatic-return block when battery or integrity is too low, or the ship is not docked at an external drone's installation. Repeated identical blocks do not flood the log.
+- autorecall OFF permits deliberate risk under the ordinary task requirements. No protective reserve applies to a recovery reboot or non-consuming work on a docked drone. God mode does not reserve battery for consumption it bypasses.
+- This protection does not restore previously spent energy or bypass recall damage, docking or success requirements.
+
 Common block reasons
 - `drone_not_in_bay` for drone-module install/uninstall when target drone is not docked in bay.
 - `drone_bay_install_offline` when bay support is offline.

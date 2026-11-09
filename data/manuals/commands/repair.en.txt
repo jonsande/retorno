@@ -18,6 +18,7 @@ Job outcomes
 - On failure, only part of the reserved scrap is consumed; the remainder is refunded.
 
 Operational notes
+- With autorecall ON, repair must preserve the operator drone's return reserve, including pending work and idle consumption. Otherwise it is refused, reserved scrap is refunded, and automatic return is requested.
 - Drone repair consumes operator battery and reserved scrap.
 - Self-test repair is slower and more scrap-efficient per health unit.
 - In critical power state, non-critical repairs are allowed but warned as high-risk tradeoff.

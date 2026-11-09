@@ -4,6 +4,7 @@ Ref: OS-MAN/SYS/DIST
 energy_distribution es el bus y la capa de distribución: disyuntores, alineación de fase, líneas troncales.
 
 Función
+- El apagado automático y CRUISE preservan la alimentación auxiliar de engines; consulta su carga en power status.
 - Lleva energía desde power_core al resto de sistemas.
 - Mantiene la alineación de fase y evita oscilaciones.
 
@@ -14,7 +15,7 @@ Por qué importa
 - OFFLINE activa el bypass de mantenimiento de emergencia para control mínimo de terminal/core.
 
 Impacto en comandos por estado
-- POR DEBAJO de NOMINAL: algunos arranques se bloquean por dependencias (p.ej. sensors, security, data_core).
+- POR DEBAJO de NOMINAL: algunos arranques se bloquean por dependencias (p.ej. sensors, comms, data_core).
 - CRITICAL/DAMAGED/LIMITED: penalización extra a Q; avisos de inestabilidad.
 - OFFLINE: fuerza a OFFLINE sistemas no críticos, reduciendo P_load.
 - OFFLINE: la recarga y la reparación pasiva en drone_bay quedan no disponibles hasta restaurar distribución.

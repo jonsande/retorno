@@ -104,6 +104,39 @@ class Engine:
     _MAX_RECENT_EVENTS = 50
 
     def tick(self, state: GameState, dt: float) -> list[Event]:
+        # Stop at drone decision/completion boundaries. A large wait must not
+        # jump from a safe reserve to an exhausted drone before checking recall.
+        events: list[Event] = []
+        remaining = dt
+        while remaining > 0.0:
+            step = remaining
+            if not state.os.god_active:
+                for drone in state.ship.drones.values():
+                    if not drone.autorecall_enabled or drone.status not in {DroneStatus.DEPLOYED, DroneStatus.DOCKED}:
+                        continue
+                    jobs = [state.jobs.jobs[key] for key in state.jobs.active_job_ids
+                            if key in state.jobs.jobs and state.jobs.jobs[key].owner_id == drone.drone_id]
+                    if drone.status == DroneStatus.DOCKED and not any(j.job_type == JobType.DEPLOY_DRONE for j in jobs):
+                        continue
+                    returning = any(j.job_type == JobType.RECALL_DRONE for j in jobs)
+                    projected_spend = (Balance.DRONE_BATTERY_IDLE_DRAIN_DEPLOYED_PER_S * remaining
+                                       + sum(self._drone_job_battery_cost(j.job_type) for j in jobs))
+                    if not returning and drone.battery - projected_spend > self._drone_return_reserve(state, drone) + 1e-12:
+                        continue
+                    for job in jobs:
+                        if job.eta_s > 0 and not job.params.get("awaiting_auto_move_confirmation"):
+                            step = min(step, job.eta_s)
+                    if drone.status == DroneStatus.DEPLOYED and not returning:
+                        rate = Balance.DRONE_BATTERY_IDLE_DRAIN_DEPLOYED_PER_S
+                        until_recall = ((drone.battery - self._drone_return_reserve(state, drone)) / rate
+                                        if rate > 0 else 0.0)
+                        if until_recall > 1e-6:
+                            step = min(step, until_recall)
+            events.extend(self._tick_interval(state, step))
+            remaining = max(0.0, remaining - step)
+        return events
+
+    def _tick_interval(self, state: GameState, dt: float) -> list[Event]:
         if dt <= 0:
             return []
 
@@ -163,6 +196,7 @@ class Engine:
             )
             arrived_this_tick = True
 
+        events.extend(self._update_drone_battery_alerts(state))
         events.extend(self._process_jobs(state, dt))
         run_lore_scheduler_tick(state)
         if arrived_this_tick:
@@ -368,6 +402,31 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
+            engines = state.ship.systems.get("engines")
+            if (not engines or engines.forced_offline or engines.health <= 0.0
+                    or engines.state in {SystemState.OFFLINE, SystemState.CRITICAL}):
+                event = self._make_event(
+                    state, EventType.BOOT_BLOCKED, Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    "Travel blocked: engines unavailable",
+                    data={"message_key": "boot_blocked", "reason": "engines_unavailable"},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            # Validate and price before mutating even the local range cache.
+            is_local = self._is_local_hop(state, current_id, action.node_id, distance_ly)
+            fuel_cost = 0.0 if is_local else self.engine_fuel_cost(state, distance_ly)
+            if (not math.isfinite(state.ship.antimatter_capsules)
+                    or state.ship.antimatter_capsules < fuel_cost):
+                event = self._make_event(
+                    state, EventType.BOOT_BLOCKED, Severity.WARN,
+                    SourceRef(kind="ship", id=state.ship.ship_id),
+                    "Travel blocked: insufficient antimatter",
+                    data={"message_key": "boot_blocked", "reason": "insufficient_antimatter",
+                          "fuel_cost": fuel_cost, "fuel_available": state.ship.antimatter_capsules},
+                )
+                self._record_event(state.events, event)
+                return [event]
             fine_km = state.world.fine_ranges_km.get(action.node_id)
             same_sector = False
             from_node = state.world.space.nodes.get(current_id)
@@ -379,11 +438,6 @@ class Engine:
                 if fine_km is None and same_sector and distance_ly <= Balance.LOCAL_TRAVEL_RADIUS_LY:
                     fine_km = self._compute_fine_range_km(state, current_id, action.node_id)
                     state.world.fine_ranges_km[action.node_id] = fine_km
-            is_local = bool(
-                fine_km is not None
-                and same_sector
-                and distance_ly <= Balance.LOCAL_TRAVEL_RADIUS_LY
-            )
             if is_local:
                 travel_s = fine_km / max(0.1, Balance.LOCAL_TRAVEL_SPEED_KM_S)
                 years = travel_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
@@ -391,6 +445,7 @@ class Engine:
                 speed = max(0.001, state.ship.cruise_speed_ly_per_year)
                 years = distance_ly / speed
                 travel_s = years * Balance.YEAR_S
+            state.ship.antimatter_capsules -= fuel_cost
             state.ship.in_transit = True
             state.ship.transit_from = current_id
             state.ship.transit_to = action.node_id
@@ -410,7 +465,7 @@ class Engine:
                 state.ship.op_mode = "CRUISE"
                 state.ship.op_mode_source = "auto"
                 # Apply the cruise power plan behavior (auto-shed systems).
-                targets = ["sensors", "security", "data_core", "drone_bay"]
+                targets = ["sensors", "data_core", "drone_bay"]
                 for sid in targets:
                     sys = state.ship.systems.get(sid)
                     if not sys:
@@ -479,6 +534,8 @@ class Engine:
                     "local": is_local,
                     "distance_km": fine_km,
                     "eta_s": travel_s,
+                    "fuel_cost": fuel_cost,
+                    "fuel_remaining": state.ship.antimatter_capsules,
                 },
             )
             self._record_event(state.events, event)
@@ -578,7 +635,7 @@ class Engine:
 
         if isinstance(action, PowerPlan):
             events: list[Event] = []
-            targets = ["sensors", "security", "data_core", "drone_bay"]
+            targets = ["sensors", "data_core", "drone_bay"]
             if action.mode == "cruise":
                 state.ship.op_mode = "CRUISE"
                 state.ship.op_mode_source = "manual"
@@ -3352,6 +3409,13 @@ class Engine:
                     continue
                 if job.job_type == JobType.ROUTE_SOLVE and route_solve_running:
                     continue
+            required = self._drone_task_reserve_requirement(state, job)
+            if required is not None:
+                events.extend(self._cancel_drone_task_for_return(state, job))
+                events.append(self._drone_reserve_block_event(state, job.owner_id, required))
+                events.extend(self._enqueue_drone_autorecall(state, state.ship.drones[job.owner_id]))
+                continue
+            if job.status == JobStatus.QUEUED:
                 job.status = JobStatus.RUNNING
                 if job.owner_id:
                     running_by_owner.add(job.owner_id)
@@ -3685,13 +3749,83 @@ class Engine:
         if not state.os.god_active:
             drone.battery = max(0.0, drone.battery - amount)
 
+    @staticmethod
+    def _drone_job_battery_cost(job_type: JobType) -> float:
+        """The same lump-sum costs are used for admission and actual debit."""
+        return {
+            JobType.REPAIR_SYSTEM: Balance.DRONE_BATTERY_DRAIN_REPAIR,
+            JobType.REPAIR_DRONE: Balance.DRONE_BATTERY_DRAIN_REPAIR,
+            JobType.INSTALL_MODULE: Balance.DRONE_BATTERY_DRAIN_REPAIR,
+            JobType.UNINSTALL_MODULE: Balance.DRONE_BATTERY_DRAIN_REPAIR,
+            JobType.DEPLOY_DRONE: Balance.DRONE_BATTERY_DRAIN_DEPLOY,
+            JobType.MOVE_DRONE: Balance.DRONE_BATTERY_DRAIN_MOVE,
+            JobType.REBOOT_DRONE: Balance.DRONE_BATTERY_DRAIN_RECALL + Balance.DRONE_BATTERY_DRAIN_REBOOT,
+            JobType.SALVAGE_SCRAP: Balance.DRONE_BATTERY_DRAIN_SALVAGE,
+            JobType.SALVAGE_MODULE: Balance.DRONE_BATTERY_DRAIN_SALVAGE,
+            JobType.SALVAGE_DATA: Balance.DRONE_BATTERY_DRAIN_SALVAGE,
+            JobType.SURVEY_DRONE: Balance.DRONE_BATTERY_DRAIN_SALVAGE,
+            JobType.SALVAGE_DRONE: Balance.DRONE_BATTERY_DRAIN_SALVAGE,
+        }.get(job_type, 0.0)
+
+    def _drone_return_eta(self, state: GameState, drone) -> float:
+        return (Balance.RECALL_TIME_S * self._drone_bay_eta_mult(state)
+                * self._drone_profile(state, drone).move_time_mult_effective)
+
+    def _drone_return_reserve(self, state: GameState, drone) -> float:
+        maximum = self._drone_profile(state, drone).battery_max_effective
+        # One second of slack protects the minimum gate at the next scheduler
+        # boundary; the full return ETA is included even with a slower bay.
+        return max(self._clamp(drone.autorecall_threshold) * maximum,
+                   Balance.DRONE_MIN_BATTERY_FOR_RECALL * maximum
+                   + Balance.DRONE_BATTERY_IDLE_DRAIN_DEPLOYED_PER_S * (self._drone_return_eta(state, drone) + 1.0))
+
+    def _drone_task_reserve_requirement(self, state: GameState, job: Job, *, include_pending: bool = False) -> float | None:
+        drone = state.ship.drones.get(job.owner_id)
+        if (not drone or not drone.autorecall_enabled or state.os.god_active
+                or self._drone_job_battery_cost(job.job_type) <= 0
+                or job.job_type == JobType.REBOOT_DRONE
+                or (drone.status != DroneStatus.DEPLOYED and job.job_type != JobType.DEPLOY_DRONE)):
+            return None
+        work = [job]
+        if include_pending:
+            work += [state.jobs.jobs[key] for key in state.jobs.active_job_ids
+                     if key in state.jobs.jobs and state.jobs.jobs[key].owner_id == drone.drone_id
+                     and state.jobs.jobs[key].status in {JobStatus.QUEUED, JobStatus.RUNNING}
+                     and state.jobs.jobs[key].job_type != JobType.RECALL_DRONE]
+        required = self._drone_return_reserve(state, drone) + sum(
+            self._drone_job_battery_cost(task.job_type)
+            + Balance.DRONE_BATTERY_IDLE_DRAIN_DEPLOYED_PER_S * max(0.0, task.eta_s)
+            for task in work)
+        returning = self._drone_has_active_job(state, drone.drone_id, JobType.RECALL_DRONE)
+        return required if (returning and job.status == JobStatus.QUEUED) or drone.battery + 1e-12 < required else None
+
+    def _drone_reserve_block_event(self, state: GameState, drone_id: str, required: float) -> Event:
+        drone = state.ship.drones[drone_id]
+        maximum = self._drone_profile(state, drone).battery_max_effective
+        return self._make_event(
+            state, EventType.BOOT_BLOCKED, Severity.WARN, SourceRef(kind="drone", id=drone_id),
+            "Drone task blocked: return battery reserve required",
+            data={"message_key": "boot_blocked", "reason": "drone_return_reserve", "drone_id": drone_id,
+                  "battery_percent": self._drone_battery_ratio(state, drone) * 100,
+                  "required_percent": required / max(0.000001, maximum) * 100})
+
+    def _cancel_drone_task_for_return(self, state: GameState, job: Job) -> list[Event]:
+        refunded = self._refund_reserved_repair_scrap(state, job)
+        job.params.pop("awaiting_auto_move_confirmation", None)
+        job.status = JobStatus.CANCELLED
+        return [self._make_job_outcome_event(
+            state, job, EventType.JOB_FAILED, Severity.INFO,
+            SourceRef(kind="drone", id=job.owner_id or ""), "Drone task cancelled for automatic return",
+            data={"message_key": "job_cancelled_autorecall", "drone_id": job.owner_id,
+                  "job_type": job.job_type.value, "scrap_refunded": refunded})]
+
     def _drain_repair_operator_battery(self, state: GameState, job: Job) -> None:
         drone_id = str(job.params.get("drone_id", "") or "")
         if not drone_id:
             return
         drone = state.ship.drones.get(drone_id)
         if drone:
-            self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_REPAIR)
+            self._drain_drone_battery(state, drone, self._drone_job_battery_cost(job.job_type))
 
     def _effective_repair_amount(self, current: float, maximum: float, nominal_amount: float) -> float:
         missing = max(0.0, float(maximum) - float(current))
@@ -4210,7 +4344,7 @@ class Engine:
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
                 drone.status = DroneStatus.DEPLOYED
-                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_DEPLOY)
+                self._drain_drone_battery(state, drone, self._drone_job_battery_cost(job.job_type))
                 if job.target.kind == "world_node":
                     drone.location = DroneLocation(kind="world_node", id=job.target.id)
                 else:
@@ -4242,7 +4376,7 @@ class Engine:
                     drone.location = DroneLocation(kind="world_node", id=job.target.id)
                 else:
                     drone.location = DroneLocation(kind="ship_sector", id=job.target.id)
-                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_MOVE)
+                self._drain_drone_battery(state, drone, self._drone_job_battery_cost(job.job_type))
                 events.append(
                     self._make_job_outcome_event(
                         state,
@@ -4271,8 +4405,7 @@ class Engine:
                 if rng.random() < p_success:
                     drone.status = DroneStatus.DOCKED
                     drone.location = DroneLocation(kind="ship_sector", id=self._drone_bay_sector_id(state))
-                    self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_RECALL)
-                    self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_REBOOT)
+                    self._drain_drone_battery(state, drone, self._drone_job_battery_cost(job.job_type))
                     events.append(
                         self._make_job_outcome_event(
                             state,
@@ -4420,7 +4553,7 @@ class Engine:
             drone_id = job.params.get("drone_id")
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
-                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_SALVAGE)
+                self._drain_drone_battery(state, drone, self._drone_job_battery_cost(job.job_type))
             events.append(
                 self._make_event(
                     state,
@@ -4526,7 +4659,7 @@ class Engine:
             drone_id = job.params.get("drone_id")
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
-                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_SALVAGE)
+                self._drain_drone_battery(state, drone, self._drone_job_battery_cost(job.job_type))
             recompute_node_completion(state, node_id)
             return events
 
@@ -4547,7 +4680,7 @@ class Engine:
             drone_id = job.params.get("drone_id")
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
-                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_SALVAGE)
+                self._drain_drone_battery(state, drone, self._drone_job_battery_cost(job.job_type))
             lore_ctx = self._build_lore_context(state, node_id)
             lore_result = maybe_deliver_lore(state, "salvage_data", lore_ctx, count_trigger=False)
             if count > 0 or lore_result.files or lore_result.events:
@@ -4602,7 +4735,7 @@ class Engine:
             drone_id = job.params.get("drone_id")
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
-                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_SALVAGE)
+                self._drain_drone_battery(state, drone, self._drone_job_battery_cost(job.job_type))
             events.append(
                 self._make_job_outcome_event(
                     state,
@@ -4659,7 +4792,7 @@ class Engine:
             drone_id = job.params.get("drone_id")
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
-                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_SALVAGE)
+                self._drain_drone_battery(state, drone, self._drone_job_battery_cost(job.job_type))
             events.append(
                 self._make_job_outcome_event(
                     state,
@@ -4795,7 +4928,7 @@ class Engine:
             drone_id = job.params.get("drone_id")
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
-                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_REPAIR)
+                self._drain_drone_battery(state, drone, self._drone_job_battery_cost(job.job_type))
             effects: dict = {}
             if module_id and module_id in state.ship.cargo_modules:
                 modules = load_modules()
@@ -4840,7 +4973,7 @@ class Engine:
             drone_id = str(job.params.get("drone_id", "") or "")
             drone = state.ship.drones.get(drone_id) if drone_id else None
             if drone:
-                self._drain_drone_battery(state, drone, Balance.DRONE_BATTERY_DRAIN_REPAIR)
+                self._drain_drone_battery(state, drone, self._drone_job_battery_cost(job.job_type))
             if module_id and module_id in list(state.ship.installed_modules or []):
                 prev_installed = list(state.ship.installed_modules or [])
                 state.ship.installed_modules.remove(module_id)
@@ -5012,7 +5145,7 @@ class Engine:
             if job.status == JobStatus.RUNNING and job.power_draw_kw > 0.0:
                 job_load_kw += job.power_draw_kw
         if state.ship.op_mode == "CRUISE":
-            cruise_shed_targets = {"sensors", "security", "data_core", "drone_bay"}
+            cruise_shed_targets = {"sensors", "data_core", "drone_bay"}
             def _factor(sys: ShipSystem) -> float:
                 if sys.state == SystemState.OFFLINE:
                     return 0.0
@@ -5027,6 +5160,48 @@ class Engine:
                 return 0.1
             return sum(sys.p_effective_kw() * _factor(sys) for sys in systems) + job_load_kw
         return sum(system.p_effective_kw() for system in systems if system.state != SystemState.OFFLINE) + job_load_kw
+
+    @staticmethod
+    def _is_local_hop(state: GameState, from_id: str, to_id: str, distance_ly: float) -> bool:
+        a = state.world.space.nodes.get(from_id)
+        b = state.world.space.nodes.get(to_id)
+        return bool(a and b and distance_ly <= Balance.LOCAL_TRAVEL_RADIUS_LY
+                    and sector_id_for_pos(a.x_ly, a.y_ly, a.z_ly)
+                    == sector_id_for_pos(b.x_ly, b.y_ly, b.z_ly))
+
+    def engine_fuel_cost(self, state: GameState, distance_ly: float) -> float:
+        """Provisional P-TECH-001 price; pure, unrounded capsule equivalents."""
+        if not math.isfinite(distance_ly) or distance_ly < 0.0:
+            raise ValueError("Invalid travel distance")
+        engines = state.ship.systems["engines"]
+        maximum = engines.health_max_effective
+        integrity = self._clamp(engines.health / maximum) if maximum > 0.0 else 0.0
+        modules = load_modules()
+        multiplier = math.prod(
+            float(modules.get(mid, {}).get("effects", {}).get("engine_fuel_mult", 1.0))
+            for mid in sorted(set(state.ship.installed_modules))
+        )
+        return (0.5 + distance_ly / 10.0) * (1.0 + 1.5 * (1.0 - integrity) ** 2) * multiplier
+
+    def estimate_travel_fuel(self, state: GameState, destination_id: str) -> float | None:
+        """Read-only public estimate, restricted to acquired, valid direct routes.
+
+        None means no estimable known hop, rather than a free journey. Does not
+        populate ranges, generate sectors, consume RNG or change navigation.
+        """
+        world = state.world
+        origin = world.current_node_id
+        if (destination_id == origin or "engines" not in state.ship.systems
+                or destination_id not in (world.known_nodes | set(world.known_intel))
+                or destination_id not in world.known_links.get(origin, set())
+                or not is_hop_within_cap(world, origin, destination_id)):
+            return None
+        distance = distance_between_nodes_ly(world, origin, destination_id)
+        if distance is None or not math.isfinite(distance) or distance < 0.0:
+            return None
+        if self._is_local_hop(state, origin, destination_id, distance):
+            return 0.0
+        return self.engine_fuel_cost(state, distance)
 
     def _distance_between_nodes(self, state: GameState, from_id: str, to_id: str) -> float:
         nodes = state.world.space.nodes
@@ -5170,10 +5345,12 @@ class Engine:
                     repair_gain = Balance.DRONE_REPAIR_INTEGRITY_PER_SCRAP * repair_rate_mult
                     drone.integrity = min(profile.integrity_max_effective, drone.integrity + repair_gain)
 
-    def _update_drone_battery_alerts(self, state: GameState) -> list[Event]:
+    def _update_drone_battery_alerts(self, state: GameState, drone_id: str | None = None) -> list[Event]:
         events: list[Event] = []
         threshold = Balance.DRONE_LOW_BATTERY_THRESHOLD
         for drone in state.ship.drones.values():
+            if drone_id is not None and drone.drone_id != drone_id:
+                continue
             battery_ratio = self._drone_battery_ratio(state, drone)
             if battery_ratio <= threshold:
                 if not drone.low_battery_warned:
@@ -5215,11 +5392,13 @@ class Engine:
             if (
                 drone.status == DroneStatus.DEPLOYED
                 and drone.autorecall_enabled
-                and battery_ratio <= max(0.0, min(1.0, drone.autorecall_threshold))
+                and drone.battery <= self._drone_return_reserve(state, drone) + 1e-12
                 and not self._drone_has_active_job(state, drone.drone_id, JobType.RECALL_DRONE)
             ):
                 auto_recall_events = self._enqueue_drone_autorecall(state, drone)
                 events.extend(auto_recall_events)
+            elif not drone.autorecall_enabled or drone.status == DroneStatus.DOCKED or drone.battery > self._drone_return_reserve(state, drone) + 1e-12:
+                drone.autorecall_block_reason = None
         return events
 
     def _has_active_jobs_for_owner(self, state: GameState, owner_id: str) -> bool:
@@ -5247,19 +5426,39 @@ class Engine:
         return False
 
     def _enqueue_drone_autorecall(self, state: GameState, drone) -> list[Event]:
-        if not self._drone_has_min_integrity(state, drone, Balance.DRONE_RECALL_MIN_INTEGRITY):
-            return []
-        if not self._drone_has_min_battery(state, drone, Balance.DRONE_MIN_BATTERY_FOR_RECALL):
-            return []
-        if drone.location.kind == "world_node" and state.ship.docked_node_id != drone.location.id:
+        if drone.status != DroneStatus.DEPLOYED:
             return []
         pre_events: list[Event] = []
+        for key in list(state.jobs.active_job_ids):
+            pending = state.jobs.jobs.get(key)
+            if (pending and pending.owner_id == drone.drone_id and pending.job_type != JobType.RECALL_DRONE
+                    and (pending.status == JobStatus.QUEUED or pending.params.get("awaiting_auto_move_confirmation"))):
+                pre_events.extend(self._cancel_drone_task_for_return(state, pending))
+        reason = None
+        if not self._drone_has_min_integrity(state, drone, Balance.DRONE_RECALL_MIN_INTEGRITY):
+            reason = "drone_autorecall_integrity"
+        elif not self._drone_has_min_battery(state, drone, Balance.DRONE_MIN_BATTERY_FOR_RECALL):
+            reason = "drone_autorecall_battery"
+        elif drone.location.kind == "world_node" and state.ship.docked_node_id != drone.location.id:
+            reason = "drone_autorecall_not_docked"
+        if reason:
+            if drone.autorecall_block_reason != reason:
+                drone.autorecall_block_reason = reason
+                pre_events.append(self._make_event(
+                    state, EventType.BOOT_BLOCKED, Severity.WARN, SourceRef(kind="drone", id=drone.drone_id),
+                    "Automatic drone return blocked",
+                    data={"message_key": "boot_blocked", "reason": reason, "drone_id": drone.drone_id,
+                          "required_battery_percent": Balance.DRONE_MIN_BATTERY_FOR_RECALL * 100,
+                          "required_integrity_percent": Balance.DRONE_RECALL_MIN_INTEGRITY * 100}))
+            return pre_events
+        drone.autorecall_block_reason = None
+        if self._drone_has_active_job(state, drone.drone_id, JobType.RECALL_DRONE):
+            return pre_events
         support_warning = self._emit_drone_bay_support_warning(state, DroneRecall(drone_id=drone.drone_id))
         if support_warning:
             pre_events.append(support_warning)
         bay_state = self._drone_bay_state(state)
-        profile = self._drone_profile(state, drone)
-        eta = Balance.RECALL_TIME_S * self._drone_bay_eta_mult(state) * profile.move_time_mult_effective
+        eta = self._drone_return_eta(state, drone)
         job_key, job_id = allocate_job_ids(state.jobs)
         job = Job(
             job_id=job_id,
@@ -5272,7 +5471,7 @@ class Engine:
             internal_id=job_key,
         )
         state.jobs.jobs[job_key] = job
-        state.jobs.active_job_ids.append(job_key)
+        state.jobs.active_job_ids.insert(0, job_key)
         queued_event = self._make_event(
             state,
             EventType.JOB_QUEUED,
@@ -5648,6 +5847,15 @@ class Engine:
         risk: RiskProfile | None = None,
         power_draw_kw: float = 0.0,
     ) -> list[Event]:
+        candidate = Job("", job_type, JobStatus.QUEUED, eta_s, owner_id=owner_id, target=target, params=params)
+        required = self._drone_task_reserve_requirement(state, candidate, include_pending=True)
+        if required is not None:
+            self._refund_reserved_repair_scrap(state, candidate)
+            events = [self._drone_reserve_block_event(state, owner_id, required)]
+            events.extend(self._enqueue_drone_autorecall(state, state.ship.drones[owner_id]))
+            for event in events:
+                self._record_event(state.events, event)
+            return events
         job_key, job_id = allocate_job_ids(state.jobs)
         job = Job(
             job_id=job_id,

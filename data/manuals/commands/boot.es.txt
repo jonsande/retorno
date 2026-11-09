@@ -1,7 +1,7 @@
 boot <service_name>
 
 Propósito
-- Arrancar un daemon de servicio de subsistema (por ejemplo `sensord`, `datad`, `securityd`, `radiod`).
+- Arrancar un daemon de servicio de subsistema (por ejemplo `sensord`, `datad`, `radiod`).
 
 Requisitos (gating)
 - El servicio debe existir y pertenecer a un subsistema instalado.

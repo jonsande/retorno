@@ -43,8 +43,22 @@ En diseño económico, un concepto fundamental es el coste de oportunidad: aquel
 
 La escasez no es únicamente un obstáculo. Es también el mecanismo que hace que nuestras decisiones importen. Pero tampoco queremos llevarla al extremo. Si los recursos son tan escasos que el jugador solo puede permitirse una estrategia viable, volvemos a perder diversidad de decisiones. Por tanto, tanto la abundancia excesiva como la escasez extrema pueden empobrecer el juego.
 
+- [] Hay que aumentar el coste actual de reparación en scrap. O disminuir el scrap inicial. O ambos.
 
 === SIN CLASIFICAR ===
+
+
+- [] Que el jugador pueda decidir la velocidad de viaje (0.3c o 0.5 si tiene 'engines' en 'nominal', y posibilidad de viajar a 0.8c si tiene el módulo que le permite 'upgraded').
+
+- [] Módulo de menor consumo de antimateria. Y módulo (otro módulo independiente) de más velocidad de viaje (hasta 0.8c)
+
+- [] La nave tiene que tener una capacidad máxima de 4 módulos.
+
+- [] Al inicial el viaje debe sonar un sonido de motores funcionando (más, quizá, una explosión acto seguido).
+
+- [] Un comando para poder auditar el estado de los distintos sistemas. Sería simplemente para mejorar la inmersiónd el juego, sin mayores consecuencias. El estado de los distintos sitemas de la nave (core_os, life_support, sensors, etc.) se considera una abstracción, pero la auditoría técnica puede dar información más detallada (sólo para la sensación de inmersión en el juego) de los problemas que está teniendo cada una de las partes. Por ejemplo auditorías técnicas que revelasen el estado particular del alimentador, la cámara y el sistema de empuje (sin tener que convertirlos necesariamente en tres sistemas independientes). [P.D. Actualmente el comando 'diag' ya está implementado. Decidir si valdría con ampliar ese, o modificar su fucnionamiento; en principoio sería interesante que 'diag' llevara algo de tiempo, y que diera un informe diegético inmersivo más completo.
+
+- [] Virus informáticos! Al hacer uplink puede haber un riesgo de que data_core sea infectado con algún virus (cada uno de esos virus puede tener distintos efectos en la nave, algo así como las maldiciones de un roguelike tradicional). Así mismo habrá que implementar algún módulo que añade función de antivirus. O quizá que la nave tenga desde el principio un servicio de antivirus básico, pero que el módulo lo mejore. O que haya algún consumible (quizá esto sea mejor idea), de un solo uso, que te permite librarte de un solo virus por uso (cada tipo de consumible sirve para un tipo de virus: por ejemplo, un virus que te impide usar los sensores tendría a su vez un "antídoto" que limpia ese virus en particular).	
 
 - [] Ahora mismo los sensores solo sirven para route solve y para scan. Hace falta añadir algún tipo de sensor pasivo o sonar pasivo/activo, que sirva para detectar peligros, para que así la decisión de apagar los sensores (y ganar energía) no sea gratis.
 

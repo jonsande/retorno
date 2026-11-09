@@ -11,5 +11,8 @@ Operational behavior
 Usage notes
 - Run audit after salvage/install operations if values look outdated.
 
+Live fuel telemetry
+- inventory shows antimatter in equivalent capsules directly from the propulsion meter, independent of the scrap/module manifest. cargo audit never resets fuel.
+
 Related commands
 - `inventory`, `inventory update`, `modules`, `jobs`

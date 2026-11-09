@@ -1,0 +1,44 @@
+RESUMEN DE SISTEMA — engines
+Ref: OS-MAN/SYS/ENG-R1
+
+Los motores de antimateria de RETORNO ocupan ENG-R1. Una lectura de integridad representa el conjunto completo.
+
+Función
+- El alimentador de antimateria transfiere y dosifica el contenido de las cápsulas manteniendo el confinamiento.
+- La cámara de aniquilación combina cantidades controladas de materia ordinaria y antimateria, gestionando calor y radiación.
+- El sistema de empuje dirige energía y productos de reacción mediante guiado y tobera magnéticos para producir empuje sublumínico.
+- Los reactivos ordinarios proceden de reservas internas; no requieren un inventario independiente del operador.
+
+Dependencias operativas
+- Los auxiliares eléctricos consumen 0.2 kW en NOMINAL. CRUISE y el apagado automático por carga preservan su alimentación.
+- power_core es una fuente eléctrica de fusión independiente; no consume estas cápsulas.
+- CRG-01 almacena cápsulas con trampas electromagnéticas y alto vacío autónomos, independientes de la red principal.
+- La navegación sigue exigiendo ruta directa conocida, salto máximo de 45 ly, potencia y Core OS válidos y nave desacoplada.
+
+Impacto en comandos por estado
+- OFFLINE, apagado forzado o CRITICAL: salida bloqueada. Usa power on engines o repara según diag engines.
+- DAMAGED o superior: salida permitida si se cumplen los demás requisitos.
+- El desgaste reduce la eficiencia continuamente, incluso dentro de una banda de estado; reparar recupera eficiencia.
+- Los viajes locales no consumen antimateria. Para salidas interestelares la estimación actual es:
+  coste = (0.5 + distancia_ly / 10) * (1 + 1.5 * (1 - integridad_normalizada)^2) * multiplicador_mejora.
+- integridad_normalizada es integridad dividida por máximo efectivo, limitada a 0..1.
+- multiplicador_mejora es 1.0, o 0.8 con engine_efficiency_upgrade_01 instalado.
+- nav map routes muestra cápsulas equivalentes estimadas y reserva disponible para rutas directas conocidas. La confirmación de navegación repite la estimación.
+- El combustible insuficiente bloquea la salida sin cambiar navegación ni consumir combustible. La salida aceptada cobra una vez; nav abort no devuelve combustible ni añade otro cobro.
+- Reserva de un viaje nuevo: 12.0 cápsulas equivalentes. Se conservan las fracciones; el desgaste posterior afecta a futuras salidas, no al combustible ya cobrado.
+
+Síntomas comunes
+- Estimaciones crecientes para la misma ruta indican menor integridad o retirada del módulo de eficiencia.
+- El aislamiento eléctrico, daños críticos o reservas agotadas impiden salir.
+
+Recuperación típica
+- Consulta diag engines, locate engines y power status.
+- Despliega un dron en ENG-R1; drone repair <drone_id> engines utiliza materiales habituales de reparación y restaura integridad global.
+- Restablece la alimentación si está aislado; compara nav map routes tras reparar.
+- Instalar engine_efficiency_upgrade_01 reduce el consumo un 20% a igual integridad. Retirarlo restaura el coste sin mejora; varias copias no acumulan esta mejora.
+- El terminal informa de integridad global del motor; no hay diagnósticos separados de componentes.
+
+Comandos relacionados
+- diag engines, locate engines, power on engines, power status, inventory
+- drone deploy <drone_id> ENG-R1, drone repair <drone_id> engines
+- nav map routes, nav <node_id>, nav abort, man engine_efficiency_upgrade_01

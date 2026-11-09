@@ -1194,6 +1194,9 @@ class RetornoTextualApp(App):
         locale = state.os.locale.value
         current_node = state.world.current_node_id
         dest = getattr(action, "node_id", "?")
+        estimate = repl.fuel_readout(state, dest)
+        if estimate:
+            self._log_line(repl.public_text(state, estimate))
         out = []
         for d in state.ship.drones.values():
             if d.status in {DroneStatus.DEPLOYED, DroneStatus.DISABLED} and d.location.kind == "world_node":

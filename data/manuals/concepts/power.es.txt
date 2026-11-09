@@ -9,7 +9,7 @@ SoC amortigua déficits momentáneos y absorbe excedentes.
 
 P_gen (kW)
 Generación instantánea disponible. Principalmente desde power_core.
-Un P_gen bajo suele indicar daño del núcleo, falta de combustible o limitación de potencia.
+Un P_gen bajo suele indicar daño del núcleo o limitación de potencia. power_core es un reactor compacto de fusión nuclear con reservas internas selladas de larga duración; el operador no gestiona combustible consumible del reactor. Las cápsulas de antimateria alimentan engines, no power_core.
 
 P_load (kW)
 Demanda instantánea de los sistemas activos. Más sistemas en marcha → más carga.

@@ -101,25 +101,18 @@ def create_initial_state_prologue(*, seed: int | None = None) -> GameState:
             k_rad=0.15,
             dependencies=[],
         ),
-        "security": ShipSystem(
-            system_id="security",
-            name="Security",
+        "engines": ShipSystem(
+            system_id="engines",
+            name="Antimatter Engines",
             state=SystemState.NOMINAL,
             health=0.9,
-            sector_id="BRG-01",
-            p_nom_kw=0.5,
-            priority=3,
+            sector_id="ENG-R1",
+            p_nom_kw=0.2,
+            priority=1,
             base_decay_per_s=8.5e-11,
             k_power=0.30,
             k_rad=0.10,
-            dependencies=[
-                Dependency(
-                    dep_type="system_state_at_least",
-                    target_id="energy_distribution",
-                    value=SystemState.NOMINAL.value,
-                )
-            ],
-            service=ServiceState(service_name="securityd", is_running=False, boot_time_s=6),
+            tags={"critical"},
         ),
         "data_core": ShipSystem(
             system_id="data_core",

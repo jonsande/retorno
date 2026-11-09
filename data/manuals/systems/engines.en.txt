@@ -1,0 +1,44 @@
+SYSTEM SUMMARY — engines
+Ref: OS-MAN/SYS/ENG-R1
+
+RETORNO's antimatter engines occupy ENG-R1. One integrity reading covers the whole assembly.
+
+Function
+- The antimatter feeder transfers and meters capsule contents under confinement.
+- The annihilation chamber combines controlled quantities of ordinary matter and antimatter, managing heat and radiation.
+- The propulsion assembly directs reaction energy and products through magnetic guidance and a magnetic nozzle to produce sublight thrust.
+- Ordinary reactants come from internal reserves; they require no separate operator inventory.
+
+Operational dependencies
+- Electrical auxiliaries draw 0.2 kW at NOMINAL. Automatic CRUISE and load shedding preserve their supply.
+- power_core is an independent fusion electricity source; it does not consume these capsules.
+- CRG-01 stores capsules with autonomous electromagnetic traps and high vacuum, independent of the main grid.
+- Navigation still requires a known direct route, a hop within 45 ly, valid ship power and Core OS, and an undocked ship.
+
+Command impact by state
+- OFFLINE, forced off or CRITICAL: departure blocked. Use power on engines or repair as indicated by diag engines.
+- DAMAGED or better: departure allowed when other requirements are met.
+- Wear reduces efficiency continuously, including within a state band; repair recovers efficiency.
+- Local travel consumes no antimatter. For interstellar departures the current estimate is:
+  cost = (0.5 + distance_ly / 10) * (1 + 1.5 * (1 - normalized_integrity)^2) * upgrade_multiplier.
+- normalized_integrity is integrity divided by effective maximum, limited to 0..1.
+- upgrade_multiplier is 1.0, or 0.8 with engine_efficiency_upgrade_01 installed.
+- nav map routes shows estimated capsule equivalents and available reserve for known direct routes. Navigation confirmation repeats the estimate.
+- Insufficient fuel blocks departure without changing navigation or consuming fuel. Accepted departure charges once; nav abort gives no refund and adds no charge.
+- New voyage reserve: 12.0 equivalent capsules. Fractions are retained; subsequent wear affects future departures, not fuel already charged.
+
+Common symptoms
+- Rising estimates for the same route indicate reduced integrity or removal of the efficiency module.
+- Electrical isolation, critical damage or exhausted reserves prevent departure.
+
+Recovery pattern
+- Read diag engines, locate engines and power status.
+- Deploy a drone to ENG-R1; drone repair <drone_id> engines uses ordinary repair materials and restores global integrity.
+- Restore electrical supply if isolated; compare nav map routes after repair.
+- Installing engine_efficiency_upgrade_01 reduces consumption by 20% at the same integrity. Removing it restores the unmodified cost; repeated copies do not compound this improvement.
+- The terminal reports global engine integrity; separate component diagnostics are unavailable.
+
+Related commands
+- diag engines, locate engines, power on engines, power status, inventory
+- drone deploy <drone_id> ENG-R1, drone repair <drone_id> engines
+- nav map routes, nav <node_id>, nav abort, man engine_efficiency_upgrade_01

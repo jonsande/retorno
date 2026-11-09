@@ -18,6 +18,7 @@ Resultados de job
 - En fallo, solo se consume una parte de la chatarra reservada; el resto se reembolsa.
 
 Notas operativas
+- Con autorecall ON, la reparación debe preservar la reserva de retorno del dron operador, incluido trabajo pendiente y consumo en espera. Si no puede hacerlo, se rechaza, se devuelve la chatarra reservada y se solicita autorretorno.
 - La reparación con dron consume batería del operador y chatarra reservada.
 - La auto-reparación es más lenta y más eficiente en chatarra por unidad de salud.
 - En estado crítico de energía, reparar sistemas no críticos está permitido pero con advertencia de riesgo operativo.

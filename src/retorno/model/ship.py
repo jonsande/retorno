@@ -83,6 +83,8 @@ class ShipState:
     # Cargo (truth)
     cargo_scrap: int = 0
     cargo_modules: list[str] = field(default_factory=list)
+    # Metered propulsion reserve; never rounded to whole cargo items.
+    antimatter_capsules: float = 12.0
 
     # Manifest (record)
     manifest_scrap: int = 0

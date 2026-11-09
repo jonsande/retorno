@@ -9,7 +9,7 @@ SoC buffers moment-to-moment deficits and absorbs surpluses.
 
 P_gen (kW)
 Instant generation available to the ship. Primarily from power_core.
-Low P_gen usually means core damage, fuel starvation, or throttling.
+Low P_gen usually means core damage or throttling. power_core is a compact nuclear fusion reactor with sealed long-duration internal fuel reserves; the operator does not manage a consumable reactor fuel. Antimatter capsules feed engines, not power_core.
 
 P_load (kW)
 Instant demand from active systems. More running systems → higher load.

@@ -384,7 +384,7 @@ def test_11_localization_diagnostics_and_dynamic_notices():
         assert f"({hint}: boot radiod)" in rendered and f"({hint}: boot fixture_service)" in rendered
         assert ("Servicio de comunicaciones por radio" if locale==Locale.ES else "Radio Communications Service") in rendered
         assert command(s,"power on comms")==[]
-        for owner_id in ("sensors", "data_core", "security", "comms"):
+        for owner_id in ("sensors", "data_core", "comms"):
             actual = ready()
             actual.os.locale = locale
             command(actual, f"power off {owner_id}")
@@ -423,7 +423,7 @@ def test_12_radio_does_not_consume_rng_or_change_physics():
 
 def test_13_public_prologue_sequence_without_resource_overrides():
     s=create_initial_state_prologue(seed=701)
-    script=["power off security","power off data_core","drone deploy D1 PWR-A1",
+    script=["power off data_core","drone deploy D1 PWR-A1",
             "drone repair D1 power_core","drone repair D1 power_core","drone repair D1 power_core",
             "drone move D1 BUS-A2","drone repair D1 energy_distribution","drone repair D1 energy_distribution",
             "drone move D1 BRG-01","drone repair D1 comms",

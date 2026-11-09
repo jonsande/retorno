@@ -164,7 +164,6 @@ def test_public_journey():
                 return result
 
             # From here onwards no relocation, repair, RNG, balance or pool edits.
-            do("power off security")
             do("dock ECHO_7")
             do("wait 60")
             assert state.ship.docked_node_id == "ECHO_7"

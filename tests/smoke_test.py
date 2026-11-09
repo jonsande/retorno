@@ -39,7 +39,8 @@ def main() -> None:
     assert state.ship.systems["energy_distribution"].sector_id == "BUS-A2"
     assert state.ship.systems["core_os"].sector_id == "BRG-01"
     assert state.ship.systems["data_core"].sector_id == "BRG-01"
-    assert state.ship.systems["security"].sector_id == "BRG-01"
+    assert "security" not in state.ship.systems
+    assert state.ship.systems["engines"].sector_id == "ENG-R1"
     assert state.ship.systems["sensors"].sector_id == "SNS-R1"
     assert state.ship.systems["drone_bay"].sector_id == "DRN-BAY"
 

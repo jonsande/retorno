@@ -519,8 +519,10 @@ node intel with confidence 0.4.
 
 Scan and route solve reserve no specific energy draw in their `Job`. Elapsed
 time still runs the general power, degradation, and radiation model. Starting
-travel with automatic `CRUISE` switches off sensors, security, `data_core`, and
+travel with automatic `CRUISE` switches off sensors, `data_core`, and
 `drone_bay`, which may fail active scan or route-solve jobs on the next tick.
+
+Propulsion now also requires operational `engines` and sufficient antimatter. Read-only estimates appear in `nav map routes`; see [Engines and antimatter](engines-antimatter.md).
 
 ## 6. Navigation and travel
 

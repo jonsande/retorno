@@ -45,6 +45,16 @@ Comportamiento operativo
 - El mantenimiento en bahia (carga/reparacion pasiva) respeta maximos efectivos (`battery_max_effective`, `integrity_max_effective`).
 - El ETA de `drone salvage scrap` escala por carga solicitada frente a capacidad de carga efectiva del dron.
 
+Autorretorno y reserva de batería
+- Con autorecall ON, cada nueva tarea de despliegue, movimiento, reparación, módulos de nave, survey o salvage debe dejar energía para el umbral configurado y un retorno seguro. Se incluyen trabajo pendiente, duración restante, consumo en espera, capacidad efectiva de batería y modificadores de bahía/movimiento.
+- La admisión se comprueba inmediatamente, incluso con el tiempo DEBUG pausado, y de nuevo al iniciar trabajo. Cambios posteriores de batería o equipo pueden detener trabajo inacabado inseguro antes de su descuento de tarea.
+- Rechazar una tarea solicita retorno anticipado. Se cancelan las tareas pendientes de ese dron y se devuelve íntegra la chatarra de reparación reservada. El trabajo activo seguro termina antes del retorno; ningún trabajo adicional se adelanta a este.
+- El retorno es un único trabajo normal de recall, no un acoplamiento instantáneo. En DEBUG necesita wait para avanzar. Las esperas largas siguen comprobando umbrales de batería y límites de trabajos relevantes.
+- Un umbral configurado inferior al mínimo de retorno se eleva internamente para proteger el mínimo de batería, la duración estimada del regreso y un breve margen de planificación.
+- drone status muestra un bloqueo de autorretorno si falta batería o integridad, o si la nave no está acoplada en la instalación de un dron externo. Los bloqueos idénticos repetidos no saturan el registro.
+- autorecall OFF permite asumir riesgo deliberado bajo los requisitos normales de las tareas. No se aplica reserva protectora al reinicio de recuperación ni a operaciones sin consumo sobre un dron en bahía. El modo dios no reserva batería para consumos que evita.
+- Esta protección no recupera energía ya gastada ni evita requisitos de integridad, acoplamiento o éxito del retorno.
+
 Bloqueos frecuentes
 - `drone_not_in_bay` en install/uninstall de modulo de dron si el objetivo no esta acoplado en bahia.
 - `drone_bay_install_offline` cuando el soporte de bahia esta offline.

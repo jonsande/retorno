@@ -1,10 +1,10 @@
 SYSTEM SUMMARY — power_core
 Ref: OS-MAN/SYS/CORE-PWR
 
-`power_core` is RETORNO's primary electrical generation source.
+`power_core` is RETORNO's compact nuclear fusion reactor. Its sealed internal fuel reserves support long-duration operation without an operator-managed consumable fuel. Antimatter capsules supply engines independently.
 
 Function
-- Converts reactor resources into ship-usable electrical output.
+- Converts fusion energy into ship-usable electrical output.
 - Provides baseline generation for all downstream subsystems.
 
 Output profile by state

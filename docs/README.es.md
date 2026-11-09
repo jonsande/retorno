@@ -20,6 +20,8 @@ Versión inglesa: [README.md](README.md)
 
 | Documento | Finalidad | Estado |
 | --- | --- | --- |
+| [Autorretorno preventivo de drones](systems/drone-autorecall.es.md) | Admisión con reserva de batería, prioridad de retorno y diagnóstico público de bloqueos. | Implementado; reglas compartidas CLI/Textual. |
+| [Motores y antimateria](systems/engines-antimatter.es.md) | Integridad de propulsión, consumo de cápsulas, módulo de eficiencia e interfaces públicas compartidas. | Implementado con balance provisional de CANON v0.5.0. |
 | [Universo físico y generación procedural](systems/world-generation.es.md) | Referencia canónica del modelo espacial, regiones, sectores, worldgen, topología, contenido authored y determinismo. | **Verificado** para la integración 4D-3e2 en el árbol basado en `5cdde28`, pendiente de revisión externa. Documenta las lagunas conocidas y el efecto materializador del diagnóstico de sector; no cubre en profundidad navegación, lore o failsafes. |
 | [Physical universe and procedural generation](systems/world-generation.md) | Pareja inglesa de la referencia de universo y worldgen. | **Verificado**; se mantiene como pareja lingüística del documento español. |
 | [Descubrimiento, navegación e intel](systems/discovery-navigation-intel.es.md) | Referencia canónica del conocimiento del jugador, scan, route solve, uplink, importación de intel, viaje, protección narrativa y failsafes. | **Verificado** contra código productivo y pruebas específicas, incluidas las caracterizaciones reparadas de breadcrumb y route solve por id físico no descubierto; actualmente no hay arcos activos. |

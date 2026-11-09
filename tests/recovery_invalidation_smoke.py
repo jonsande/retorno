@@ -106,19 +106,9 @@ def test_02_v2_withdrawn_archive_persists_without_injection():
     assert all(not pool.injected_files for pool in s.world.node_pools.values())
 
 
-def test_03_real_legacy_invalid_boundary_keeps_everything_and_searches():
+def test_03_pre_engines_legacy_boundary_is_rejected_without_rewrite():
     raw = LEGACY.read_bytes()
-    s = save_load.load_single_slot(LEGACY).state
-    plan = next(iter(s.world.recovery_plans.values()))
-    first_link(s, plan)
-    at(s, 'B')
-    rec.advance_recovery_plans(s)
-    assert plan.stage == 1 and plan.invalidation[0] == 'stage_unprepared'
-    s, plan = roundtrip_inactive(s, plan)
-    rec.request_recovery(s, plan.proposal.block, 'C')
-    assert s.world.recovery_searches[plan.proposal.block]['status'] != 'search_pending'
-    assert not any(p.status in rec.ACTIVE for p in s.world.recovery_plans.values())
-    assert len(s.world.radio_opportunities) == 1 and radio.retry_radio_opportunities(s) == []
+    reject(lambda: save_load.load_single_slot(LEGACY))
     assert LEGACY.read_bytes() == raw
 
 

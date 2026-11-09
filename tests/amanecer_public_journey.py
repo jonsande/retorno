@@ -72,7 +72,7 @@ def travel(ident):
 
 read = set()
 try:
-    for text in ['power off security','power off data_core','drone deploy D1 PWR-A1',
+    for text in ['power off data_core','drone deploy D1 PWR-A1',
                  'drone repair D1 power_core','drone repair D1 power_core','drone repair D1 power_core',
                  'drone move D1 BUS-A2','drone repair D1 energy_distribution','drone repair D1 energy_distribution',
                  'drone move D1 BRG-01','drone repair D1 comms','drone recall D1',

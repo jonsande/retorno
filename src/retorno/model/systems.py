@@ -94,6 +94,8 @@ def build_communications_system() -> ShipSystem:
 
 
 def system_name_for_locale(system: ShipSystem, locale: str) -> str:
+    if system.system_id == "engines":
+        return "Motores de antimateria" if locale == "es" else "Antimatter Engines"
     if system.system_id == "comms" and locale == "es":
         return "Sistema de comunicaciones"
     return system.name
@@ -104,7 +106,6 @@ def service_name_for_locale(service: ServiceState, locale: str) -> str:
         "radiod": ("Radio Communications Service", "Servicio de comunicaciones por radio"),
         "sensord": ("Sensor Service", "Servicio de sensores"),
         "datad": ("Data Service", "Servicio de datos"),
-        "securityd": ("Security Service", "Servicio de seguridad"),
         "core_os": ("Core OS", "Sistema operativo central"),
     }
     return names.get(service.service_name, (service.service_name, service.service_name))[locale == "es"]

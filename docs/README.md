@@ -20,6 +20,8 @@ Spanish version: [README.es.md](README.es.md)
 
 | Document | Purpose | Status |
 | --- | --- | --- |
+| [Preventive drone autorecall](systems/drone-autorecall.md) | Battery reserve admission, return priority and public block diagnostics. | Implemented; shared CLI/Textual rules. |
+| [Engines and antimatter](systems/engines-antimatter.md) | Propulsion integrity, capsule consumption, efficiency module and shared public controls. | Implemented with provisional CANON v0.5.0 balance. |
 | [Physical universe and procedural generation](systems/world-generation.md) | Canonical reference for the spatial model, regions, sectors, worldgen, topology, authored content, and determinism. | **Verified** for 4D-3e2 in the working tree based on `5cdde28`, pending external review. It records known gaps and the sector diagnostic's materializing effect; it does not fully cover navigation, lore, or failsafes. |
 | [Universo físico y generación procedural](systems/world-generation.es.md) | Spanish counterpart of the universe and worldgen reference. | **Verified**; maintained as a language pair with the English document. |
 | [Discovery, navigation, and intel](systems/discovery-navigation-intel.md) | Canonical reference for player knowledge, scan, route solve, uplink, intel import, travel, narrative protection, and failsafes. | **Verified** against production code and focused tests, including repaired breadcrumb and exact-undiscovered-physical-id route-solve characterizations; no arcs are currently active. |

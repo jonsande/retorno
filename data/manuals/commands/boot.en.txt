@@ -1,7 +1,7 @@
 boot <service_name>
 
 Purpose
-- Boot a subsystem service daemon (for example `sensord`, `datad`, `securityd`, `radiod`).
+- Boot a subsystem service daemon (for example `sensord`, `datad`, `radiod`).
 
 Requirements (gating)
 - Service must exist and belong to an installed ship subsystem.

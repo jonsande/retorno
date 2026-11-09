@@ -56,6 +56,7 @@ def build_power_lines(state) -> list[str]:
         f"P_gen={p.p_gen_kw:.2f}kW  P_load={p.p_load_kw:.2f}kW  net={net:+.2f}kW  SoC={soc:.2f}  Q={p.power_quality:.2f}"
         f" | hull={ship.hull_integrity:.2f}"
         f" | rad env={env_rad:.4f}rad/s internal={internal_rad:.4f}rad/s"
+        f" | {repl.fuel_readout(state)}"
     ]
 
 

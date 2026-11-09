@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 import os
 import pickle
 import re
@@ -123,6 +124,9 @@ def _pack_state(state: GameState) -> bytes:
     try:
         if state.meta.save_version != 3:
             raise ValueError("save schema")
+        if ("engines" not in state.ship.systems or "security" in state.ship.systems
+                or not math.isfinite(state.ship.antimatter_capsules) or state.ship.antimatter_capsules < 0):
+            raise ValueError("Invalid engines/fuel state / Estado de motores/combustible no válido")
         from retorno.worldgen.generator import pin_universe, validate_universe_state
         from retorno.worldgen.narrative import validate_catalog
         validate_catalog(state)
@@ -184,6 +188,9 @@ def _load_from_file(path: Path) -> GameState:
     try:
         from retorno.worldgen.generator import validate_universe_state
         from retorno.worldgen.narrative import validate_catalog
+        if ("engines" not in loaded.ship.systems or "security" in loaded.ship.systems
+                or not math.isfinite(loaded.ship.antimatter_capsules) or loaded.ship.antimatter_capsules < 0):
+            raise ValueError("Incompatible engines/fuel state / Estado de motores/combustible incompatible")
         if not loaded.world.narrative_snapshot:
             raise ValueError("Narrative catalog snapshot missing / Falta el snapshot del catálogo narrativo")
         validate_catalog(loaded)

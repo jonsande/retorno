@@ -20,7 +20,7 @@ Sectores internos canónicos de RETORNO
 - `LFS-01`: Soporte Vital
 - `PWR-A1`: Nucleo de Potencia
 - `BUS-A2`: Distribucion de Energia
-- `ENG-R1`: Sala de máquinas / Propulsión (reservado)
+- `ENG-R1`: Sala de máquinas / Propulsión — engines
 - `BRG-01`: Puente / Mando
 - `SNS-R1`: Sala de Sensores
 - `DRN-BAY`: Bahia de Drones

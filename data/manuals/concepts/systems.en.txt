@@ -76,7 +76,7 @@ energy_distribution
   - CRITICAL: stronger Q penalty.
   - OFFLINE: distribution collapse; non-critical systems are pushed to OFFLINE automatically.
   - OFFLINE: no effective bay support (no drone charging/decon/passive repair).
-- Note: formal boot dependency for sensors, security, and data_core at >= nominal.
+- Note: formal boot dependency for sensors, comms, and data_core at >= nominal.
 
 data_core
 - What it is: data nucleus and inventory/navdb services (datad).
@@ -101,11 +101,12 @@ drone_bay
   - OFFLINE: normal deploy blocked; install blocked; emergency deploy only.
   - energy_distribution OFFLINE: passive bay support is disabled even if drone_bay is online.
 
-security
-- What it is: security layer/securityd service (prepared for future rules).
-- Consequences:
-  - Currently it does not directly block gameplay commands by itself, but its state still affects load/survival margins.
-  - Requires energy_distribution >= nominal to boot securityd.
+engines
+- Antimatter propulsion assembly in ENG-R1; one global integrity reading.
+- OFFLINE, forced off or CRITICAL blocks departure; DAMAGED or better can travel.
+- Wear increases capsule consumption; drone repair restores efficiency.
+- nav map routes reports cost and reserve; engine_efficiency_upgrade_01 reduces cost by 20% without changing integrity.
+- CRUISE preserves engine electrical auxiliaries. See man engines.
 
 Global cross-system effects
 - Critical power state (Q collapse, brownout, core_os critical, or energy_distribution offline):
@@ -120,7 +121,7 @@ Base note: except for emergency/minimal-terminal exceptions, all commands depend
 - about -> core_os.
 - alerts -> core_os.
 - auth -> core_os; auth recover requires data_core >= limited + datad running + Q >= 0.55.
-- boot -> target system (service host) + system dependencies (for example energy_distribution >= nominal for datad/sensord/securityd).
+- boot -> target system (service host) + system dependencies (for example energy_distribution >= nominal for datad/sensord/radiod).
 - cargo -> core_os (inventory alias).
 - cat -> core_os.
 - config -> core_os.

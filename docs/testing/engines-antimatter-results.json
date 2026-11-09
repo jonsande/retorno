@@ -1,0 +1,472 @@
+{
+  "base_commit": "bc95cae37c04c4cd20f9e205558766bb8bdbb066",
+  "interpreter": "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+  "script_suite": {
+    "total": 83,
+    "passed": 65,
+    "failed": 18
+  },
+  "baseline_script_suite": {
+    "total": 82,
+    "passed": 61,
+    "failed": 21
+  },
+  "new_integration_groups": 12,
+  "pytest_default": {
+    "passed": 17,
+    "subtests_passed": 14
+  },
+  "scripts": [
+    {
+      "script": "amanecer_productive_integration.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "amanecer_public_journey.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "audio_config_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "authored_closing_shift_integration.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "AssertionError",
+      "baseline_failure": "AssertionError"
+    },
+    {
+      "script": "bilingual_salvage_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "config_audio_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "contacts_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "deadnode_chain_detours_smoke.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "AssertionError",
+      "baseline_failure": "AssertionError"
+    },
+    {
+      "script": "deadnode_chain_planner_smoke.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "AssertionError",
+      "baseline_failure": "AssertionError"
+    },
+    {
+      "script": "deadnode_cooldown_zero_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "deadnode_opportunity_selection_smoke.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "AttributeError: 'types.SimpleNamespace' object has no attribute 'os'",
+      "baseline_failure": "AttributeError: 'types.SimpleNamespace' object has no attribute 'os'"
+    },
+    {
+      "script": "debug_add_commands_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "debug_galaxy_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "debug_god_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "debug_lore_arcs_smoke.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "AssertionError: Active runtime data must not load template arcs",
+      "baseline_failure": "AssertionError: Active runtime data must not load template arcs"
+    },
+    {
+      "script": "debug_worldgen_graph_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "drone_completion_context_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "drone_modular_v1_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "drone_recall_all_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "drone_salvage_survey_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "energy_policy_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "engines_antimatter_smoke.py",
+      "code": 0,
+      "baseline_code": null
+    },
+    {
+      "script": "exploration_recovery_smoke.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "ValueError: Speed must be finite and satisfy 0 <= beta < 1",
+      "baseline_failure": "ValueError: Speed must be finite and satisfy 0 <= beta < 1"
+    },
+    {
+      "script": "fast_sandbox_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "forced_hidden_ad_hoc_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "galaxy_physical_model_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "hibernate_radiation_wake_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "historical_information_smoke.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "AssertionError",
+      "baseline_failure": "AssertionError"
+    },
+    {
+      "script": "historical_radio_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "information_capabilities_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "intel_recent_order_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "job_id_numbering_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "knowledge_boundary_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "known_routes_integrity_smoke.py",
+      "code": 0,
+      "baseline_code": 1
+    },
+    {
+      "script": "lore_channel_preference_and_unlock_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "lore_distance_from_start_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "lore_relative_placement_integration.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "lore_secondary_count_weights_hard_smoke.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "- hard_force_constraints_and_no_relax: AssertionError:",
+      "baseline_failure": "- hard_force_constraints_and_no_relax: AssertionError:"
+    },
+    {
+      "script": "lore_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "mail_metadata_and_log_header_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "manuals_style_check.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "narrative_world_integration_smoke.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "AssertionError",
+      "baseline_failure": "AssertionError"
+    },
+    {
+      "script": "nav_abort_waypoint_cleanup_smoke.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "ValueError: Historical universe seed/version changed",
+      "baseline_failure": "ValueError: Historical universe seed/version changed"
+    },
+    {
+      "script": "nav_map_galaxy_dependencies_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "nav_map_galaxy_determinism_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "nav_map_galaxy_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "passive_communications_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "procedural_radiation_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "prologue_chain_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "prologue_navigation_policy_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "public_location_ids_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "radiation_hull_smoke.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "AssertionError: []",
+      "baseline_failure": "AssertionError: []"
+    },
+    {
+      "script": "radio_spacetime_smoke.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "AssertionError",
+      "baseline_failure": "AssertionError"
+    },
+    {
+      "script": "recovery_invalidation_smoke.py",
+      "code": 0,
+      "baseline_code": 1
+    },
+    {
+      "script": "recovery_provenance_smoke.py",
+      "code": 0,
+      "baseline_code": 1
+    },
+    {
+      "script": "route_hop_cap_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "route_solve_out_of_range_origins_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "save_load_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "scan_job_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "scan_observation_memory_smoke.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "ValueError: Historical universe seed/version changed",
+      "baseline_failure": "ValueError: Historical universe seed/version changed"
+    },
+    {
+      "script": "sector_intel_validation_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "sensor_detection_factor_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "ship_layout_output_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "ship_survey_radiation_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "smoke_test.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "structural_recovery_smoke.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "AssertionError",
+      "baseline_failure": "AssertionError"
+    },
+    {
+      "script": "test_cruise_speed.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "test_temporal_clocks.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "textual_active_jobs_job_id_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "textual_command_spacing_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "textual_completion_context_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "textual_theme_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "time_advance_performance_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "transit_radiation_progression_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "uplink_authored_and_failsafe_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "uplink_once_per_node_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "uplink_only_delivery_retry_smoke.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "AssertionError",
+      "baseline_failure": "AssertionError"
+    },
+    {
+      "script": "worldgen_manifest_integration_smoke.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "ValueError: Historical universe seed/version changed",
+      "baseline_failure": "ValueError: Historical universe seed/version changed"
+    },
+    {
+      "script": "worldgen_manifest_prototype_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "worldgen_modules_pool_smoke.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "ValueError: Historical universe seed/version changed",
+      "baseline_failure": "ValueError: Historical universe seed/version changed"
+    },
+    {
+      "script": "worldgen_preexistence_catalog_smoke.py",
+      "code": 1,
+      "baseline_code": 1,
+      "failure": "ValueError: Historical universe seed/version changed",
+      "baseline_failure": "ValueError: Historical universe seed/version changed"
+    },
+    {
+      "script": "worldgen_preexistence_characterization_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    },
+    {
+      "script": "worldgen_sparse_archetypes_smoke.py",
+      "code": 0,
+      "baseline_code": 0
+    }
+  ]
+}

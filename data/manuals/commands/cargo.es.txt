@@ -11,5 +11,8 @@ Comportamiento operativo
 Notas de uso
 - Ejecuta audit tras salvage/install si los valores no cuadran.
 
+Telemetría de combustible
+- inventory muestra antimateria en cápsulas equivalentes directamente del contador de propulsión, independiente del manifiesto de chatarra/módulos. cargo audit nunca restablece el combustible.
+
 Comandos relacionados
 - `inventory`, `inventory update`, `modules`, `jobs`

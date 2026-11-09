@@ -8,6 +8,7 @@ Function
 - Maintains bus quality and suppresses instability propagation.
 
 Operational dependencies
+- engines auxiliary supply is preserved by automatic shedding and CRUISE; monitor its load in power status.
 - Multiple subsystem boots require distribution at nominal-grade state.
 - Distribution OFFLINE triggers protective shutdown behavior for non-critical systems.
 

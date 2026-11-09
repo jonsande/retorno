@@ -1,4 +1,15 @@
 {
+  "engine_efficiency_upgrade_01": {
+    "scope": "ship",
+    "name": "Engine Efficiency Upgrade",
+    "name_en": "Engine Efficiency Upgrade",
+    "name_es": "Mejora de eficiencia de motores",
+    "desc_en": "Reduces interstellar antimatter consumption by 20% without changing engine integrity.",
+    "desc_es": "Reduce el consumo interestelar de antimateria un 20% sin cambiar la integridad del motor.",
+    "scrap_cost": 18,
+    "pool": "rare",
+    "effects": { "engine_fuel_mult": 0.8 }
+  },
   "bus_stabilizer": {
     "scope": "ship",
     "name": "Bus Stabilizer",

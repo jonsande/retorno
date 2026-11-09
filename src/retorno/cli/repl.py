@@ -92,6 +92,7 @@ from retorno.model.world import (
     sector_id_for_pos,
 )
 from retorno.model.world import SpaceNode, region_for_pos
+
 from retorno.worldgen.generator import (
     _parse_sector_id,
     ensure_sector_generated,
@@ -104,6 +105,21 @@ from retorno.cli.location_ids import (
     resolve_public_id, resolve_public_path,
 )
 
+
+_AUTORECALL_BLOCK_MESSAGES = {
+    "drone_autorecall_battery": {
+        "en": "Autorecall blocked for {drone_id}: insufficient battery for return (minimum {required_battery_percent:.0f}%).",
+        "es": "Autorretorno bloqueado para {drone_id}: batería insuficiente para volver (mínimo {required_battery_percent:.0f}%).",
+    },
+    "drone_autorecall_integrity": {
+        "en": "Autorecall blocked for {drone_id}: insufficient integrity for return (minimum {required_integrity_percent:.0f}%).",
+        "es": "Autorretorno bloqueado para {drone_id}: integridad insuficiente para volver (mínimo {required_integrity_percent:.0f}%).",
+    },
+    "drone_autorecall_not_docked": {
+        "en": "Autorecall blocked for {drone_id}: the ship must dock at the drone's installation.",
+        "es": "Autorretorno bloqueado para {drone_id}: la nave debe acoplarse en la instalación del dron.",
+    },
+}
 
 @dataclass
 class HibernateRunResult:
@@ -405,11 +421,11 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ),
                 ("nav map graph [node_id]", "show known route graph", "muestra grafo de rutas conocido"),
                 ("nav map path <node_id>", "show best known path", "muestra mejor camino conocido"),
-                ("nav map routes", "list direct operational routes", "lista rutas operativas directas"),
+                ("nav map routes", "list direct routes and antimatter estimates", "lista rutas directas y estimaciones de antimateria"),
                 ("nav map contacts", "list known contacts", "lista contactos conocidos"),
-                ("nav <node_id>", "start transit to node", "inicia tránsito al nodo"),
+                ("nav <node_id>", "start transit with operational engines and sufficient antimatter", "inicia tránsito con motores operativos y antimateria suficiente"),
                 ("nav --no-cruise <node_id>", "start transit without cruise profile", "inicia tránsito sin perfil cruise"),
-                ("nav abort", "stop at current position; explore or solve another route", "detente en la posición actual; explora o resuelve otra ruta"),
+                ("nav abort", "stop at current position; no fuel refund or extra charge", "detente en la posición actual; sin devolución ni cobro adicional de combustible"),
                 ("dock <node_id>", "dock at current node", "acopla en nodo actual"),
                 ("undock", "undock from current node", "desacopla del nodo actual"),
                 ("uplink", "pull route intel from docked hub", "extrae intel de rutas desde hub acoplado"),
@@ -449,7 +465,7 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ("drone deploy! <drone_id> [sector_id]", "emergency deploy override", "despliegue de emergencia"),
                 ("drone move <drone_id> <target_id>", "move drone to target", "mueve dron a objetivo"),
                 ("drone survey <drone_id> [node_id]", "survey salvage signatures at node", "inspecciona señales de salvage en nodo"),
-                ("drone autorecall <drone_id> on", "enable automatic recall", "activa autorretorno"),
+                ("drone autorecall <drone_id> on", "protect return reserve and enable automatic recall", "protege reserva de retorno y activa autorretorno"),
                 ("drone autorecall <drone_id> off", "disable automatic recall", "desactiva autorretorno"),
                 ("drone autorecall <drone_id> <percent>", "set recall battery threshold", "ajusta umbral de batería para retorno"),
                 ("drone repair <drone_id> <target_id>", "repair target with drone", "repara objetivo con dron"),
@@ -826,8 +842,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
     }
     travel_templates = {
         "travel_started": {
-            "en": "[{sev}] travel_started :: To {to} dist={distance_ly:.2f}ly ETA={eta} (hint: nav abort)",
-            "es": "[{sev}] travel_started :: A {to} dist={distance_ly:.2f}ly ETA={eta} (pista: nav abort)",
+            "en": "[{sev}] travel_started :: To {to} dist={distance_ly:.2f}ly ETA={eta} antimatter cost={fuel_cost} remaining={fuel_remaining} equivalent capsules (hint: nav abort)",
+            "es": "[{sev}] travel_started :: A {to} dist={distance_ly:.2f}ly ETA={eta} antimateria coste={fuel_cost} restante={fuel_remaining} cápsulas equivalentes (pista: nav abort)",
         },
         "arrived": {
             "en": "[{sev}] arrived :: Arrived at {to} (from {from})",
@@ -920,8 +936,23 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             parts.append(f"E_batt_max+{float(effects['e_batt_bonus_kwh']):.2f}kWh")
         if "power_quality_offset" in effects:
             parts.append(f"Q+{float(effects['power_quality_offset']):.2f}")
+        if "engine_fuel_mult" in effects:
+            parts.append(_format_module_effect("engine_fuel_mult", effects["engine_fuel_mult"], locale))
         return ", ".join(parts)
     boot_blocked_reasons = {
+        **_AUTORECALL_BLOCK_MESSAGES,
+        "drone_return_reserve": {
+            "en": "Task blocked for {drone_id}: battery {battery_percent:.1f}%; at least {required_percent:.1f}% needed for pending work and return reserve. Automatic return requested.",
+            "es": "Tarea bloqueada para {drone_id}: batería {battery_percent:.1f}%; necesita al menos {required_percent:.1f}% para trabajo pendiente y reserva de retorno. Se solicita autorretorno.",
+        },
+        "engines_unavailable": {
+            "en": "Travel blocked: engines must be powered and at least DAMAGED. Use diag engines, power on engines or drone repair <drone_id> engines.",
+            "es": "Viaje bloqueado: engines debe estar alimentado y al menos DAMAGED. Usa diag engines, power on engines o drone repair <drone_id> engines.",
+        },
+        "insufficient_antimatter": {
+            "en": "Travel blocked: insufficient antimatter; cost={fuel_cost}, available={fuel_available} equivalent capsules.",
+            "es": "Viaje bloqueado: antimateria insuficiente; coste={fuel_cost}, disponible={fuel_available} cápsulas equivalentes.",
+        },
         "service_owner_unavailable": {
             "en": "Boot blocked: {service} requires its powered, recoverable owner; use diag comms for radiod.",
             "es": "Arranque bloqueado: {service} necesita su sistema propietario alimentado y recuperable; usa diag comms para radiod.",
@@ -1347,6 +1378,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "job_cancelled": {
             "en": "Job cancelled: {job_id}",
             "es": "Trabajo cancelado: {job_id}",
+        },
+        "job_cancelled_autorecall": {
+            "en": "Job {job_id} cancelled for {drone_id}'s automatic return; refunded {scrap_refunded} scrap.",
+            "es": "Trabajo {job_id} cancelado para el autorretorno de {drone_id}; devuelta chatarra: {scrap_refunded}.",
         },
     }
     def _safe_format(tmpl: str, payload: dict) -> str:
@@ -2087,6 +2122,10 @@ def render_status(state) -> None:
         Balance.RAD_LEVEL_INTERNAL_EXTREME,
     )
     print(f"hull: {ship.hull_integrity:.2f}")
+
+    engines = ship.systems.get("engines")
+    if engines:
+        print(f"engines: {engines.p_effective_kw():.2f} kW")
     print(
         "radiation: "
         f"env={env_rad:.4f}rad/s ({_radiation_level_label(locale, env_level)}) "
@@ -2148,6 +2187,7 @@ def render_status(state) -> None:
     disp_scrap, disp_modules, dirty = _inventory_view(ship)
     dirty_suffix = " [manifest stale]" if dirty else ""
     print(f"inventory: scrap={disp_scrap} modules={len(disp_modules)}{dirty_suffix}")
+    print(fuel_readout(state))
     if disp_modules:
         counts: dict[str, int] = {}
         for mid in disp_modules:
@@ -2198,6 +2238,9 @@ def render_power_status(state) -> None:
     print(f"Battery={p.e_batt_kwh:.3f}/{p.e_batt_max_kwh:.3f} kWh (SoC={soc:.2f})")
     print(f"Quality={p.power_quality:.2f}  DeficitRatio={p.deficit_ratio:.2f}  Brownout={p.brownout}")
     print(f"hull: {ship.hull_integrity:.2f}")
+    engines = ship.systems.get("engines")
+    if engines:
+        print(f"engines: {engines.p_effective_kw():.2f} kW")
 
 
 @public_output
@@ -2403,12 +2446,16 @@ def render_drone_status(state, drone_id: str | None = None) -> None:
             f"mods={len(installed_modules)}{modules_suffix} "
             f"autorecall={ar_mode}@{ar_threshold}%"
         )
+        if d.autorecall_block_reason in _AUTORECALL_BLOCK_MESSAGES:
+            print("  " + _AUTORECALL_BLOCK_MESSAGES[d.autorecall_block_reason][locale].format(
+                drone_id=did, required_battery_percent=Balance.DRONE_MIN_BATTERY_FOR_RECALL * 100,
+                required_integrity_percent=Balance.DRONE_RECALL_MIN_INTEGRITY * 100))
         if drone_id is not None and installed_modules:
             label = "módulos instalados" if locale == "es" else "installed modules"
             print(f"  {label}:")
             for mid, count in sorted(module_counts.items()):
                 info = modules.get(mid, {})
-                name = str(info.get("name", mid))
+                name = str(info.get(f"name_{locale}", info.get("name", mid)))
                 suffix = f" x{count}" if count > 1 else ""
                 print(f"  - {name}{suffix} [{mid}]")
 
@@ -2425,25 +2472,33 @@ def _set_drone_autorecall(state, drone_id: str, enabled: bool | None = None, thr
         return
     if enabled is not None:
         drone.autorecall_enabled = bool(enabled)
+        if not enabled:
+            drone.autorecall_block_reason = None
         mode = "on" if drone.autorecall_enabled else "off"
         msg = {
             "en": f"drone autorecall: {drone_id} set to {mode} (threshold={drone.autorecall_threshold*100:.0f}%)",
             "es": f"drone autorecall: {drone_id} configurado a {mode} (umbral={drone.autorecall_threshold*100:.0f}%)",
         }
         print(msg.get(locale, msg["en"]))
-        return
-    if threshold is not None:
+    elif threshold is not None:
         drone.autorecall_threshold = max(0.0, min(1.0, float(threshold)))
         msg = {
             "en": f"drone autorecall: {drone_id} threshold set to {drone.autorecall_threshold*100:.0f}%",
             "es": f"drone autorecall: umbral de {drone_id} configurado a {drone.autorecall_threshold*100:.0f}%",
         }
         print(msg.get(locale, msg["en"]))
+    if drone.autorecall_enabled and (enabled is not None or threshold is not None):
+        engine = Engine()
+        events = engine._update_drone_battery_alerts(state, drone_id)
+        for event in events:
+            engine._record_event(state.events, event)
+        render_events(state, events)
 
 
 @public_output
 def render_inventory(state) -> None:
     print("\n=== INVENTORY ===")
+    print(fuel_readout(state))
     disp_scrap, disp_modules, dirty = _inventory_view(state.ship)
     suffix = " (stale; run 'cargo audit')" if dirty else ""
     print(f"scrap: {disp_scrap}{suffix}")
@@ -2459,6 +2514,24 @@ def render_inventory(state) -> None:
         print("modules: (none)")
     if dirty:
         print("(cargo changes pending; run 'cargo audit' to refresh)")
+
+
+def fuel_readout(state, destination_id: str | None = None) -> str:
+    """Shared CLI/Textual telemetry; str(float) preserves the priced amount."""
+    locale = state.os.locale.value
+    reserve = state.ship.antimatter_capsules
+    if destination_id is None:
+        return (f"Antimateria: {reserve} cápsulas equivalentes" if locale == "es"
+                else f"Antimatter: {reserve} equivalent capsules")
+    cost = Engine().estimate_travel_fuel(state, destination_id)
+    if cost is None:
+        return ""
+    sufficient = reserve >= cost
+    if locale == "es":
+        return (f"Antimateria: coste={cost}; disponible={reserve} cápsulas equivalentes; "
+                + ("suficiente" if sufficient else "insuficiente"))
+    return (f"Antimatter: cost={cost}; available={reserve} equivalent capsules; "
+            + ("sufficient" if sufficient else "insufficient"))
 
 
 def _module_scope(info: dict) -> str:
@@ -2487,6 +2560,7 @@ def _format_module_effect(effect_key: str, value, locale: str) -> str:
         "power_quality_offset": {"en": "power quality", "es": "calidad de energía"},
         "e_batt_bonus_kwh": {"en": "battery capacity", "es": "capacidad de batería"},
         "p_gen_bonus_kw": {"en": "generation power", "es": "potencia de generación"},
+        "engine_fuel_mult": {"en": "antimatter consumption", "es": "consumo de antimateria"},
     }
     label = labels.get(effect_key, {}).get(locale, effect_key)
     try:
@@ -2528,7 +2602,7 @@ def render_modules_installed(state) -> None:
         ship_counts = _module_counts(ship_installed)
         for mid, count in sorted(ship_counts.items()):
             info = modules.get(mid, {})
-            name = info.get("name", mid)
+            name = info.get(f"name_{locale}", info.get("name", mid))
             scope = _module_scope(info)
             suffix = f" x{count}" if count > 1 else ""
             print(f"- {mid}: {name}{suffix} [scope={scope}]")
@@ -2553,7 +2627,7 @@ def render_modules_installed(state) -> None:
         counts = _module_counts(mids)
         for mid, count in sorted(counts.items()):
             info = modules.get(mid, {})
-            name = info.get("name", mid)
+            name = info.get(f"name_{locale}", info.get("name", mid))
             scope = _module_scope(info)
             suffix = f" x{count}" if count > 1 else ""
             print(f"  - {mid}: {name}{suffix} [scope={scope}]")
@@ -2573,7 +2647,7 @@ def render_modules_installed(state) -> None:
     if inv_ship:
         for mid, count in sorted(inv_ship.items()):
             info = modules.get(mid, {})
-            name = info.get("name", mid)
+            name = info.get(f"name_{locale}", info.get("name", mid))
             suffix = f" x{count}" if count > 1 else ""
             print(f"  - {mid}: {name}{suffix}")
     else:
@@ -2582,7 +2656,7 @@ def render_modules_installed(state) -> None:
     if inv_drone:
         for mid, count in sorted(inv_drone.items()):
             info = modules.get(mid, {})
-            name = info.get("name", mid)
+            name = info.get(f"name_{locale}", info.get("name", mid))
             suffix = f" x{count}" if count > 1 else ""
             print(f"  - {mid}: {name}{suffix}")
     else:
@@ -2603,7 +2677,7 @@ def render_module_inspect(state, module_id: str) -> None:
         print(f"(module) unknown module_id: {module_id}")
         return
     locale = state.os.locale.value
-    name = info.get("name", module_id)
+    name = info.get(f"name_{locale}", info.get("name", module_id))
     scope = _module_scope(info)
     effects = _module_effects(info)
     drawbacks = _module_drawbacks(info, locale)
@@ -2663,7 +2737,7 @@ def render_modules_catalog(state) -> None:
         return
     locale = state.os.locale.value
     for mid, info in modules.items():
-        name = info.get("name", mid)
+        name = info.get(f"name_{locale}", info.get("name", mid))
         scope = _module_scope(info)
         slot_cost = int(info.get("slot_cost", 1) or 1) if scope == "drone" else 0
         scrap_cost = info.get("scrap_cost", "?")
@@ -5325,6 +5399,7 @@ def render_locate(state, system_id: str) -> None:
 @public_output
 def render_nav_routes(state) -> None:
     print("\n=== NAV ROUTES ===")
+    print(fuel_readout(state))
     current_id = state.world.current_node_id
     player_ship_id = getattr(state.ship, "ship_id", "RETORNO_SHIP")
     routes = {
@@ -5369,6 +5444,9 @@ def render_nav_routes(state) -> None:
                 sector = f" sector={sector_id}"
                 visited = "visited" if nid in state.world.visited_nodes else "unvisited"
                 print(f"- {node.name} ({node.kind}){sector} id={nid} dist={_format_dist(node)} {visited}")
+                estimate = fuel_readout(state, nid)
+                if estimate:
+                    print(f"  {estimate}")
             else:
                 print(f"- id={nid}")
     else:
@@ -5948,6 +6026,9 @@ def _confirm_nav(state, action) -> bool:
     locale = state.os.locale.value
     current_node = state.world.current_node_id
     dest = getattr(action, "node_id", "?")
+    estimate = fuel_readout(state, dest)
+    if estimate:
+        print(estimate)
     out = []
     for d in state.ship.drones.values():
         if d.status in {DroneStatus.DEPLOYED, DroneStatus.DISABLED} and d.location.kind == "world_node":

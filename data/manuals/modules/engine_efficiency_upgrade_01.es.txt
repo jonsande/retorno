@@ -1,0 +1,16 @@
+DOSSIER DE MÓDULO — engine_efficiency_upgrade_01
+
+Rol
+- Paquete de eficiencia de dosificación y control de empuje de los motores de la nave.
+
+Efecto operativo
+- Multiplica el coste interestelar de antimateria por 0.8: un 20% menos de consumo a igual integridad.
+- No repara engines ni cambia su integridad máxima efectiva, velocidad de viaje o llegada.
+- Los viajes locales siguen sin consumir cápsulas. Varias copias no acumulan la mejora.
+
+Notas de integración
+- Requiere una copia en bodega, 18 de chatarra y un dron desplegado dentro de la nave con batería y soporte de drone_bay.
+- drone install <drone_id> engine_efficiency_upgrade_01 activa el efecto al completarse la instalación.
+- drone uninstall <drone_id> engine_efficiency_upgrade_01 devuelve una copia a bodega; el modificador desaparece al retirar la última copia.
+- Compara nav map routes antes y después de instalar; inspecciona con module inspect engine_efficiency_upgrade_01.
+- El combustible ya cobrado en un tránsito activo no cambia al instalar o retirar el módulo.

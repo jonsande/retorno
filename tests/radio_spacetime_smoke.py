@@ -302,7 +302,7 @@ def test_15_public_remote_capture_read_import_and_repeated_load():
             origin=s.world.current_node_id;before_nodes=set(s.world.space.nodes)
             assert 'RADIO_REMOTE' not in before_nodes
             events=[]
-            for text in ('power off security','power off data_core','power on comms','boot radiod'):
+            for text in ('power off data_core','power on comms','boot radiod'):
                 events.extend(command(s,text))
                 command(twin,text)
             events.extend(E.tick(s,5))
@@ -327,7 +327,7 @@ def test_15_public_remote_capture_read_import_and_repeated_load():
             save_single_slot(s,slot);s=load_single_slot(slot).state
             assert not [e for e in E.tick(s,1) if e.type==EventType.SIGNAL_CAPTURED]
             print('PUBLIC REMOTE FLOW',locale.value,origin,'<- RADIO_REMOTE; distance=5ly; emitted=-10yr; captured=5s;',
-                  'power off security -> power off data_core -> power on comms -> boot radiod -> wait 5s -> save/load -> cat',file,
+                  'power off data_core -> power on comms -> boot radiod -> wait 5s -> save/load -> cat',file,
                   '; LINK imported only after reading',flush=True)
 
 
@@ -718,7 +718,7 @@ def test_43_public_repair_improves_remote_sensitivity_during_continuous_emission
     def station(scene):emitter(scene)['category']='station'
     with installed(station):
         s=create_initial_state_sandbox();events=[]
-        for text in ('power off security','power off data_core','power on comms','boot radiod'):
+        for text in ('power off data_core','power on comms','boot radiod'):
             events.extend(command(s,text))
         events.extend(E.tick(s,5))
         assert s.ship.systems['comms'].state==SystemState.LIMITED and not s.world.radio_opportunities

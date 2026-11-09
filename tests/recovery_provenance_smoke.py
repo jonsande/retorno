@@ -147,26 +147,11 @@ def test_11_missing_emitters_do_not_consume_attempts_or_reveal_candidates():
     assert not s.world.mobility_hints and not s.world.known_links
 
 
-def test_12_real_pre_correction_legacy_slot_keeps_prepared_opportunity_only():
-    raw=LEGACY.read_bytes();s=save_load.load_single_slot(LEGACY).state
-    plan=next(iter(s.world.recovery_plans.values()));op=next(iter(s.world.radio_opportunities.values()))
-    assert plan.version==rec.LEGACY_VERSION and plan.proposal.stage_sources is None
-    assert op.emission is op.emitter is None and op.status=='pending'
-    ready(s);events=radio.retry_radio_opportunities(s)
-    assert len(events)==1 and events[0].type==EventType.BROADCAST_RECEIVED
-    assert radio.retry_radio_opportunities(s)==[]
-    read(s,op.path);at(s,'B');rec.advance_recovery_plans(s)
-    assert plan.status=='invalid' and len(s.world.radio_opportunities)==1
-    assert LEGACY.read_bytes()==raw  # No retroactive transmitter or source rewrite.
-    frozen=deepcopy((s.world,s.ship,s.os))
-    with TemporaryDirectory() as directory:
-        slot=Path(directory)/'invalid-legacy.dat'
-        save_load.save_single_slot(s,slot)
-        s=save_load.load_single_slot(slot).state
-        assert s.world.recovery_plans[plan.plan_id].status=='invalid'
-        assert radio.retry_radio_opportunities(s)==[]
-        rec.advance_recovery_plans(s)
-        assert (s.world,s.ship,s.os)==frozen
+def test_12_pre_engines_legacy_slot_is_rejected_without_rewrite():
+    # Pre-engines saves are disposable; no player-ship migration is supported.
+    raw = LEGACY.read_bytes()
+    reject(lambda: save_load.load_single_slot(LEGACY))
+    assert LEGACY.read_bytes() == raw
 
 
 def test_13_declared_stage_provenance_persists_through_save_load():

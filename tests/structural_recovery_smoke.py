@@ -440,7 +440,7 @@ def test_19_public_commands_from_declared_scene_without_gameplay_edits():
     # manufactured gameplay resources or prepared recovery. No edits follow.
     s=scene(clean=True)
     transcript=[]
-    for command in ("scan","power off security","power on comms","boot radiod"):
+    for command in ("scan","power on comms","boot radiod"):
         public_command(s,command);transcript.append(command)
     plans=list(s.world.recovery_plans.values())
     assert plans,"Public scan must trigger recovery after verifying empty sources"
@@ -568,7 +568,7 @@ def test_26_installed_prologue_public_journey_without_fixture_or_overrides():
     # Separate from synthetic geometry: shipping content, new-game seed and
     # public commands only. Existing frontiers must suppress unnecessary rescue.
     s=create_initial_state_prologue(seed=701)
-    script=["power off security","power off data_core","drone deploy D1 PWR-A1",
+    script=["power off data_core","drone deploy D1 PWR-A1",
         "drone repair D1 power_core","drone repair D1 power_core","drone repair D1 power_core",
         "drone move D1 BUS-A2","drone repair D1 energy_distribution","drone repair D1 energy_distribution",
         "drone move D1 BRG-01","drone repair D1 comms","power on comms","boot radiod",
@@ -652,7 +652,7 @@ def test_31_public_repair_and_boot_capture_local_pending_exactly_once():
     op=next(iter(s.world.radio_opportunities.values()))
     assert retry_radio_opportunities(s)==[] and op.status=="pending" and not p.captured
     assert s.world.mobility_failsafe_count==0
-    script=["power off security","drone deploy D1 BRG-01"]
+    script=["drone deploy D1 BRG-01"]
     for command in script:public_command(s,command)
     for _ in range(6):
         if s.ship.systems["comms"].health>=Balance.SYSTEM_HEALTH_DAMAGED:break
@@ -712,11 +712,11 @@ def test_33_public_travel_changes_conditional_search_into_local_reception():
     assert len(s.world.recovery_plans)==1
     op=next(iter(s.world.radio_opportunities.values()))
     assert op.origin_node_id=="REMOTE" and op.status=="pending"
-    for command in ("power off security","power on comms","boot radiod"):public_command(s,command)
+    for command in ("power on comms","boot radiod"):public_command(s,command)
     assert op.status=="received" and s.world.mobility_failsafe_count==1
     public_command(s,"cat "+op.path)
     assert "T" in s.world.known_links["REMOTE"] and retry_radio_opportunities(s)==[]
-    print("PUBLIC FIRST RECEPTION FLOW: scan -> nav REMOTE -> power off security -> power on comms -> boot radiod -> cat received file; one capture")
+    print("PUBLIC FIRST RECEPTION FLOW: scan -> nav REMOTE -> power on comms -> boot radiod -> cat received file; one capture")
 
 
 def test_34_selector_confirmation_and_capture_share_spatial_boundary():

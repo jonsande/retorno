@@ -183,7 +183,7 @@ class _OpportunityContext:
         self.sector_intel = {n for n, info in world.known_intel.items() if info.get("sector")}
         self.sector_intel.update(item.sector_id for item in world.intel if item.kind == "sector" and item.sector_id)
         systems = {sid: replace(system, state=SystemState.OFFLINE, forced_offline=True)
-                   if sid in {"sensors", "security", "data_core", "drone_bay"} else system
+                   if sid in {"sensors", "data_core", "drone_bay"} else system
                    for sid, system in state.ship.systems.items()}
         view = SimpleNamespace(ship=replace(state.ship, op_mode="CRUISE", systems=systems),
                                jobs=SimpleNamespace(jobs={}))

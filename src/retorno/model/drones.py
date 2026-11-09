@@ -50,6 +50,7 @@ class DroneState:
     low_battery_warned: bool = False
     autorecall_enabled: bool = True
     autorecall_threshold: float = 0.10
+    autorecall_block_reason: str | None = None
 
     shield_factor: float = 1.0
     dose_rad: float = 0.0

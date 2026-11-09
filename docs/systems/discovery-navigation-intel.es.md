@@ -535,8 +535,10 @@ intel de nodo con confianza 0.4.
 Scan y route solve no reservan un consumo energético específico en el `Job`.
 El tiempo transcurrido sigue ejecutando el modelo general de potencia,
 degradación y radiación. Iniciar viaje con el perfil automático `CRUISE` apaga
-sensores, seguridad, `data_core` y `drone_bay`, lo que puede hacer fallar en el
+sensores, `data_core` y `drone_bay`, lo que puede hacer fallar en el
 siguiente tick trabajos de scan o route solve todavía activos.
+
+La propulsión exige además `engines` operativo y antimateria suficiente. `nav map routes` ofrece estimaciones de solo lectura; véase [Motores y antimateria](engines-antimatter.es.md).
 
 ## 6. Navegación y viaje
 

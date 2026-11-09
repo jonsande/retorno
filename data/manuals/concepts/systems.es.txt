@@ -76,7 +76,7 @@ energy_distribution
   - CRITICAL: penaliza Q aun mas.
   - OFFLINE: colapso de distribucion; sistemas no criticos pasan a OFFLINE automaticamente.
   - OFFLINE: sin soporte energetico efectivo de bahia (sin recarga/descontaminacion/reparacion pasiva de drones).
-- Nota: es dependencia formal para arrancar sensors, security y data_core en estado >= nominal.
+- Nota: es dependencia formal para arrancar sensors, comms y data_core en estado >= nominal.
 
 data_core
 - Qué es: nucleo de datos y servicios de inventario/navdb (datad).
@@ -101,11 +101,12 @@ drone_bay
   - OFFLINE: deploy normal bloqueado; install bloqueado; solo deploy de emergencia.
   - OFFLINE de energy_distribution: anula soporte pasivo de bahia aunque drone_bay este online.
 
-security
-- Que es: capa de seguridad/servicio securityd (estructura preparada para futuras reglas).
-- Consecuencias:
-  - Hoy no bloquea comandos jugables por si sola, pero su estado afecta carga y supervivencia energetica.
-  - Requiere energy_distribution >= nominal para arrancar securityd.
+engines
+- Conjunto de propulsión de antimateria en ENG-R1; una lectura global de integridad.
+- OFFLINE, apagado forzado o CRITICAL bloquea la salida; DAMAGED o superior permite viajar.
+- El desgaste aumenta el consumo de cápsulas; drone repair recupera eficiencia.
+- nav map routes informa de coste y reserva; engine_efficiency_upgrade_01 reduce el coste un 20% sin cambiar integridad.
+- CRUISE preserva los auxiliares eléctricos del motor. Consulta man engines.
 
 Efectos globales que cruzan sistemas
 - Estado critico de potencia (Q colapsada, brownout, core_os critical o energy_distribution offline):
@@ -120,7 +121,7 @@ Nota base: salvo excepciones de emergencia/terminal minima, todos dependen de qu
 - about -> core_os.
 - alerts -> core_os.
 - auth -> core_os; auth recover requiere data_core >= limited + datad running + Q >= 0.55.
-- boot -> sistema objetivo (service host) + dependencias del sistema (p.ej. energy_distribution >= nominal para datad/sensord/securityd).
+- boot -> sistema objetivo (service host) + dependencias del sistema (p.ej. energy_distribution >= nominal para datad/sensord/radiod).
 - cargo -> core_os (alias de inventory).
 - cat -> core_os.
 - config -> core_os.

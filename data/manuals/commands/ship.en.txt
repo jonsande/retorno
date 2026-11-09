@@ -20,7 +20,7 @@ RETORNO canonical internal sectors
 - `LFS-01`: Life Support
 - `PWR-A1`: Power Core
 - `BUS-A2`: Power Distribution
-- `ENG-R1`: Engine room / Propulsion (reserved)
+- `ENG-R1`: Engine room / Propulsion — engines
 - `BRG-01`: Bridge / Command
 - `SNS-R1`: Sensors Room
 - `DRN-BAY`: Drone Bay

@@ -52,5 +52,12 @@ Dependencias y gating
   - `CRITICAL`: solo set de recuperación de emergencia.
   - `OFFLINE`: terminal mínima de supervivencia.
 
+Propulsión y combustible
+- Requiere engines alimentado en DAMAGED o superior. CRUISE preserva sus auxiliares eléctricos.
+- nav map routes muestra coste actual de cápsulas y reserva para rutas directas conocidas; la confirmación lo repite.
+- La salida interestelar aceptada cobra una vez; con antimateria insuficiente la navegación no cambia.
+- Los viajes locales no cuestan cápsulas. nav abort no devuelve combustible ni añade cobro.
+- Un viaje nuevo lleva 12.0 cápsulas equivalentes, incluido contenido fraccionario. El desgaste aumenta el coste; reparar y engine_efficiency_upgrade_01 mejoran eficiencia. Consulta man engines.
+
 Comandos relacionados
 - `route solve <node_id>`, `dock <node_id>`, `undock`, `hibernate until_arrival`, `intel`, `debug galaxy map <scale>`

@@ -361,7 +361,10 @@ def test_17_saved_cursor_cache_and_receipt_forgery_rejected_nondestructively():
 
 
 def test_18_recovery_certified_procedural_notice_no_fabrication():
-    s,row=chosen(lambda r: r.host.kind in recovery.HUBS and r.message_kind=='navigation' and r.emissions[0].end_t is None)
+    locked = lore._locked_primary_targets(create_initial_state_prologue(seed=SEEDS[0]))
+    s,row=chosen(lambda r: r.host.kind in recovery.HUBS and r.message_kind=='navigation'
+                 and r.emissions[0].end_t is None and r.emitter.host_id not in locked
+                 and r.emissions[0].navigation_link_to not in locked)
     nid=row.emitter.host_id;dest=row.emissions[0].navigation_link_to
     ensure_historical_node(s,nid);ensure_historical_node(s,dest);at(s,nid)
     s.world.known_nodes={nid};s.world.known_contacts={nid};s.world.known_links={};s.world.visited_nodes={nid}
@@ -472,13 +475,20 @@ def test_22_reuse_procedural_later_receipt_without_rewriting_file():
 def test_23_authored_and_procedural_listening_share_capture_ledger():
     from radio_spacetime_smoke import installed
     with installed():
-        s=create_initial_state_sandbox(seed=1);ready(s);w=universe_definition(s)
-        tx,authored=hr.resolve_emission(s,'fixture-history')
-        source=manifest.resolve_operative_id(w,tx.host_id)
-        sites=manifest.query_physical_sectors(w,SECTORS).sites
-        rows=[hr.query_host(w,s.world.radio_definition,s.world.information_definition,manifest.operative_id(w,x)) for x in sites if x.kind in hr.KINDS]
-        row=next(r for r in rows if r and r.emissions and r.emissions[0].end_t is None
-            and math.dist(r.host.position_ly,source.position_ly)<9+math.sqrt(r.emitter.power))
+        # Module catalogue additions change the universe fingerprint. Select a
+        # certified overlap witness instead of assuming seed 1 always has one.
+        row = None
+        for seed in SEEDS:
+            s=create_initial_state_sandbox(seed=seed);ready(s);w=universe_definition(s)
+            tx,authored=hr.resolve_emission(s,'fixture-history')
+            source=manifest.resolve_operative_id(w,tx.host_id)
+            sites=manifest.query_physical_sectors(w,SECTORS).sites
+            rows=[hr.query_host(w,s.world.radio_definition,s.world.information_definition,manifest.operative_id(w,x)) for x in sites if x.kind in hr.KINDS]
+            row=next((r for r in rows if r and r.emissions and r.emissions[0].end_t is None
+                and math.dist(r.host.position_ly,source.position_ly)<9+math.sqrt(r.emitter.power)), None)
+            if row is not None:
+                break
+        assert row is not None, 'No certified radio overlap witness'
         distance=math.dist(row.host.position_ly,source.position_ly)
         fraction=min(1.,9/distance) if distance else 0.
         s.world.current_pos_ly=tuple(a+(b-a)*fraction for a,b in zip(source.position_ly,row.host.position_ly))

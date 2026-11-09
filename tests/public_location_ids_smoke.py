@@ -240,7 +240,10 @@ def test_09_negative_disclosure_across_cli_textual_and_commands():
 
 def test_10_radio_view_reception_link_import_and_uplink_history():
     from historical_radio_smoke import chosen,prepare,ready
-    state,row=chosen(lambda r:r.navigation_record is not None and r.emissions[0].end_t is None)
+    locked = lore._locked_primary_targets(create_initial_state_prologue(seed=0))
+    state,row=chosen(lambda r:r.navigation_record is not None and r.emissions[0].end_t is None
+                     and r.emitter.host_id not in locked
+                     and r.navigation_record.destination_id not in locked)
     ready(state)
     # Controlled reception integration; the public journey is separate.
     state.world.current_pos_ly=row.host.position_ly
