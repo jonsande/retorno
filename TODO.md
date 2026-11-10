@@ -47,7 +47,12 @@ La escasez no es únicamente un obstáculo. Es también el mecanismo que hace qu
 
 === SIN CLASIFICAR ===
 
-- [] Implementar medios interlestelares: ya tenemos la radiación ambiental en los esencial, pero interesa añadir riesgos ligados al movimiento relativista, como partículas energéticas incidentes, colisiones con polvo y erosión del blindaje. Estos efectos dependerían de la velocidad, del medio interestelar atravesado y de las protecciones de la nave.
+- [] A partir de qué distancia se usa la antimateria para viajar? Creo recordar que por debajo de cierta distancia se viaja más despacio y sin usar antimateria.
+Esto hay que dejárselo claro al jugador. Actualmente la información es un poco confusa, pues no se indica en ninguna parte (ni al navegar ni al leer el output de "routes") que por debajo de ciertas distancias no se usa antimateria, ni a la velicidad a la que se viaja.
+
+- [!] Cuando los drones en bahía no se pueden recargar o arreglar debido a que no se cumple algunos de los requisitos, en el mensaje que lo advierte tiene que indicarse también qué requisitos no se cumplen.
+
+- [] Implementar medios interlestelares: ya tenemos la radiación ambiental en lo esencial, pero interesa añadir riesgos ligados al movimiento relativista, como partículas energéticas incidentes, colisiones con polvo y erosión del blindaje. Estos efectos dependerían de la velocidad, del medio interestelar atravesado y de las protecciones de la nave.
 
 - [] Que el jugador pueda decidir la velocidad de viaje (0.3c o 0.5 si tiene 'engines' en 'nominal', y posibilidad de viajar a 0.8c si tiene el módulo que le permite 'upgraded').
 
@@ -61,7 +66,7 @@ La escasez no es únicamente un obstáculo. Es también el mecanismo que hace qu
 
 - [] Virus informáticos! Al hacer uplink puede haber un riesgo de que data_core sea infectado con algún virus (cada uno de esos virus puede tener distintos efectos en la nave, algo así como las maldiciones de un roguelike tradicional). Así mismo habrá que implementar algún módulo que añade función de antivirus. O quizá que la nave tenga desde el principio un servicio de antivirus básico, pero que el módulo lo mejore. O que haya algún consumible (quizá esto sea mejor idea), de un solo uso, que te permite librarte de un solo virus por uso (cada tipo de consumible sirve para un tipo de virus: por ejemplo, un virus que te impide usar los sensores tendría a su vez un "antídoto" que limpia ese virus en particular).	
 
-- [] Ahora mismo los sensores solo sirven para route solve y para scan. Hace falta añadir algún tipo de sensor pasivo o sonar pasivo/activo, que sirva para detectar peligros, para que así la decisión de apagar los sensores (y ganar energía) no sea gratis.
+- [] Ahora mismo los sensores solo sirven para route solve y para scan. Hace falta añadir algún tipo de sensor pasivo o sonar pasivo/activo, que sirva para detectar peligros, para que así la decisión de apagar los sensores (y ganar energía) no sea gratis. Arreglar en consecuena la detección automática de ECHO_7 al inicio del juego.
 
 - [x] Actualmente, a la hora de configurar dónde pueden aparecer los documentos de un arco y/o las estaciones/pecios/etc. relativos a él, podemos configurar el rango de distancia, con respecto al origen de la partida, a la que pueden aparecer esos documentos. No podemos configurarlo para que los documentos aparezcan dentro de un rango de distancia con respecto a una estación o nodo en particular. Si quisiéramos distribuir documentos a un máximo de 15 años luz de Liria, por ejemplo, necesitaríamos diseñar una solución concreta; no existe un parámetro genérico equivalente a max_dist_from_node: "LIRIA". Necesitamos desarrollar esa solución.
 

@@ -141,7 +141,7 @@ class Engine:
             return []
 
         # Integrate clocks from the initial transit state, before arrival changes it.
-        # All existing subsystem updates below continue to use galactic dt.
+        # Ordinary electricity uses proper time; other subsystems keep galactic dt.
         moving_dt = 0.0
         beta = 0.0
         if state.ship.in_transit:
@@ -150,7 +150,8 @@ class Engine:
                 beta = (Balance.LOCAL_TRAVEL_SPEED_KM_S / SPEED_OF_LIGHT_KM_S
                         if state.ship.last_travel_is_local
                         else state.ship.transit_speed_ly_per_year)
-        dt_ship = proper_time_interval(moving_dt, beta) + proper_time_interval(dt - moving_dt, 0.0)
+        moving_dt_ship = proper_time_interval(moving_dt, beta)
+        dt_ship = moving_dt_ship + proper_time_interval(dt - moving_dt, 0.0)
         dt_bio = biological_time_interval(dt_ship, state.ship.is_hibernating)
 
         state.clock.last_dt = dt
@@ -162,6 +163,14 @@ class Engine:
 
         # Update effective generation based on power_core state.
         state.ship.power.p_gen_kw = self._compute_p_gen(state)
+
+        # At arrival, first account for the in-flight electrical state. Running
+        # the whole tick twice would also run jobs/narrative/radio twice. Instead
+        # only the electrical integrator gets a pre-arrival and post-arrival leg.
+        integrated_transit_power = moving_dt > 0.0 and state.clock.t >= state.ship.arrival_t
+        if integrated_transit_power:
+            events.extend(self._enforce_distribution_collapse(state))
+            events.extend(self._integrate_power_interval(state, moving_dt_ship))
 
         arrived_this_tick = False
         if state.ship.in_transit and state.clock.t >= state.ship.arrival_t:
@@ -204,53 +213,15 @@ class Engine:
 
         events.extend(self._enforce_distribution_collapse(state))
 
-        p_load = self._compute_load_kw(state)
-        if state.os.god_active:
+        # Only electricity is segmented at arrival; the other consumers below
+        # keep one galactic interval and their existing scheduler order.
+        electrical_dt = dt - moving_dt if integrated_transit_power else dt_ship
+        if integrated_transit_power:
             state.ship.power.p_gen_kw = self._compute_p_gen(state)
+        events.extend(self._integrate_power_interval(state, electrical_dt))
+        p_load = state.ship.power.p_load_kw
         p_gen = state.ship.power.p_gen_kw
-        p_discharge_max = state.ship.power.p_discharge_max_kw
-        soc = self._soc(state)
-        available_discharge_kw = p_discharge_max if soc > 0.0 else 0.0
-        p_capacity = p_gen + available_discharge_kw
-
-        if p_load > p_capacity:
-            events.extend(self._auto_load_shed(state, p_capacity, p_load))
-            p_load = self._compute_load_kw(state)
-
-        if 0.0 < soc < 0.10 and p_load > p_gen:
-            events.extend(self._auto_load_shed(state, p_gen, p_load))
-            p_load = self._compute_load_kw(state)
-
-        power_quality_pre = self._compute_power_quality(state, p_gen, p_load)
-        if power_quality_pre < Balance.POWER_QUALITY_COLLAPSE_THRESHOLD:
-            events.extend(self._shed_all_noncritical(state))
-            p_load = self._compute_load_kw(state)
-            power_quality_pre = self._compute_power_quality(state, p_gen, p_load)
-        if power_quality_pre < Balance.POWER_QUALITY_CRITICAL_THRESHOLD:
-            if p_load > p_gen or p_load > p_capacity:
-                state.ship.power.low_q_shed_timer_s += dt
-            else:
-                state.ship.power.low_q_shed_timer_s = 0.0
-            if state.ship.power.low_q_shed_timer_s >= Balance.POWER_QUALITY_SHED_INTERVAL_S:
-                events.extend(self._auto_shed_one_noncritical(state))
-                state.ship.power.low_q_shed_timer_s = 0.0
-                p_load = self._compute_load_kw(state)
-        else:
-            state.ship.power.low_q_shed_timer_s = 0.0
-
-        state.ship.power.p_load_kw = p_load
-
-        self._update_battery(state, dt, p_gen, p_load)
-        power_quality = self._compute_power_quality(state, p_gen, p_load)
-        state.ship.power.power_quality = power_quality
-        soc = self._soc(state)
-        available_discharge_kw = p_discharge_max if soc > 0.0 else 0.0
-        state.ship.power.brownout = not state.os.god_active and p_load > (p_gen + available_discharge_kw)
-        if state.ship.power.brownout:
-            state.ship.power.brownout_sustained_s += dt
-        else:
-            state.ship.power.brownout_sustained_s = 0.0
-
+        power_quality = state.ship.power.power_quality
         brownout_sustained = (
             state.ship.power.brownout
             and state.ship.power.brownout_sustained_s >= Balance.BROWNOUT_SUSTAINED_AFTER_S
@@ -7014,7 +6985,63 @@ class Engine:
 
         return None
 
-    def _update_battery(self, state: GameState, dt: float, p_gen: float, p_load: float) -> None:
+    def _integrate_power_interval(self, state: GameState, dt_ship: float) -> list[Event]:
+        """Integrate ordinary ship electricity and regulation in onboard seconds.
+
+        Generation has been sampled by the caller for this electrical segment.
+        This does not advance clocks, jobs, wear, drones or narrative schedulers.
+        """
+        events: list[Event] = []
+        p_load = self._compute_load_kw(state)
+        if state.os.god_active:
+            state.ship.power.p_gen_kw = self._compute_p_gen(state)
+        p_gen = state.ship.power.p_gen_kw
+        p_discharge_max = state.ship.power.p_discharge_max_kw
+        soc = self._soc(state)
+        available_discharge_kw = p_discharge_max if soc > 0.0 else 0.0
+        p_capacity = p_gen + available_discharge_kw
+
+        if p_load > p_capacity:
+            events.extend(self._auto_load_shed(state, p_capacity, p_load))
+            p_load = self._compute_load_kw(state)
+
+        if 0.0 < soc < 0.10 and p_load > p_gen:
+            events.extend(self._auto_load_shed(state, p_gen, p_load))
+            p_load = self._compute_load_kw(state)
+
+        power_quality_pre = self._compute_power_quality(state, p_gen, p_load)
+        if power_quality_pre < Balance.POWER_QUALITY_COLLAPSE_THRESHOLD:
+            events.extend(self._shed_all_noncritical(state))
+            p_load = self._compute_load_kw(state)
+            power_quality_pre = self._compute_power_quality(state, p_gen, p_load)
+        if power_quality_pre < Balance.POWER_QUALITY_CRITICAL_THRESHOLD:
+            if p_load > p_gen or p_load > p_capacity:
+                state.ship.power.low_q_shed_timer_s += dt_ship
+            else:
+                state.ship.power.low_q_shed_timer_s = 0.0
+            if state.ship.power.low_q_shed_timer_s >= Balance.POWER_QUALITY_SHED_INTERVAL_S:
+                events.extend(self._auto_shed_one_noncritical(state))
+                state.ship.power.low_q_shed_timer_s = 0.0
+                p_load = self._compute_load_kw(state)
+        else:
+            state.ship.power.low_q_shed_timer_s = 0.0
+
+        state.ship.power.p_load_kw = p_load
+
+        self._update_battery(state, dt_ship, p_gen, p_load)
+        power_quality = self._compute_power_quality(state, p_gen, p_load)
+        state.ship.power.power_quality = power_quality
+        soc = self._soc(state)
+        available_discharge_kw = p_discharge_max if soc > 0.0 else 0.0
+        state.ship.power.brownout = not state.os.god_active and p_load > (p_gen + available_discharge_kw)
+        if state.ship.power.brownout:
+            state.ship.power.brownout_sustained_s += dt_ship
+        else:
+            state.ship.power.brownout_sustained_s = 0.0
+
+        return events
+
+    def _update_battery(self, state: GameState, dt_ship: float, p_gen: float, p_load: float) -> None:
         if state.os.god_active:
             return
         p_charge_max = state.ship.power.p_charge_max_kw
@@ -7022,14 +7049,14 @@ class Engine:
         net = p_gen - p_load
         if net >= 0:
             charge_kw = min(net, p_charge_max)
-            delta_e = (charge_kw * dt / 3600.0) * state.ship.power.eta_charge
+            delta_e = (charge_kw * dt_ship / 3600.0) * state.ship.power.eta_charge
             state.ship.power.e_batt_kwh = min(
                 state.ship.power.e_batt_max_kwh,
                 state.ship.power.e_batt_kwh + delta_e,
             )
         else:
             discharge_kw = min(-net, p_discharge_max)
-            delta_e = (discharge_kw * dt / 3600.0) / max(state.ship.power.eta_discharge, 1e-6)
+            delta_e = (discharge_kw * dt_ship / 3600.0) / max(state.ship.power.eta_discharge, 1e-6)
             state.ship.power.e_batt_kwh = max(
                 0.0,
                 state.ship.power.e_batt_kwh - delta_e,

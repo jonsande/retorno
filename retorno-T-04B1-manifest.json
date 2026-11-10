@@ -1,0 +1,189 @@
+{
+  "task": "RETORNO T-04B1",
+  "date": "2026-11-10",
+  "archive": "retorno-T-04B1.zip",
+  "base_head": "8e4b9e924a3ca9aeff1fe6cf8e31a3ec0e1325c0",
+  "paths_en": "All paths are relative to the repository root.",
+  "paths_es": "Todas las rutas son relativas a la raíz del repositorio.",
+  "files": [
+    {
+      "path": "data/manuals/commands/power.en.txt",
+      "status": "modified",
+      "bytes": 1545,
+      "sha256": "a90a803f7ec2e0ec642f8ef4a1fb10861512f9694db4fa748389cd0818fb873f"
+    },
+    {
+      "path": "data/manuals/commands/power.es.txt",
+      "status": "modified",
+      "bytes": 1634,
+      "sha256": "41d5235fa7cfa04f0cc357b818abad463691b69258b9b2d133b1233edbd01267"
+    },
+    {
+      "path": "data/manuals/concepts/power.en.txt",
+      "status": "modified",
+      "bytes": 3413,
+      "sha256": "cd5524f895e07bd6e81e11f3db088404fc0eefc27134b033e1bab8c0ee6eb25a"
+    },
+    {
+      "path": "data/manuals/concepts/power.es.txt",
+      "status": "modified",
+      "bytes": 4152,
+      "sha256": "be9fca2ccfb7ff847cec4afc23f32a5aeab9e59b6f9e52852830521197e87d51"
+    },
+    {
+      "path": "data/manuals/systems/power_core.en.txt",
+      "status": "modified",
+      "bytes": 1346,
+      "sha256": "781f4eb7296ed97d0870b26865086f615ac0dfa0db0bd17e06ef8abf12368520"
+    },
+    {
+      "path": "data/manuals/systems/power_core.es.txt",
+      "status": "modified",
+      "bytes": 1653,
+      "sha256": "3bf5c3c39c663ffd1b6b22e85883d1383c5a388a3ebba6faa180262b4d293e3e"
+    },
+    {
+      "path": "docs/README.es.md",
+      "status": "modified",
+      "bytes": 10466,
+      "sha256": "4f888757addb6929576647da73c28134fa0e40cc561162783488f15fd240cf67"
+    },
+    {
+      "path": "docs/README.md",
+      "status": "modified",
+      "bytes": 9892,
+      "sha256": "75538270b534d1ef71a4c59a29106abf8fd0dfc360ec15440bfedc5275bbd87b"
+    },
+    {
+      "path": "docs/design/modelo_temporal_hibernacion.md",
+      "status": "modified",
+      "bytes": 17060,
+      "sha256": "36482356ba8de5a5a3be759df6a43b651eed5fc6568ac20985a6f4f6b5e779e4"
+    },
+    {
+      "path": "docs/systems/discovery-navigation-intel.es.md",
+      "status": "modified",
+      "bytes": 58711,
+      "sha256": "ec8eceb5cd2fdeb9a0b0f105907aaae4082c8757e7521367b5bd9122c6638653"
+    },
+    {
+      "path": "docs/systems/discovery-navigation-intel.md",
+      "status": "modified",
+      "bytes": 54181,
+      "sha256": "9c440f13fda6c00d41f68dc17c725343bf71a076bbeb99f95929f125d5cedd4e"
+    },
+    {
+      "path": "docs/systems/electrical-proper-time.es.md",
+      "status": "added",
+      "bytes": 4799,
+      "sha256": "51e015cc5b6795e73b60031e675765f5524f82617ab38454cb8b335aa4a7ff3f"
+    },
+    {
+      "path": "docs/systems/electrical-proper-time.md",
+      "status": "added",
+      "bytes": 4637,
+      "sha256": "056f5df97642e7a597cc485e598b43ed38c9828badcd66d13e02858b98d0e8fa"
+    },
+    {
+      "path": "docs/systems/engines-antimatter.es.md",
+      "status": "modified",
+      "bytes": 10396,
+      "sha256": "8530022fdd6b48a1894ebf5da8f3f2abfa5b591b3619841b45b9c64c5948efb3"
+    },
+    {
+      "path": "docs/systems/engines-antimatter.md",
+      "status": "modified",
+      "bytes": 9697,
+      "sha256": "74977e7b5e779120960b09b60f1a581a145d37ee2d39106a143256522326b7e3"
+    },
+    {
+      "path": "docs/testing/electrical-proper-time-results.json",
+      "status": "added",
+      "bytes": 2202,
+      "sha256": "56c3f97eb8f506defc22b14529035b3ed5fad8e12371583243cfd57c426de9d8"
+    },
+    {
+      "path": "docs/testing/electrical-proper-time-review.es.md",
+      "status": "added",
+      "bytes": 3391,
+      "sha256": "ae36833d73608c667178ad6ae3bb1478c14e094808dd2e000f41023f6230fdf7"
+    },
+    {
+      "path": "docs/testing/electrical-proper-time-review.md",
+      "status": "added",
+      "bytes": 3172,
+      "sha256": "a3768b2c93f702c8ebfb83c06ded8d9c75b47f2fba318d95fd74d7348000e39b"
+    },
+    {
+      "path": "retorno-T-04B1-manifest.json",
+      "status": "added",
+      "note_en": "Manifest self-entry has no recursive digest. SHA-256 covers every delivered implementation/documentation/test file.",
+      "note_es": "La entrada del manifiesto no tiene hash recursivo. SHA-256 cubre cada archivo de implementación/documentación/pruebas entregado."
+    },
+    {
+      "path": "src/retorno/core/engine.py",
+      "status": "modified",
+      "bytes": 344678,
+      "sha256": "2dc23d274387e5d0ba43044e79c42065bbe216bcd02261050d23a73ea301ed2a"
+    },
+    {
+      "path": "tests/test_electrical_proper_time.py",
+      "status": "added",
+      "bytes": 16532,
+      "sha256": "05193dc80ffe36bfdd533e198e5fceeef9dec7bb6d07ae6ce17b38bd522f7bd5"
+    }
+  ],
+  "renamed": [],
+  "deleted": [],
+  "preserved_preexisting_files": [
+    {
+      "path": "TODO.md",
+      "sha256": "7fb19f4020ba2348be81b5c3ded71a8ab933a9161945b0e4b93b680a132d0e8b"
+    },
+    {
+      "path": "data/manuals/commands/status.en.txt",
+      "sha256": "d92176abd5d91f34d5033d178b5e5caca0d8c850d67d5efd7d6963b0b65d4b7c"
+    },
+    {
+      "path": "data/manuals/commands/status.es.txt",
+      "sha256": "d82a95546b4e0946e24583eda0af5e1b5dee5f6a940820e9dc80d931bd9a427e"
+    },
+    {
+      "path": "docs/textual.es.md",
+      "sha256": "f7e12db72bc4f5d426ac67b4b25fea54577628e0bf8aff41551fd47d2828ddf8"
+    },
+    {
+      "path": "docs/textual.md",
+      "sha256": "3feae9849a872b8cdd9189b2c98c9e8b2ee9207e2a66b9f330f3b216bfccc3d9"
+    },
+    {
+      "path": "src/retorno/cli/repl.py",
+      "sha256": "479aeee919bcd28b569e462f17894e05833d351a27790f7ef23caf5803370890"
+    },
+    {
+      "path": "src/retorno/ui_textual/app.py",
+      "sha256": "e75f69707a2c2ec7577c8b7828b110285a2e96945bcd5bb9f2a2cde598007c8a"
+    },
+    {
+      "path": "src/retorno/ui_textual/presenter.py",
+      "sha256": "a5546e24959207f87ebfa5b5757beb92c66516ddab91995f4f9c577544c454c3"
+    },
+    {
+      "path": "src/retorno/ui_theme.py",
+      "sha256": "3fb549e9bcdab1057576675d8b6239328717f18319d8585e47702ca8b1f40413"
+    },
+    {
+      "path": "tests/test_clock_display.py",
+      "sha256": "856c662433a3f310ba6f31c82aea9bb37e8f1be59f5906bb2b0f08ae55ef6a46"
+    },
+    {
+      "path": "tests/test_engine_speed_upgrade.py",
+      "sha256": "c927bd51d3f6880ede02cd6de3e6e7c705d0c5f2791cb2f25782e8cf35f19095"
+    }
+  ],
+  "excluded_en": "Pre-existing changes, saved games, .git, environments, caches, previous deliverables and unrelated files are excluded.",
+  "excluded_es": "Se excluyen cambios previos, partidas, .git, entornos, cachés, entregas anteriores y archivos ajenos.",
+  "validation_evidence": "docs/testing/electrical-proper-time-results.json",
+  "validation_en": "42 tests and 23 subtests PASS; existing electrical smoke PASS before/after; manual style and EN/ES pairs PASS.",
+  "validation_es": "42 pruebas y 23 subpruebas PASS; smoke eléctrico existente PASS antes/después; estilo y parejas EN/ES PASS."
+}

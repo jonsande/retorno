@@ -117,8 +117,9 @@ that frozen value for `proper_time_interval`: dt * sqrt(1 - beta²). Later engin
 wear, repair, power changes, nominal configuration or module completion affect
 future departures, never the ongoing speed, ETA or proper time. Arrival still
 splits moving/rest intervals; abort ends movement without a refund. No acceleration
-or braking is simulated. Electrical generation, wear, radiation, jobs and
-hibernation retain their existing galactic time integration.
+or braking is simulated. T-04B1 integrates ordinary electricity and electrical
+regulation in [ship proper time](electrical-proper-time.md); wear, radiation,
+jobs and hibernation retain their existing galactic time integration.
 
 Save/load persists both modules and frozen speed without reconstructing it from
 current engine state. Active interstellar saves without a valid positive frozen

@@ -3,6 +3,9 @@ Ref: OS-MAN/ENG/POWER-01
 
 Your capsule terminal reports the ship’s electrical state using five values:
 
+Onboard power and energy
+P_gen and P_load are kW measured aboard; stored battery energy is kWh. Ordinary battery charge/discharge and internal electrical regulation timers follow ship proper time. At rest this matches galactic elapsed time. During cruise the frozen departure speed determines the onboard interval; an interval crossing arrival accounts separately for movement and rest. Hibernation does not slow electricity by the biological ageing rate.
+
 SoC (State of Charge)
 Battery charge fraction. 0.00 empty, 1.00 full.
 SoC buffers moment-to-moment deficits and absorbs surpluses.

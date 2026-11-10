@@ -5,6 +5,7 @@ Purpose
 
 Operational behavior
 - Designed as first-look command after wake, incident, or major action.
+- Lists three separate clocks from mission start: galactic time, ship proper time (including relativistic time dilation), and player biological time (also accounting for hibernation).
 
 Usage notes
 - Use as entry point, then drill down with `alerts`, `diag`, `jobs`, and domain commands.

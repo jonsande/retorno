@@ -20,6 +20,7 @@ Spanish version: [README.es.md](README.es.md)
 
 | Document | Purpose | Status |
 | --- | --- | --- |
+| [Electricity in ship proper time](systems/electrical-proper-time.md) | Onboard kW/kWh, battery integration, regulation timers and electrical arrival segments. | Implemented T-04B1; other time domains preserved. |
 | [Preventive drone autorecall](systems/drone-autorecall.md) | Battery reserve admission, return priority and public block diagnostics. | Implemented; shared CLI/Textual rules. |
 | [Engines and antimatter](systems/engines-antimatter.md) | Propulsion integrity, state-dependent speed, inertial cruise, independent modules and capsule consumption. | Implemented with provisional CANON v0.5.0 balance. |
 | [Physical universe and procedural generation](systems/world-generation.md) | Canonical reference for the spatial model, regions, sectors, worldgen, topology, authored content, and determinism. | **Verified** for 4D-3e2 in the working tree based on `5cdde28`, pending external review. It records known gaps and the sector diagnostic's materializing effect; it does not fully cover navigation, lore, or failsafes. |

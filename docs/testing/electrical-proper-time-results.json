@@ -1,0 +1,64 @@
+{
+  "task": "RETORNO T-04B1",
+  "date": "2026-11-10",
+  "base_head": "8e4b9e924a3ca9aeff1fe6cf8e31a3ec0e1325c0",
+  "baseline_electrical_smoke": "PASS before source changes: PYTHONPATH=src:. /home/jon/prog/retorno_case/retorno_venv/bin/python tests/energy_policy_smoke.py",
+  "scope_en": "Focused electrical, clock, inertial transit and antimatter checks only. No general audit or historical-test repairs.",
+  "scope_es": "Solo pruebas focalizadas eléctricas, relojes, tránsito inercial y antimateria. Sin auditoría general ni reparación de pruebas históricas.",
+  "checks": [
+    {
+      "name": "electrical_policy_smoke",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/energy_policy_smoke.py"
+      ],
+      "pythonpath": "src:.",
+      "exit_code": 0,
+      "seconds": 15.47,
+      "output": "ENERGY POLICY SMOKE PASSED"
+    },
+    {
+      "name": "focused_energy_clocks_antimatter",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_electrical_proper_time.py",
+        "tests/test_temporal_clocks.py",
+        "tests/engines_antimatter_smoke.py"
+      ],
+      "pythonpath": "src:.",
+      "exit_code": 0,
+      "seconds": 33.49,
+      "output": ".........................................         [100%]\n41 passed, 23 subtests passed in 32.97s"
+    },
+    {
+      "name": "inertial_module_regression",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_engine_speed_upgrade.py",
+        "-k",
+        "inertial_freeze"
+      ],
+      "pythonpath": "src:.",
+      "exit_code": 0,
+      "seconds": 1.65,
+      "output": ".                                                                        [100%]\n1 passed, 10 deselected in 1.26s"
+    },
+    {
+      "name": "manuals_style_and_pairs",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/manuals_style_check.py"
+      ],
+      "pythonpath": "src:.",
+      "exit_code": 0,
+      "seconds": 0.07,
+      "output": "MANUAL STYLE CHECK PASSED"
+    }
+  ]
+}

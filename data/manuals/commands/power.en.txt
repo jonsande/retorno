@@ -7,6 +7,8 @@ Purpose
 - Inspect and control electrical posture of RETORNO.
 
 Operational model
+- Generation and demand are onboard kW; the battery stores kWh. Charge/discharge, brownout persistence and low-quality automatic shedding timers use ship proper time.
+- At rest the electrical interval matches galactic time. During transit it uses the frozen departure speed; arrival separates movement from rest. Hibernation does not apply the biological ageing factor to electricity.
 - `power status`: shows SoC, `P_gen`, `P_load`, `Q`, brownout, and margins.
 - `power plan cruise|normal`: applies profile-level load policy.
 - `power on/off <system_id>`: manual power shedding/restoration for a subsystem.

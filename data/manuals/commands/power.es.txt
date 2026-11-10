@@ -7,6 +7,8 @@ Propósito
 - Inspeccionar y controlar la postura eléctrica de RETORNO.
 
 Modelo operativo
+- Generación y demanda son kW a bordo; la batería almacena kWh. Carga/descarga, persistencia del brownout y temporizadores de apagado por baja calidad usan tiempo propio de la nave.
+- En reposo el intervalo eléctrico coincide con el galáctico. En tránsito usa la velocidad congelada de salida; la llegada separa movimiento y reposo. Hibernar no aplica el factor de envejecimiento biológico a la electricidad.
 - `power status`: muestra SoC, `P_gen`, `P_load`, `Q`, brownout y márgenes.
 - `power plan cruise|normal`: aplica política de carga a nivel de perfil.
 - `power on/off <system_id>`: corte/restauración manual de energía por subsistema.

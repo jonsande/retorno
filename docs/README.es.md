@@ -20,6 +20,7 @@ Versión inglesa: [README.md](README.md)
 
 | Documento | Finalidad | Estado |
 | --- | --- | --- |
+| [Electricidad en tiempo propio](systems/electrical-proper-time.es.md) | kW/kWh a bordo, batería, temporizadores de regulación y tramos eléctricos de llegada. | T-04B1 implementado; otros dominios temporales conservados. |
 | [Autorretorno preventivo de drones](systems/drone-autorecall.es.md) | Admisión con reserva de batería, prioridad de retorno y diagnóstico público de bloqueos. | Implementado; reglas compartidas CLI/Textual. |
 | [Motores y antimateria](systems/engines-antimatter.es.md) | Integridad, velocidad por estado, crucero inercial, módulos independientes y consumo de cápsulas. | Implementado con balance provisional de CANON v0.5.0. |
 | [Universo físico y generación procedural](systems/world-generation.es.md) | Referencia canónica del modelo espacial, regiones, sectores, worldgen, topología, contenido authored y determinismo. | **Verificado** para la integración 4D-3e2 en el árbol basado en `5cdde28`, pendiente de revisión externa. Documenta las lagunas conocidas y el efecto materializador del diagnóstico de sector; no cubre en profundidad navegación, lore o failsafes. |

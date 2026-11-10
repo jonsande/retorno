@@ -5,6 +5,7 @@ Propósito
 
 Comportamiento operativo
 - Diseñado como comando de primera lectura tras despertar, incidente o acción mayor.
+- Enumera tres relojes separados desde el inicio de la misión: tiempo galáctico, tiempo propio de la nave (con dilatación temporal relativista) y tiempo biológico del personaje (que contempla además la hibernación).
 
 Notas de uso
 - Úsalo como entrada y profundiza con `alerts`, `diag`, `jobs` y comandos de dominio.

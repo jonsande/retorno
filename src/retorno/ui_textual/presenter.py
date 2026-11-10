@@ -4,7 +4,6 @@ import io
 from contextlib import redirect_stdout
 
 from retorno.cli import repl
-from retorno.util.timefmt import format_elapsed_short
 from retorno.config.balance import Balance
 from retorno.runtime.operator_config import resolve_help_verbose
 
@@ -41,7 +40,7 @@ def build_header(state) -> str:
         node_name = node.name if node else loc_id
         status_label = repl._orbit_status_label(state, loc_id)
         loc = f"{loc_id} ({node_name}) [{status_label}]"
-    elapsed = format_elapsed_short(state.clock.t, include_seconds=True)
+    elapsed = " | ".join(repl.clock_readouts(state, compact=True))
     return repl.public_text(state, f"{elapsed} | ship_mode={mode} | {loc}")
 
 
@@ -76,7 +75,7 @@ def build_status_lines(state) -> list[str]:
             parts = [p for p in compact.split() if not (p.startswith("svc=") or p.startswith("running="))]
             compact = " ".join(parts)
             sys_lines.append(compact)
-    return [repl.public_text(state, repl.speed_readout(state)), *sys_lines] if sys_lines else lines
+    return sys_lines
 
 
 def build_alerts_lines(state) -> list[str]:

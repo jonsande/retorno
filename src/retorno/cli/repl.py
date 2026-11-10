@@ -389,7 +389,7 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
             "Info",
             "Información",
             [
-                ("status", "show ship/system status", "muestra estado de nave/sistemas"),
+                ("status", "show ship/system status and all three clocks", "muestra estado de nave/sistemas y los tres relojes"),
                 ("jobs", "show active jobs", "muestra trabajos activos"),
                 ("jobs <amount>", "show first N active jobs", "muestra primeros N trabajos activos"),
                 ("jobs all", "show all active jobs", "muestra todos los trabajos activos"),
@@ -2023,6 +2023,28 @@ def _radiation_level_label(locale: str, level: str) -> str:
     return labels.get(locale, labels["en"]).get(level, level)
 
 
+def clock_readouts(state, *, compact: bool = False) -> list[str]:
+    """Shared read-only clock labels and values for status and the UI header."""
+    es = state.os.locale.value == "es"
+    if compact:
+        labels = ("G", "S", "P")
+    else:
+        labels = (
+            ("Tiempo galáctico", "Tiempo de la nave", "Tiempo del personaje (biológico)")
+            if es else ("Galactic time", "Ship time", "Player time (biological)")
+        )
+    values = (state.clock.t, state.clock.ship_elapsed_s, state.clock.bio_elapsed_s)
+    lines = []
+    for label, value in zip(labels, values):
+        elapsed = format_elapsed_short(value, include_seconds=True) if compact else format_elapsed_long(value)
+        if es:
+            elapsed = elapsed.replace("T+Y", "T+A").replace("Year ", "Año ").replace("Day ", "Día ")
+        if compact:
+            elapsed = elapsed.removeprefix("T+")
+        lines.append(f"{label}: {elapsed}")
+    return lines
+
+
 @public_output
 def render_status(state) -> None:
     ship = state.ship
@@ -2033,7 +2055,8 @@ def render_status(state) -> None:
     deficit = max(0.0, p.p_load_kw - p.p_gen_kw)
     headroom = p.p_discharge_max_kw - deficit
     print("\n=== STATUS ===")
-    print(f"time: {format_elapsed_long(state.clock.t)}")
+    for clock_line in clock_readouts(state):
+        print(clock_line)
     print(speed_readout(state))
     if ship.op_mode == "CRUISE":
         source = ship.op_mode_source or "manual"

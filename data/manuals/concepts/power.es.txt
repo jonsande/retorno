@@ -3,6 +3,9 @@ Ref: OS-MAN/ENG/POWER-01
 
 La terminal del sarcófago informa del estado eléctrico con cinco valores:
 
+Potencia y energía a bordo
+P_gen y P_load son kW medidos a bordo; la energía almacenada en batería se expresa en kWh. La carga/descarga ordinaria y los temporizadores internos de regulación eléctrica siguen el tiempo propio de la nave. En reposo coincide con el tiempo galáctico transcurrido. En crucero, la velocidad congelada de salida determina el intervalo a bordo; si se atraviesa una llegada se separan movimiento y reposo. Hibernar no ralentiza la electricidad por la tasa de envejecimiento biológico.
+
 SoC (State of Charge)
 Fracción de carga de la batería. 0.00 vacía, 1.00 llena.
 SoC amortigua déficits momentáneos y absorbe excedentes.

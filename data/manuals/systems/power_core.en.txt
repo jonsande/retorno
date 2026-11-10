@@ -4,6 +4,7 @@ Ref: OS-MAN/SYS/CORE-PWR
 `power_core` is RETORNO's compact nuclear fusion reactor. Its sealed internal fuel reserves support long-duration operation without an operator-managed consumable fuel. Antimatter capsules supply engines independently.
 
 Function
+- Output is onboard kW. Generation, demand and battery energy exchange are integrated over ship proper time; battery storage remains kWh. Power and capacity ratings are unchanged.
 - Converts fusion energy into ship-usable electrical output.
 - Provides baseline generation for all downstream subsystems.
 

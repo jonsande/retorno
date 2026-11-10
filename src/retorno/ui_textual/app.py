@@ -87,7 +87,8 @@ class RetornoTextualApp(App):
         scrollbar-corner-color: transparent;
     }
     #header {
-        height: 1;
+        height: auto;
+        min-height: 1;
         padding: 0 2;
         background: #002F69;
         color: #f2f2f2;

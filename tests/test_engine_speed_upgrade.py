@@ -323,7 +323,8 @@ class EngineSpeedUpgradeTests(unittest.TestCase):
             self.assertIn('0.8c', expected)
             self.assertIn(expected, output(repl.render_status, s))
             self.assertIn(expected, output(repl.render_diag, s, 'engines'))
-            self.assertIn(expected, presenter.build_status_lines(s))
+            self.assertNotIn(expected, presenter.build_status_lines(s))
+            self.assertTrue(any(line.startswith('engines ') for line in presenter.build_status_lines(s)))
             self.assertEqual(presenter.build_command_output(repl.render_nav_routes, s),
                              output(repl.render_nav_routes, s).strip().splitlines())
             for module in (SPEED, EFFICIENCY):

@@ -13,6 +13,15 @@
 
 # RETORNO — Modelo temporal, hibernación y edad biológica
 
+> **T-04B1 (2026-11-10), electricidad implementada / implemented electricity:**
+> Generación y demanda son kW a bordo; batería en kWh. Integración y temporizadores
+> de regulación eléctrica usan tiempo propio, con tramos separados en la llegada.
+> Los demás consumidores conservan el intervalo galáctico y su frecuencia de llamadas.
+> / Generation and demand are onboard kW; storage is kWh. Electrical integration
+> and regulation timers use proper time, with separate legs at arrival. Other
+> consumers retain their galactic interval and call cadence.
+> [ES](../systems/electrical-proper-time.es.md) · [EN](../systems/electrical-proper-time.md).
+
 > **T-04A (2026-11-09), velocidad inercial implementada / implemented inertial speed:**
 > El atributo de crucero es ahora referencia nominal; `effective_cruise_speed()`
 > aplica el estado de engines y el módulo independiente de velocidad. Cada salida
@@ -40,12 +49,12 @@
 > splits moving/rest intervals for clocks only. Biological ageing equals proper
 > time awake, or proper time times the configurable nominal rate when hibernating.
 >
-> **T-04 pendiente / pending:** energía, trabajos, desgaste y demás consumidores
-> conservan su tiempo galáctico actual. Una emergencia detectada al final de un
+> **Pendiente tras T-04B1 / pending after T-04B1:** trabajos, desgaste y demás
+> consumidores no eléctricos conservan su tiempo galáctico actual. Una emergencia detectada al final de un
 > bloque de hibernación aún contabiliza todo el bloque como hibernado; no se
 > reconstruye el instante físico del fallo ni se cambia el margen de 300 s.
 > Eficacia según `life_support`, interfaces y gravedad quedan pendientes.
-> / Existing consumers retain galactic time. An emergency detected at a block's
+> / Non-electrical consumers retain galactic time. An emergency detected at a block's
 > end still counts the whole block as hibernation; the physical failure instant
 > is not reconstructed and the 300-second grace is unchanged. Life-support
 > effectiveness, clock displays and gravity remain pending.

@@ -148,6 +148,7 @@ _PATH_RE = re.compile(r"(?<!\w)(/(?:[A-Za-z0-9._-]+/?)+)")
 _QUOTED_RE = re.compile(r"'[^']+'")
 _TIP_RE = re.compile(r"^(Tip:|Consejo:)")
 _LABEL_RE = re.compile(r"^(\s*(?:- |\* )?)([A-Za-z_][A-Za-z0-9_ /()\-]*:)")
+_CLOCK_LABEL_RE = re.compile(r"(?:^|\| )([GSP]:)(?= [YA]\d)")
 
 
 def theme_presets() -> tuple[str, ...]:
@@ -328,6 +329,9 @@ def _line_spans(line: str) -> list[tuple[int, int, str]]:
         for index in range(start, end):
             claims[index] = True
         spans.append((start, end, role))
+
+    for match in _CLOCK_LABEL_RE.finditer(line):
+        claim(match.start(1), match.end(1), "muted")
 
     label_match = _LABEL_RE.match(line)
     if label_match:

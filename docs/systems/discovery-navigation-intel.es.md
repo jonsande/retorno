@@ -575,7 +575,9 @@ La salida registra `transit_speed_ly_per_year`; ETA y velocidad usada por el
 tiempo propio quedan fijas hasta llegada/aborto, pese a cambios posteriores del
 motor. Se cobra antimateria una vez al salir hacia un destino interestelar,
 sin reembolso por aborto; véase [motores y antimateria](engines-antimatter.es.md).
-Los demás subsistemas conservan su dominio de tiempo galáctico existente.
+Los demás subsistemas conservan su dominio galáctico, salvo electricidad
+ordinaria y regulación eléctrica, convertidas por [T-04B1](electrical-proper-time.es.md)
+a tiempo propio de nave.
 
 Al llegar, el nodo pasa a `visited_nodes`, se actualiza la posición, se cierra
 su ventana de pool y se elimina el placeholder inicial `UNKNOWN` cuando
