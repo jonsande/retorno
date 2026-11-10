@@ -21,7 +21,7 @@ Impacto en comandos por estado
 - status y diag engines distinguen velocidad disponible para salir y velocidad real en tránsito; nav map routes y la confirmación incluyen duración galáctica estimada.
 - OFFLINE, apagado forzado o CRITICAL: salida bloqueada. Usa power on engines o repara según diag engines.
 - DAMAGED o superior: salida permitida si se cumplen los demás requisitos.
-- El desgaste reduce la eficiencia continuamente, incluso dentro de una banda de estado; reparar recupera eficiencia.
+- El desgaste ordinario sigue el tiempo propio de la nave, con los modificadores eléctricos, de radiación y perfil operativo existentes. Reduce eficiencia continuamente dentro de cada banda; reparar recupera eficiencia.
 - Los viajes locales no consumen antimateria. Para salidas interestelares la estimación actual es:
   coste = (0.5 + distancia_ly / 10) * (1 + 1.5 * (1 - integridad_normalizada)^2) * multiplicador_mejora.
 - integridad_normalizada es integridad dividida por máximo efectivo, limitada a 0..1.

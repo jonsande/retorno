@@ -1,0 +1,175 @@
+{
+  "task": "RETORNO T-04B2",
+  "date": "2026-11-10",
+  "archive": "retorno-T-04B2.zip",
+  "base_branch": "main",
+  "base_head": "1b963eac3da5905549ce00209dfc3c6c84cdce52",
+  "initial_worktree": "clean",
+  "paths_en": "All file paths are relative to the repository root.",
+  "paths_es": "Todas las rutas son relativas a la raíz del repositorio.",
+  "files": [
+    {
+      "path": "data/manuals/concepts/radiation.en.txt",
+      "status": "modified",
+      "bytes": 2507,
+      "sha256": "044325f2a5d065111f9efc50739b495adcc05a06d7dd0f34118940fb1eb9bc11"
+    },
+    {
+      "path": "data/manuals/concepts/radiation.es.txt",
+      "status": "modified",
+      "bytes": 2716,
+      "sha256": "558857f511441c8f5ad70ef7198b6e984704f3d47d29365b4442a170d8042a5d"
+    },
+    {
+      "path": "data/manuals/concepts/systems.en.txt",
+      "status": "modified",
+      "bytes": 8717,
+      "sha256": "d001a6d6e10ef854922ed7400158c06084c07ee8d17d5c8b30b0465e1d75819f"
+    },
+    {
+      "path": "data/manuals/concepts/systems.es.txt",
+      "status": "modified",
+      "bytes": 9283,
+      "sha256": "26bb51780e3ff5a8ed80438ed68d35f9f6f463763ff579cd76beab94151d7c39"
+    },
+    {
+      "path": "data/manuals/systems/engines.en.txt",
+      "status": "modified",
+      "bytes": 3857,
+      "sha256": "fa32adff2d2a1ccfa25ac86c427677e568b8a2ecf64ced7549500af822b2b0f1"
+    },
+    {
+      "path": "data/manuals/systems/engines.es.txt",
+      "status": "modified",
+      "bytes": 4131,
+      "sha256": "233c898b43f89150389d2060805f1d2b41f8d7bdadf792f8486462eadfdd1528"
+    },
+    {
+      "path": "docs/README.es.md",
+      "status": "modified",
+      "bytes": 10703,
+      "sha256": "735be096fd32d3e709acd458e0ec99bb079f46310ed6d3b36d9459a838bd250f"
+    },
+    {
+      "path": "docs/README.md",
+      "status": "modified",
+      "bytes": 10099,
+      "sha256": "d10f9e961e141a499deea9473ebb229b28b461a7bf068fbe1f89de38dd3f4648"
+    },
+    {
+      "path": "docs/design/modelo_temporal_hibernacion.md",
+      "status": "modified",
+      "bytes": 17931,
+      "sha256": "8480c56525c0300b6f9bcd9211c363c58fd1ff67d15297f006672d26822ef2ab"
+    },
+    {
+      "path": "docs/systems/discovery-navigation-intel.es.md",
+      "status": "modified",
+      "bytes": 58800,
+      "sha256": "b225b1a623f8900e62bed2699b02fdf1ae1b5fe7bf0ac51678bda12930978eab"
+    },
+    {
+      "path": "docs/systems/discovery-navigation-intel.md",
+      "status": "modified",
+      "bytes": 54258,
+      "sha256": "7951923d6108334f08456708fec1eccfbd48c40f76c1cef3d4a99eec143dc282"
+    },
+    {
+      "path": "docs/systems/electrical-proper-time.es.md",
+      "status": "modified",
+      "bytes": 4933,
+      "sha256": "a415285b3cbc8b3145d4ae9412c1908bc9f6bf503406842d3fa376da39e8db95"
+    },
+    {
+      "path": "docs/systems/electrical-proper-time.md",
+      "status": "modified",
+      "bytes": 4746,
+      "sha256": "e5b390c52af926e480f74499a76563c923766c5852932898f685fbd73bb06df0"
+    },
+    {
+      "path": "docs/systems/engines-antimatter.es.md",
+      "status": "modified",
+      "bytes": 10530,
+      "sha256": "bcc089fbb705331fd4a5bf08130ee695601e095d33ca2f6be8bc85ebaa0f5b29"
+    },
+    {
+      "path": "docs/systems/engines-antimatter.md",
+      "status": "modified",
+      "bytes": 9793,
+      "sha256": "39330e4d710abc049da53f9396a6f1ef4a1ec4e897906bcb2599cd9ecddabca6"
+    },
+    {
+      "path": "docs/systems/wear-proper-time.es.md",
+      "status": "added",
+      "bytes": 5286,
+      "sha256": "1dd7ce615ad2bb8f7b26b6ba904c8edaf1a4b069c9765d2e071d4cb61311f38d"
+    },
+    {
+      "path": "docs/systems/wear-proper-time.md",
+      "status": "added",
+      "bytes": 5115,
+      "sha256": "e9a5375e6377a9d25cfcded6ccf5ff495ffdc543fc03ae3cfd40288316211460"
+    },
+    {
+      "path": "docs/testing/wear-proper-time-results.json",
+      "status": "added",
+      "bytes": 3952,
+      "sha256": "daba7ef8e0300ed7e4badedd7eeaedd72a2f8758894561b67ab613fc24b6d1ca"
+    },
+    {
+      "path": "docs/testing/wear-proper-time-review.es.md",
+      "status": "added",
+      "bytes": 4370,
+      "sha256": "85c05e353394ebc4c877839320ce6a681fc7497367d01ac21cf5d45b564ca570"
+    },
+    {
+      "path": "docs/testing/wear-proper-time-review.md",
+      "status": "added",
+      "bytes": 4102,
+      "sha256": "e9f1e544e320c8c0b23d61aef9558abe604bab5653afd99dea7c305c2f0087eb"
+    },
+    {
+      "path": "retorno-T-04B2-manifest.json",
+      "status": "added",
+      "note_en": "The manifest SHA-256 is recorded in the ZIP comment to avoid a recursive self-hash.",
+      "note_es": "El SHA-256 del manifiesto está en el comentario del ZIP para evitar un hash recursivo."
+    },
+    {
+      "path": "src/retorno/core/engine.py",
+      "status": "modified",
+      "bytes": 346631,
+      "sha256": "1b7653d3e3224131fd6002ff950bef6ed2a43884c99d0259e3b5efd92548f5a8"
+    },
+    {
+      "path": "tests/test_electrical_proper_time.py",
+      "status": "modified",
+      "bytes": 16956,
+      "sha256": "149eefb2d265e60b85d2c40862d9681316d47c7d00b0bde835c006c0e4ca610d"
+    },
+    {
+      "path": "tests/test_engine_speed_upgrade.py",
+      "status": "modified",
+      "bytes": 21097,
+      "sha256": "ae66e20537e57b8a88a27e80ffe4de6b463e190b3e6c4fb63ec0658948739741"
+    },
+    {
+      "path": "tests/test_wear_proper_time.py",
+      "status": "added",
+      "bytes": 15850,
+      "sha256": "2ef7ae4038352e4d542c99515454bdf12aacf2c5a5179514921575a5259f69a4"
+    }
+  ],
+  "renamed": [],
+  "deleted": [],
+  "preexisting_local_changes": [],
+  "unchanged_excluded_files": [
+    "TODO.md",
+    "docs/canon/universo.md",
+    "src/retorno/config/balance.py"
+  ],
+  "exclusions_en": "No .git, environments, caches, saved games, previous deliverables or unrelated files.",
+  "exclusions_es": "Sin .git, entornos, cachés, partidas, entregas anteriores ni archivos ajenos.",
+  "validation_evidence": "docs/testing/wear-proper-time-results.json",
+  "validation_en": "70 tests and 80 subtests PASS; electrical/interpolation smoke and EN/ES manuals PASS. Existing radiation_hull_smoke failure reproduced before and after without repair.",
+  "validation_es": "70 pruebas y 80 subpruebas PASS; smokes eléctrico/interpolación y manuales EN/ES PASS. Fallo existente de radiation_hull_smoke reproducido antes y después sin reparar."
+}

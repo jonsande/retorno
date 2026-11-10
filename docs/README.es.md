@@ -20,6 +20,7 @@ Versión inglesa: [README.md](README.md)
 
 | Documento | Finalidad | Estado |
 | --- | --- | --- |
+| [Desgaste ordinario en tiempo propio](systems/wear-proper-time.es.md) | Envejecimiento de sistemas/casco, muestras de llegada, modificadores y límites de radiación. | T-04B2 implementado; sin cambios de navegación/economía v0.6. |
 | [Electricidad en tiempo propio](systems/electrical-proper-time.es.md) | kW/kWh a bordo, batería, temporizadores de regulación y tramos eléctricos de llegada. | T-04B1 implementado; otros dominios temporales conservados. |
 | [Autorretorno preventivo de drones](systems/drone-autorecall.es.md) | Admisión con reserva de batería, prioridad de retorno y diagnóstico público de bloqueos. | Implementado; reglas compartidas CLI/Textual. |
 | [Motores y antimateria](systems/engines-antimatter.es.md) | Integridad, velocidad por estado, crucero inercial, módulos independientes y consumo de cápsulas. | Implementado con balance provisional de CANON v0.5.0. |

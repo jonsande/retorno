@@ -289,7 +289,7 @@ Quedan pendientes las probabilidades y ubicaciones de recuperación, las alterna
 
 ### A-TECH-005 — Coherencia temporal del desgaste y maniobras locales [A]
 
-El principio `C-TIME-003` establece que los procesos físicos y el envejecimiento de los componentes de la nave deben regirse por el **tiempo propio**. En la implementación examinada durante esta revisión, el desgaste de sistemas del motor todavía utiliza el **delta de tiempo galáctico**, aunque los relojes propio y biológico se calculan por separado. Se registra esta **discrepancia entre canon y código** para auditoría técnica: no debe naturalizarse como verdad del universo ni corregirse accidentalmente dentro de una modificación de velocidades sin comprobar su impacto en el balance, pruebas y mantenimiento de sistemas.
+El principio C-TIME-003 establece que los procesos físicos y el envejecimiento de los componentes de la nave deben regirse por el tiempo propio. Desde T-04B2, el deterioro ordinario de los sistemas y del casco se integra en tiempo propio, separando los tramos de tránsito y reposo cuando corresponde y conservando los modificadores operativos existentes. La discrepancia original entre canon e implementación queda resuelta para estos procesos. Permanecen pendientes la revisión de la exposición ambiental por tramos y la migración temporal de otros subsistemas físicos.
 
 También permanecen abiertos los controles separados de maniobra local, las aceleraciones/desaceleraciones físicas y una eventual modificación de velocidad durante el tránsito. La primera implementación de `engines speed` no altera el movimiento local.
 
@@ -421,7 +421,7 @@ Esta misma lectura debe aplicarse al contenido narrativo asignado durante la par
 | **A-TECH-002** | Segundo recurso de materia ordinaria | Posibilidad futura, aún no decidida, de recuperar y consumir también materia ordinaria. |
 | **A-TECH-003** | Física de detalle | Masa de reacción, tobera, confinamiento de largo plazo y límites de las reservas. |
 | **A-TECH-004** | Abastecimiento y agotamiento | Recuperación procedural y alternativas ante la falta total de antimateria, deliberadamente pendientes. |
-| **A-TECH-005** | Desgaste y tiempo propio | Revisar discrepancia entre `C-TIME-003` y degradación calculada actualmente con tiempo galáctico; controles locales y cambios de velocidad en ruta siguen abiertos. |
+| **A-TECH-005** | Desgaste y tiempo propio | Desgaste ordinario de sistemas y casco migrado a tiempo propio en T-04B2. Pendientes exposición ambiental por tramos, maniobras locales y cambios de velocidad durante el tránsito. |
 | **A-TIME-003** | Modelo matemático de los relojes | Convención del tiempo galáctico, integración del tiempo propio y tratamiento coherente de la relatividad. |
 | **A-BIO-001** | Químicos y condiciones de hibernación | Existencias, consumo, suministro, carencias y sus efectos mecánicos. |
 | **A-BIO-002** | Daño y eficacia de `life_support` | Fórmula efectiva, umbrales, comportamiento en fallos y consulta al jugador. |

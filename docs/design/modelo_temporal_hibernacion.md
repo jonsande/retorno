@@ -13,6 +13,17 @@
 
 # RETORNO — Modelo temporal, hibernación y edad biológica
 
+> **T-04B2, desgaste ordinario implementado / implemented ordinary wear:**
+> Sistemas y casco envejecen en tiempo propio, conservando tasas y modificadores.
+> En la llegada se reutilizan los tramos eléctricos y sus condiciones muestreadas,
+> sin repetir jobs, narrativa ni radio. Dosis, drones y reglas de soporte vital
+> siguen pendientes de migración temporal. No se implementa selección de velocidad
+> ni economía de antimateria v0.6. / Systems and hull age in proper time, retaining
+> rates and modifiers. Arrival reuses electrical segments and their sampled
+> conditions without repeating jobs, narrative or radio. Dose, drones and life-
+> support rules remain unconverted. No v0.6 speed selection or antimatter economy
+> is implemented. [ES](../systems/wear-proper-time.es.md) · [EN](../systems/wear-proper-time.md).
+
 > **T-04B1 (2026-11-10), electricidad implementada / implemented electricity:**
 > Generación y demanda son kW a bordo; batería en kWh. Integración y temporizadores
 > de regulación eléctrica usan tiempo propio, con tramos separados en la llegada.
@@ -49,12 +60,12 @@
 > splits moving/rest intervals for clocks only. Biological ageing equals proper
 > time awake, or proper time times the configurable nominal rate when hibernating.
 >
-> **Pendiente tras T-04B1 / pending after T-04B1:** trabajos, desgaste y demás
-> consumidores no eléctricos conservan su tiempo galáctico actual. Una emergencia detectada al final de un
+> **Pendiente tras T-04B2 / pending after T-04B2:** trabajos, dosis y drones,
+> entre otros consumidores no migrados, conservan su tiempo galáctico actual. Una emergencia detectada al final de un
 > bloque de hibernación aún contabiliza todo el bloque como hibernado; no se
 > reconstruye el instante físico del fallo ni se cambia el margen de 300 s.
 > Eficacia según `life_support`, interfaces y gravedad quedan pendientes.
-> / Non-electrical consumers retain galactic time. An emergency detected at a block's
+> / Unconverted consumers (jobs, dose and drones among others) retain galactic time. An emergency detected at a block's
 > end still counts the whole block as hibernation; the physical failure instant
 > is not reconstructed and the 300-second grace is unchanged. Life-support
 > effectiveness, clock displays and gravity remain pending.

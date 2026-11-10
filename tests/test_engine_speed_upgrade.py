@@ -19,6 +19,7 @@ from retorno.cli.parser import parse_command
 from retorno.config.balance import Balance
 from retorno.core.actions import PowerPlan, PowerShed, Repair, SystemOn, Travel, TravelAbort
 from retorno.core.engine import Engine
+from retorno.core.temporal import proper_time_interval
 from retorno.io.save_load import SaveLoadError, load_single_slot, save_single_slot
 from retorno.model.drones import DroneLocation, DroneStatus
 from retorno.model.events import EventType
@@ -213,7 +214,8 @@ class EngineSpeedUpgradeTests(unittest.TestCase):
         before = s.clock.ship_elapsed_s
         self.engine.apply_action(s, Travel(node_id=target))
         arrival, fuel = s.ship.arrival_t, s.ship.antimatter_capsules
-        self.system.base_decay_per_s = .01
+        # Accelerated fixture wear is now per onboard second (T-04B2).
+        self.system.base_decay_per_s = .01 / proper_time_interval(1, .8)
         self.engine.tick(s, 50)
         self.assertEqual(self.system.state, SystemState.DAMAGED)
         self.assertEqual(s.ship.transit_speed_ly_per_year, .8)

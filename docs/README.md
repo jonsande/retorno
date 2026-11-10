@@ -20,6 +20,7 @@ Spanish version: [README.es.md](README.es.md)
 
 | Document | Purpose | Status |
 | --- | --- | --- |
+| [Ordinary ship wear in proper time](systems/wear-proper-time.md) | System/hull ageing, arrival samples, retained modifiers and radiation limits. | T-04B2 implemented; no v0.6 navigation/economy changes. |
 | [Electricity in ship proper time](systems/electrical-proper-time.md) | Onboard kW/kWh, battery integration, regulation timers and electrical arrival segments. | Implemented T-04B1; other time domains preserved. |
 | [Preventive drone autorecall](systems/drone-autorecall.md) | Battery reserve admission, return priority and public block diagnostics. | Implemented; shared CLI/Textual rules. |
 | [Engines and antimatter](systems/engines-antimatter.md) | Propulsion integrity, state-dependent speed, inertial cruise, independent modules and capsule consumption. | Implemented with provisional CANON v0.5.0 balance. |

@@ -11,7 +11,7 @@ Model layers
 
 Environmental source
 - Out of transit: current node ambient radiation.
-- In transit: average ambient radiation between origin and destination nodes.
+- In transit: a point sample interpolated by route progress between origin and destination radiation. At arrival it reaches the destination value; it does not integrate the corridor continuously.
 - Docking does not create a separate transfer model; docked exposure follows node ambient conditions.
 - Radiation follows broad regional patterns plus local anomalies.
   - Region: `bulge` usually runs hotter than `disk`, and `disk` hotter than `halo`.
@@ -22,6 +22,10 @@ Hull interaction
 - Hull integrity (`hull`) is global ship protection state (`0..1`).
 - Lower hull integrity increases internal ingress.
 - Internal radiation amplifies subsystem degradation through each system `k_rad` factor.
+
+Time and exposure
+- Radiation still modifies ordinary system/hull ageing, which follows onboard proper time. This is distinct from accumulated drone dose, whose integration is unchanged.
+- No relativistic radiation-flow model is available; a coarse arrival sample does not reconstruct the environment experienced over the whole journey.
 
 Drone exposure
 - Non-docked drones accumulate dose continuously.

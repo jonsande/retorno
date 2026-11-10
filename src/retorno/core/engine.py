@@ -141,7 +141,8 @@ class Engine:
             return []
 
         # Integrate clocks from the initial transit state, before arrival changes it.
-        # Ordinary electricity uses proper time; other subsystems keep galactic dt.
+        # Electricity and ordinary ship wear use proper time; other consumers
+        # retain their existing galactic interval.
         moving_dt = 0.0
         beta = 0.0
         if state.ship.in_transit:
@@ -166,11 +167,26 @@ class Engine:
 
         # At arrival, first account for the in-flight electrical state. Running
         # the whole tick twice would also run jobs/narrative/radio twice. Instead
-        # only the electrical integrator gets a pre-arrival and post-arrival leg.
+        # the electrical integrator supplies both legs; wear retains their samples
+        # until its existing update stage.
         integrated_transit_power = moving_dt > 0.0 and state.clock.t >= state.ship.arrival_t
+        transit_wear_sample = None
         if integrated_transit_power:
             events.extend(self._enforce_distribution_collapse(state))
             events.extend(self._integrate_power_interval(state, moving_dt_ship))
+            # Keep this segment's electrical/operating conditions. Apply wear
+            # at its original tick stage, so jobs and electrical integration
+            # are not rerun or reordered. Radiation remains a point sample;
+            # at arrival the existing interpolation already reaches its endpoint.
+            moving_env_rad = self._compute_env_radiation_rad_per_s(state)
+            transit_wear_sample = (
+                state.ship.power.power_quality,
+                (state.ship.power.brownout
+                 and state.ship.power.brownout_sustained_s >= Balance.BROWNOUT_SUSTAINED_AFTER_S),
+                state.ship.op_mode,
+                moving_env_rad,
+                self._compute_internal_radiation_rad_per_s(state, moving_env_rad),
+            )
 
         arrived_this_tick = False
         if state.ship.in_transit and state.clock.t >= state.ship.arrival_t:
@@ -213,8 +229,8 @@ class Engine:
 
         events.extend(self._enforce_distribution_collapse(state))
 
-        # Only electricity is segmented at arrival; the other consumers below
-        # keep one galactic interval and their existing scheduler order.
+        # Electricity's existing arrival segments also supply the wear intervals.
+        # Jobs and narrative retain one galactic interval and their call order.
         electrical_dt = dt - moving_dt if integrated_transit_power else dt_ship
         if integrated_transit_power:
             state.ship.power.p_gen_kw = self._compute_p_gen(state)
@@ -230,8 +246,16 @@ class Engine:
         state.ship.radiation_env_rad_per_s = env_rad
         internal_rad = self._compute_internal_radiation_rad_per_s(state, env_rad)
         events.extend(self._update_ship_radiation_level_alerts(state, env_rad, internal_rad))
-        self._apply_hull_degradation(state, dt, env_rad)
-        events.extend(self._apply_degradation(state, dt, power_quality, brownout_sustained, internal_rad))
+        if transit_wear_sample is not None:
+            moving_q, moving_brownout, moving_mode, moving_env_rad, moving_internal_rad = transit_wear_sample
+            self._apply_hull_degradation(state, moving_dt_ship, moving_env_rad, in_transit=True)
+            events.extend(self._apply_degradation(
+                state, moving_dt_ship, moving_q, moving_brownout, moving_internal_rad,
+                in_transit=True, op_mode=moving_mode,
+            ))
+        if electrical_dt > 0.0:
+            self._apply_hull_degradation(state, electrical_dt, env_rad)
+            events.extend(self._apply_degradation(state, electrical_dt, power_quality, brownout_sustained, internal_rad))
         self._apply_radiation(state, dt, env_rad)
         self._update_drone_maintenance(state, dt)
         events.extend(self._update_drone_radiation_level_alerts(state))
@@ -5270,17 +5294,23 @@ class Engine:
     def _apply_degradation(
         self,
         state: GameState,
-        dt: float,
+        dt_ship: float,
         power_quality: float,
         brownout_sustained: bool,
         internal_rad: float,
+        *,
+        in_transit: bool | None = None,
+        op_mode: str | None = None,
     ) -> list[Event]:
+        """Ordinary system ageing in proper seconds; optional sampled flight context."""
         if state.os.god_active:
             return []
         internal_rad_norm = self._clamp(internal_rad / Balance.R_REF)
         events: list[Event] = []
         wear_mult = 1.0
-        if state.ship.in_transit and state.ship.op_mode != "CRUISE":
+        moving = state.ship.in_transit if in_transit is None else in_transit
+        mode = state.ship.op_mode if op_mode is None else op_mode
+        if moving and mode != "CRUISE":
             wear_mult = Balance.TRANSIT_WEAR_MULT_NORMAL
         for system in state.ship.systems.values():
             s_factor = 1.0 + system.k_power * (1.0 - power_quality) + system.k_rad * internal_rad_norm
@@ -5291,7 +5321,7 @@ class Engine:
                     s_factor *= Balance.BROWNOUT_DEGRADE_MULT_POWER_CORE
             system.health = max(
                 0.0,
-                system.health - system.base_decay_per_s * s_factor * wear_mult * dt,
+                system.health - system.base_decay_per_s * s_factor * wear_mult * dt_ship,
             )
             self._apply_health_state(system, state, events, cause="degradation")
         return events
@@ -6550,12 +6580,17 @@ class Engine:
         )
         return max(0.0, env_rad) * ingress
 
-    def _apply_hull_degradation(self, state: GameState, dt: float, env_rad: float) -> None:
+    def _apply_hull_degradation(
+        self, state: GameState, dt_ship: float, env_rad: float,
+        *, in_transit: bool | None = None,
+    ) -> None:
+        """Ordinary hull ageing in proper seconds, distinct from instantaneous damage."""
         env_norm = self._clamp(env_rad / Balance.HULL_RAD_REF) if Balance.HULL_RAD_REF > 0 else 0.0
         env_mult = 1.0 + env_norm * (Balance.HULL_RAD_DECAY_MULT_MAX - 1.0)
-        if state.ship.in_transit or state.ship.is_hibernating:
+        moving = state.ship.in_transit if in_transit is None else in_transit
+        if moving or state.ship.is_hibernating:
             env_mult *= Balance.HULL_TRANSIT_DECAY_MULT
-        amount = Balance.HULL_BASE_DECAY_PER_S * env_mult * dt
+        amount = Balance.HULL_BASE_DECAY_PER_S * env_mult * dt_ship
         self._damage_hull(state, amount)
 
     def _damage_hull(self, state: GameState, amount: float) -> None:

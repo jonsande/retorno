@@ -11,7 +11,7 @@ Capas del modelo
 
 Origen ambiental
 - Fuera de tránsito: radiación ambiental del nodo actual.
-- En tránsito: promedio de radiación ambiental entre origen y destino.
+- En tránsito: muestra puntual interpolada por avance del trayecto entre la radiación de origen y destino. Al llegar alcanza el valor de destino; no integra continuamente el corredor.
 - El acoplamiento no crea modelo de transferencia separado; la exposición acoplada sigue el nodo.
 - La radiación sigue patrones regionales amplios y también anomalías locales.
   - Región: `bulge` suele registrar más carga que `disk`, y `disk` más que `halo`.
@@ -22,6 +22,10 @@ Interacción con casco
 - La integridad de casco (`hull`) es protección global de nave (`0..1`).
 - Menor integridad de casco implica mayor ingreso interno.
 - La radiación interna amplifica degradación de subsistemas vía factor `k_rad` de cada sistema.
+
+Tiempo y exposición
+- La radiación sigue modificando el envejecimiento ordinario de sistemas/casco, que usa tiempo propio a bordo. Es distinto de la dosis acumulada de drones, cuya integración no cambia.
+- No hay modelo de flujo radiológico relativista; una muestra gruesa de llegada no reconstruye el entorno experimentado durante todo el viaje.
 
 Exposición de drones
 - Los drones no acoplados acumulan dosis de forma continua.

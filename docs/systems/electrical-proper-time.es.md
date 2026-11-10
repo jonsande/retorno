@@ -41,13 +41,14 @@ consumo en la llegada no puede aplicarse al tránsito anterior. El integrador
 eléctrico no invoca el scheduler narrativo, avanza relojes, procesa trabajos,
 cambia ubicación, aplica desgaste ni mantiene drones. No hay bucle por segundo.
 Se conservan las fronteras existentes de decisión de drones en `Engine.tick`;
-solo se divide la electricidad en la llegada dentro de cada intervalo. Los
+T-04B2 reutiliza también estos tramos para desgaste ordinario de sistemas/casco. Los
 eventos eléctricos mantienen la marca galáctica del tick que los contiene.
 
 `clock.t`, `last_dt`, ETA, eventos históricos, narrativa y radio siguen siendo
-galácticos. Trabajos, reparaciones, desgaste de sistemas/casco, radiación,
-consumo/carga/mantenimiento de drones y reglas de soporte vital/hibernación
-siguen recibiendo una vez su intervalo galáctico existente. El cobro de
+galácticos. T-04B2 convierte [desgaste ordinario de sistemas/casco](wear-proper-time.es.md)
+a tiempo propio sin cambiar esta política eléctrica. Trabajos, reparaciones,
+radiación, consumo/carga/mantenimiento de drones y reglas de soporte vital/
+hibernación siguen recibiendo una vez su intervalo galáctico existente. El cobro de
 antimateria y las reglas de aborto no cambian. Los guardados nuevos persisten
 valores y temporizadores eléctricos existentes sin campos nuevos, migraciones
 ni cambios de formato.
@@ -55,9 +56,9 @@ ni cambios de formato.
 Se explicitan las dependencias y límites existentes:
 
 - Brownout sostenido y calidad eléctrica siguen alimentando el modelo de
-  desgaste. El umbral de persistencia se mide ahora a bordo; la fórmula de
-  desgaste y su intervalo no cambian. Sus consecuencias pueden activarse en
-  otro momento galáctico, como exige la conversión del temporizador.
+  desgaste. El umbral de persistencia se mide a bordo. T-04B2 mide también a
+  bordo el intervalo de desgaste y conserva sus multiplicadores de calidad/
+  brownout. Estas muestras pueden activar consecuencias en otro momento galáctico.
 - Trabajos y soporte de drones ya consultan disponibilidad eléctrica. La energía
   distinta puede cambiar admisión/soporte, pero no convierte sus duraciones,
   consumo ni mantenimiento. No se añade coste eléctrico para drones.

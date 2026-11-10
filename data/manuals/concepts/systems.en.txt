@@ -5,6 +5,11 @@ System maintenance is not secondary work: it is a ship survival condition.
 In RETORNO, letting one system degrade affects more than that subsystem; it drags power quality (Q),
 consumption, command availability, and, eventually, host viability.
 
+Ordinary ageing aboard
+- Ordinary system and hull wear follows ship proper time. At rest it matches galactic elapsed time; during travel it follows the frozen cruise speed.
+- Electrical instability, sustained brownout, radiation pressure and transit/operating profile still modify wear. Hibernation does not apply the biological ageing factor to machinery.
+- Arrival separates moving and stationary wear. Damage can restrict the next departure; it does not change the current inertial speed or arrival time.
+
 Recommended operational priority
 1) Keep the critical base alive: life_support, core_os, power_core, energy_distribution.
 2) Restore electrical stability (Q) before complex operations.

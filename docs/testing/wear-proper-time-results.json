@@ -1,0 +1,93 @@
+{
+  "task": "RETORNO T-04B2",
+  "base_branch": "main",
+  "base_head": "1b963eac3da5905549ce00209dfc3c6c84cdce52",
+  "initial_worktree": "clean",
+  "baseline_focused_pytest": ".........................................................                        [100%]\n57 passed, 64 subtests passed in 49.65s",
+  "baseline_radiation_hull_existing_smoke": "Traceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/radiation_hull_smoke.py\", line 217, in <module>\n    main()\n  File \"/home/jon/prog/retorno_case/retorno/tests/radiation_hull_smoke.py\", line 183, in main\n    assert any(e.data.get(\"metric\") == \"env\" for e in ship_rad_events), ship_rad_events\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: []",
+  "unchanged_method_ast": [
+    "_integrate_power_interval",
+    "_update_battery",
+    "_compute_p_gen",
+    "_compute_load_kw",
+    "apply_action",
+    "engine_fuel_cost",
+    "_apply_radiation",
+    "_update_drone_maintenance",
+    "_apply_critical_system_consequences",
+    "_damage_hull"
+  ],
+  "canon_and_balance_unchanged": true,
+  "checks": [
+    {
+      "name": "electrical_policy_smoke",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/energy_policy_smoke.py"
+      ],
+      "pythonpath": "src:.",
+      "exit_code": 0,
+      "seconds": 14.82,
+      "classification": "pass",
+      "output": "ENERGY POLICY SMOKE PASSED"
+    },
+    {
+      "name": "focused_wear_energy_navigation_clocks_antimatter",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/test_wear_proper_time.py",
+        "tests/test_electrical_proper_time.py",
+        "tests/test_engine_speed_upgrade.py",
+        "tests/engines_antimatter_smoke.py",
+        "tests/test_temporal_clocks.py",
+        "tests/test_cruise_speed.py"
+      ],
+      "pythonpath": "src:.",
+      "exit_code": 0,
+      "seconds": 57.75,
+      "classification": "pass",
+      "output": "...................................... [ 54%]\n................................                                                                   [100%]\n70 passed, 80 subtests passed in 57.27s"
+    },
+    {
+      "name": "manual_style_en_es",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/manuals_style_check.py"
+      ],
+      "pythonpath": "src:.",
+      "exit_code": 0,
+      "seconds": 0.06,
+      "classification": "pass",
+      "output": "MANUAL STYLE CHECK PASSED"
+    },
+    {
+      "name": "radiation_hull_existing_smoke",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/radiation_hull_smoke.py"
+      ],
+      "pythonpath": "src:.",
+      "exit_code": 1,
+      "seconds": 4.91,
+      "classification": "documented_historical_failure",
+      "output": "Traceback (most recent call last):\n  File \"/home/jon/prog/retorno_case/retorno/tests/radiation_hull_smoke.py\", line 217, in <module>\n    main()\n  File \"/home/jon/prog/retorno_case/retorno/tests/radiation_hull_smoke.py\", line 183, in main\n    assert any(e.data.get(\"metric\") == \"env\" for e in ship_rad_events), ship_rad_events\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: []"
+    },
+    {
+      "name": "radiation_interpolation_smoke",
+      "command": [
+        "/home/jon/prog/retorno_case/retorno_venv/bin/python",
+        "tests/transit_radiation_progression_smoke.py"
+      ],
+      "pythonpath": "src:.",
+      "exit_code": 0,
+      "seconds": 0.38,
+      "classification": "pass",
+      "output": "TRANSIT RADIATION PROGRESSION SMOKE PASSED"
+    }
+  ],
+  "scope_en": "Focused checks only; no general audit, full suite or historical-test repair.",
+  "scope_es": "Solo comprobaciones focalizadas; sin auditoría general, batería global ni reparación histórica."
+}

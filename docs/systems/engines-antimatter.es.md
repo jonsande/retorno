@@ -124,8 +124,10 @@ alimentación, configuración nominal o finalización de módulos posteriores af
 a futuras salidas, nunca a velocidad, ETA o tiempo propio del viaje en curso.
 La llegada sigue separando movimiento y reposo; abortar termina el movimiento sin
 reembolso. No se simula aceleración ni frenado. T-04B1 integra electricidad
-ordinaria y regulación eléctrica en [tiempo propio](electrical-proper-time.es.md);
-desgaste, radiación, trabajos e hibernación conservan su integración galáctica.
+ordinaria y regulación eléctrica en [tiempo propio](electrical-proper-time.es.md).
+T-04B2 convierte además [desgaste ordinario de sistemas/casco](wear-proper-time.es.md);
+dosis, trabajos, mantenimiento de drones y reglas de soporte vital/hibernación
+conservan sus intervalos galácticos existentes.
 
 Guardar/cargar persiste ambos módulos y la velocidad congelada sin reconstruirla
 con el estado actual del motor. Se rechazan guardados interestelares activos sin

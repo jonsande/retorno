@@ -41,22 +41,23 @@ A change to generation or load at arrival cannot price the preceding transit.
 The electrical integrator does not invoke a narrative scheduler, advance clocks,
 process jobs, change location, apply wear or maintain drones. There is no
 per-second simulation loop. Existing drone decision boundaries in `Engine.tick`
-remain intact; only electricity is segmented at arrival inside each interval.
+remain intact; T-04B2 also reuses these segments for ordinary system/hull wear.
 Electrical events retain the existing enclosing tick's galactic timestamp.
 
 `clock.t`, `last_dt`, navigation ETA, historical events, narrative and radio
-remain galactic. Jobs, repairs, system/hull wear, radiation, drone consumption/
-charging/maintenance, and life-support/hibernation rules still receive their
-existing galactic interval once. Antimatter departure charging and abort rules
+remain galactic. T-04B2 converts [ordinary system/hull wear](wear-proper-time.md)
+to proper time without changing this electrical policy. Jobs, repairs, radiation,
+drone consumption/charging/maintenance and life-support/hibernation rules still
+receive their existing galactic interval once. Antimatter departure charging and abort rules
 are unchanged. New saves persist the existing power values and timers without
 new fields, migrations or changes to the save format.
 
 Existing dependencies and limits are explicit:
 
 - Sustained brownout and power quality still feed the existing wear model.
-  The persistence threshold is now measured onboard; the wear formula and its
-  integration interval remain unchanged. Physical consequences can therefore
-  activate at a different galactic time, as required by the timer conversion.
+  The persistence threshold is measured onboard. T-04B2 now also measures the
+  wear interval onboard, preserving its existing quality/brownout multipliers.
+  These sampled conditions can activate consequences at different galactic times.
 - Jobs and drone support already read electrical availability. Changed energy
   may change their admission/support, but their durations, drain and maintenance
   rates are not converted. No additional electrical cost for drones is added.

@@ -5,6 +5,11 @@ El mantenimiento de sistemas no es una tarea secundaria: es la condicion de supe
 En RETORNO, dejar que un sistema se degrade no solo afecta a ese subsistema; arrastra calidad de energia (Q),
 consumo, disponibilidad de comandos y, en cadena, la viabilidad de los sarcófagos.
 
+Envejecimiento ordinario a bordo
+- El desgaste ordinario de sistemas y casco sigue el tiempo propio de la nave. En reposo coincide con el galáctico; en viaje depende de la velocidad de crucero congelada.
+- Inestabilidad eléctrica, brownout sostenido, presión de radiación y perfil operativo/tránsito siguen modificando el desgaste. Hibernar no aplica el factor de edad biológica a la maquinaria.
+- La llegada separa desgaste en movimiento y en reposo. El daño puede restringir la siguiente salida; no cambia la velocidad inercial ni la llegada del viaje actual.
+
 Prioridad operativa recomendada
 1) Mantener viva la base critica: life_support, core_os, power_core, energy_distribution.
 2) Recuperar estabilidad electrica (Q) antes de operaciones complejas.

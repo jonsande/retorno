@@ -577,7 +577,8 @@ motor. Se cobra antimateria una vez al salir hacia un destino interestelar,
 sin reembolso por aborto; véase [motores y antimateria](engines-antimatter.es.md).
 Los demás subsistemas conservan su dominio galáctico, salvo electricidad
 ordinaria y regulación eléctrica, convertidas por [T-04B1](electrical-proper-time.es.md)
-a tiempo propio de nave.
+a tiempo propio de nave, y desgaste ordinario de sistemas/casco, convertido por
+[T-04B2](wear-proper-time.es.md).
 
 Al llegar, el nodo pasa a `visited_nodes`, se actualiza la posición, se cierra
 su ventana de pool y se elimina el placeholder inicial `UNKNOWN` cuando

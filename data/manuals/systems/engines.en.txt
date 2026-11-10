@@ -21,7 +21,7 @@ Command impact by state
 - status and diag engines distinguish available departure speed from actual transit speed; nav map routes and confirmation include estimated galactic duration.
 - OFFLINE, forced off or CRITICAL: departure blocked. Use power on engines or repair as indicated by diag engines.
 - DAMAGED or better: departure allowed when other requirements are met.
-- Wear reduces efficiency continuously, including within a state band; repair recovers efficiency.
+- Ordinary wear follows ship proper time, with the existing electrical, radiation and operating-profile modifiers. It reduces efficiency continuously within each state band; repair recovers efficiency.
 - Local travel consumes no antimatter. For interstellar departures the current estimate is:
   cost = (0.5 + distance_ly / 10) * (1 + 1.5 * (1 - normalized_integrity)^2) * upgrade_multiplier.
 - normalized_integrity is integrity divided by effective maximum, limited to 0..1.

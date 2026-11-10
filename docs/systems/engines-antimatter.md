@@ -118,8 +118,9 @@ wear, repair, power changes, nominal configuration or module completion affect
 future departures, never the ongoing speed, ETA or proper time. Arrival still
 splits moving/rest intervals; abort ends movement without a refund. No acceleration
 or braking is simulated. T-04B1 integrates ordinary electricity and electrical
-regulation in [ship proper time](electrical-proper-time.md); wear, radiation,
-jobs and hibernation retain their existing galactic time integration.
+regulation in [ship proper time](electrical-proper-time.md). T-04B2 also converts
+[ordinary system/hull wear](wear-proper-time.md); radiation dose, jobs, drone
+upkeep and life-support/hibernation rules retain their existing galactic intervals.
 
 Save/load persists both modules and frozen speed without reconstructing it from
 current engine state. Active interstellar saves without a valid positive frozen

@@ -558,7 +558,8 @@ time stay fixed until arrival/abort, despite subsequent engine changes.
 Antimatter is charged once at interstellar departure, with no abort refund;
 see [engines and antimatter](engines-antimatter.md). Other subsystems retain
 their existing galactic time domain, except ordinary electricity and electrical
-regulation, converted by [T-04B1](electrical-proper-time.md) to ship proper time.
+regulation, converted by [T-04B1](electrical-proper-time.md), and ordinary system/
+hull wear, converted by [T-04B2](wear-proper-time.md), to ship proper time.
 
 On arrival, the node enters `visited_nodes`, position is updated, its pool
 window closes, and the initial `UNKNOWN` placeholder is dropped when relevant.

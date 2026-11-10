@@ -1,4 +1,4 @@
-"""T-04B1: onboard electrical energy; other consumers retain galactic seconds."""
+"""T-04B1 electricity regressions, updated for T-04B2 ordinary ship wear."""
 from copy import deepcopy
 from dataclasses import asdict
 import math
@@ -126,7 +126,7 @@ class ElectricalProperTimeTests(unittest.TestCase):
             self.engine.tick(s, 20)
             self.assertAlmostEqual(p.brownout_sustained_s, 33.6)
             self.assertTrue(wear.call_args.args[3])
-            self.assertEqual(wear.call_args.args[1], 20)  # Wear domain is unchanged.
+            self.assertAlmostEqual(wear.call_args.args[1], proper_time_interval(20, .8))
         p.p_gen_base_kw = 10
         self.engine.apply_action(s, SystemOn(system_id='power_core'))
         self.engine.tick(s, 1)
@@ -252,7 +252,8 @@ class ElectricalProperTimeTests(unittest.TestCase):
     def test_frozen_speed_survives_engine_damage_and_nominal_reference_changes(self):
         s = self.depart()
         engines = s.ship.systems['engines']
-        engines.base_decay_per_s = .004
+        # Preserve this fixture's damaged-engine scenario in onboard seconds.
+        engines.base_decay_per_s = .004 / proper_time_interval(1, .8)
         self.engine.tick(s, 50)
         self.assertEqual(engines.state, SystemState.DAMAGED)
         self.assertEqual(s.ship.effective_cruise_speed(), .3)
@@ -309,7 +310,7 @@ class ElectricalProperTimeTests(unittest.TestCase):
         self.assertTrue(math.isclose(s.clock.ship_elapsed_s, .6*dt, rel_tol=1e-12))
         self.assertEqual(s.clock.t, dt)
 
-    def test_non_electrical_consumers_still_receive_one_galactic_interval(self):
+    def test_remaining_consumers_keep_galactic_time_while_wear_uses_arrival_segments(self):
         s = self.depart()
         s.ship.arrival_t = s.clock.t + 30
         with patch.object(self.engine, '_apply_degradation', wraps=self.engine._apply_degradation) as wear, \
@@ -318,9 +319,14 @@ class ElectricalProperTimeTests(unittest.TestCase):
              patch.object(self.engine, '_update_drone_maintenance', wraps=self.engine._update_drone_maintenance) as drones, \
              patch.object(self.engine, '_apply_critical_system_consequences', wraps=self.engine._apply_critical_system_consequences) as life_support:
             self.engine.tick(s, 100)
-        for consumer in (wear, hull, radiation, drones, life_support):
+        for consumer in (radiation, drones, life_support):
             self.assertEqual(consumer.call_count, 1)
             self.assertEqual(consumer.call_args.args[1], 100)
+        for consumer in (wear, hull):
+            self.assertEqual(consumer.call_count, 2)
+            self.assertAlmostEqual(consumer.call_args_list[0].args[1], 18)
+            self.assertEqual(consumer.call_args_list[0].kwargs['in_transit'], True)
+            self.assertEqual(consumer.call_args_list[1].args[1], 70)
 
 
 if __name__ == '__main__':
