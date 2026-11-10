@@ -4,7 +4,7 @@ Role
 - Ship engine metering and thrust-control efficiency package.
 
 Operational effect
-- Multiplies interstellar antimatter cost by 0.8: 20% less consumption at unchanged integrity.
+- Multiplies interstellar antimatter cost by 0.8: 20% less consumption at unchanged integrity and selected speed, including the speed-tier multiplier.
 - Does not repair engines or change their effective maximum integrity, travel speed or arrival time.
 - Local travel remains free of capsule consumption. Multiple copies do not compound the improvement.
 

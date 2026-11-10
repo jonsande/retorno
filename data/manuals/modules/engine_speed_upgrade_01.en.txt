@@ -4,9 +4,9 @@ Role
 - Ship engine cruise-speed package, independent of the antimatter efficiency package.
 
 Operational effect
-- Enables UPGRADED only while powered engines have nominal integrity. The standard profile offers 0.8c, compared with NOMINAL at 0.5c, LIMITED at 0.4c and DAMAGED at 0.3c.
-- Wear suspends the improvement below nominal integrity; repair restores it while a copy remains installed. Critical or offline engines block new departures.
-- Does not change antimatter consumption, integrity, maximum integrity or auxiliary electrical demand. Multiple copies do not compound the improvement.
+- Raises the cruise ceiling to 0.8c at nominal integrity, 0.6c at LIMITED and 0.4c at DAMAGED. Without this package the respective ceilings are 0.5c, 0.4c and 0.3c. UPGRADED is shown only with nominal integrity.
+- Wear reduces the ceiling; repair recovers it while installed. Critical/offline engines block departures. An explicit target above a reduced ceiling stays selected and blocks the next interstellar departure until repaired or reconfigured.
+- No direct fuel change at the same selected speed/integrity; no integrity, maximum-integrity or electrical effect. With engines speed max, the higher speed increases fuel cost according to its speed tier. Copies do not stack.
 - Local travel keeps its independent 20 km/s speed and existing engine requirements.
 - Each interstellar departure fixes cruise speed, arrival time and the speed used by onboard clocks for that whole journey. Later wear, repairs or module changes affect future departures.
 
@@ -17,3 +17,4 @@ Integration notes
 - engine_efficiency_upgrade_01 can remain installed simultaneously; it changes only antimatter cost.
 - Compare nav map routes and diag engines; status distinguishes available speed from actual transit speed.
 - Installation and removal retain ordinary drone task restrictions, including restrictions on requesting new tasks during transit.
+- Query/select with engines speed, engines speed max or engines speed 0.3; consult man engine_speed. A fixed target is not lowered silently when the last copy is removed.

@@ -549,8 +549,11 @@ For very local distances in the same sector, `fine_ranges_km` permits travel
 time in kilometers; other travel uses light-year distance and cruise speed.
 `ShipState.cruise_speed_ly_per_year` is the configurable nominal reference,
 initially 0.5 ly per 365-day year. `ShipState.effective_cruise_speed()` applies
-the engine state profile: initially 0.8c UPGRADED (speed module required), 0.5c
-NOMINAL, 0.4c LIMITED and 0.3c DAMAGED. CRITICAL/OFFLINE block departure.
+the persistent target selected by engines speed. max resolves the health/equipment
+ceiling at each departure (default nominal/LIMITED/DAMAGED: 0.5c/0.4c/0.3c,
+or 0.8c/0.6c/0.4c with the speed module). An explicit target remains fixed and
+blocks departure if it exceeds a reduced ceiling; [speed and fuel](engines-antimatter.md)
+share the same chosen departure speed. CRITICAL/OFFLINE block departure.
 Effective speed always remains below c. Local travel retains its independent
 20 km/s speed and existing engine gates. Duration is distance divided by speed.
 Departure records `transit_speed_ly_per_year`; ETA and the speed used for proper

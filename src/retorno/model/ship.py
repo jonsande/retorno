@@ -57,6 +57,7 @@ class ShipState:
     arrival_t: float = 0.0
     transit_start_t: float = 0.0
     cruise_speed_ly_per_year: float = 0.5  # Nominal reference; ly per 365-day year.
+    target_cruise_speed: float | None = None  # None = max; independent of electrical profile.
     transit_speed_ly_per_year: float = 0.0  # Frozen interstellar departure speed.
     last_travel_distance_ly: float = 0.0
     last_travel_distance_km: float = 0.0
@@ -123,13 +124,26 @@ class ShipState:
             return SystemState.UPGRADED
         return SystemState.NOMINAL
 
-    def effective_cruise_speed(self) -> float:
-        """Available interstellar beta; zero blocks departure, always below c."""
-        multiplier = Balance.ENGINE_SPEED_MULTIPLIERS.get(self.engine_operating_state().value, 0.0)
+    def maximum_cruise_speed(self) -> float:
+        """Highest discrete beta supported by physical health and installed equipment."""
+        profile = (Balance.ENGINE_SPEED_UPGRADE_MULTIPLIERS
+                   if "engine_speed_upgrade_01" in self.installed_modules else Balance.ENGINE_SPEED_MULTIPLIERS)
+        multiplier = profile.get(self.engine_operating_state().value, 0.0)
         speed = self.cruise_speed_ly_per_year * multiplier
         if not math.isfinite(speed) or speed <= 0.0:
             return 0.0
-        return min(speed, math.nextafter(1.0, 0.0))
+        ceiling = min(speed, math.nextafter(1.0, 0.0))
+        return max((beta for beta in Balance.ENGINE_SPEED_FUEL_MULTIPLIERS if 0 < beta < 1 and beta <= ceiling), default=0.0)
+
+    def effective_cruise_speed(self) -> float:
+        """Prospective departure beta; invalid fixed targets block rather than fall back."""
+        maximum = self.maximum_cruise_speed()
+        target = self.target_cruise_speed
+        if target is None:
+            return maximum
+        if target in Balance.ENGINE_SPEED_FUEL_MULTIPLIERS and 0 < target <= maximum:
+            return target
+        return 0.0
 
     def __setstate__(self, state) -> None:
         """Backward-compatible unpickle for renamed fields.

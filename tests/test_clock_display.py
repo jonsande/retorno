@@ -24,8 +24,8 @@ class ClockDisplayTests(unittest.TestCase):
         state.clock.ship_elapsed_s = 3661
         state.clock.bio_elapsed_s = 61
         for locale, labels, day, year in (
-            (Locale.EN, ("G", "S", "P"), "Day", "Y"),
-            (Locale.ES, ("G", "S", "P"), "Día", "A"),
+            (Locale.EN, ("G", "S", "B"), "Day", "Y"),
+            (Locale.ES, ("G", "N", "B"), "Día", "A"),
         ):
             with self.subTest(locale=locale):
                 state.os.locale = locale
@@ -46,7 +46,7 @@ class ClockDisplayTests(unittest.TestCase):
 
     def test_large_year_abbreviations_in_header(self):
         state = create_initial_state_sandbox()
-        for locale, prefix in ((Locale.EN, 'Y'), (Locale.ES, 'A')):
+        for locale, prefix, labels in ((Locale.EN, 'Y', ('G', 'S', 'B')), (Locale.ES, 'A', ('G', 'N', 'B'))):
             state.os.locale = locale
             for year, expected in ((9999, '9999 D1'), (10000, '10.0k +1d'),
                                    (12500, '12.5k +1d'), (1000000, '1.0M +1d'),
@@ -55,13 +55,13 @@ class ClockDisplayTests(unittest.TestCase):
                     seconds = (year - 1) * 365 * 86400
                     state.clock.t = state.clock.ship_elapsed_s = state.clock.bio_elapsed_s = seconds
                     header = presenter.build_header(state)
-                    for label in ('G', 'S', 'P'):
+                    for label in labels:
                         self.assertIn(f'{label}: {prefix}{expected} 00:00:00', header)
                     self.assertNotIn('T+', header)
 
     def test_clock_labels_use_power_key_color_in_every_theme(self):
         state = create_initial_state_sandbox()
-        for locale in (Locale.EN, Locale.ES):
+        for locale, labels in ((Locale.EN, ("G:", "S:", "B:")), (Locale.ES, ("G:", "N:", "B:"))):
             state.os.locale = locale
             for preset in theme_presets():
                 with self.subTest(locale=locale, preset=preset):
@@ -69,7 +69,7 @@ class ClockDisplayTests(unittest.TestCase):
                     power = render_rich_line(presenter.build_power_lines(state)[0], preset)
                     console = Console()
                     expected = power.get_style_at_offset(console, 0)
-                    for label in ('G:', 'S:', 'P:'):
+                    for label in labels:
                         actual = header.get_style_at_offset(console, header.plain.index(label))
                         self.assertEqual(actual, expected)
 

@@ -18,6 +18,11 @@ class Diag(Action):
 
 
 @dataclass(slots=True)
+class EngineSpeed(Action):
+    target: float | None  # None selects max; query is a read-only interface command.
+
+
+@dataclass(slots=True)
 class PowerShed(Action):
     system_id: str
 

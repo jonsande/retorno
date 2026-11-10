@@ -175,7 +175,8 @@ def _assert_components_and_views():
         assert repl._map_bfs_path(adj, "A", "TAIL")[0] is None
         assert reachable_from(state.world, "A") == {"B"}
         routes = _capture(repl.render_nav_routes, state)
-        operative = routes.split("Nearby contacts without known route:", 1)[0]
+        separator = "Contactos cercanos sin ruta conocida:" if locale == Locale.ES else "Nearby contacts without known route:"
+        operative = routes.split(separator, 1)[0]
         assert "id=B" in operative and "FAR" not in operative and "MISSING" not in operative
         assert repl._travel_targets_for_completion(state) == ["B"]
         flags = {entry["cid"]: entry["route_flag"] for entry in repl._collect_known_contact_entries(state)}

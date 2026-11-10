@@ -3,14 +3,18 @@
 This game includes a Textual UI with multiple panels and keyboard shortcuts.
 
 ## Panels
-- Header (top): galactic time, ship proper time, player biological time, ship mode, and location. The clocks use `G:` (galactic), `S:` (ship), and `P:` (player), with the same label color as `P_gen=` and `P_load=`, and include seconds; the header wraps on narrow terminals.
+- Header (top): galactic time, ship proper time, guest biological time, ship mode, and location. In that order, English clock labels are `G:` (galactic), `S:` (ship), and `B:` (biological); Spanish uses `G:`, `N:`, and `B:`. They share the label color of `P_gen=` and `P_load=` and include seconds; the header wraps on narrow terminals.
 - Status (left): system states and health, without the engine speed summary.
 - Alerts (right, top): active alerts.
 - Jobs (right, bottom): job queue and recent results.
 - Log (bottom): command output and events.
 - Input (bottom): command line.
 
-The `status` command also lists all three clocks. Ship time accounts for relativistic time dilation; player biological time also accounts for hibernation. Each clock counts from the start of the mission (year 1, day 1).
+At rest, the header removes a repeated location prefix: `ECHO_7 (ECHO-7 Relay Station)` appears as `ECHO-7 (Relay Station)`. Command IDs and docking/orbit status keep using the original location ID; names without that prefix retain their full display.
+
+The header shows the ship mode directly, such as `NORMAL` or `CRUISE (auto)`, without the `ship_mode=` prefix.
+
+The `status` command also lists all three clocks: `Galactic time:`, `Ship time:` and `Guest time (biological):`. Their labels share the active theme's accent in both languages, including accented Spanish characters. Ship time accounts for relativistic time dilation; guest biological time also accounts for hibernation. Each clock counts from the start of the mission (year 1, day 1).
 
 In `Y1 D1 00:01:58`, `Y1` is the first year, `D1` the first day of that year, and `00:01:58` hours, minutes, and seconds since mission start. Years and days are numbered from 1, so this example represents 1 minute 58 seconds elapsed. Years have 365 days. Spanish uses `A` instead of `Y`. The header omits the redundant `T+` prefix. Years below 10,000 appear in full; from 10,000 they use `k` (thousands), from 1,000,000 `M` (millions), and from 1,000,000,000 `B` (thousands of millions), rounded to one decimal place. For abbreviated years, the day appears as `+1d` instead of `D1`; for example, `Y12.5k +1d 00:00:00`.
 

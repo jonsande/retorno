@@ -282,6 +282,14 @@ class Balance:
         "limited": 0.8,
         "damaged": 0.6,
     }
+    ENGINE_SPEED_UPGRADE_MULTIPLIERS = {
+        "upgraded": 1.6, "nominal": 1.6, "limited": 1.2, "damaged": 0.8,
+    }
+    # Discrete selectable beta and provisional P-TECH-004 price factors.
+    ENGINE_SPEED_FUEL_MULTIPLIERS = {
+        0.1: 0.30, 0.2: 0.48, 0.3: 0.66, 0.4: 0.82,
+        0.5: 1.00, 0.6: 1.28, 0.7: 1.65, 0.8: 2.20,
+    }
 
     # Local (low scale) movement
     # Travel speed for local (km/mi) hops inside the same sector.

@@ -13,16 +13,24 @@
 
 # RETORNO — Modelo temporal, hibernación y edad biológica
 
+> **Selección de velocidad implementada / implemented speed selection:**
+> `engines speed` selecciona max o un escalón persistente de 0.1c a 0.8c para
+> futuras salidas, con coste de cápsulas dependiente de esa velocidad. Conserva
+> velocidad congelada e integradores T-04B1/B2. / `engines speed` selects max or
+> a persistent 0.1c–0.8c step for future departures, with speed-dependent capsule
+> cost. Frozen transit speed and T-04B1/B2 integrators are retained.
+> [ES](../systems/engines-antimatter.es.md) · [EN](../systems/engines-antimatter.md).
+
 > **T-04B2, desgaste ordinario implementado / implemented ordinary wear:**
 > Sistemas y casco envejecen en tiempo propio, conservando tasas y modificadores.
 > En la llegada se reutilizan los tramos eléctricos y sus condiciones muestreadas,
 > sin repetir jobs, narrativa ni radio. Dosis, drones y reglas de soporte vital
-> siguen pendientes de migración temporal. No se implementa selección de velocidad
+> siguen pendientes de migración temporal. T-04B2 no incluyó selección de velocidad
 > ni economía de antimateria v0.6. / Systems and hull age in proper time, retaining
 > rates and modifiers. Arrival reuses electrical segments and their sampled
 > conditions without repeating jobs, narrative or radio. Dose, drones and life-
-> support rules remain unconverted. No v0.6 speed selection or antimatter economy
-> is implemented. [ES](../systems/wear-proper-time.es.md) · [EN](../systems/wear-proper-time.md).
+> support rules remain unconverted. T-04B2 did not include v0.6 speed selection or
+> antimatter economy. [ES](../systems/wear-proper-time.es.md) · [EN](../systems/wear-proper-time.md).
 
 > **T-04B1 (2026-11-10), electricidad implementada / implemented electricity:**
 > Generación y demanda son kW a bordo; batería en kWh. Integración y temporizadores

@@ -3,14 +3,18 @@
 El juego incluye una interfaz Textual con varios paneles y atajos de teclado.
 
 ## Paneles
-- Header (arriba): tiempo galáctico, tiempo propio de la nave, tiempo biológico del personaje, modo de la nave y ubicación. Los relojes usan `G:` (galáctico), `S:` (nave) y `P:` (personaje), con el mismo color de etiqueta que `P_gen=` y `P_load=`, e incluyen segundos; la barra se distribuye en varias líneas en terminales estrechos.
+- Header (arriba): tiempo galáctico, tiempo propio de la nave, tiempo biológico del huésped, modo de la nave y ubicación. En ese orden, las etiquetas son `G:` (galáctico), `N:` (nave) y `B:` (biológico); en inglés se usa `G:`, `S:` y `B:`. Comparten el color de etiqueta de `P_gen=` y `P_load=` e incluyen segundos; la barra se distribuye en varias líneas en terminales estrechos.
 - Status (izquierda): estado y salud de los sistemas, sin el resumen de velocidad de motores.
 - Alerts (derecha, arriba): alertas activas.
 - Jobs (derecha, abajo): cola de trabajos y resultados recientes.
 - Log (abajo): salida de comandos y eventos.
 - Input (abajo): línea de comandos.
 
-El comando `status` también enumera los tres relojes. El tiempo de la nave refleja la dilatación temporal relativista; el tiempo biológico del personaje refleja además la hibernación. Cada reloj cuenta desde el inicio de la misión (año 1, día 1).
+En reposo, la barra elimina el prefijo repetido de la ubicación: `ECHO_7 (ECHO-7 Relay Station)` se muestra como `ECHO-7 (Relay Station)`. Los IDs de comandos y el estado de acoplamiento/órbita siguen usando el ID original; los nombres sin ese prefijo conservan su presentación completa.
+
+La barra muestra el modo de la nave directamente, como `NORMAL` o `CRUISE (auto)`, sin el prefijo `ship_mode=`.
+
+El comando `status` también enumera los tres relojes: `Tiempo galáctico:`, `Tiempo de la nave:` y `Tiempo del huésped (biológico):`. Las tres etiquetas comparten el acento del tema activo en ambos idiomas, incluidos los caracteres acentuados. El tiempo de la nave refleja la dilatación temporal relativista; el tiempo biológico del huésped refleja además la hibernación. Cada reloj cuenta desde el inicio de la misión (año 1, día 1).
 
 En `A1 D1 00:01:58`, `A1` indica el primer año, `D1` el primer día de ese año y `00:01:58` horas, minutos y segundos desde el inicio de la misión. Los años y días se numeran desde 1, así que el ejemplo representa 1 minuto y 58 segundos transcurridos. Los años tienen 365 días. En inglés se usa `Y` en lugar de `A`. La barra omite el prefijo redundante `T+`. Los años inferiores a 10.000 aparecen completos; desde 10.000 usan `k` (miles), desde 1.000.000 `M` (millones) y desde 1.000.000.000 `B` (miles de millones), redondeados a un decimal. Cuando se abrevia el año, el día aparece como `+1d` en lugar de `D1`; por ejemplo, `A12.5k +1d 00:00:00`.
 

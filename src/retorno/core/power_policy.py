@@ -5,6 +5,7 @@ from retorno.core.actions import (
     Action,
     Boot,
     Diag,
+    EngineSpeed,
     DroneDeploy,
     DroneMove,
     DroneRecall,
@@ -39,6 +40,7 @@ _CRITICAL_REPL_STRINGS = {
 }
 
 _CRITICAL_REPL_TUPLES = {
+    "ENGINES_SPEED",
     "ALERTS_EXPLAIN",
     "LOG_COPY",
     "JOBS",
@@ -80,7 +82,7 @@ def is_critical_service(state, service_name: str) -> bool:
 def is_action_allowed_in_critical_state(state, action: Action) -> bool:
     if isinstance(action, (Status, Diag)):
         return True
-    if isinstance(action, (PowerShed, SystemOn, PowerPlan)):
+    if isinstance(action, (PowerShed, SystemOn, PowerPlan, EngineSpeed)):
         return True
     if isinstance(action, DroneDeploy):
         return action.emergency

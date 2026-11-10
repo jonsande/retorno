@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from retorno.core.gamestate import GameState
+from retorno.config.balance import Balance
 from retorno.model.ship_layout import apply_retorno_canonical_layout
 
 _SAVE_MAGIC = b"RETORNO_SAVE_V2"
@@ -131,6 +132,9 @@ def _pack_state(state: GameState) -> bytes:
             speed = state.ship.transit_speed_ly_per_year
             if not math.isfinite(speed) or not 0.0 < speed < 1.0:
                 raise ValueError("Invalid frozen transit speed / Velocidad de tránsito congelada no válida")
+        if (state.ship.target_cruise_speed is not None
+                and state.ship.target_cruise_speed not in Balance.ENGINE_SPEED_FUEL_MULTIPLIERS):
+            raise ValueError("Invalid engine speed selection / Selección de velocidad de motores no válida")
         from retorno.worldgen.generator import pin_universe, validate_universe_state
         from retorno.worldgen.narrative import validate_catalog
         validate_catalog(state)
@@ -199,6 +203,9 @@ def _load_from_file(path: Path) -> GameState:
             speed = loaded.ship.transit_speed_ly_per_year
             if not math.isfinite(speed) or not 0.0 < speed < 1.0:
                 raise ValueError("Invalid frozen transit speed / Velocidad de tránsito congelada no válida")
+        if (loaded.ship.target_cruise_speed is not None
+                and loaded.ship.target_cruise_speed not in Balance.ENGINE_SPEED_FUEL_MULTIPLIERS):
+            raise ValueError("Invalid engine speed selection / Selección de velocidad de motores no válida")
         if not loaded.world.narrative_snapshot:
             raise ValueError("Narrative catalog snapshot missing / Falta el snapshot del catálogo narrativo")
         validate_catalog(loaded)

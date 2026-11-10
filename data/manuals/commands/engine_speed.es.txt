@@ -1,0 +1,31 @@
+engines speed
+engines speed max
+engines speed <0.1..0.8>
+
+Propósito
+- Consulta o selecciona la velocidad objetivo de la siguiente salida interestelar. Consulta el sistema con man engines.
+
+Requisitos (gating)
+- Acceso al terminal de la nave. Las consultas siguen disponibles en tránsito; los cambios de configuración requieren estar detenido.
+- La selección numérica debe ser un escalón de 0.1c compatible con el estado actual del motor y el equipo instalado.
+
+Comportamiento operativo
+- engines speed muestra estado del motor y objetivo: MAX con su velocidad resuelta, o una velocidad explícita. Si no está disponible, muestra el máximo permitido y el bloqueo de salida sin cambiar el objetivo. Detenido, indica cómo configurar y consultar el manual; en tránsito, muestra la velocidad real congelada y la restricción de cambios. El tránsito local usa km/s. Usa diag engines para el diagnóstico completo y power status para el modo eléctrico.
+- max es el valor predeterminado: resuelve de nuevo la mayor velocidad permitida en cada salida.
+- Un objetivo explícito persiste entre viajes y guardados. El daño o la retirada del módulo pueden invalidarlo; se conserva y bloquea la siguiente salida interestelar hasta repararlo, restaurarlo o cambiarlo. Nunca se reduce silenciosamente.
+- Los techos normales de NOMINAL/LIMITED/DAMAGED son 0.5c/0.4c/0.3c; engine_speed_upgrade_01 los eleva a 0.8c/0.6c/0.4c. CRITICAL u OFFLINE impiden salir.
+- El módulo de velocidad eleva la capacidad; engine_efficiency_upgrade_01 reduce el combustible un 20% de forma independiente a igual integridad y velocidad. Con max, un techo mayor también puede elevar el coste del siguiente viaje.
+- El coste de cápsulas conserva su cálculo por distancia/integridad/eficiencia y lo multiplica por el factor de la velocidad seleccionada:
+  0.1c: 0.30; 0.2c: 0.48; 0.3c: 0.66; 0.4c: 0.82;
+  0.5c: 1.00; 0.6c: 1.28; 0.7c: 1.65; 0.8c: 2.20.
+- nav map routes y la confirmación de salida estiman rutas adquiridas a la velocidad disponible. La salida aceptada cobra una vez y congela velocidad/ETA. Los cambios posteriores del motor no alteran el viaje ni el ritmo del reloj de a bordo. nav abort no devuelve combustible ni cobra más.
+- Los viajes locales ignoran el objetivo interestelar: 20 km/s y ninguna cápsula, con los requisitos habituales del motor.
+- La velocidad objetivo es independiente del perfil eléctrico CRUISE. Seleccionarla no cambia el modo de potencia ni la demanda auxiliar.
+
+Bloqueos frecuentes
+- Escalón no permitido, valor fuera de escala u objetivo superior al máximo actual: elige un escalón disponible o max.
+- Cualquier cambio de configuración en tránsito: espera la llegada o usa nav abort; las consultas siguen disponibles.
+- El objetivo fijo dejó de estar disponible: repara engines, reinstala el módulo de velocidad o cambia el objetivo antes de la siguiente salida interestelar.
+
+Comandos relacionados
+- engines speed, diag engines, status, nav map routes, nav, nav abort, power status, module inspect engine_speed_upgrade_01, module inspect engine_efficiency_upgrade_01.

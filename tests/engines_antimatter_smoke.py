@@ -89,18 +89,18 @@ class EnginesAntimatterTests(unittest.TestCase):
         system = self.state.ship.systems['engines']
         system.health = 1.0
         for distance, expected in ((2, .7), (10, 1.5), (20, 2.5), (45, 5.0)):
-            self.assertAlmostEqual(self.engine.engine_fuel_cost(self.state, distance), expected)
+            self.assertAlmostEqual(self.engine.engine_fuel_cost(self.state, distance, .5), expected)
         system.health = .5
-        self.assertAlmostEqual(self.engine.engine_fuel_cost(self.state, 10), 1.5 * 1.375)
+        self.assertAlmostEqual(self.engine.engine_fuel_cost(self.state, 10, .5), 1.5 * 1.375)
         system.health_max_effective = 2
         system.health = 1
-        self.assertAlmostEqual(self.engine.engine_fuel_cost(self.state, 10), 1.5 * 1.375)
+        self.assertAlmostEqual(self.engine.engine_fuel_cost(self.state, 10, .5), 1.5 * 1.375)
         for health, factor in ((-1, 2.5), (4, 1)):
             system.health = health
-            self.assertEqual(self.engine.engine_fuel_cost(self.state, 10), 1.5 * factor)
+            self.assertEqual(self.engine.engine_fuel_cost(self.state, 10, .5), 1.5 * factor)
         for distance in (-1, float('nan'), float('inf')):
             with self.assertRaises(ValueError):
-                self.engine.engine_fuel_cost(self.state, distance)
+                self.engine.engine_fuel_cost(self.state, distance, .5)
 
     def test_03_real_module_install_uninstall(self):
         self.deployed_drone()
@@ -239,10 +239,10 @@ class EnginesAntimatterTests(unittest.TestCase):
         s = self.state
         for locale in (Locale.EN, Locale.ES):
             s.os.locale = locale
-            expected = repl.fuel_readout(s, target)
             before = pickle.dumps(s)
             routes = output(repl.render_nav_routes, s)
-            self.assertIn(expected, routes)
+            cost = self.engine.estimate_travel_fuel(s, target)
+            self.assertIn(f"~{cost:.3f} {'cápsulas' if locale == Locale.ES else 'capsules'}", routes)
             self.assertEqual(presenter.build_command_output(repl.render_nav_routes, s), routes.strip().splitlines())
             self.assertEqual(pickle.dumps(s), before)
             for view in (repl.render_inventory, repl.render_status):
@@ -252,11 +252,12 @@ class EnginesAntimatterTests(unittest.TestCase):
             self.assertIn('consumo de antimateria' if locale == Locale.ES else 'antimatter consumption',
                           output(repl.render_module_inspect, s, UPGRADE))
             with patch('builtins.input', return_value='s' if locale == Locale.ES else 'y'):
-                self.assertIn(expected, output(repl._confirm_nav, s, Travel(node_id=target)))
+                self.assertIn(f'~{cost:.3f}', output(repl._confirm_nav, s, Travel(node_id=target)))
             lines = []
             harness = SimpleNamespace(loop=SimpleNamespace(state=s), _log_line=lines.append)
             RetornoTextualApp._confirm_nav_needed(harness, s, Travel(node_id=target))
-            self.assertIn(expected, lines)
+            self.assertEqual(lines, [*repl.nav_confirmation(s, Travel(node_id=target))[0],
+                                     repl.nav_confirmation(s, Travel(node_id=target))[1]])
             for reason in ('engines_unavailable', 'insufficient_antimatter'):
                 if reason == 'engines_unavailable':
                     s.ship.systems['engines'].forced_offline = True
@@ -338,7 +339,7 @@ class EnginesAntimatterTests(unittest.TestCase):
                 cost = self.engine.estimate_travel_fuel(s, target)
                 await command('inventory')
                 await command('nav map routes')
-                self.assertTrue(any(repl.fuel_readout(s, target) in line for line in app._log_buffer))
+                self.assertTrue(any(f"~{cost:.3f}" in line for line in app._log_buffer))
                 await command('nav ' + target)
                 await command('n')
                 self.assertFalse(s.ship.in_transit)

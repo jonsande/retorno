@@ -792,6 +792,7 @@ class RetornoTextualApp(App):
             "wait",
             "debug",
             "power",
+            "engines",
             "logs",
             "log",
             "module",
@@ -912,6 +913,8 @@ class RetornoTextualApp(App):
         if cmd == "path":
             if len(tokens) == 2:
                 return [c for c in contacts if c.startswith(text)]
+        if cmd == "engines":
+            return repl.engine_speed_completions(state, tokens, text)
         if cmd == "power":
             if len(tokens) == 2:
                 return [c for c in ["status", "plan", "on", "off"] if c.startswith(text)]
@@ -1193,38 +1196,15 @@ class RetornoTextualApp(App):
 
     def _confirm_nav_needed(self, state, action) -> bool:
         locale = state.os.locale.value
-        current_node = state.world.current_node_id
-        dest = getattr(action, "node_id", "?")
-        estimate = repl.fuel_readout(state, dest)
-        if estimate:
-            self._log_line(repl.public_text(state, estimate))
-        duration = repl.speed_readout(state, dest)
-        if duration:
-            self._log_line(repl.public_text(state, duration))
-        out = []
-        for d in state.ship.drones.values():
-            if d.status in {DroneStatus.DEPLOYED, DroneStatus.DISABLED} and d.location.kind == "world_node":
-                out.append(d)
-        if out:
-            drone_ids = ", ".join(d.drone_id for d in out)
-            prompts = {
-                "en": (
-                    f"WARNING: confirm nav to {dest}? "
-                    f"Drones not aboard ({drone_ids}) will be abandoned when leaving {current_node}. Continue? [y/N]"
-                ),
-                "es": (
-                    f"ADVERTENCIA: ¿confirmar nav a {dest}? "
-                    f"Los drones fuera de la nave ({drone_ids}) quedarán abandonados al salir de {current_node}. "
-                    "¿Continuar? [s/N]"
-                ),
-            }
-        else:
-            prompts = {
-                "en": f"WARNING: confirm nav to {dest}. Continue? [y/N]",
-                "es": f"ADVERTENCIA: confirmar nav a {dest}. ¿Continuar? [s/N]",
-            }
+        lines, prompt = repl.nav_confirmation(state, action)
+        for line in lines:
+            self._log_line(line)
+        if prompt is None:
+            self._pending_confirm_action = None
+            self._pending_confirm_prompt = ""
+            return True
         self._pending_confirm_action = action
-        self._pending_confirm_prompt = prompts.get(locale, prompts["en"])
+        self._pending_confirm_prompt = prompt
         self._pending_confirm_locale = locale
         self._log_line(repl.public_text(self.loop.state, self._pending_confirm_prompt))
         return True
@@ -1729,6 +1709,7 @@ class RetornoTextualApp(App):
         if (isinstance(parsed, str) and parsed in info_tokens) or (
             isinstance(parsed, tuple)
             and parsed[0] in {
+                "ENGINES_SPEED",
                 "LS",
                 "CAT",
                 "ABOUT",
@@ -1929,6 +1910,10 @@ class RetornoTextualApp(App):
         if isinstance(parsed, tuple) and parsed[0] == "DRONE_AUTORECALL_THRESHOLD":
             with self.loop.with_lock() as state:
                 self._log_lines(presenter.build_command_output(repl._set_drone_autorecall, state, parsed[1], None, float(parsed[2])))
+            return
+        if isinstance(parsed, tuple) and parsed[0] == "ENGINES_SPEED":
+            with self.loop.with_lock() as state:
+                self._log_lines(presenter.build_command_output(repl.render_engines_speed, state))
             return
         if parsed == "POWER_STATUS":
             with self.loop.with_lock() as state:

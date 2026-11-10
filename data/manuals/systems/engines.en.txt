@@ -16,22 +16,24 @@ Operational dependencies
 - Navigation still requires a known direct route, a hop within 45 ly, valid ship power and Core OS, and an undocked ship.
 
 Command impact by state
-- Standard departure speeds: UPGRADED 0.8c, NOMINAL 0.5c, LIMITED 0.4c, DAMAGED 0.3c. UPGRADED requires engine_speed_upgrade_01 and nominal integrity; repair restores the improvement while installed.
+- Standard departure ceilings: NOMINAL 0.5c, LIMITED 0.4c, DAMAGED 0.3c; with engine_speed_upgrade_01: nominal/UPGRADED 0.8c, LIMITED 0.6c, DAMAGED 0.4c. Select engines speed max or a valid 0.1c step. An invalidated fixed target blocks the next interstellar departure instead of being reduced.
 - Every interstellar journey freezes its speed and arrival time at departure; onboard clocks keep using that speed despite later engine damage, repairs, shutdown or module changes. Local travel stays at 20 km/s.
 - status and diag engines distinguish available departure speed from actual transit speed; nav map routes and confirmation include estimated galactic duration.
 - OFFLINE, forced off or CRITICAL: departure blocked. Use power on engines or repair as indicated by diag engines.
 - DAMAGED or better: departure allowed when other requirements are met.
 - Ordinary wear follows ship proper time, with the existing electrical, radiation and operating-profile modifiers. It reduces efficiency continuously within each state band; repair recovers efficiency.
 - Local travel consumes no antimatter. For interstellar departures the current estimate is:
-  cost = (0.5 + distance_ly / 10) * (1 + 1.5 * (1 - normalized_integrity)^2) * upgrade_multiplier.
+  cost = (0.5 + distance_ly / 10) * (1 + 1.5 * (1 - normalized_integrity)^2) * upgrade_multiplier * speed_multiplier.
 - normalized_integrity is integrity divided by effective maximum, limited to 0..1.
 - upgrade_multiplier is 1.0, or 0.8 with engine_efficiency_upgrade_01 installed.
 - nav map routes shows estimated capsule equivalents and available reserve for known direct routes. Navigation confirmation repeats the estimate.
 - Insufficient fuel blocks departure without changing navigation or consuming fuel. Accepted departure charges once; nav abort gives no refund and adds no charge.
 - New voyage reserve: 12.0 equivalent capsules. Fractions are retained; subsequent wear affects future departures, not fuel already charged.
 
+- engines speed shows state and target, or the maximum and departure block when unavailable. In transit it shows the frozen actual speed; changes remain blocked. The price tier is 0.30/0.48/0.66/0.82/1.00/1.28/1.65/2.20 for 0.1c..0.8c; see man engine_speed.
+
 Common symptoms
-- Rising estimates for the same route indicate reduced integrity or removal of the efficiency module.
+- Rising estimates for the same route indicate a higher selected speed, reduced integrity or removal of the efficiency module.
 - Electrical isolation, critical damage or exhausted reserves prevent departure.
 
 Recovery pattern

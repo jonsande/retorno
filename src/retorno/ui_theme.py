@@ -147,8 +147,32 @@ _KEY_RE = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*=)")
 _PATH_RE = re.compile(r"(?<!\w)(/(?:[A-Za-z0-9._-]+/?)+)")
 _QUOTED_RE = re.compile(r"'[^']+'")
 _TIP_RE = re.compile(r"^(Tip:|Consejo:)")
-_LABEL_RE = re.compile(r"^(\s*(?:- |\* )?)([A-Za-z_][A-Za-z0-9_ /()\-]*:)")
-_CLOCK_LABEL_RE = re.compile(r"(?:^|\| )([GSP]:)(?= [YA]\d)")
+_LABEL_RE = re.compile(r"^(\s*(?:- |\* )?)([^\W\d][\w /()\-]*:)")
+_CLOCK_LABEL_RE = re.compile(r"(?:^|\| )([GSNB]:)(?= [YA]\d)")
+# Only the nav-routes identity/summary formats opt into these presentation rules.
+_NAV_ROUTE_DESTINATION_RE = re.compile(
+    r"^- (?P<name>.+) \([^()\n]*\) sector=\S+ id=(?P<id>\S+) dist=\S+ (?:visited|unvisited)$"
+)
+_NAV_ROUTE_VALUE_LINE_RE = re.compile(
+    r"^(?:Antimatter: \S+ capsules|Antimateria: \S+ cápsulas|"
+    r"Engines: \w+ \| Cruise target: .+ \| Set: engines speed <value>|"
+    r"Motores: \w+ \| Objetivo de crucero: .+ \| Configurar: engines speed <value>|"
+    r"  Fuel: .+ \| Speed: .+ \| ETA: .+|"
+    r"  Combustible: .+ \| Velocidad: .+ \| ETA: .+)$"
+)
+_NAV_CONFIRM_DESTINATION_RE = re.compile(r"^(?:Destination|Destino): (?P<id>\S+)$")
+_COMPACT_NAV_SPEED_LINE_RE = re.compile(
+    r"^(?:Engines: \w+ \| (?:Target|Maximum): .+|"
+    r"Motores: \w+ \| (?:Objetivo|Máximo): .+|"
+    r"(?:Target|Objetivo): .+ \| (?:DEPARTURE BLOCKED|SALIDA BLOQUEADA)|"
+    r"Set: engines speed <value> \| Manual: man engines|"
+    r"Configurar: engines speed <valor> \| Manual: man engines|"
+    r"In transit: .+ \(fixed\)|En tránsito: .+ \(fija\)|"
+    r"Cruise: .+ \| Galactic ETA: .+|Crucero: .+ \| ETA galáctica: .+|"
+    r"Local maneuver: .+ \| ETA: .+|Maniobra local: .+ \| ETA: .+|"
+    r"Antimatter: (?:~.+ caps\. \| Reserve: .+|— \| Reserve: .+|0 capsules)|"
+    r"Antimateria: (?:~.+ cáps\. \| Reserva: .+|— \| Reserva: .+|0 cápsulas))$"
+)
 
 
 def theme_presets() -> tuple[str, ...]:
@@ -315,6 +339,17 @@ def _line_spans(line: str) -> list[tuple[int, int, str]]:
         return [(0, len(line), "accent")]
     if line.startswith(("WARNING:", "ADVERTENCIA:")):
         return [(0, len(line), "warn")]
+    if line.strip() in {"Start travel? [y/N]", "¿Iniciar viaje? [s/N]"}:
+        return [(0, len(line), "warn")]
+    if line in {"Insufficient fuel", "Combustible insuficiente"}:
+        return [(0, len(line), "warn")]
+    if line in {"Departure blocked", "Salida bloqueada", "Departure blocked: estimate unavailable", "Salida bloqueada: estimación no disponible"}:
+        return [(0, len(line), "error")]
+    if line.endswith(":") and line.startswith((
+        "Known routes from ", "Rutas conocidas desde ",
+        "Nearby contacts without known route:", "Contactos cercanos sin ruta conocida:",
+    )):
+        return [(0, len(line), "accent")]
 
     claims = [False] * len(line)
     spans: list[tuple[int, int, str]] = []
@@ -333,7 +368,23 @@ def _line_spans(line: str) -> list[tuple[int, int, str]]:
     for match in _CLOCK_LABEL_RE.finditer(line):
         claim(match.start(1), match.end(1), "muted")
 
-    label_match = _LABEL_RE.match(line)
+    destination_match = _NAV_ROUTE_DESTINATION_RE.fullmatch(line)
+    if destination_match:
+        for field in ("name", "id"):
+            claim(destination_match.start(field), destination_match.end(field), "accent")
+    confirm_destination = _NAV_CONFIRM_DESTINATION_RE.fullmatch(line)
+    if confirm_destination:
+        claim(confirm_destination.start("id"), confirm_destination.end("id"), "accent")
+
+    route_value_line = _NAV_ROUTE_VALUE_LINE_RE.fullmatch(line) or _COMPACT_NAV_SPEED_LINE_RE.fullmatch(line)
+    if route_value_line:
+        for notice, role in (("Insufficient fuel", "warn"), ("Combustible insuficiente", "warn"),
+                             ("Departure blocked", "error"), ("Salida bloqueada", "error"),
+                             ("DEPARTURE BLOCKED", "error"), ("SALIDA BLOQUEADA", "error")):
+            start = line.find(" | " + notice)
+            if start >= 0:
+                claim(start + 3, start + 3 + len(notice), role)
+    label_match = _LABEL_RE.match(line) if not (route_value_line or confirm_destination) else None
     if label_match:
         claim(label_match.start(2), label_match.end(2), "accent")
 

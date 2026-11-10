@@ -38,7 +38,8 @@ Public location IDs
 - Read an acquired navigation record to register its references. The display abbreviates installation references; the retained archive and its integrity data are preserved.
 
 Operational notes
-- Interstellar departure speed follows engine condition. engine_speed_upgrade_01 permits UPGRADED with nominal integrity; engine_efficiency_upgrade_01 independently reduces capsule consumption. See man engines and both module dossiers.
+- engines speed selects the next interstellar target, max by default. Explicit 0.1c steps persist; a target invalidated by damage or module removal blocks departure until restored or changed. Query during transit; configure while stopped. See man engine_speed.
+- Engine ceilings depend on condition: 0.5c/0.4c/0.3c for NOMINAL/LIMITED/DAMAGED, raised to 0.8c/0.6c/0.4c by engine_speed_upgrade_01. Speed affects capsule cost; engine_efficiency_upgrade_01 independently reduces it at the same speed. See man engines and both module dossiers.
 - Cruise is inertial: speed, ETA and the speed used by onboard clocks are fixed at departure. Engine changes affect future departures. Local speed stays at 20 km/s.
 - status and diag engines show available and actual transit speed; nav map routes and confirmation include galactic duration estimates.
 - Knowing a contact is not the same as knowing a route to it.

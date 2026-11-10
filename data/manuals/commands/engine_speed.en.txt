@@ -1,0 +1,31 @@
+engines speed
+engines speed max
+engines speed <0.1..0.8>
+
+Purpose
+- Query or select the target speed for the next interstellar departure. Inspect engines with man engines.
+
+Requirements (gating)
+- Ship terminal access. Queries remain available during transit; configuration changes require the ship to be stopped.
+- Numeric selections must be discrete 0.1c steps supported by current engine condition and installed equipment.
+
+Operational behavior
+- engines speed shows engine state and target: MAX with its resolved speed, or an explicit speed. If unavailable, it shows the permitted maximum and a departure block while preserving the target. While stopped, it gives configuration/manual hints; during transit, it shows the actual frozen speed and the restriction on changes. Local transit uses km/s. Use diag engines for full diagnostics and power status for the electrical mode.
+- max is the default: resolve the highest supported speed anew at each departure.
+- An explicit target persists across trips and saves. Damage or module removal can invalidate it; it is retained and blocks the next interstellar departure until repaired, restored or changed. It is never silently lowered.
+- Normal ceilings for NOMINAL/LIMITED/DAMAGED are 0.5c/0.4c/0.3c; engine_speed_upgrade_01 raises them to 0.8c/0.6c/0.4c. CRITICAL or OFFLINE engines cannot depart.
+- The speed module raises capability; engine_efficiency_upgrade_01 independently reduces fuel cost by 20% at the same integrity and speed. With max, a raised ceiling can also raise the next trip's cost.
+- Capsule cost retains its distance/integrity/efficiency calculation, multiplied by the selected speed's factor:
+  0.1c: 0.30; 0.2c: 0.48; 0.3c: 0.66; 0.4c: 0.82;
+  0.5c: 1.00; 0.6c: 1.28; 0.7c: 1.65; 0.8c: 2.20.
+- nav map routes and departure confirmation quote acquired routes at the available speed. Accepted departure charges once and freezes speed/ETA. Later engine changes do not change this trip or its onboard clock rate. nav abort gives no refund or extra charge.
+- Local trips ignore the interstellar target: 20 km/s and no capsules, subject to the usual engine requirements.
+- Target speed is independent of the CRUISE electrical profile. Selecting it does not change power mode or auxiliary demand.
+
+Common block reasons
+- Unsupported step, out-of-scale value, or target above the current maximum: choose an available step or max.
+- Any configuration change during transit: wait for arrival or use nav abort; queries remain available.
+- Fixed target became unavailable: repair engines, reinstall the speed module or change the target before the next interstellar departure.
+
+Related commands
+- engines speed, diag engines, status, nav map routes, nav, nav abort, power status, module inspect engine_speed_upgrade_01, module inspect engine_efficiency_upgrade_01.

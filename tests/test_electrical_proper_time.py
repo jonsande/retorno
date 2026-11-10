@@ -256,7 +256,7 @@ class ElectricalProperTimeTests(unittest.TestCase):
         engines.base_decay_per_s = .004 / proper_time_interval(1, .8)
         self.engine.tick(s, 50)
         self.assertEqual(engines.state, SystemState.DAMAGED)
-        self.assertEqual(s.ship.effective_cruise_speed(), .3)
+        self.assertEqual(s.ship.effective_cruise_speed(), .4)
         self.assertEqual(s.ship.transit_speed_ly_per_year, .8)
         engines.base_decay_per_s = 0
         s.ship.cruise_speed_ly_per_year = .4
@@ -265,6 +265,7 @@ class ElectricalProperTimeTests(unittest.TestCase):
         self.assertAlmostEqual(s.clock.ship_elapsed_s, 60)
 
     def test_antimatter_departure_charge_and_abort_refund_rules_unchanged(self):
+        self.state.ship.installed_modules = ['engine_speed_upgrade_01']
         cost = self.engine.estimate_travel_fuel(self.state, self.target)
         s = self.depart()
         fuel = s.ship.antimatter_capsules

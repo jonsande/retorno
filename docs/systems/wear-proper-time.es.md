@@ -68,14 +68,12 @@ worldgen y recuperación no cambian ni se invocan dos veces por estos tramos.
 No se añade bucle por segundo, campo de guardado ni migración.
 
 El deterioro de engines sigue produciendo LIMITED/DAMAGED/CRITICAL y puede
-bloquear futuras salidas. Se conservan módulos/velocidades de T-04A y precio de
-antimateria. No se implementan `engines speed`, escalera de consumo ni techos
-nuevos para motores dañados mejorados previstos en v0.6.0. No cambia el balance
-ni la disponibilidad de recursos.
+bloquear futuras salidas. La implementación posterior de [engines speed](engines-antimatter.es.md)
+añade selección, techos según equipo y precio por escalón, conservando intactos
+este integrador de desgaste en tiempo propio y sus coeficientes.
 
 Se cierra la discrepancia concreta de envejecimiento de sistemas/casco de
-A-TECH-005 respecto a C-TIME-003. Su descripción del estado de implementación
-debe actualizarse mediante mantenimiento canónico; maniobras locales,
+A-TECH-005 respecto a C-TIME-003, como ya recoge CANON v0.6.0. Maniobras locales,
 aceleración/frenado y cambios de velocidad en ruta siguen abiertos. Se deja
 `docs/canon/universo.md` intacto. Los manuales EN/ES distinguen envejecimiento
 y dosis. No hacen falta comandos, sintaxis de help ni textos de eventos nuevos.

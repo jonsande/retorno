@@ -13,6 +13,7 @@ from retorno.core.actions import (
     AuthRecover,
     Boot,
     Diag,
+    EngineSpeed,
     Dock,
     Undock,
     DroneDeploy,
@@ -285,6 +286,26 @@ class Engine:
         if blocked:
             return [blocked]
 
+        if isinstance(action, EngineSpeed):
+            maximum = state.ship.maximum_cruise_speed()
+            data = {"target": action.target, "maximum": maximum}
+            if state.ship.in_transit:
+                reason = "engine_speed_in_transit"
+            elif action.target is not None and action.target not in Balance.ENGINE_SPEED_FUEL_MULTIPLIERS:
+                reason = "engine_speed_invalid"
+            elif action.target is not None and action.target > maximum:
+                reason = "engine_speed_exceeds_max"
+            else:
+                state.ship.target_cruise_speed = action.target
+                event = self._make_event(
+                    state, EventType.ENGINE_SPEED_SET, Severity.INFO,
+                    SourceRef(kind="ship_system", id="engines"), "Engine target speed set",
+                    data={**data, "target": "max" if action.target is None else str(action.target) + "c"},
+                )
+                self._record_event(state.events, event)
+                return [event]
+            return [self._power_blocked_event(state, "Engine speed selection blocked", reason, data)]
+
         if isinstance(action, Travel):
             if state.ship.in_transit:
                 event = self._make_event(
@@ -400,7 +421,7 @@ class Engine:
             is_local = self._is_local_hop(state, current_id, action.node_id, distance_ly)
             speed = state.ship.effective_cruise_speed()
             if (state.ship.engine_operating_state() in {SystemState.OFFLINE, SystemState.CRITICAL}
-                    or (not is_local and speed <= 0.0)):
+                    or (not is_local and state.ship.maximum_cruise_speed() <= 0.0)):
                 event = self._make_event(
                     state, EventType.BOOT_BLOCKED, Severity.WARN,
                     SourceRef(kind="ship", id=state.ship.ship_id),
@@ -409,8 +430,14 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
+            if not is_local and speed <= 0.0:
+                return [self._power_blocked_event(
+                    state, "Travel blocked: selected speed exceeds current capability",
+                    "engine_speed_exceeds_max",
+                    {"target": state.ship.target_cruise_speed, "maximum": state.ship.maximum_cruise_speed()},
+                )]
             # Validate and price before mutating even the local range cache.
-            fuel_cost = 0.0 if is_local else self.engine_fuel_cost(state, distance_ly)
+            fuel_cost = 0.0 if is_local else self.engine_fuel_cost(state, distance_ly, speed)
             if (not math.isfinite(state.ship.antimatter_capsules)
                     or state.ship.antimatter_capsules < fuel_cost):
                 event = self._make_event(
@@ -5167,10 +5194,13 @@ class Engine:
                     and sector_id_for_pos(a.x_ly, a.y_ly, a.z_ly)
                     == sector_id_for_pos(b.x_ly, b.y_ly, b.z_ly))
 
-    def engine_fuel_cost(self, state: GameState, distance_ly: float) -> float:
+    def engine_fuel_cost(self, state: GameState, distance_ly: float, speed: float | None = None) -> float:
         """Provisional P-TECH-001 price; pure, unrounded capsule equivalents."""
         if not math.isfinite(distance_ly) or distance_ly < 0.0:
             raise ValueError("Invalid travel distance")
+        speed = state.ship.effective_cruise_speed() if speed is None else speed
+        if speed not in Balance.ENGINE_SPEED_FUEL_MULTIPLIERS:
+            raise ValueError("Unavailable engine target speed / Velocidad objetivo de motores no disponible")
         engines = state.ship.systems["engines"]
         maximum = engines.health_max_effective
         integrity = self._clamp(engines.health / maximum) if maximum > 0.0 else 0.0
@@ -5179,7 +5209,8 @@ class Engine:
             float(modules.get(mid, {}).get("effects", {}).get("engine_fuel_mult", 1.0))
             for mid in sorted(set(state.ship.installed_modules))
         )
-        return (0.5 + distance_ly / 10.0) * (1.0 + 1.5 * (1.0 - integrity) ** 2) * multiplier
+        return ((0.5 + distance_ly / 10.0) * (1.0 + 1.5 * (1.0 - integrity) ** 2)
+                * multiplier * Balance.ENGINE_SPEED_FUEL_MULTIPLIERS[speed])
 
     def estimate_travel_fuel(self, state: GameState, destination_id: str) -> float | None:
         """Read-only public estimate, restricted to acquired, valid direct routes.
@@ -5192,7 +5223,8 @@ class Engine:
             return None
         if self._is_local_hop(state, state.world.current_node_id, destination_id, distance):
             return 0.0
-        return self.engine_fuel_cost(state, distance)
+        speed = state.ship.effective_cruise_speed()
+        return self.engine_fuel_cost(state, distance, speed) if speed > 0.0 else None
 
     def estimate_travel_duration(self, state: GameState, destination_id: str) -> float | None:
         """Read-only galactic seconds for an acquired direct hop, at current speed.

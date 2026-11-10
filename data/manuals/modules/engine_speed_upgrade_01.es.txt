@@ -4,9 +4,9 @@ Rol
 - Paquete de velocidad de crucero de los motores de la nave, independiente del paquete de eficiencia de antimateria.
 
 Efecto operativo
-- Habilita UPGRADED solo con engines alimentado e integridad nominal. El perfil estándar ofrece 0.8c, frente a NOMINAL a 0.5c, LIMITED a 0.4c y DAMAGED a 0.3c.
-- El desgaste suspende la mejora por debajo de integridad nominal; reparar la restaura mientras quede una copia instalada. Los motores críticos o apagados bloquean nuevas salidas.
-- No cambia consumo de antimateria, integridad, integridad máxima ni demanda eléctrica auxiliar. Varias copias no acumulan la mejora.
+- Eleva el techo de crucero a 0.8c con integridad nominal, 0.6c en LIMITED y 0.4c en DAMAGED. Sin el paquete los techos respectivos son 0.5c, 0.4c y 0.3c. UPGRADED solo se muestra con integridad nominal.
+- El desgaste reduce el techo; reparar lo recupera mientras siga instalado. CRITICAL/OFFLINE bloquean salidas. Un objetivo explícito superior al techo reducido permanece elegido y bloquea la siguiente salida interestelar hasta reparar o reconfigurar.
+- Sin cambio directo de combustible a igual velocidad/integridad; sin efecto en integridad, máximo ni electricidad. Con engines speed max, la mayor velocidad eleva el coste según su escalón. Las copias no se acumulan.
 - El viaje local conserva su velocidad independiente de 20 km/s y los requisitos existentes del motor.
 - Cada salida interestelar fija velocidad de crucero, llegada y velocidad usada por los relojes de a bordo durante todo el trayecto. El desgaste, las reparaciones o los cambios de módulos posteriores afectan a futuras salidas.
 
@@ -17,3 +17,4 @@ Notas de integración
 - engine_efficiency_upgrade_01 puede permanecer instalado simultáneamente; solo cambia el coste de antimateria.
 - Compara nav map routes y diag engines; status distingue velocidad disponible de velocidad real en tránsito.
 - Instalar y desinstalar conserva las restricciones ordinarias de tareas de drones, incluidas las restricciones para solicitar tareas nuevas durante el tránsito.
+- Consulta/selecciona con engines speed, engines speed max o engines speed 0.3; consulta man engine_speed. Al retirar la última copia no se reduce silenciosamente un objetivo fijo.

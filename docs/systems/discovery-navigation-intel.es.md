@@ -566,9 +566,11 @@ Para distancias muy locales del mismo sector, `fine_ranges_km` permite calcular
 el tiempo en kilómetros; el resto usa distancia en años luz y velocidad de
 crucero. `ShipState.cruise_speed_ly_per_year` es la referencia nominal
 configurable, inicialmente 0,5 años luz por año de 365 días.
-`ShipState.effective_cruise_speed()` aplica el perfil de estado: inicialmente
-0.8c UPGRADED (requiere módulo de velocidad), 0.5c NOMINAL, 0.4c LIMITED y
-0.3c DAMAGED. CRITICAL/OFFLINE bloquean salidas. La velocidad efectiva siempre
+`ShipState.effective_cruise_speed()` aplica el objetivo persistente de engines speed. max resuelve el techo por salud/equipo
+al salir (nominal/LIMITED/DAMAGED: 0.5c/0.4c/0.3c, o 0.8c/0.6c/0.4c con
+módulo). Un objetivo explícito permanece fijo y bloquea la salida si supera el
+techo reducido; [velocidad y combustible](engines-antimatter.es.md) usan la misma
+velocidad de salida. CRITICAL/OFFLINE bloquean salidas. La velocidad efectiva siempre
 es inferior a c. El viaje local mantiene 20 km/s y los requisitos de motor
 existentes. La duración sigue siendo distancia dividida por velocidad.
 La salida registra `transit_speed_ly_per_year`; ETA y velocidad usada por el

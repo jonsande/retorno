@@ -23,6 +23,7 @@ class EventType(str, Enum):
     DRONE_BAY_MAINTENANCE_BLOCKED = "drone_bay_maintenance_blocked"
     SYSTEM_STATE_CHANGED = "system_state_changed"
     SYSTEM_POWER_RESTORED = "system_power_restored"
+    ENGINE_SPEED_SET = "engine_speed_set"
     JOB_COMPLETED = "job_completed"
     JOB_FAILED = "job_failed"
     BOOT_BLOCKED = "boot_blocked"

@@ -39,9 +39,13 @@ def build_header(state) -> str:
         node = state.world.space.nodes.get(loc_id)
         node_name = node.name if node else loc_id
         status_label = repl._orbit_status_label(state, loc_id)
+        display_id = loc_id.replace("_", "-")
+        if node and node_name.startswith(display_id + " "):
+            node_name = node_name[len(display_id) + 1:]
+            loc_id = display_id
         loc = f"{loc_id} ({node_name}) [{status_label}]"
     elapsed = " | ".join(repl.clock_readouts(state, compact=True))
-    return repl.public_text(state, f"{elapsed} | ship_mode={mode} | {loc}")
+    return repl.public_text(state, f"{elapsed} | {mode} | {loc}")
 
 
 def build_power_lines(state) -> list[str]:

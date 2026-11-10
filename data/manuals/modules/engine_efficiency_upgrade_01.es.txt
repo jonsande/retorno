@@ -4,7 +4,7 @@ Rol
 - Paquete de eficiencia de dosificación y control de empuje de los motores de la nave.
 
 Efecto operativo
-- Multiplica el coste interestelar de antimateria por 0.8: un 20% menos de consumo a igual integridad.
+- Multiplica el coste interestelar de antimateria por 0.8: un 20% menos de consumo a igual integridad y velocidad seleccionada, incluido el multiplicador por escalón.
 - No repara engines ni cambia su integridad máxima efectiva, velocidad de viaje o llegada.
 - Los viajes locales siguen sin consumir cápsulas. Varias copias no acumulan la mejora.
 

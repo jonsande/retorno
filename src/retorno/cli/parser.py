@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import difflib
+from retorno.config.balance import Balance
 
 from retorno.core.actions import (
     AuthRecover,
     Boot,
     CargoAudit,
     Diag,
+    EngineSpeed,
     Dock,
     Undock,
     DroneDeploy,
@@ -104,6 +106,7 @@ _PARSE_ERROR_MESSAGES = {
         "usage_about": "Usage: about <system_id>",
         "usage_man": "Usage: man <command>",
         "usage_boot": "Usage: boot <service_name>",
+        "usage_engines_speed": "Usage: engines speed [max|0.1..0.8]; use one of the discrete 0.1c steps.",
         "usage_power": "Usage: power status | power plan cruise|normal | power on <system_id> | power off <system_id>",
         "usage_power_plan": "Usage: power plan cruise|normal",
         "usage_power_on": "Usage: power on <system_id>",
@@ -191,6 +194,7 @@ _PARSE_ERROR_MESSAGES = {
         "usage_about": "Uso: about <system_id>",
         "usage_man": "Uso: man <comando>",
         "usage_boot": "Uso: boot <service_name>",
+        "usage_engines_speed": "Uso: engines speed [max|0.1..0.8]; usa uno de los escalones discretos de 0.1c.",
         "usage_power": "Uso: power status | power plan cruise|normal | power on <system_id> | power off <system_id>",
         "usage_power_plan": "Uso: power plan cruise|normal",
         "usage_power_on": "Uso: power on <system_id>",
@@ -667,6 +671,21 @@ def parse_command(line: str):
             raise ParseError("usage_boot")
         return Boot(service_name=args[0])
 
+    if cmd == "engines":
+        if len(args) not in {1, 2} or args[0].lower() != "speed":
+            raise ParseError("usage_engines_speed")
+        if len(args) == 1:
+            return ("ENGINES_SPEED",)
+        if args[1].lower() == "max":
+            return EngineSpeed(target=None)
+        try:
+            target = float(args[1])
+        except ValueError:
+            raise ParseError("usage_engines_speed") from None
+        if target not in Balance.ENGINE_SPEED_FUEL_MULTIPLIERS:
+            raise ParseError("usage_engines_speed")
+        return EngineSpeed(target=target)
+
     if cmd == "power":
         if not args:
             raise ParseError("usage_power")
@@ -868,6 +887,7 @@ def _suggest_command(cmd: str) -> str | None:
         "wait",
         "debug",
         "power",
+        "engines",
         "logs",
         "module",
         "exit",

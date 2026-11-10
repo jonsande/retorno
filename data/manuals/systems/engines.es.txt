@@ -16,22 +16,24 @@ Dependencias operativas
 - La navegación sigue exigiendo ruta directa conocida, salto máximo de 45 ly, potencia y Core OS válidos y nave desacoplada.
 
 Impacto en comandos por estado
-- Velocidades estándar de salida: UPGRADED 0.8c, NOMINAL 0.5c, LIMITED 0.4c, DAMAGED 0.3c. UPGRADED requiere engine_speed_upgrade_01 e integridad nominal; reparar restaura la mejora mientras siga instalado.
+- Techos estándar de salida: NOMINAL 0.5c, LIMITED 0.4c, DAMAGED 0.3c; con engine_speed_upgrade_01: nominal/UPGRADED 0.8c, LIMITED 0.6c, DAMAGED 0.4c. Selecciona engines speed max o un escalón válido de 0.1c. Un objetivo fijo invalidado bloquea la siguiente salida interestelar y no se rebaja.
 - Cada trayecto interestelar fija velocidad y llegada al salir; los relojes de a bordo siguen usando esa velocidad pese a daño, reparación, apagado o cambios de módulos posteriores. El viaje local sigue a 20 km/s.
 - status y diag engines distinguen velocidad disponible para salir y velocidad real en tránsito; nav map routes y la confirmación incluyen duración galáctica estimada.
 - OFFLINE, apagado forzado o CRITICAL: salida bloqueada. Usa power on engines o repara según diag engines.
 - DAMAGED o superior: salida permitida si se cumplen los demás requisitos.
 - El desgaste ordinario sigue el tiempo propio de la nave, con los modificadores eléctricos, de radiación y perfil operativo existentes. Reduce eficiencia continuamente dentro de cada banda; reparar recupera eficiencia.
 - Los viajes locales no consumen antimateria. Para salidas interestelares la estimación actual es:
-  coste = (0.5 + distancia_ly / 10) * (1 + 1.5 * (1 - integridad_normalizada)^2) * multiplicador_mejora.
+  coste = (0.5 + distancia_ly / 10) * (1 + 1.5 * (1 - integridad_normalizada)^2) * multiplicador_mejora * multiplicador_velocidad.
 - integridad_normalizada es integridad dividida por máximo efectivo, limitada a 0..1.
 - multiplicador_mejora es 1.0, o 0.8 con engine_efficiency_upgrade_01 instalado.
 - nav map routes muestra cápsulas equivalentes estimadas y reserva disponible para rutas directas conocidas. La confirmación de navegación repite la estimación.
 - El combustible insuficiente bloquea la salida sin cambiar navegación ni consumir combustible. La salida aceptada cobra una vez; nav abort no devuelve combustible ni añade otro cobro.
 - Reserva de un viaje nuevo: 12.0 cápsulas equivalentes. Se conservan las fracciones; el desgaste posterior afecta a futuras salidas, no al combustible ya cobrado.
 
+- engines speed muestra estado y objetivo, o máximo y bloqueo de salida si no está disponible. En tránsito muestra la velocidad real congelada; los cambios siguen bloqueados. Los factores de precio son 0.30/0.48/0.66/0.82/1.00/1.28/1.65/2.20 para 0.1c..0.8c; consulta man engine_speed.
+
 Síntomas comunes
-- Estimaciones crecientes para la misma ruta indican menor integridad o retirada del módulo de eficiencia.
+- Estimaciones crecientes para la misma ruta indican mayor velocidad seleccionada, menor integridad o retirada del módulo de eficiencia.
 - El aislamiento eléctrico, daños críticos o reservas agotadas impiden salir.
 
 Recuperación típica

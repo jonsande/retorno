@@ -67,14 +67,13 @@ remain unchanged; none is called twice for these wear segments. No per-second
 loop, new save field or migration is added.
 
 Engine ageing still produces LIMITED/DAMAGED/CRITICAL transitions and can block
-future departure. T-04A's module/speed rules and antimatter price remain intact.
-CANON v0.6.0's future `engines speed`, consumption ladder and improved damaged-
-engine ceilings are not implemented. No availability or balance change is made.
+future departure. The subsequent [engines speed implementation](engines-antimatter.md)
+adds target selection, revised equipment ceilings and speed-tier fuel pricing;
+it leaves this proper-time wear integration and its coefficients unchanged.
 
 This closes A-TECH-005's specific system/hull ageing discrepancy against
-C-TIME-003. Its implementation-status description should now be updated through
-canon maintenance, while local manoeuvres, acceleration/braking and in-transit
-speed changes remain open. `docs/canon/universo.md` is deliberately unchanged.
+C-TIME-003, as already recorded by CANON v0.6.0. Local manoeuvres,
+acceleration/braking and in-transit speed changes remain open. `docs/canon/universo.md` is deliberately unchanged.
 Player-facing EN/ES manuals describe ageing separately from dose. Existing
 commands, help syntax and event strings need no additions.
 

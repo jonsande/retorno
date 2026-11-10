@@ -43,7 +43,7 @@ from retorno.runtime.operator_config import (
     config_value_choices,
     resolve_help_verbose,
 )
-from retorno.core.power_policy import is_parsed_command_allowed_in_core_os_critical
+from retorno.core.power_policy import is_critical_power_state, is_parsed_command_allowed_in_core_os_critical
 from retorno.model.events import Event, EventType, Severity, SourceRef
 from retorno.model.jobs import JobStatus, JobType, active_job_display_ids
 from retorno.model.ship_layout import (
@@ -104,6 +104,26 @@ from retorno.cli.location_ids import (
     public_node_id, public_text, public_output, print_public as print,
     resolve_public_id, resolve_public_path,
 )
+
+
+_ENGINE_SPEED_MESSAGES = {
+    "engine_speed_set": {
+        "en": "Target speed: {target}; available maximum: {maximum}c. Electrical profile unchanged.",
+        "es": "Objetivo de velocidad: {target}; máximo disponible: {maximum}c. Perfil eléctrico sin cambios.",
+    },
+    "engine_speed_invalid": {
+        "en": "Speed blocked: use engines speed max or a discrete speed from 0.1c to 0.8c.",
+        "es": "Velocidad bloqueada: usa engines speed max o un escalón de 0.1c a 0.8c.",
+    },
+    "engine_speed_exceeds_max": {
+        "en": "Speed/departure blocked: target={target}c exceeds maximum={maximum}c. Repair engines, restore the speed module or select engines speed max/a lower speed.",
+        "es": "Velocidad/salida bloqueada: objetivo={target}c supera máximo={maximum}c. Repara engines, restaura el módulo de velocidad o selecciona engines speed max/una velocidad menor.",
+    },
+    "engine_speed_in_transit": {
+        "en": "Speed change blocked during transit. Query with engines speed; configure the next journey after arrival or abort.",
+        "es": "Cambio de velocidad bloqueado en tránsito. Consulta con engines speed; configura el siguiente viaje tras llegar o abortar.",
+    },
+}
 
 
 _AUTORECALL_BLOCK_MESSAGES = {
@@ -423,6 +443,7 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ("nav map path <node_id>", "show best known path", "muestra mejor camino conocido"),
                 ("nav map routes", "list direct routes, speed, duration and antimatter estimates", "lista rutas directas, velocidad, duración y estimaciones de antimateria"),
                 ("nav map contacts", "list known contacts", "lista contactos conocidos"),
+                ("engines speed [max|0.1..0.8]", "query/select next interstellar speed; independent of CRUISE power profile", "consulta/selecciona velocidad interestelar futura; independiente del perfil eléctrico CRUISE"),
                 ("nav <node_id>", "start transit with operational engines and sufficient antimatter", "inicia tránsito con motores operativos y antimateria suficiente"),
                 ("nav --no-cruise <node_id>", "start transit without cruise profile", "inicia tránsito sin perfil cruise"),
                 ("nav abort", "stop at current position; no fuel refund or extra charge", "detente en la posición actual; sin devolución ni cobro adicional de combustible"),
@@ -942,6 +963,7 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             parts.append(_format_module_effect("engine_speed_upgrade", effects["engine_speed_upgrade"], locale))
         return ", ".join(parts)
     boot_blocked_reasons = {
+        **_ENGINE_SPEED_MESSAGES,
         **_AUTORECALL_BLOCK_MESSAGES,
         "drone_return_reserve": {
             "en": "Task blocked for {drone_id}: battery {battery_percent:.1f}%; at least {required_percent:.1f}% needed for pending work and return reserve. Automatic return requested.",
@@ -1403,6 +1425,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             else:
                 origin_tag = "CMD"
         sev = e.severity.value.upper()
+        if e.type == EventType.ENGINE_SPEED_SET:
+            template = _ENGINE_SPEED_MESSAGES[e.type.value][state.os.locale.value]
+            print(f"[{origin_tag}] [{sev}] " + template.format_map(SafeDict(e.data)))
+            continue
         payload = _build_event_payload(e)
         if e.type == EventType.JOB_QUEUED:
             job_id = e.data.get("job_id", "?")
@@ -2027,11 +2053,11 @@ def clock_readouts(state, *, compact: bool = False) -> list[str]:
     """Shared read-only clock labels and values for status and the UI header."""
     es = state.os.locale.value == "es"
     if compact:
-        labels = ("G", "S", "P")
+        labels = ("G", "N", "B") if es else ("G", "S", "B")
     else:
         labels = (
-            ("Tiempo galáctico", "Tiempo de la nave", "Tiempo del personaje (biológico)")
-            if es else ("Galactic time", "Ship time", "Player time (biological)")
+            ("Tiempo galáctico", "Tiempo de la nave", "Tiempo del huésped (biológico)")
+            if es else ("Galactic time", "Ship time", "Guest time (biological)")
         )
     values = (state.clock.t, state.clock.ship_elapsed_s, state.clock.bio_elapsed_s)
     lines = []
@@ -2352,6 +2378,10 @@ def render_logs(state, limit: int = 15) -> None:
         if t_label.startswith("T+"):
             t_label = t_label[2:]
         message = _public_unknown_contact_message(state, e) or e.message
+        speed_message = _ENGINE_SPEED_MESSAGES.get(
+            e.type.value if e.type == EventType.ENGINE_SPEED_SET else e.data.get("reason"))
+        if speed_message:
+            message = speed_message[state.os.locale.value].format_map(SafeDict(e.data))
         print(f"- [{t_label}] [{e.severity.value.upper()}] {e.type.value}: {message}")
 
 
@@ -2552,9 +2582,13 @@ def speed_readout(state, destination_id: str | None = None) -> str:
     es = state.os.locale.value == "es"
     speed = ship.effective_cruise_speed()
     available = f"{speed}c" if speed > 0.0 else ("no disponible" if es else "unavailable")
+    maximum = ship.maximum_cruise_speed()
+    target = "max" if ship.target_cruise_speed is None else f"{ship.target_cruise_speed}c"
     text = (f"engines: {ship.engine_operating_state().value}; "
-            + (f"velocidad disponible={available}; nominal={ship.cruise_speed_ly_per_year:.6g}c" if es
-               else f"available speed={available}; nominal={ship.cruise_speed_ly_per_year:.6g}c"))
+            + (f"objetivo={target}; máximo={maximum}c; velocidad disponible={available}; nominal={ship.cruise_speed_ly_per_year:.6g}c; modo eléctrico={ship.op_mode}" if es
+               else f"target={target}; maximum={maximum}c; available speed={available}; nominal={ship.cruise_speed_ly_per_year:.6g}c; electrical mode={ship.op_mode}"))
+    if ship.target_cruise_speed is not None and ship.target_cruise_speed > maximum:
+        text += "; " + ("objetivo supera el máximo: salida interestelar bloqueada" if es else "target exceeds maximum: interstellar departure blocked")
     if ship.in_transit:
         actual = (f"{Balance.LOCAL_TRAVEL_SPEED_KM_S:g} km/s" if ship.last_travel_is_local
                   else f"{ship.transit_speed_ly_per_year}c")
@@ -2565,6 +2599,44 @@ def speed_readout(state, destination_id: str | None = None) -> str:
             return ""
         text += f"; {'duración estimada (galáctica)' if es else 'estimated duration (galactic)'}={_format_eta_short(duration, state.os.locale.value)}"
     return text
+
+
+def _cruise_target_text(ship) -> str:
+    target = "MAX" if ship.target_cruise_speed is None else f"{ship.target_cruise_speed:g}c"
+    if ship.target_cruise_speed is None and ship.effective_cruise_speed() > 0.0:
+        target += f" ({ship.effective_cruise_speed():g}c)"
+    return target
+
+
+@public_output
+def render_engines_speed(state) -> None:
+    ship = state.ship
+    es = state.os.locale.value == "es"
+    operating = ship.engine_operating_state().value.upper()
+    target = _cruise_target_text(ship)
+    if ship.effective_cruise_speed() <= 0.0:
+        print(f"Motores: {operating} | Máximo: {ship.maximum_cruise_speed():g}c" if es else
+              f"Engines: {operating} | Maximum: {ship.maximum_cruise_speed():g}c")
+        print(f"Objetivo: {target} | SALIDA BLOQUEADA" if es else f"Target: {target} | DEPARTURE BLOCKED")
+    else:
+        print(f"Motores: {operating} | Objetivo: {target}" if es else f"Engines: {operating} | Target: {target}")
+    if ship.in_transit:
+        actual = (f"{Balance.LOCAL_TRAVEL_SPEED_KM_S:g} km/s" if ship.last_travel_is_local else
+                  f"{ship.transit_speed_ly_per_year:g}c")
+        print(f"En tránsito: {actual} (fija)" if es else f"In transit: {actual} (fixed)")
+        print("Cambio de velocidad no disponible durante el viaje." if es else
+              "Speed change unavailable during travel.")
+    else:
+        print("Configurar: engines speed <valor> | Manual: man engines" if es else
+              "Set: engines speed <value> | Manual: man engines")
+
+
+def engine_speed_completions(state, tokens: list[str], text: str) -> list[str]:
+    choices = (["speed"] if len(tokens) == 2 else
+               ["max", *(str(beta) for beta in Balance.ENGINE_SPEED_FUEL_MULTIPLIERS
+                          if beta <= state.ship.maximum_cruise_speed())]
+               if len(tokens) == 3 and tokens[1] == "speed" else [])
+    return [choice for choice in choices if choice.startswith(text)]
 
 
 def fuel_readout(state, destination_id: str | None = None) -> str:
@@ -5452,11 +5524,35 @@ def render_locate(state, system_id: str) -> None:
     print(f"coords: {node.x_ly:.2f}, {node.y_ly:.2f}, {node.z_ly:.2f}")
 
 
+def _nav_departure_blocked(state) -> bool:
+    """Known onboard blockers for presentation; Engine remains the action authority."""
+    ship = state.ship
+    core_os = ship.systems.get("core_os")
+    return bool(ship.in_transit or ship.docked_node_id or state.os.terminal_lock
+                or (core_os and core_os.state in {SystemState.DAMAGED, SystemState.OFFLINE})
+                or is_critical_power_state(state))
+
+
 @public_output
 def render_nav_routes(state) -> None:
-    print("\n=== NAV ROUTES ===")
-    print(fuel_readout(state))
-    print(speed_readout(state))
+    es = state.os.locale.value == "es"
+    ship = state.ship
+    engine = Engine()
+    speed = ship.effective_cruise_speed()
+    maximum = ship.maximum_cruise_speed()
+    unavailable = "no disponible" if es else "unavailable"
+    target = "MAX" if ship.target_cruise_speed is None else f"{ship.target_cruise_speed:g}c"
+    if speed <= 0.0:
+        target += f" ({unavailable}; {'máx.' if es else 'max'} {maximum:g}c)"
+    elif ship.target_cruise_speed is None:
+        target += f" ({speed:g}c)"
+    print("\n=== RUTAS NAV ===" if es else "\n=== NAV ROUTES ===")
+    print(f"Antimateria: {ship.antimatter_capsules:.3f} cápsulas" if es else
+          f"Antimatter: {ship.antimatter_capsules:.3f} capsules")
+    operating_state = ship.engine_operating_state().value.upper()
+    print(f"Motores: {operating_state} | Objetivo de crucero: {target} | Configurar: engines speed <value>" if es else
+          f"Engines: {operating_state} | Cruise target: {target} | Set: engines speed <value>")
+    departure_blocked = _nav_departure_blocked(state)
     current_id = state.world.current_node_id
     player_ship_id = getattr(state.ship, "ship_id", "RETORNO_SHIP")
     routes = {
@@ -5490,7 +5586,7 @@ def render_nav_routes(state) -> None:
         return f"{dist:.2f}ly"
 
     if routes:
-        print(f"Known routes from {current_id}:")
+        print(f"Rutas conocidas desde {current_id}:" if es else f"Known routes from {current_id}:")
         for nid in sorted(routes):
             node = state.world.space.nodes.get(nid)
             if node:
@@ -5501,16 +5597,29 @@ def render_nav_routes(state) -> None:
                 sector = f" sector={sector_id}"
                 visited = "visited" if nid in state.world.visited_nodes else "unvisited"
                 print(f"- {node.name} ({node.kind}){sector} id={nid} dist={_format_dist(node)} {visited}")
-                estimate = fuel_readout(state, nid)
-                if estimate:
-                    print(f"  {estimate}")
-                duration = speed_readout(state, nid)
-                if duration:
-                    print(f"  {duration}")
+                cost = engine.estimate_travel_fuel(state, nid)
+                duration = engine.estimate_travel_duration(state, nid)
+                if cost is None or duration is None:
+                    fuel, route_speed, eta = "—", "—", "—"
+                else:
+                    fuel = f"~{cost:.3f} {'cápsulas' if es else 'capsules'}"
+                    distance = engine._known_hop_distance(state, nid)
+                    local = distance is not None and engine._is_local_hop(state, current_id, nid, distance)
+                    route_speed = f"{Balance.LOCAL_TRAVEL_SPEED_KM_S:g} km/s" if local else f"{speed:g}c"
+                    eta = _format_eta_short(duration, state.os.locale.value)
+                estimate = (f"  Combustible: {fuel} | Velocidad: {route_speed} | ETA: {eta}" if es else
+                            f"  Fuel: {fuel} | Speed: {route_speed} | ETA: {eta}")
+                if cost is not None and cost > ship.antimatter_capsules:
+                    estimate += " | Combustible insuficiente" if es else " | Insufficient fuel"
+                if cost is None or duration is None or departure_blocked:
+                    estimate += " | Salida bloqueada" if es else " | Departure blocked"
+                print(estimate)
             else:
                 print(f"- id={nid}")
+                print("  Combustible: — | Velocidad: — | ETA: — | Salida bloqueada" if es else
+                      "  Fuel: — | Speed: — | ETA: — | Departure blocked")
     else:
-        print(f"(no known routes from {current_id})")
+        print(f"(sin rutas conocidas desde {current_id})" if es else f"(no known routes from {current_id})")
     # Nearby contacts without routes
     nearby = [
         nid
@@ -5518,7 +5627,7 @@ def render_nav_routes(state) -> None:
         if nid not in routes and nid != current_id and nid != player_ship_id and not _is_hidden_origin_contact_id(nid)
     ]
     if nearby:
-        print("Nearby contacts without known route:")
+        print("Contactos cercanos sin ruta conocida:" if es else "Nearby contacts without known route:")
         for nid in sorted(nearby):
             node = state.world.space.nodes.get(nid)
             if node:
@@ -6083,15 +6192,52 @@ def _confirm_travel_abort(state) -> bool:
 
 
 def _confirm_nav(state, action) -> bool:
+    lines, prompt = nav_confirmation(state, action)
+    for line in lines:
+        print(line)
+    if prompt is None:
+        return False
+    reply = input(prompt + " ").strip().lower()
+    if state.os.locale.value == "es":
+        return reply in {"s", "si", "sí", "y", "yes"}
+    return reply in {"y", "yes"}
+
+
+def nav_confirmation(state, action) -> tuple[list[str], str | None]:
+    """Pure, shared public preview and prompt; acceptance still revalidates in Engine."""
     locale = state.os.locale.value
+    es = locale == "es"
     current_node = state.world.current_node_id
     dest = getattr(action, "node_id", "?")
-    estimate = fuel_readout(state, dest)
-    if estimate:
-        print(estimate)
-    duration = speed_readout(state, dest)
-    if duration:
-        print(duration)
+    engine = Engine()
+    cost = engine.estimate_travel_fuel(state, dest)
+    duration = engine.estimate_travel_duration(state, dest)
+    reserve = state.ship.antimatter_capsules
+    lines = [f"Destino: {dest}" if es else f"Destination: {dest}"]
+    if cost is None or duration is None:
+        lines += ["Crucero: — | ETA galáctica: —" if es else "Cruise: — | Galactic ETA: —",
+                  f"Antimateria: — | Reserva: {reserve:.3f}" if es else f"Antimatter: — | Reserve: {reserve:.3f}",
+                  "Salida bloqueada: estimación no disponible" if es else "Departure blocked: estimate unavailable"]
+    else:
+        distance = engine._known_hop_distance(state, dest)
+        local = distance is not None and engine._is_local_hop(state, current_node, dest, distance)
+        eta = _format_eta_short(duration, locale)
+        if local:
+            lines += [f"Maniobra local: {Balance.LOCAL_TRAVEL_SPEED_KM_S:g} km/s | ETA: {eta}" if es else
+                      f"Local maneuver: {Balance.LOCAL_TRAVEL_SPEED_KM_S:g} km/s | ETA: {eta}",
+                      "Antimateria: 0 cápsulas" if es else "Antimatter: 0 capsules"]
+        else:
+            target = _cruise_target_text(state.ship)
+            lines += [f"Crucero: {target} | ETA galáctica: {eta}" if es else f"Cruise: {target} | Galactic ETA: {eta}",
+                      f"Antimateria: ~{cost:.3f} cáps. | Reserva: {reserve:.3f} → ~{reserve - cost:.3f}" if es else
+                      f"Antimatter: ~{cost:.3f} caps. | Reserve: {reserve:.3f} → ~{reserve - cost:.3f}"]
+        if cost > reserve:
+            lines.append("Combustible insuficiente" if es else "Insufficient fuel")
+    if (cost is None or duration is None or not math.isfinite(reserve)
+            or cost > reserve or _nav_departure_blocked(state)):
+        if cost is not None and duration is not None and (not math.isfinite(reserve) or _nav_departure_blocked(state)):
+            lines.append("Salida bloqueada" if es else "Departure blocked")
+        return [public_text(state, line) for line in lines], None
     out = []
     for d in state.ship.drones.values():
         if d.status in {DroneStatus.DEPLOYED, DroneStatus.DISABLED} and d.location.kind == "world_node":
@@ -6111,13 +6257,10 @@ def _confirm_nav(state, action) -> bool:
         }.get(locale, f"WARNING: confirm nav to {dest}. Continue? [y/N] ")
     else:
         msg = {
-            "en": f"WARNING: confirm nav to {dest}. Continue? [y/N] ",
-            "es": f"ADVERTENCIA: confirmar nav a {dest}. ¿Continuar? [s/N] ",
-        }.get(locale, f"WARNING: confirm nav to {dest}. Continue? [y/N] ")
-    reply = input(public_text(state, msg)).strip().lower()
-    if locale == "es":
-        return reply in {"s", "si", "sí", "y", "yes"}
-    return reply in {"y", "yes"}
+            "en": "Start travel? [y/N]",
+            "es": "¿Iniciar viaje? [s/N]",
+        }.get(locale, "Start travel? [y/N]")
+    return [public_text(state, line) for line in lines], public_text(state, msg.strip())
 
 
 def _resolve_node_id_from_input(state, token: str) -> str | None:
@@ -7141,6 +7284,7 @@ def main() -> None:
         "status",
         "jobs",
         "power",
+        "engines",
         "alerts",
         "logs",
         "log",
@@ -7311,6 +7455,8 @@ def main() -> None:
                 elif cmd == "path":
                     if len(tokens) == 2:
                         candidates = [c for c in contacts if c.startswith(text)]
+                elif cmd == "engines":
+                    candidates = engine_speed_completions(locked_state, tokens, text)
                 elif cmd == "power":
                     if len(tokens) == 2:
                         candidates = [c for c in ["status", "plan", "on", "off"] if c.startswith(text)]
@@ -8060,6 +8206,11 @@ def main() -> None:
             _drain_auto_events()
             with loop.with_lock() as locked_state:
                 _handle_intel_export(locked_state, parsed[1])
+            continue
+        if isinstance(parsed, tuple) and parsed[0] == "ENGINES_SPEED":
+            _drain_auto_events()
+            with loop.with_lock() as locked_state:
+                render_engines_speed(locked_state)
             continue
         if parsed == "POWER_STATUS":
             _drain_auto_events()
