@@ -1,8 +1,8 @@
 # RETORNO — Canon del universo
 
 **ID:** `RET-CAN`  
-**Versión:** `0.5.0`<br>
-**Fecha:** 2026-11-09<br>
+**Versión:** `0.6.0`<br>
+**Fecha:** 2026-11-10<br>
 **Estado:** base canónica inicial, revisable mediante decisión explícita  
 **Destinatarios:** diseño narrativo, sistemas, programación, pruebas y asistentes de desarrollo  
 **Documento complementario:** [`guia_coherencia.md`](guia_coherencia.md)  
@@ -195,6 +195,20 @@ La investigación pormenorizada de los componentes mediante auditorías se conte
 
 La nave del jugador **no tendrá un sistema funcional independiente `security`** en su configuración objetivo. Esto sustituye su presencia en el estado inicial actual del prototipo y **no prohíbe** que otras naves, estaciones o instalaciones dispongan de seguridad interior, contramedidas, controles de acceso o defensas, especialmente al desarrollar salvage avanzado. No se atribuye una mecánica de seguridad a esas instalaciones hasta que se diseñe explícitamente.
 
+### C-TECH-008 — Selección explícita de velocidad objetivo en tránsito no local [C]
+
+El piloto podrá seleccionar mediante `engines speed` la **velocidad de crucero objetivo** para el siguiente viaje **no local**, en escalones expresados como fracciones de `c`. El valor por defecto es `max`: la mayor velocidad que permitan **conjuntamente** las condiciones físicas del motor y las mejoras instaladas. También podrá elegirse una velocidad numérica explícita. Si supera el máximo disponible, se informará del límite y se impedirá la salida; no se reducirá silenciosamente la petición expresa del jugador.
+
+La configuración de velocidad de crucero no es un nivel de potencia eléctrica, ni modifica el **perfil eléctrico CRUISE**, ni controla las maniobras locales. Para un viaje ya iniciado se conserva una velocidad efectiva fija; no se permitirá cambiarla durante el tránsito mientras no exista un modelo completo de aceleración, consumo y relojes para cambios en ruta. El modelo de desplazamiento sigue siendo sublumínico.
+
+La velocidad elegida afectará tanto al **tiempo de viaje** como al **consumo de antimateria**, según parámetros provisionales de balance. El sistema debe mostrar antes de confirmar una salida la velocidad efectiva, el tiempo estimado, el combustible requerido y su suficiencia, utilizando solamente información de navegación legítimamente conocida por la nave.
+
+### C-TECH-009 — Independencia de mejoras de velocidad y eficiencia [C]
+
+Una **mejora de velocidad** aumenta el techo tecnológico de crucero; una **mejora de eficiencia** disminuye el gasto de antimateria a igualdad de trayecto, integridad y velocidad. Ambas son categorías diferentes y podrán coexistir. La primera se contempla para el futuro; la segunda ya tiene una primera implementación jugable prevista en `C-TECH-006` y `P-TECH-002`.
+
+El límite operativo **no debe inferirse solamente del estado nominal `UPGRADED`**: el sistema deberá calcularlo a partir de su integridad y del equipamiento instalado. Instalar o retirar mejoras de eficiencia no altera por sí solo la velocidad máxima; reparar el motor no concede gratuitamente un módulo de velocidad.
+
 ### P-TECH-001 — Consumo interestelar experimental y eficiencia [P]
 
 Se adopta la siguiente **fórmula inicial de balance para pruebas**, no una ley física ni un valor canónico irreversible:
@@ -221,6 +235,42 @@ Para iniciar pruebas de autonomía se propone **12 cápsulas equivalentes de ant
 
 Los parámetros anteriores pueden ajustarse sin cambiar el hecho canónico de que `engines` consume antimateria, se deteriora, puede repararse y admite mejoras de eficiencia.
 
+### P-TECH-003 — Límites experimentales de velocidad [P]
+
+Para la primera versión de selección se propone **`0.1c`, `0.2c`, `0.3c`, `0.4c` y `0.5c`**; `max` será la selección inicial. Un **futuro módulo de velocidad** podrá permitir progresivamente **`0.6c`, `0.7c` y `0.8c`**. `0.8c` es el **objetivo provisional de ese módulo**, no una capacidad ya implementada ni un límite físico universal.
+
+| Integridad/estado operativo de `engines` | Techo sin mejora de velocidad | Techo con futuro módulo de velocidad |
+|---|---:|---:|
+| NOMINAL (o integridad sana con presentación UPGRADED) | 0.5c | 0.8c |
+| LIMITED | 0.4c | 0.6c |
+| DAMAGED | 0.3c | 0.4c |
+| CRITICAL / OFFLINE | No permite iniciar viaje | No permite iniciar viaje |
+
+La tabla es **balance provisional**, no definición definitiva de umbrales de integridad, y tampoco obliga a que `UPGRADED` sea un estado persistente independiente de salud. Si se selecciona una velocidad fija que supera el nuevo techo tras un daño, la salida se bloqueará hasta reparar o reconfigurar; `max` siempre elegirá el techo efectivo.
+
+### P-TECH-004 — Escalera de consumo por velocidad y equilibrio estratégico [P]
+
+Como **hipótesis de balance preferente para pruebas**, se propone multiplicar el precio vigente de `P-TECH-001` por un factor dependiente de la velocidad. Dado que las velocidades seleccionables son discretas, una tabla configurable permite afinar la economía sin forzar una falsa ley física:
+
+| Velocidad objetivo | Factor sobre consumo de `P-TECH-001` | Disponibilidad prevista |
+|---|---:|---|
+| 0.1c | 0.30 | Inicial |
+| 0.2c | 0.48 | Inicial |
+| 0.3c | 0.66 | Inicial |
+| 0.4c | 0.82 | Inicial |
+| 0.5c | 1.00 | Inicial, a integridad nominal |
+| 0.6c | 1.28 | Futura mejora de velocidad |
+| 0.7c | 1.65 | Futura mejora de velocidad |
+| 0.8c | 2.20 | Futura mejora de velocidad |
+
+Por ejemplo, con 10 años luz, integridad de `engines` de `0.90` respecto a máximo `1.0` y **sin módulo de eficiencia**, la fórmula base da 1,5225 cápsulas equivalentes a `0.5c`. La escala propuesta produciría aproximadamente 0,457 a `0.1c`, 0,731 a `0.2c`, 1,005 a `0.3c`, 1,248 a `0.4c` y 1,523 a `0.5c`. La futura `0.8c` consumiría aproximadamente 3,350 cápsulas equivalentes en ese ejemplo.
+
+La escala anterior **sustituye como candidata preferente de ensayo** a la curva exploratoria `0.6 + 0.4 * (v/0.5)^2`: esta última ofrecía un ahorro escaso entre velocidades lentas en comparación con las décadas adicionales de viaje y el desgaste actual. **No se afirma que la nueva escala esté ya equilibrada.**
+
+**Criterio de balance obligatorio antes de cerrar coeficientes:** evaluar conjuntamente consumo, disponibilidad de cápsulas, tiempo galáctico, tiempo propio, envejecimiento biológico, deterioro acumulado, capacidad de reparación y autonomía restante. Usar al menos viajes cortos, medios y largos, diferentes integridades, pocas/abundantes cápsulas y presencia/ausencia de módulos. Cada velocidad disponible debería resultar una elección razonable en algún escenario plausible; comprobar que ninguna domina en la práctica a todas las demás. Si la economía procedural todavía carece de datos, declararlo explícitamente y no concluir un equilibrio definitivo a partir de la fórmula aislada.
+
+La velocidad objetivo debe consultarse junto con la estimación de viaje y ser consistente con la velocidad efectiva utilizada para el cálculo relativista. La configuración de `max` no debe suponer cambio imprevisto de velocidad a mitad de trayecto.
+
 ### A-TECH-001 — Perfiles de viaje, desgaste y semántica de consumo [A]
 
 Quedan por concretar la aceleración y frenado, la dependencia entre empuje, masa, velocidad y tiempo galáctico/propio, el tratamiento del combustible ante `nav abort`, el desgaste durante tránsito y los fallos de `engines` en ruta. No modificar indirectamente el modelo temporal existente al implementar el combustible.
@@ -236,6 +286,12 @@ Permanecen abiertos el mecanismo exacto de la tobera y del aprovechamiento de pr
 ### A-TECH-004 — Abastecimiento y agotamiento total de antimateria [A]
 
 Quedan pendientes las probabilidades y ubicaciones de recuperación, las alternativas disponibles cuando no quedan cápsulas y los mecanismos de prevención o resolución de bloqueos de exploración por combustible. **No se adopta todavía una solución específica**. El futuro diseño deberá comprobar sus efectos sobre las rutas y el desarrollo narrativo.
+
+### A-TECH-005 — Coherencia temporal del desgaste y maniobras locales [A]
+
+El principio `C-TIME-003` establece que los procesos físicos y el envejecimiento de los componentes de la nave deben regirse por el **tiempo propio**. En la implementación examinada durante esta revisión, el desgaste de sistemas del motor todavía utiliza el **delta de tiempo galáctico**, aunque los relojes propio y biológico se calculan por separado. Se registra esta **discrepancia entre canon y código** para auditoría técnica: no debe naturalizarse como verdad del universo ni corregirse accidentalmente dentro de una modificación de velocidades sin comprobar su impacto en el balance, pruebas y mantenimiento de sistemas.
+
+También permanecen abiertos los controles separados de maniobra local, las aceleraciones/desaceleraciones físicas y una eventual modificación de velocidad durante el tránsito. La primera implementación de `engines speed` no altera el movimiento local.
 
 ## 5. Conservación y desaparición de infraestructura
 
@@ -365,6 +421,7 @@ Esta misma lectura debe aplicarse al contenido narrativo asignado durante la par
 | **A-TECH-002** | Segundo recurso de materia ordinaria | Posibilidad futura, aún no decidida, de recuperar y consumir también materia ordinaria. |
 | **A-TECH-003** | Física de detalle | Masa de reacción, tobera, confinamiento de largo plazo y límites de las reservas. |
 | **A-TECH-004** | Abastecimiento y agotamiento | Recuperación procedural y alternativas ante la falta total de antimateria, deliberadamente pendientes. |
+| **A-TECH-005** | Desgaste y tiempo propio | Revisar discrepancia entre `C-TIME-003` y degradación calculada actualmente con tiempo galáctico; controles locales y cambios de velocidad en ruta siguen abiertos. |
 | **A-TIME-003** | Modelo matemático de los relojes | Convención del tiempo galáctico, integración del tiempo propio y tratamiento coherente de la relatividad. |
 | **A-BIO-001** | Químicos y condiciones de hibernación | Existencias, consumo, suministro, carencias y sus efectos mecánicos. |
 | **A-BIO-002** | Daño y eficacia de `life_support` | Fórmula efectiva, umbrales, comportamiento en fallos y consulta al jugador. |
@@ -409,8 +466,11 @@ Una historia o implementación puede trabajar con una de estas incógnitas, pero
 | **0.5 — 2026-11-09** | `C-TECH-001`–`007` | Mapa de diez sectores; reactor de fusión independiente; `engines` por aniquilación materia-antimateria con tres componentes; cápsulas confinadas en vacío y trampas electromagnéticas; degradación, reparación y mejoras; retirada prevista de `security` del jugador. | Establecido como diseño, pendiente de implementación |
 | **0.5 — 2026-11-09** | `P-TECH-001`–`002` | Fórmula de consumo experimental, módulo de eficiencia al 20 % y 12 cápsulas iniciales. | Provisional, sujeto a pruebas |
 | **0.5 — 2026-11-09** | `A-TECH-001`–`004`, `A-TIME-002` | Perfiles y física detallada, segundo recurso de materia, semántica de consumo y alternativas al agotamiento permanecen abiertos. | Abierto |
+| **0.6 — 2026-11-10** | `C-TECH-008`–`009` | Selección de velocidad objetivo no local; independencia de mejoras de velocidad y eficiencia. | Establecido como diseño, pendiente de implementación |
+| **0.6 — 2026-11-10** | `P-TECH-003`–`004` | Límites experimentales hasta 0.5c sin módulo y futura mejora hasta 0.8c; escalera provisional de consumo y criterios de pruebas de equilibrio. | Provisional, sujeto a simulación y recorrido jugable |
+| **0.6 — 2026-11-10** | `A-TECH-005` | Discrepancia entre tiempo propio canónico y desgaste actual basado en tiempo galáctico; maniobras locales y cambios de velocidad durante el tránsito sin resolver. | Abierto |
 
-Las referencias narrativas a miles de años son compatibles con el **colapso milenario** establecido; **ninguna fecha exacta, porcentaje de supervivencia, duración de viaje o final posible** se vuelve canónico por figurar en un ejemplo de lore. Las tasas `0,5c` y `0,5 %`, así como las cifras de consumo, eficiencia y reservas de `P-TECH-001`–`002`, son **hipótesis de balance** hasta su validación.
+Las referencias narrativas a miles de años son compatibles con el **colapso milenario** establecido; **ninguna fecha exacta, porcentaje de supervivencia, duración de viaje o final posible** se vuelve canónico por figurar en un ejemplo de lore. Las tasas `0,5c` y `0,5 %`, así como las cifras de consumo, eficiencia, velocidad y reservas de `P-TECH-001`–`004`, son **hipótesis de balance** hasta su validación.
 
 ## 11. Mantenimiento del documento
 
