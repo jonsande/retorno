@@ -10,9 +10,7 @@ from tests.fixtures.worldgen_catalog_5cdde28 import SiteStatus, catalog_sector
 
 
 def _state(seed=271828):
-    state = create_initial_state_prologue()
-    state.meta.rng_seed = seed
-    return state
+    return create_initial_state_prologue(seed=seed)
 
 
 def _physical(state):

@@ -26,8 +26,7 @@ from retorno.worldgen.generator import pin_universe
 
 
 def _state():
-    state = create_initial_state_sandbox()
-    state.meta.rng_seed = state.world.rng_seed = 314159
+    state = create_initial_state_sandbox(seed=314159)
     pin_universe(state)
     state.meta.rng_counter = 0
     world = state.world
@@ -366,7 +365,9 @@ def test_pending_waypoint_jobs_become_history():
     _has(engine.apply_action(state, RouteSolve(node_id="A")), EventType.JOB_QUEUED)
     job = state.jobs.jobs[state.jobs.active_job_ids[-1]]
     _travel(engine, state, "C")
-    t2 = _abort(engine, state, 0.5)
+    # Keep the route job pending: a relativistic trip takes longer than the solve.
+    fraction = min(0.5, job.eta_s / (2 * (state.ship.arrival_t - state.clock.t)))
+    t2 = _abort(engine, state, fraction)
     assert t1 not in state.world.space.nodes and t2 in state.world.space.nodes
     assert job.internal_id not in state.jobs.active_job_ids, "Job still operates from deleted waypoint"
     assert job.status in {JobStatus.CANCELLED, JobStatus.FAILED}
@@ -377,6 +378,11 @@ def test_pending_waypoint_jobs_become_history():
 
 def _pending_waypoint_solve():
     engine, state, tmp = _stopped()
+    # A local hop lets the ship leave before the route solve completes at the
+    # current configured cruise speed; the real travel calculation stays active.
+    origin = state.world.space.nodes[tmp]
+    nearby = state.world.space.nodes["C"]
+    nearby.x_ly, nearby.y_ly, nearby.z_ly = origin.x_ly, origin.y_ly + 1e-6, origin.z_ly
     _solve(engine, state)
     state.world.known_links[tmp].discard("A")
     _has(engine.apply_action(state, RouteSolve(node_id="A")), EventType.JOB_QUEUED)
@@ -454,6 +460,9 @@ def test_cleanup_cancellation_event_once_on_arrival():
 def test_cleanup_cancellation_event_once_on_repeated_abort():
     engine, state, tmp, job = _pending_waypoint_solve()
     _travel(engine, state, "C")
+    origin = state.world.space.nodes[tmp]
+    destination = state.world.space.nodes["C"]
+    expected = (origin.x_ly, (origin.y_ly + destination.y_ly) / 2, origin.z_ly)
     engine.tick(state, (state.ship.arrival_t - state.clock.t) * 0.5)
     assert job.internal_id in state.jobs.active_job_ids and job.eta_s > 0
     terminal_seq = state.jobs.next_terminal_job_seq
@@ -462,7 +471,7 @@ def test_cleanup_cancellation_event_once_on_repeated_abort():
     assert tmp not in state.world.space.nodes
     assert state.world.active_tmp_node_id == state.world.current_node_id != tmp
     assert not state.ship.in_transit
-    assert all(abs(x - y) < 1e-10 for x, y in zip(state.world.current_pos_ly, (2.0, 1.05, 0.5)))
+    assert all(abs(x - y) < 1e-10 for x, y in zip(state.world.current_pos_ly, expected))
     _assert_single_cleanup_cancellation(engine, state, events, job, terminal_seq, 1)
 
 

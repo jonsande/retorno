@@ -151,10 +151,11 @@ def test_05_equal_hops_different_distances():
 
 
 def test_06_short_chain_long_backtrack_counted():
-    e = _evaluation(_backtrack())
+    state = _backtrack()
+    e = _evaluation(state)
     assert e.euclidean_to_target_ly == 630
     assert e.chain_distance_ly < e.access_distance_ly
-    assert e.costs.nominal_transit_s.value == 630 * Balance.YEAR_S
+    assert e.costs.nominal_transit_s.value == 630 / state.ship.effective_cruise_speed() * Balance.YEAR_S
 
 
 def test_07_longer_chain_nearer_origin():
@@ -290,6 +291,26 @@ def test_18_wear_and_repair_not_predicted_as_exact():
     e = _evaluation(_state(40))
     assert "radiation_and_system_wear" in e.costs.unknown_risks
     assert e.costs.future_repair_scrap.status == EstimateStatus.UNKNOWN
+
+
+def test_18a_cruise_power_uses_engine_in_normal_and_god_modes_without_mutation():
+    for god_active in (False, True):
+        state = _state(40)
+        if god_active:
+            state.os.set_debug(True)
+            state.os.debug_god_enabled = True
+        before, rng = pickle.dumps(state), random.getstate()
+        evaluation = _evaluation(state)
+        assert pickle.dumps(state) == before and random.getstate() == rng
+        trial = copy.deepcopy(state)
+        add_known_link(trial.world, "A", "D")
+        Engine().apply_action(trial, Travel(node_id="D"))
+        assert trial.ship.in_transit
+        duration = evaluation.costs.nominal_transit_s.value
+        assert duration is not None
+        engine = Engine()
+        assert evaluation.costs.steady_cruise_load_kwh.value == engine._compute_load_kw(trial) * duration / 3600
+        assert evaluation.costs.steady_cruise_generation_kwh.value == engine._compute_p_gen(trial) * duration / 3600
 
 
 def test_19_future_scrap_unknown_not_zero():

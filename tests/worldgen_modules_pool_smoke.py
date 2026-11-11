@@ -89,8 +89,7 @@ def _assert_selection() -> None:
 
 
 def _generate(seed, generate=ensure_sector_generated):
-    state = create_initial_state_prologue()
-    state.meta.rng_seed = seed
+    state = create_initial_state_prologue(seed=seed)
     authored = {nid: asdict(node) for nid, node in state.world.space.nodes.items()}
     for _, sector_id, _ in _REGIONS:
         generate(state, sector_id)
@@ -173,8 +172,7 @@ def _assert_regions() -> None:
 
 
 def _assert_salvage() -> None:
-    state = create_initial_state_sandbox()
-    state.meta.rng_seed = 2
+    state = create_initial_state_sandbox(seed=2)
     ensure_sector_generated(state, _REGIONS[1][1])
     # Same legacy sampling slot; operative identity and resource seed are new.
     node = next(n for n in state.world.space.nodes.values()

@@ -32,8 +32,8 @@ from tests.sensor_detection_factor_smoke import _scan_state, ORIGIN_ID, TARGET_I
 from tests.fixtures.scan_590a3e8 import perform_scan as baseline_scan
 
 
-def _state():
-    s = _scan_state(SystemState.NOMINAL)
+def _state(seed: int | None = None):
+    s = _scan_state(SystemState.NOMINAL, seed=seed)
     # Observation fixture injects a synthetic pending archive, not v1 history.
     s.world.information_version = "legacy-information-v0"
     s.world.information_definition = None
@@ -365,8 +365,7 @@ def test_15_hidden_and_protected_manifest_sites_never_leak_from_query():
 
 
 def test_16_physical_z_spill_observed_from_actual_position():
-    s=create_initial_state_prologue()
-    s.meta.rng_seed=271828
+    s=create_initial_state_prologue(seed=271828)
     d=gen.universe_definition(s)
     target=next(t for t in manifest.query_physical_sectors(d,('S+15126_+000_+001',)).sites
                 if t.generation_sector_id=='S+15126_+000_+000')
@@ -387,8 +386,7 @@ def test_16_physical_z_spill_observed_from_actual_position():
 def test_17_exact_prechange_rng_and_world_results_across_seeds_conditions():
     for seed in (0,1,2,29,271828):
         for sensor_state in (SystemState.NOMINAL,SystemState.LIMITED,SystemState.DAMAGED):
-            s=_state()
-            s.meta.rng_seed=seed
+            s=_state(seed)
             s.clock.t=23.125
             s.ship.systems['sensors'].state=sensor_state
             old=copy.deepcopy(s)

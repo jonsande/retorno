@@ -315,26 +315,42 @@ def test_12_actual_readline_callback_and_cli_dispatch():
     from types import SimpleNamespace
     from retorno.audio.config import AudioConfigError
     from retorno.core.actions import Action
+    from retorno.model.world import is_hop_within_cap
     state,nid=scene('station')
     state.os.debug_enabled=True
     state.os.audio.enabled=state.os.audio.ambient_enabled=False
     alias=public_node_id(state,nid)
-    other=next(n for n in state.world.space.nodes if ':WG1' in n and n!=nid)
-    state.world.known_contacts.add(other)
-    add_known_link(state.world,nid,other,bidirectional=True)
+    other=next(n for n in state.world.space.nodes
+               if ':WG1' in n and n!=nid and is_hop_within_cap(state.world,nid,n))
+    # Acquire the destination and its operational route through the same intel
+    # import path used for a recovered navigation archive.
+    messages=repl._auto_import_intel_from_text(
+        state,f'NODE: {other}\nLINK: {nid} -> {other}\n','/logs/nav/public-id-fixture.txt')
+    assert len(messages)==2 and other in state.world.known_nodes
+    assert other in state.world.known_links[nid]
     other_alias=public_node_id(state,other)
     callback=[]
     seen=[]
     buffer=['']
     original=Engine.apply_action
-    lines=iter((f'ship survey {alias}',f'route solve {alias}',f'nav {alias}',
-                f'dock {alias}',f'drone survey D1 {alias}','exit'))
+    lines=iter((f'ship survey {alias}',f'route solve {alias}',f'dock {alias}',
+                f'drone survey D1 {alias}','undock','wait 46',f'nav {alias}',
+                f'nav {other_alias}',f'nav {other_alias}',f'nav {other_alias}',
+                f'nav {other_alias}','exit'))
     completed=[]
+    nav_replies=iter(('', 'invalid','n','y'))
+    prompts=[]
+    fuel_before=state.ship.antimatter_capsules
     def apply(engine,s,action):
         seen.append(action)
         return original(engine,s,action)
     def reader(prompt):
         if prompt!='\n> ':
+            if 'confirm nav' in prompt or 'confirmar nav' in prompt:
+                prompts.append(prompt)
+                assert state.ship.antimatter_capsules==fuel_before
+                assert not state.ship.in_transit and state.ship.docked_node_id is None
+                return next(nav_replies)
             return 'y'
         if not completed:
             for buf,expected in ((f'ship survey {alias[:-1]}',alias),
@@ -365,9 +381,13 @@ def test_12_actual_readline_callback_and_cli_dispatch():
         text=output(repl.main)
     assert completed and callback
     assert any(a.__class__.__name__=='RouteSolve' and a.node_id==nid for a in seen)
-    assert any(a.__class__.__name__=='Travel' and a.node_id==nid for a in seen)
-    assert not any(getattr(a,'node_id',None)==alias for a in seen)
-    assert alias in text and ':WG1' not in text
+    travels=[a for a in seen if a.__class__.__name__=='Travel']
+    assert len(prompts)==4 and len(travels)==1 and travels[0].node_id==other
+    assert all(a.node_id!=nid for a in travels)
+    assert state.ship.in_transit and state.ship.transit_to==other
+    assert state.ship.antimatter_capsules<fuel_before
+    assert not any(getattr(a,'node_id',None) in {alias,other_alias} for a in seen)
+    assert alias in text and other_alias in text and ':WG1' not in text
 
 
 def test_13_successful_route_computation_with_public_contact_id():

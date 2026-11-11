@@ -186,7 +186,7 @@ class _OpportunityContext:
                    if sid in {"sensors", "data_core", "drone_bay"} else system
                    for sid, system in state.ship.systems.items()}
         view = SimpleNamespace(ship=replace(state.ship, op_mode="CRUISE", systems=systems),
-                               jobs=SimpleNamespace(jobs={}))
+                               jobs=SimpleNamespace(jobs={}), os=state.os)
         self.cruise_load_kw = self.engine._compute_load_kw(view)
         self.generation_kw = self.engine._compute_p_gen(view)
 

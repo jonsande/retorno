@@ -132,8 +132,8 @@ def test_07_no_verified_latent_sites_and_guardrail_conditions_are_explicit():
     assert all(p.status != SiteStatus.VERIFIED for c in result.sectors for p in c.sites)
     samples = [p for c in result.sectors for p in c.sites if p.node_id is None]
     assert samples and all("initial_guardrail_unresolved" in p.conditions for p in samples)
+    a = _state(271828)
     a.world.space.nodes.pop("ECHO_7")
-    a.meta.rng_seed = 271828
     # A missing ECHO_7 fallback is not silently applied to the snapshot.
     origin = catalog_sector(a, "S+000_+000_+000")
     samples = [p for p in origin.sites if p.node_id is None]

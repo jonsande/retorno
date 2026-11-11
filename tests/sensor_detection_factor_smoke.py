@@ -37,8 +37,8 @@ def _node(node_id: str, x_ly: float) -> SpaceNode:
     )
 
 
-def _scan_state(sensor_state: SystemState, *, target_distance_ly: float = 1.0):
-    state = create_initial_state_prologue()
+def _scan_state(sensor_state: SystemState, *, target_distance_ly: float = 1.0, seed: int | None = None):
+    state = create_initial_state_prologue(seed=seed)
     state.ship.power.power_quality = 0.90
     state.ship.systems["core_os"].state = SystemState.NOMINAL
     state.ship.systems["energy_distribution"].state = SystemState.NOMINAL

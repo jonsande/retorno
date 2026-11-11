@@ -27,9 +27,7 @@ IDS = ('S+020_+020_+000', 'S+022_+020_+000', 'S+020_+022_+000',
 
 
 def state(seed=271828):
-    result = create_initial_state_prologue()
-    result.meta.rng_seed = seed
-    return result
+    return create_initial_state_prologue(seed=seed)
 
 
 def generate(s, ids):
@@ -373,7 +371,8 @@ def test_14_seed_command_compatibility_and_localization():
     from retorno.cli.parser import parse_command
     assert parse_command('debug seed 29') == ('DEBUG_SEED',29)
     s = state(29)
-    assert repl.debug_seed_block_reason(s,2) is None
+    assert repl.debug_seed_block_reason(s,29) is None
+    assert 'blocked' in repl.debug_seed_block_reason(s,2)
     gen.pin_universe(s)
     before = unchanged(s)
     for locale,word in ((Locale.EN,'blocked'),(Locale.ES,'bloqueado')):
@@ -381,6 +380,15 @@ def test_14_seed_command_compatibility_and_localization():
         assert word in repl.debug_seed_block_reason(s,2)
         assert repl.debug_seed_block_reason(s,29) is None
     s.os.locale = Locale.EN
+    assert unchanged(s) == before
+    tampered = copy.deepcopy(s)
+    tampered.meta.rng_seed = 2
+    try:
+        gen.universe_definition(tampered)
+    except ValueError as exc:
+        assert "seed/version changed" in str(exc)
+    else:
+        raise AssertionError("A pinned universe accepted a different seed")
     assert unchanged(s) == before
 
 
