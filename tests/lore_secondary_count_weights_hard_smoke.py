@@ -1,14 +1,75 @@
 from __future__ import annotations
 
-import copy
+from contextlib import contextmanager
+import json
+import math
+from pathlib import Path
+import shutil
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 import retorno.core.lore as lore_mod
-from retorno.runtime.data_loader import load_locations
+from retorno.runtime import data_loader as data
 from retorno.bootstrap import create_initial_state_sandbox
 from retorno.config.balance import Balance
 from retorno.core.lore import run_lore_scheduler_tick, sync_node_pools_for_known_nodes
 from retorno.model.world import SpaceNode, region_for_pos
+from retorno.worldgen import generator, manifest
+from retorno.worldgen.narrative import ContentError
+
+
+@contextmanager
+def _legacy_catalog(state, *, arcs=(), singles=()):
+    """Expose loader fixtures only in a scoped pre-contract scheduler scene."""
+    world = state.world
+    original = (world.narrative_snapshot, world.information_version,
+                world.information_definition, world.radio_history_version,
+                world.radio_definition)
+    world.narrative_snapshot = {}
+    world.information_version = "legacy-information-v0"
+    world.information_definition = None
+    world.radio_history_version = "legacy-radio-v0"
+    world.radio_definition = None
+    try:
+        with patch.object(lore_mod, "load_arcs", return_value=list(arcs)), \
+             patch.object(lore_mod, "load_singles", return_value=list(singles)):
+            yield
+    finally:
+        (world.narrative_snapshot, world.information_version,
+         world.information_definition, world.radio_history_version,
+         world.radio_definition) = original
+
+
+@contextmanager
+def _non_forced_scheduler():
+    with patch.object(Balance, "LORE_SCHEDULER_ENABLED", True), \
+         patch.object(Balance, "LORE_NON_FORCED_INJECT_P", 1.0), \
+         patch.object(Balance, "LORE_NON_FORCED_INTERVAL_YEARS", 0.0):
+        yield
+
+
+@contextmanager
+def _installed_arc(arc):
+    """Compile the synthetic hard opportunity with the historical universe."""
+    with TemporaryDirectory(prefix="retorno-n1b1-lore-") as directory:
+        root = Path(directory) / "data"
+        shutil.copytree(data._DATA_ROOT, root)
+        (root / "arcs" / f"{arc['arc_id']}.json").write_text(json.dumps(arc), encoding="utf-8")
+        with patch.object(data, "_DATA_ROOT", root):
+            yield
+
+
+def _certified_host(state, piece_key):
+    node_id = state.world.lore_placements.piece_to_node[piece_key]
+    definition = generator.universe_definition(state)
+    site = manifest.resolve_operative_id(definition, node_id)
+    node = state.world.space.nodes[node_id]
+    assert site is not None and site.identity.scope == definition.scope
+    assert node.historical_key == site.identity.encoded
+    assert node.generation_sector_id == site.generation_sector_id
+    assert (node.x_ly, node.y_ly, node.z_ly) == site.position_ly
+    assert node.kind == site.kind and node.region == site.region
+    return node_id, node
 
 
 def _add_open_receiver(state, receiver_id: str) -> None:
@@ -79,9 +140,10 @@ def _run_secondary_count_case() -> None:
             },
         }
     ]
-    lore_mod.load_arcs = lambda: arcs
-    lore_mod.load_singles = lambda: []
-    run_lore_scheduler_tick(state)
+    with _legacy_catalog(state, arcs=arcs), _non_forced_scheduler():
+        assert any(piece["piece_key"] == "arc:smoke_secondary_count:doc_01"
+                   for piece in lore_mod._iter_all_pieces(state))
+        run_lore_scheduler_tick(state)
     assigned = [
         key
         for key in state.world.lore_placements.piece_to_node
@@ -96,8 +158,7 @@ def _run_secondary_count_case() -> None:
 def _run_single_weight_case() -> None:
     state = create_initial_state_sandbox()
     _add_open_receiver(state, "SINGLE_WEIGHT_RECEIVER")
-    lore_mod.load_arcs = lambda: []
-    lore_mod.load_singles = lambda: [
+    singles = [
         {
             "single_id": "single_weight_zero",
             "weight": 0.0,
@@ -125,16 +186,17 @@ def _run_single_weight_case() -> None:
             ],
         },
     ]
-    run_lore_scheduler_tick(state)
+    with _legacy_catalog(state, singles=singles), _non_forced_scheduler():
+        assert {piece["piece_key"] for piece in lore_mod._iter_all_pieces(state)} == {
+            "single:single_weight_zero", "single:single_weight_one"}
+        run_lore_scheduler_tick(state)
     keys = set(state.world.lore_placements.piece_to_node.keys())
     assert "single:single_weight_zero" not in keys, "weight=0 single should never be assigned"
     assert "single:single_weight_one" in keys, "weight=1 single should be eligible and assigned with inject_p=1"
 
 
 def _run_hard_force_case() -> None:
-    state = create_initial_state_sandbox()
-    arcs = [
-        {
+    arc = {
             "arc_id": "smoke_hard_force",
             "primary_intel": {
                 "id": "hard_primary",
@@ -154,132 +216,106 @@ def _run_hard_force_case() -> None:
                 }
             },
         }
-    ]
-    lore_mod.load_arcs = lambda: arcs
-    lore_mod.load_singles = lambda: []
-    run_lore_scheduler_tick(state)
-    piece_key = "arc:smoke_hard_force:hard_primary"
-    assert piece_key in state.world.lore_placements.piece_to_node, "hard force piece should be placed immediately"
-    node_id = state.world.lore_placements.piece_to_node[piece_key]
-    assert node_id in state.world.forced_hidden_nodes, "hard force fallback should use hidden ad-hoc candidate when needed"
+    with _installed_arc(arc):
+        state = create_initial_state_sandbox()
+        piece_key = "arc:smoke_hard_force:hard_primary"
+        assert arc in state.world.narrative_snapshot["arcs"]
+        reservation = state.world.narrative_snapshot["reservations"][piece_key]
+        assert reservation["node_id"] not in state.world.space.nodes
+        run_lore_scheduler_tick(state)
+        assert piece_key in state.world.lore_placements.piece_to_node
+        node_id, _ = _certified_host(state, piece_key)
+        assert node_id == reservation["node_id"]
+        assert state.world.space.nodes[node_id].historical_key == reservation["historical_key"]
+        assert node_id in state.world.forced_hidden_nodes
+        assert node_id not in state.world.known_nodes | state.world.known_contacts
 
 
 def _run_hard_force_constraints_and_no_relax_case() -> None:
-    locations = copy.deepcopy(load_locations())
-    for location in locations:
-        if location.get('node',{}).get('node_id') == 'UNKNOWN':
-            location['node'].update(x_ly=100.0,y_ly=0.0,z_ly=0.0)
-    with patch('retorno.bootstrap.load_locations',return_value=locations), \
-         patch('retorno.worldgen.manifest.load_locations',return_value=locations), \
-         patch('retorno.worldgen.generator.load_locations',return_value=locations):
+    arc = {
+        "arc_id": "smoke_hard_force_strict",
+        "primary_intel": {
+            "id": "hard_strict_primary",
+            "kind": "link",
+            "line": "LINK: ECHO_7 -> STRICT_TARGET",
+            "force": True,
+            "force_policy": "hard",
+            "allowed_channels": ["salvage_data"],
+            "constraints": {
+                "min_dist_ly": 20.0,
+                "max_dist_ly": 22.0,
+                "regions_any": ["disk"],
+            },
+        },
+        "secondary_lore_docs": [],
+        "placement_rules": {
+            "primary": {
+                "candidates": ["procedural_station"],
+                "require_kind_any": ["station"],
+            }
+        },
+    }
+    with _installed_arc(arc):
         state = create_initial_state_sandbox()
-        start_node = state.world.space.nodes.get("UNKNOWN")
-        assert start_node is not None
-        # The fixture declares its distant start before universe definition; it
-        # cannot move an authored historical site after bootstrap.
-        assert (start_node.x_ly,start_node.y_ly,start_node.z_ly) == (100.0,0.0,0.0)
-        arcs = [
-            {
-                "arc_id": "smoke_hard_force_strict",
-                "primary_intel": {
-                    "id": "hard_strict_primary",
-                    "kind": "link",
-                    "line": "LINK: ECHO_7 -> STRICT_TARGET",
-                    "force": True,
-                    "force_policy": "hard",
-                    "allowed_channels": ["salvage_data"],
-                    "constraints": {
-                        "min_dist_ly": 20.0,
-                        "max_dist_ly": 22.0,
-                        "regions_any": ["disk"],
-                    },
-                },
-                "secondary_lore_docs": [],
-                "placement_rules": {
-                    "primary": {
-                        "candidates": ["procedural_station"],
-                        "require_kind_any": ["station"],
-                    }
-                },
-            }
-        ]
-        lore_mod.load_arcs = lambda: arcs
-        lore_mod.load_singles = lambda: []
-        run_lore_scheduler_tick(state)
+        start_node = state.world.space.nodes["UNKNOWN"]
+        assert (start_node.x_ly, start_node.y_ly, start_node.z_ly) == (0.0, 0.0, 0.0)
         piece_key = "arc:smoke_hard_force_strict:hard_strict_primary"
-        assert piece_key in state.world.lore_placements.piece_to_node, "strict hard piece should still place via legal ad-hoc"
-        node_id = state.world.lore_placements.piece_to_node[piece_key]
-        node = state.world.space.nodes.get(node_id)
-        assert node is not None, "strict hard piece node should exist"
-        dx = node.x_ly - start_node.x_ly
-        dy = node.y_ly - start_node.y_ly
-        dz = node.z_ly - start_node.z_ly
-        dist = (dx * dx + dy * dy + dz * dz) ** 0.5
-        assert 20.0 <= dist <= 22.0, f"ad-hoc node must respect dist constraints, got dist={dist}"
-        assert region_for_pos(node.x_ly, node.y_ly, node.z_ly) == "disk", "ad-hoc node must respect region constraints"
+        reservation = state.world.narrative_snapshot["reservations"][piece_key]
+        assert reservation["node_id"] not in state.world.space.nodes
+        run_lore_scheduler_tick(state)
+        node_id, node = _certified_host(state, piece_key)
+        assert node_id == reservation["node_id"]
+        assert node.historical_key == reservation["historical_key"]
+        distance = math.dist((node.x_ly, node.y_ly, node.z_ly),
+                             (start_node.x_ly, start_node.y_ly, start_node.z_ly))
+        assert 20.0 <= distance <= 22.0
+        assert node.kind == "station"
+        assert region_for_pos(node.x_ly, node.y_ly, node.z_ly) == node.region == "disk"
 
-        # No-relax guard: when only explicit non-procedural candidates are configured and no
-        # candidate is available, strict ad-hoc generation must not override those rules.
-        state_no_relax = create_initial_state_sandbox()
-        arcs_no_relax = [
-            {
-                "arc_id": "smoke_hard_force_no_relax",
-                "primary_intel": {
-                    "id": "hard_no_relax_primary",
-                    "kind": "link",
-                    "line": "LINK: ECHO_7 -> NO_RELAX_TARGET",
-                    "force": True,
-                    "force_policy": "hard",
-                    "allowed_channels": ["salvage_data"],
-                    "constraints": {},
-                },
-                "secondary_lore_docs": [],
-                "placement_rules": {
-                    "primary": {
-                        "candidates": ["NON_EXISTENT_EXPLICIT_ID"],
-                        "require_kind_any": [],
-                    }
-                },
+    # A closed explicit list with no historical host is rejected at bootstrap.
+    no_relax = {
+        "arc_id": "smoke_hard_force_no_relax",
+        "primary_intel": {
+            "id": "hard_no_relax_primary",
+            "kind": "link",
+            "line": "LINK: ECHO_7 -> NO_RELAX_TARGET",
+            "force": True,
+            "force_policy": "hard",
+            "allowed_channels": ["salvage_data"],
+            "constraints": {},
+        },
+        "secondary_lore_docs": [],
+        "placement_rules": {
+            "primary": {
+                "candidates": ["NON_EXISTENT_EXPLICIT_ID"],
+                "require_kind_any": [],
             }
-        ]
-        lore_mod.load_arcs = lambda: arcs_no_relax
-        lore_mod.load_singles = lambda: []
-        run_lore_scheduler_tick(state_no_relax)
-        no_relax_key = "arc:smoke_hard_force_no_relax:hard_no_relax_primary"
-        assert no_relax_key not in state_no_relax.world.lore_placements.piece_to_node, (
-            "ad-hoc fallback should not relax explicit non-procedural candidates"
-        )
+        },
+    }
+    with _installed_arc(no_relax):
+        try:
+            create_initial_state_sandbox()
+        except ContentError as exc:
+            assert exc.status == "unsatisfiable"
+            assert "host/channels" in str(exc)
+        else:
+            raise AssertionError("A closed list of missing hosts was accepted")
 
 
 def main() -> None:
-    original_arcs_loader = lore_mod.load_arcs
-    original_singles_loader = lore_mod.load_singles
-    original_inject = Balance.LORE_NON_FORCED_INJECT_P
-    original_interval = Balance.LORE_NON_FORCED_INTERVAL_YEARS
-    original_scheduler = Balance.LORE_SCHEDULER_ENABLED
-    try:
-        Balance.LORE_SCHEDULER_ENABLED = True
-        Balance.LORE_NON_FORCED_INJECT_P = 1.0
-        Balance.LORE_NON_FORCED_INTERVAL_YEARS = 0.0
-        failures: list[str] = []
-        cases = [
-            ("secondary_count", _run_secondary_count_case),
-            ("single_weights", _run_single_weight_case),
-            ("hard_force", _run_hard_force_case),
-            ("hard_force_constraints_and_no_relax", _run_hard_force_constraints_and_no_relax_case),
-        ]
-        for name, case in cases:
-            try:
-                case()
-            except Exception as exc:
-                failures.append(f"{name}: {type(exc).__name__}: {exc}")
-        assert not failures, "Independent lore fixture failures:\n- " + "\n- ".join(failures)
-    finally:
-        lore_mod.load_arcs = original_arcs_loader
-        lore_mod.load_singles = original_singles_loader
-        Balance.LORE_NON_FORCED_INJECT_P = original_inject
-        Balance.LORE_NON_FORCED_INTERVAL_YEARS = original_interval
-        Balance.LORE_SCHEDULER_ENABLED = original_scheduler
+    failures: list[str] = []
+    cases = [
+        ("secondary_count", _run_secondary_count_case),
+        ("single_weights", _run_single_weight_case),
+        ("hard_force", _run_hard_force_case),
+        ("hard_force_constraints_and_no_relax", _run_hard_force_constraints_and_no_relax_case),
+    ]
+    for name, case in cases:
+        try:
+            case()
+        except Exception as exc:
+            failures.append(f"{name}: {type(exc).__name__}: {exc}")
+    assert not failures, "Independent lore fixture failures:\n- " + "\n- ".join(failures)
 
     print("LORE SECONDARY COUNT + SINGLE WEIGHTS + HARD FORCE SMOKE PASSED")
 

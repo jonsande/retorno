@@ -1,12 +1,15 @@
 """4D-3e1 regression; in-memory fixtures and temporary save slots only."""
 from __future__ import annotations
 
+from contextlib import contextmanager
 import copy
 from dataclasses import FrozenInstanceError
+import json
 import os
 from pathlib import Path
 import pickle
 import random
+import shutil
 import statistics
 import subprocess
 import sys
@@ -18,6 +21,7 @@ from unittest.mock import patch
 from retorno.core import lore
 from retorno.io.save_load import load_single_slot, save_single_slot
 from retorno.model.world import NodePoolState, SpaceNode, sector_id_for_pos
+from retorno.runtime import data_loader as data
 from retorno.runtime.data_loader import load_worldgen_archetypes, load_worldgen_templates
 from retorno.worldgen import generator as gen
 from tests.fixtures import worldgen_catalog_5cdde28 as catalog
@@ -30,6 +34,18 @@ else:
 
 SID = "S+020_+020_+000"
 FAMILY = tuple(f"S{x:+04d}_{y:+04d}_+000" for x in range(20, 28) for y in range(20, 28))
+
+
+@contextmanager
+def _installed_primary_arc(target):
+    arc = {"arc_id": "n1a_primary_protection", "primary_intel": {
+        "id": "primary", "kind": "node", "line": f"NODE: {target}"}}
+    with TemporaryDirectory(prefix="retorno-n1a-primary-") as directory:
+        root = Path(directory) / "data"
+        shutil.copytree(data._DATA_ROOT, root)
+        (root / "arcs/n1a_primary_protection.json").write_text(json.dumps(arc), encoding="utf-8")
+        with patch.object(data, "_DATA_ROOT", root):
+            yield arc
 
 
 def _checked(state, ids=(SID,)):
@@ -157,18 +173,33 @@ def test_08_discovery_visits_ship_position_and_survival_do_not_change_catalog():
 
 
 def test_09_protected_primary_is_not_revealed_or_approved_for_recovery():
-    a = _state()
-    nid = "HARBOR_12"
-    arc = {"arc_id": "test", "primary_intel": {"id": "primary", "kind": "node", "line": f"NODE: {nid}"}}
-    with patch.object(lore, "load_arcs", return_value=[arc]):
+    nid = "ARCHIVE_01"
+    with _installed_primary_arc(nid) as arc:
+        a = _state()
+        assert arc in a.world.narrative_snapshot["arcs"]
         assert nid in lore._locked_primary_targets(a)
         # This is an internal physical inventory, deliberately NOT a selector.
         pos = a.world.space.nodes[nid]
         sid = sector_id_for_pos(pos.x_ly, pos.y_ly, pos.z_ly)
+        knowledge = (set(a.world.known_nodes), set(a.world.known_contacts), copy.deepcopy(a.world.known_links))
+        recovery = (copy.deepcopy(a.world.recovery_searches), copy.deepcopy(a.world.recovery_plans))
         result = _checked(a, (sid,)).sectors[0]
+        assert any(site.node_id == nid for site in result.sites)
         assert "narrative_protection_not_assessed" in result.limitations
         assert nid not in a.world.known_nodes | a.world.known_contacts
         assert all(p.status != SiteStatus.VERIFIED for p in result.sites)
+        assert knowledge == (a.world.known_nodes, a.world.known_contacts, a.world.known_links)
+        assert recovery == (a.world.recovery_searches, a.world.recovery_plans)
+
+
+def test_09a_blocked_harbor_primary_rejected_by_prologue():
+    with _installed_primary_arc("HARBOR_12"):
+        try:
+            _state()
+        except ValueError as exc:
+            assert "Prologue conflicts with narrative protection" in str(exc)
+        else:
+            raise AssertionError("A protected HARBOR_12 primary bypassed prologue certification")
 
 
 def test_10_z_outflow_and_region_boundaries_keep_both_spatial_frames():

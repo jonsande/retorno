@@ -365,9 +365,16 @@ def test_15_real_world_multiseed_order_z_and_topology():
     assert any(x.generation_sector_id=="S+15126_+000_+000" for x in spill.sites)
     # Selection includes the same certified spill inventory without materializing.
     s=create_initial_state_prologue(seed=271828)
+    pinned=gen.universe_definition(s)
+    pinned_spill=m.query_physical_sectors(pinned,("S+15126_+000_+001",))
+    assert pinned.scope != d.scope
+    assert {(x.identity.local_id,x.generation_sector_id,x.physical_sector_id,x.position_ly,x.kind)
+            for x in spill.sites} == {(x.identity.local_id,x.generation_sector_id,x.physical_sector_id,x.position_ly,x.kind)
+                                   for x in pinned_spill.sites}
+    assert all(x.identity.scope==pinned.scope for x in pinned_spill.sites)
     s.world.current_pos_ly=(151265.,5.,15.)
     r=pure(s,budget=rec.RecoveryBudget(sectors=1))
-    assert any(x.identity in {p.identity for p in spill.sites} for x in r.retained)
+    assert any(x.identity in {p.identity for p in pinned_spill.sites} for x in r.retained)
 
 
 def test_16_runtime_global_frontier_and_deadnode_counters():

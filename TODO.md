@@ -47,6 +47,59 @@ La escasez no es únicamente un obstáculo. Es también el mecanismo que hace qu
 
 === SIN CLASIFICAR ===
 
+- [] Las cinemáticas no deben ser un adorno añadido al viaje actual, sino la representación visible de estados reales de la nave. Hay que revisar, por tanto, la cinemática inicial del juego, así como la de hibernación y deshibernación. Para ello habrá que modelar en el canon cómo funciona el sarcófago y la criogenización.
+
+- [BUG 001] La nave está en tránsito y estaba haciendo algunos trabajos de reparación. El dron tenía varios trabajos en cola. Al acabar el primero, me ha salido este mensaje:
+
+  [AUTO] [WARN] warning :: Repair waiting for decision: D1 is in BRG-01, but power_core requires PWR-A1
+  WARNING: D1 is in BRG-01, but power_core is in PWR-A1. Auto-move the drone to PWR-A1 and queue the repair? [y/N]
+
+No sé que he tocado (quizá he introducido un texto diferente de 'y' y de 'n') pero el dron se ha quedado como bloqueado. El trabajo figura como "running" pero el ETA no avanza y simplemente no pasa nada. Trato de cancelar el trabajo pero me sale este mensaje de error:
+
+  [CMD] [WARN] boot_blocked :: Action blocked: ship in transit. Use 'hibernate until_arrival' to advance.
+
+No puedo cancelar ni ese trabajo ni ninguno de los que está en cola (debería poder cancelar trabajos aunque esté en tránsito). Tampoco puedo hacer "recall" del dron, pues lo encola como una tarea a llevar a cabo al terminar los demás trabajos, y los demás no pueden completarse, por lo dicho. He hecho "hibernate until_arrival" a ver qué pasa, y al acabar la cuanta atrás de la hibernación el juego se ha quedado como bloqueado.
+
+- [!] Necesitamos un comando del tipo a "drone recall D1 now", o mejor "drone recall! D1", que haga que el dron cancele todo trabajo activo y vuelva inmediatamente.
+
+
+- [] No se puede encontrar un id para los destinos que sea más legible humanamente? El actual me parece muy poco amigable para los nuevos jugadores. Deberíamos valorar otras opciones. (Con ello solucionaríamos de paso el bug 002)
+
+- [BUG 002] El nuevo id de las naves/estaciones/etc. no autocompleta con el comando "cat". Ubicaciones como "/remote/P-0.2.1.0/" no autocompletan.
+
+- [] He recuperado el siguiente mail:
+
+  === CAT /remote/P-0.2.1.0/mail/inbox/0001.es.txt ===
+  FROM: Station STATION_10BA66
+  SUBJ: Archivo de telemetría conservado
+                                                                                                                          
+  Copia histórica sin fecha absoluta verificable. No es una medición actual de la nave.
+  Región registrada: disk
+  Integridad declarada de caché: 64%
+  Deriva de reloj registrada: +96 ms
+  Referencias de conexión histórica: 2
+  Clase de extremo predominante: derrelicto
+  No constan comprobaciones actuales de respuesta, tráfico ni supervivientes.
+  El estado operativo presente y la antigüedad del registro son desconocidos.
+  Contrasta los registros navegacionales con observaciones independientes.
+
+El mail tiene "FROM:" pero no tiene "TO:". Por qué? Cómo se explica este mail diegéticamente?
+En este mail aparece alguna información interesante (y algunas expresiones un poco confusas, como "Clase de extremo predominante"): da a entender que en la región "disk" de la galaxia hay mayormente derelictos. ¿Es correcto? Qué más información útil le ofrece al jugador? ¿Cómo ha generado el juego este mail?
+
+- [] Al intentar iniciar un viaje estando atracado me sale este mensaje:
+
+> nav P-0.2.1.1
+  Destination: P-0.2.1.1
+  Cruise: MAX (0.5c) | Galactic ETA: 13.61y
+  Antimatter: ~1.196 caps. | Reserve: 9.485 → ~8.289
+  Departure blocked
+
+Debería decirme la razón de por qué departure blocked. Además, esto debería mostrarse como un mensaje de error (y con el sonido correspondiente de error). Aparte, no debería salir el resumen del viaje, si no se está llevando a cabo.
+
+- [] Hay que reducir el número de decimales de la antimateria. Algunos outputs muestran el número de antimateria disponible con una cantidad de decimales excesiva.
+
+- [] De cara al balance del juego, hace falta saber en detalle cómo funciona el módulo bus_stabilizer: ese Q+0.15 que otorga, ¿qué ventajas le proporcionan al jugador, como para merecer la pena el gasto en scrap y el ocupar un slot de módulo?
+
 - [] A partir de qué distancia se usa la antimateria para viajar? Creo recordar que por debajo de cierta distancia se viaja más despacio y sin usar antimateria.
 Esto hay que dejárselo claro al jugador. Actualmente la información es un poco confusa, pues no se indica en ninguna parte (ni al navegar ni al leer el output de "routes") que por debajo de ciertas distancias no se usa antimateria, ni a la velicidad a la que se viaja.
 

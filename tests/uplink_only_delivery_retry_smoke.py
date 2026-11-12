@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import io
-from contextlib import redirect_stdout
+import json
+import math
+import shutil
+from contextlib import contextmanager, redirect_stdout
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from retorno.bootstrap import create_initial_state_sandbox
 from retorno.cli import repl
-import retorno.core.lore as lore_mod
+from retorno.config.balance import Balance
+from retorno.runtime import data_loader as data
 from retorno.core.lore import (
     _assign_piece_to_node,
     build_lore_context,
@@ -18,6 +23,7 @@ from retorno.io.save_load import load_single_slot, save_single_slot
 from retorno.model.events import EventType
 from retorno.model.os import Locale
 from retorno.model.world import SpaceNode, add_known_link
+from retorno.worldgen import generator, manifest
 
 
 ARC_ID = "smoke_uplink_delivery"
@@ -68,8 +74,9 @@ def _add_node(state, node_id: str, *, dx: float) -> None:
 
 def _prepared_state(line: str):
     state = create_initial_state_sandbox()
-    # This retry fixture edits its route pool and creates literal synthetic
-    # endpoints. Test the retained legacy mechanism explicitly.
+    # The synthetic endpoints and route pools belong to the legacy matrix only.
+    # A historical game reads its pinned narrative and information snapshots.
+    state.world.narrative_snapshot["arcs"] = [_arc(line)]
     state.world.information_version = "legacy-information-v0"
     state.world.information_definition = None
     state.world.radio_history_version = "legacy-radio-v0"
@@ -78,9 +85,33 @@ def _prepared_state(line: str):
     state.ship.docked_node_id = state.world.current_node_id
     sync_node_pools_for_known_nodes(state)
     node_id = state.world.current_node_id
-    assert _assign_piece_to_node(state, _piece_entry(line), node_id)
     pool = state.world.node_pools[node_id]
+    assert _assign_piece_to_node(state, _piece_entry(line), node_id)
     pool.uplink_route_pool = []
+    state.world.lore.last_delivery_t = 17.0
+    return state
+
+
+@contextmanager
+def _installed_arc(line: str):
+    """Keep the authored catalog available through both save/load cycles."""
+    with TemporaryDirectory(prefix="retorno-uplink-catalog-") as directory:
+        root = Path(directory) / "data"
+        shutil.copytree(data._DATA_ROOT, root)
+        (root / "arcs" / f"{ARC_ID}.json").write_text(
+            json.dumps(_arc(line)), encoding="utf-8"
+        )
+        with patch.object(data, "_DATA_ROOT", root):
+            yield
+
+
+def _prepared_historical_state(line: str):
+    state = create_initial_state_sandbox()
+    assert _arc(line) in state.world.narrative_snapshot["arcs"]
+    state.clock.t = 123.0
+    state.ship.docked_node_id = state.world.current_node_id
+    sync_node_pools_for_known_nodes(state)
+    assert _assign_piece_to_node(state, _piece_entry(line), state.world.current_node_id)
     state.world.lore.last_delivery_t = 17.0
     return state
 
@@ -213,16 +244,12 @@ def _run_matrix() -> None:
         ),
     ]
     for line, nodes, expect_success, expected_link, preexisting in cases:
-        _run_case_with_loader(
+        _run_matrix_case(
             line,
-            lambda line=line, nodes=nodes, expect_success=expect_success,
-            expected_link=expected_link, preexisting=preexisting: _run_matrix_case(
-                line,
-                nodes=nodes,
-                expect_success=expect_success,
-                expected_link=expected_link,
-                preexisting=preexisting,
-            ),
+            nodes=nodes,
+            expect_success=expect_success,
+            expected_link=expected_link,
+            preexisting=preexisting,
         )
 
 
@@ -237,7 +264,7 @@ def _run_public_counter_matrix() -> None:
         _assert_delivered(state, "ECHO_7", "VALID_ONLY_TARGET")
         assert state.world.lore.counters.get("uplink_count", 0) == before_count + 1
 
-    _run_case_with_loader("LINK: ECHO_7 -> VALID_ONLY_TARGET", valid_only)
+    valid_only()
 
     def invalid_only() -> None:
         state = _prepared_state("LINK: ECHO_7 -> MISSING_ONLY_TARGET")
@@ -249,7 +276,7 @@ def _run_public_counter_matrix() -> None:
         _assert_no_link_effect(state, "ECHO_7", "MISSING_ONLY_TARGET")
         assert state.world.lore.counters.get("uplink_count", 0) == before_count
 
-    _run_case_with_loader("LINK: ECHO_7 -> MISSING_ONLY_TARGET", invalid_only)
+    invalid_only()
 
     def route_and_valid() -> None:
         state = _prepared_state("LINK: ECHO_7 -> VALID_WITH_ROUTE_TARGET")
@@ -266,40 +293,35 @@ def _run_public_counter_matrix() -> None:
         assert "POOL_ROUTE_TARGET" in state.world.known_links.get("ECHO_7", set())
         assert state.world.lore.counters.get("uplink_count", 0) == before_count + 1
 
-    _run_case_with_loader("LINK: ECHO_7 -> VALID_WITH_ROUTE_TARGET", route_and_valid)
+    route_and_valid()
 
 
-def _run_case_with_loader(line: str, callback) -> None:
-    original_loader = lore_mod.load_arcs
-    lore_mod.load_arcs = lambda: [_arc(line)]
-    try:
-        callback()
-    finally:
-        lore_mod.load_arcs = original_loader
-
-
-def _run_public_retry_and_persistence_for_locale(
-    locale: Locale,
-    *,
-    exhausted_message: str,
-    applied_message: str,
-) -> None:
+def _run_pending_persistence_for_locale(locale: Locale, *, exhausted_message: str) -> None:
     line = "LINK: ECHO_7 -> LATE_TARGET"
-
-    def scenario() -> None:
-        state = _prepared_state(line)
+    with _installed_arc(line):
+        state = _prepared_historical_state(line)
         state.os.locale = locale
         pool = state.world.node_pools[state.world.current_node_id]
         before_counters = dict(state.world.lore.counters)
+        certified_routes = list(pool.uplink_route_pool)
+        certified_records = list(pool.uplink_records)
         before_logs = {
             path for path in state.os.fs if path.startswith("/logs/nav/uplink_")
         }
 
         _public_uplink_output(state)
         assert pool.uplink_data_consumed is True
+        assert pool.uplink_route_pool == certified_routes
+        assert pool.uplink_records == certified_records
         _assert_pending(state)
         _assert_no_link_effect(state, "ECHO_7", "LATE_TARGET")
-        assert state.world.lore.counters == before_counters
+        assert "LATE_TARGET" not in state.world.space.nodes
+        assert "LATE_TARGET" not in state.world.known_nodes | state.world.known_contacts
+        assert state.world.lore.counters.get("uplink_count", 0) in {
+            before_counters.get("uplink_count", 0),
+            before_counters.get("uplink_count", 0) + 1,
+        }
+        pending_counters = dict(state.world.lore.counters)
         first_logs = {
             path for path in state.os.fs if path.startswith("/logs/nav/uplink_")
         }
@@ -307,10 +329,9 @@ def _run_public_retry_and_persistence_for_locale(
 
         failed_retry_output = _public_uplink_output(state)
         assert exhausted_message in failed_retry_output
-        assert applied_message not in failed_retry_output
         _assert_pending(state)
         _assert_no_link_effect(state, "ECHO_7", "LATE_TARGET")
-        assert state.world.lore.counters == before_counters
+        assert state.world.lore.counters == pending_counters
         assert {
             path for path in state.os.fs if path.startswith("/logs/nav/uplink_")
         } == first_logs
@@ -323,74 +344,156 @@ def _run_public_retry_and_persistence_for_locale(
             pending = pending_result.state
             _assert_pending(pending)
             _assert_no_link_effect(pending, "ECHO_7", "LATE_TARGET")
-            assert pending.world.lore.counters == before_counters
+            assert pending.world.lore.counters == pending_counters
             assert pending.world.node_pools[pending.world.current_node_id].uplink_data_consumed is True
-
-            _add_node(pending, "LATE_TARGET", dx=8.0)
-            success_counters = dict(pending.world.lore.counters)
-            success_logs = {
-                path for path in pending.os.fs if path.startswith("/logs/nav/uplink_")
-            }
-            before_success_events = len(pending.events.recent)
-            successful_retry_output = _public_uplink_output(pending)
-            assert applied_message in successful_retry_output
-            assert exhausted_message not in successful_retry_output
-            assert len(pending.events.recent) == before_success_events + 1
-            assert pending.events.recent[-1].type == EventType.UPLINK_COMPLETE
-            assert pending.events.recent[-1].message == applied_message
-            _assert_delivered(pending, "ECHO_7", "LATE_TARGET")
-            assert pending.world.lore.counters == success_counters
-            assert {
-                path for path in pending.os.fs if path.startswith("/logs/nav/uplink_")
-            } == success_logs
-
-            narrative_events = [
-                event
-                for event in pending.events.recent
-                if event.type
-                in {EventType.MAIL_RECEIVED, EventType.SIGNAL_CAPTURED, EventType.BROADCAST_RECEIVED}
-            ]
-            assert narrative_events == []
-            assert pending.world.lore.delivery_log == []
-
-            delivered_path = Path(tmp_dir) / "delivered.dat"
-            save_single_slot(pending, delivered_path)
-            delivered_result = load_single_slot(delivered_path)
-            assert delivered_result is not None
-            delivered = delivered_result.state
-            _assert_delivered(delivered, "ECHO_7", "LATE_TARGET")
-            assert delivered.world.lore.counters == success_counters
-
-            before_retry_intel = len(delivered.world.intel)
-            before_retry_discovered = set(
-                delivered.world.arc_placements[ARC_ID].get("discovered", set())
-            )
-            before_retry_events = len(delivered.events.recent)
-            repeated_output = _public_uplink_output(delivered)
+            assert manifest.resolve_operative_id(
+                generator.universe_definition(pending), "LATE_TARGET"
+            ) is None
+            assert pending.world.node_pools[pending.world.current_node_id].uplink_route_pool == certified_routes
+            assert pending.world.node_pools[pending.world.current_node_id].uplink_records == certified_records
+            before_retry_intel = list(pending.world.intel)
+            before_retry_events = len(pending.events.recent)
+            repeated_output = _public_uplink_output(pending)
             assert exhausted_message in repeated_output
-            assert applied_message not in repeated_output
-            _assert_delivered(delivered, "ECHO_7", "LATE_TARGET")
-            assert len(delivered.world.intel) == before_retry_intel
-            assert delivered.world.lore.counters == success_counters
-            assert delivered.world.arc_placements[ARC_ID].get("discovered", set()) == before_retry_discovered
+            _assert_pending(pending)
+            _assert_no_link_effect(pending, "ECHO_7", "LATE_TARGET")
+            assert pending.world.intel == before_retry_intel
+            assert pending.world.lore.counters == pending_counters
+            assert len(pending.events.recent) == before_retry_events + 1
+            assert pending.events.recent[-1].type == EventType.UPLINK_COMPLETE
+            assert pending.events.recent[-1].message == exhausted_message
+            assert {path for path in pending.os.fs if path.startswith("/logs/nav/uplink_")} == first_logs
+
+
+def _run_historical_delivery_for_locale(locale: Locale, *, exhausted_message: str,
+                                        routes_message: str) -> None:
+    line = "LINK: ECHO_7 -> ARCHIVE_01"
+    with _installed_arc(line):
+        state = _prepared_historical_state(line)
+        state.os.locale = locale
+        definition = generator.universe_definition(state)
+        left = manifest.resolve_operative_id(definition, "ECHO_7")
+        right = manifest.resolve_operative_id(definition, "ARCHIVE_01")
+        assert left is not None and right is not None
+        assert left.identity.scope == right.identity.scope == definition.scope
+        assert math.dist(left.position_ly, right.position_ly) <= Balance.MAX_ROUTE_HOP_LY
+        for node_id, site in (("ECHO_7", left), ("ARCHIVE_01", right)):
+            node = state.world.space.nodes[node_id]
+            assert (node.x_ly, node.y_ly, node.z_ly) == site.position_ly
+            assert node.kind == site.kind and node.region == site.region
+            assert node.historical_key in (None, site.identity.encoded)
+        pool = state.world.node_pools[state.world.current_node_id]
+        certified_routes = list(pool.uplink_route_pool)
+        certified_records = list(pool.uplink_records)
+        before_counters = dict(state.world.lore.counters)
+        before_logs = {path for path in state.os.fs if path.startswith("/logs/nav/uplink_")}
+
+        first_output = _public_uplink_output(state)
+        assert routes_message in first_output
+        assert pool.uplink_data_consumed is True
+        assert pool.uplink_route_pool == certified_routes
+        assert pool.uplink_records == certified_records
+        _assert_delivered(state, "ECHO_7", "ARCHIVE_01")
+        assert state.world.lore.last_delivery_t == state.clock.t
+        assert state.world.lore.counters.get("uplink_count", 0) == before_counters.get("uplink_count", 0) + 1
+        narrative_intel = [item for item in state.world.intel if item.source_kind == "uplink_only"]
+        assert len(narrative_intel) == 1
+        assert (narrative_intel[0].from_id, narrative_intel[0].to_id) == ("ECHO_7", "ARCHIVE_01")
+        navigation_intel = [item for item in state.world.intel if item.source_kind == "uplink"]
+        assert navigation_intel
+        assert len(navigation_intel) + len(narrative_intel) == len(state.world.intel)
+        assert all(item.from_id == "ECHO_7" and item.to_id in certified_routes
+                   for item in navigation_intel)
+        assert state.events.recent[-1].type == EventType.UPLINK_COMPLETE
+        assert routes_message in state.events.recent[-1].message
+        first_logs = {path for path in state.os.fs if path.startswith("/logs/nav/uplink_")}
+        assert len(first_logs) == len(before_logs) + 1
+        delivered_counters = dict(state.world.lore.counters)
+        delivered_intel = list(state.world.intel)
+        delivered_log = list(state.world.lore.delivery_log)
+        delivered_routes = {node: set(destinations) for node, destinations in state.world.known_links.items()}
+
+        before_repeat_events = len(state.events.recent)
+        repeat_output = _public_uplink_output(state)
+        assert exhausted_message in repeat_output
+        _assert_delivered(state, "ECHO_7", "ARCHIVE_01")
+        assert state.world.intel == delivered_intel
+        assert state.world.lore.counters == delivered_counters
+        assert state.world.lore.delivery_log == delivered_log
+        assert state.world.known_links == delivered_routes
+        assert {path for path in state.os.fs if path.startswith("/logs/nav/uplink_")} == first_logs
+        assert len(state.events.recent) == before_repeat_events + 1
+        assert state.events.recent[-1].type == EventType.UPLINK_COMPLETE
+        assert state.events.recent[-1].message == exhausted_message
+
+        with TemporaryDirectory() as tmp_dir:
+            delivered_path = Path(tmp_dir) / "delivered.dat"
+            save_single_slot(state, delivered_path)
+            result = load_single_slot(delivered_path)
+            assert result is not None
+            delivered = result.state
+            _assert_delivered(delivered, "ECHO_7", "ARCHIVE_01")
+            assert delivered.world.intel == delivered_intel
+            assert delivered.world.lore.counters == delivered_counters
+            assert delivered.world.lore.delivery_log == delivered_log
+            assert delivered.world.known_links == delivered_routes
+            assert delivered.world.node_pools[delivered.world.current_node_id].uplink_route_pool == certified_routes
+            assert delivered.world.node_pools[delivered.world.current_node_id].uplink_records == certified_records
+            before_retry_events = len(delivered.events.recent)
+            after_load_output = _public_uplink_output(delivered)
+            assert exhausted_message in after_load_output
+            _assert_delivered(delivered, "ECHO_7", "ARCHIVE_01")
+            assert delivered.world.intel == delivered_intel
+            assert delivered.world.lore.counters == delivered_counters
+            assert delivered.world.lore.delivery_log == delivered_log
+            assert delivered.world.known_links == delivered_routes
             assert len(delivered.events.recent) == before_retry_events + 1
             assert delivered.events.recent[-1].type == EventType.UPLINK_COMPLETE
             assert delivered.events.recent[-1].message == exhausted_message
+            assert {path for path in delivered.os.fs if path.startswith("/logs/nav/uplink_")} == first_logs
 
-    _run_case_with_loader(line, scenario)
+
+def _run_legacy_late_retry() -> None:
+    state = _prepared_state("LINK: ECHO_7 -> LATE_TARGET")
+    first_output = _public_uplink_output(state)
+    assert "uplink_complete" in first_output
+    _assert_pending(state)
+    _assert_no_link_effect(state, "ECHO_7", "LATE_TARGET")
+    _add_node(state, "LATE_TARGET", dx=8.0)
+    before_intel = list(state.world.intel)
+    applied_output = _public_uplink_output(state)
+    assert "pending narrative delivery applied" in applied_output
+    _assert_delivered(state, "ECHO_7", "LATE_TARGET")
+    assert len(state.world.intel) == len(before_intel) + 1
+    delivered_intel = list(state.world.intel)
+    delivered_counters = dict(state.world.lore.counters)
+    exhausted_output = _public_uplink_output(state)
+    assert "node data already exhausted" in exhausted_output
+    _assert_delivered(state, "ECHO_7", "LATE_TARGET")
+    assert state.world.intel == delivered_intel
+    assert state.world.lore.counters == delivered_counters
 
 
 def _run_public_retry_and_persistence() -> None:
-    _run_public_retry_and_persistence_for_locale(
+    _run_pending_persistence_for_locale(
         Locale.EN,
         exhausted_message="uplink_complete :: node data already exhausted",
-        applied_message="uplink_complete :: node data exhausted; pending narrative delivery applied",
     )
-    _run_public_retry_and_persistence_for_locale(
+    _run_pending_persistence_for_locale(
         Locale.ES,
         exhausted_message="uplink_complete :: datos del nodo ya agotados",
-        applied_message="uplink_complete :: datos del nodo agotados; entrega narrativa pendiente aplicada",
     )
+    _run_historical_delivery_for_locale(
+        Locale.EN,
+        exhausted_message="uplink_complete :: node data already exhausted",
+        routes_message="uplink_complete :: routes added:",
+    )
+    _run_historical_delivery_for_locale(
+        Locale.ES,
+        exhausted_message="uplink_complete :: datos del nodo ya agotados",
+        routes_message="uplink_complete :: rutas añadidas:",
+    )
+    _run_legacy_late_retry()
 
 
 def main() -> None:

@@ -583,7 +583,8 @@ def piece_emission(scene):
 def test_31_unselected_optional_piece_does_not_appear_by_proximity():
     with installed(piece_emission,singles=[piece_fixture(forced=False)]):
         s=state();lore.run_lore_scheduler_tick(s)
-        assert not s.world.lore_placements.piece_to_node
+        # Installed hard arc pieces may be placed; this optional radio piece must not be.
+        assert 'single:radio-piece' not in s.world.lore_placements.piece_to_node
         for _ in range(3):E.tick(s,1)
         assert not any(op.emission and op.emission.piece_key for op in s.world.radio_opportunities.values())
         assert not s.world.lore.delivered

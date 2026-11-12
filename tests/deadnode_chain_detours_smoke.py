@@ -28,9 +28,9 @@ from retorno.io.save_load import load_single_slot, save_single_slot
 from retorno.model.world import SectorGenState, add_known_link, region_for_pos, sector_id_for_pos
 from retorno.runtime.data_loader import load_worldgen_archetypes
 if __package__:
-    from tests.deadnode_chain_planner_smoke import _add, _assert_hops, _node, _pool, _state
+    from tests.deadnode_chain_planner_smoke import _add, _assert_hops, _legacy_arcs, _node, _pool, _state
 else:
-    from deadnode_chain_planner_smoke import _add, _assert_hops, _node, _pool, _state
+    from deadnode_chain_planner_smoke import _add, _assert_hops, _legacy_arcs, _node, _pool, _state
 
 
 def _at(state, nid, x, y, z=1.0, kind="derelict"):
@@ -211,13 +211,14 @@ def test_protected_shortcut_excluded_alternative_retained():
     state = _detour()
     _add(state, "PRIMARY", 35)
     arc = {"arc_id": "LOCK", "primary_intel": {"kind": "node", "line": "NODE: PRIMARY"}}
-    with patch.object(lore, "load_arcs", return_value=[arc]):
+    with _legacy_arcs(state, [arc]):
+        assert lore._locked_primary_targets(state) == {"PRIMARY"}
         p = _checked(state)
     assert p.reused_nodes == ("A", "B", "C", "D")
     assert "PRIMARY" not in p.reused_nodes
     state.world.forced_hidden_nodes.add("B")
     state.world.lore_placements.piece_to_node["narrative_host"] = "B"
-    with patch.object(lore, "load_arcs", return_value=[arc]):
+    with _legacy_arcs(state, [arc]):
         assert _checked(state) == p
 
 

@@ -30,9 +30,9 @@ from retorno.model.os import AccessLevel, FSNode, FSNodeType
 from retorno.model.world import SectorGenState, add_known_link, sector_id_for_pos
 
 if __package__:
-    from tests.deadnode_chain_planner_smoke import _add, _node, _pool, _state
+    from tests.deadnode_chain_planner_smoke import _add, _legacy_arcs, _node, _pool, _state
 else:
-    from deadnode_chain_planner_smoke import _add, _node, _pool, _state
+    from deadnode_chain_planner_smoke import _add, _legacy_arcs, _node, _pool, _state
 
 
 NO_NEW = PlanningContext(allow_new_nodes=False)
@@ -386,7 +386,8 @@ def test_27_longer_valid_progression_retained():
 def test_28_primary_target_protected():
     state = _state(40)
     arc={"arc_id":"LOCK","primary_intel":{"kind":"node","line":"NODE: D"}}
-    with patch.object(lore,"load_arcs",return_value=[arc]):
+    with _legacy_arcs(state,[arc]):
+        assert lore._locked_primary_targets(state) == {"D"}
         r = _checked(state)
     assert not r.preferred_ids
     assert all(e.status == OpportunityStatus.UNUSABLE for e in r.evaluations)

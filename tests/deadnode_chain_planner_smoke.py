@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import FrozenInstanceError, asdict
 import copy
 import math
@@ -37,8 +38,8 @@ def _node(nid, x, y=25.0, kind="derelict"):
 
 
 def _state(distance=100.0, y=25.0):
-    state = create_initial_state_sandbox()
-    state.meta.rng_seed = state.world.rng_seed = 271828
+    state = create_initial_state_sandbox(seed=271828)
+    state.world.rng_seed = 271828
     state.meta.rng_counter = 17
     world = state.world
     # This diagnostic fixture installs pre-contract synthetic archives, not a
@@ -69,6 +70,20 @@ def _state(distance=100.0, y=25.0):
     world.exploration_recovery = ExplorationRecoveryState()
     world.node_pools = {nid: _pool() for nid in world.space.nodes}
     return state
+
+
+@contextmanager
+def _legacy_arcs(state, arcs):
+    """Use the loader boundary only for this pre-contract diagnostic scene."""
+    assert state.world.information_version == "legacy-information-v0"
+    assert state.world.radio_history_version == "legacy-radio-v0"
+    snapshot = state.world.narrative_snapshot
+    state.world.narrative_snapshot = {}
+    try:
+        with patch.object(lore, "load_arcs", return_value=arcs):
+            yield
+    finally:
+        state.world.narrative_snapshot = snapshot
 
 
 def _pool():
@@ -330,7 +345,8 @@ def test_protected_target_intermediary_and_unlocked_host():
         for protected in ("D", "E1"):
             line = f"NODE: {protected}" if kind == "node" else f"LINK: A -> {protected}"
             arc = {"arc_id": "PROBE", "primary_intel": {"kind": kind, "line": line}}
-            with patch.object(lore, "load_arcs", return_value=[arc]):
+            with _legacy_arcs(state, [arc]):
+                assert lore._locked_primary_targets(state) == {protected}
                 result = _plan(state, False)
                 assert protected not in result.reused_nodes
                 if protected == "D":
@@ -344,7 +360,7 @@ def test_protected_target_intermediary_and_unlocked_host():
 def test_unresolved_primary_protection_fails_closed():
     arc = {"arc_id": "COORD_PRIMARY", "primary_intel": {"kind": "coord", "coord": [100, 25, 1]}}
     state = _state()
-    with patch.object(lore, "load_arcs", return_value=[arc]):
+    with _legacy_arcs(state, [arc]):
         result = _plan(state)
         assert result.reasons == ("primary_protection_query_incomplete",)
         state.world.arc_placements["COORD_PRIMARY"] = {"primary": {"unlocked": True}}
@@ -443,19 +459,30 @@ def test_stopped_waypoint_is_an_origin():
     state.world.known_nodes.add("B")
     state.world.known_contacts.add("B")
     add_known_link(state.world, "A", "B", bidirectional=True)
-    state.ship.cruise_speed_ly_per_year = 10_000_000.0
     engine = Engine()
     started = engine.apply_action(state, Travel(node_id="B", no_cruise=True))
     assert any(e.type == EventType.TRAVEL_STARTED for e in started)
+    assert state.ship.in_transit
     assert _plan(state).reasons == ("ship_in_transit",)
-    engine.tick(state, (state.ship.arrival_t - state.clock.t) / 2)
-    engine.apply_action(state, TravelAbort())
+    assert 0 < 60 < state.ship.arrival_t - state.clock.t
+    engine.tick(state, 60)
+    assert state.ship.in_transit
+    aborted = engine.apply_action(state, TravelAbort())
+    assert any(e.type == EventType.TRAVEL_ABORTED for e in aborted)
+    assert not state.ship.in_transit
+    waypoint = state.world.active_tmp_node_id
+    assert waypoint is not None and waypoint in state.world.space.nodes
+    origin = state.world.space.nodes["A"]
+    destination = state.world.space.nodes["B"]
+    stopped = state.world.space.nodes[waypoint]
+    assert origin.x_ly < stopped.x_ly < destination.x_ly
+    assert stopped.y_ly == origin.y_ly == destination.y_ly
+    assert stopped.z_ly == origin.z_ly == destination.z_ly
     state.world.space.nodes["D"].x_ly = state.world.current_pos_ly[0]
     state.world.space.nodes["D"].y_ly = state.world.current_pos_ly[1] + 40
     result = _plan(state)
     assert result.physical_chain_valid
-    assert result.origin_id == state.world.active_tmp_node_id
-    assert not state.ship.in_transit
+    assert result.origin_id == waypoint
 
 
 def test_no_arbitrary_stage_limit():

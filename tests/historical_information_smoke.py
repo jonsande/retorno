@@ -27,7 +27,7 @@ from retorno.model.os import Locale, mount_files
 from retorno.runtime import data_loader as data
 from retorno.worldgen import information as info, manifest
 from retorno.worldgen.generator import ensure_sector_generated, universe_definition, ensure_historical_node
-from retorno.worldgen.narrative import canonical, fingerprint
+from retorno.worldgen.narrative import canonical, collect_catalog, fingerprint
 from information_capabilities_smoke import scene as ready_scene
 from knowledge_boundary_smoke import public
 
@@ -168,8 +168,10 @@ def test_06_primary_disclosure_filters_delivery_without_rewriting_or_replacement
     pool = state.world.node_pools[host]
     historical = signature(query(state, host))
     immutable = deepcopy(prepared(pool))
-    nav = next(entry for entry in pool.base_files if entry.get("navigation_record"))
-    targets = set(pool.uplink_route_pool) | {nav["navigation_record"]["destination_id"]}
+    nav_targets = {entry["navigation_record"]["destination_id"] for entry in pool.base_files
+        if entry.get("navigation_record")}
+    assert nav_targets
+    targets = set(pool.uplink_route_pool) | nav_targets
     arcs = [dict(arc_id=f"locked_{i}", primary_intel=dict(id="primary", kind="link", line=f"LINK: {host} -> {dest}"))
         for i, dest in enumerate(sorted(targets))]
     with patch.object(lore, "load_arcs", return_value=arcs), patch.dict(state.world.narrative_snapshot, arcs=arcs):
@@ -246,21 +248,38 @@ def pre_b1_catalogue():
 
 
 @pre_b1_catalogue()
-def test_09_genuine_pre_b1_slots_save_retains_pools_and_uninitialized_legacy_rules():
+def test_09_pre_engine_slot_is_rejected_and_current_legacy_rules_remain_testable():
     path = FIXTURE / "B0-schema3.dat"
     expected = json.loads((FIXTURE / "B0-schema3.json").read_text())
     assert hashlib.sha256(path.read_bytes()).hexdigest() == expected["sha256"]
     original = path.read_bytes()
-    state = save_load.load_single_slot(path).state
-    assert state.world.information_version == info.LEGACY_VERSION and state.world.information_definition is None
-    for nid, old in expected["pools"].items():
-        pool = state.world.node_pools[nid]
-        assert pool.information_version == info.LEGACY_VERSION and not pool.uplink_records
-        for key, value in old.items():
-            actual = getattr(pool, key)
-            assert (sorted(actual) if isinstance(actual, set) else actual) == value, (nid, key)
-    assert all(state.os.fs[path].content == text for path, text in expected["fs"].items())
-    host = expected["uninitialized"]
+    files_before = {item.name: hashlib.sha256(item.read_bytes()).hexdigest()
+        for item in FIXTURE.iterdir() if item.is_file()}
+    catalog_before = fingerprint(collect_catalog())
+    try:
+        save_load.load_single_slot(path)
+    except save_load.SaveLoadError as exc:
+        assert "Incompatible engines/fuel state" in str(exc), str(exc)
+    else:
+        raise AssertionError("The pre-engine slot was accepted without an explicit migration")
+    assert path.read_bytes() == original
+    assert {item.name: hashlib.sha256(item.read_bytes()).hexdigest()
+        for item in FIXTURE.iterdir() if item.is_file()} == files_before
+    assert fingerprint(collect_catalog()) == catalog_before
+
+    # Separate synthetic current-architecture scene: exercises the permitted
+    # legacy information algorithm, not migration of the genuine B0 slot.
+    state = create_initial_state_sandbox(seed=expected["seed"])
+    state.world.information_version = info.LEGACY_VERSION
+    state.world.information_definition = None
+    state.world.radio_history_version = "legacy-radio-v0"
+    state.world.radio_definition = None
+    world = universe_definition(state)
+    sites = manifest.query_physical_sectors(world, ("S+000_-001_+000",)).sites
+    site = next(site for site in sites if site.identity.namespace == "procedural"
+        and site.kind in {"waystation", "station", "relay"})
+    host = manifest.operative_id(world, site)
+    assert ensure_historical_node(state, host)
     assert host not in state.world.node_pools
     for clock in (0, 86400):
         variant = deepcopy(state)
@@ -270,12 +289,17 @@ def test_09_genuine_pre_b1_slots_save_retains_pools_and_uninitialized_legacy_rul
         pool = variant.world.node_pools[host]
         assert pool.information_version == info.LEGACY_VERSION and not pool.uplink_records
         assert all("information_version" not in file for file in pool.base_files)
+        assert pool.uplink_route_pool
+    lore.initialize_node_pool(state, host)
+    original_pools, original_fs = deepcopy(state.world.node_pools), deepcopy(state.os.fs)
     with TemporaryDirectory() as folder:
         saved = save_load.save_single_slot(state, Path(folder) / "legacy.dat")
         again = save_load.load_single_slot(saved).state
-        assert again.world.node_pools == state.world.node_pools
+        assert again.world.node_pools == original_pools and again.os.fs == original_fs
         assert again.world.information_version == info.LEGACY_VERSION
+        assert again.world.information_definition is None
     assert path.read_bytes() == original
+    assert fingerprint(collect_catalog()) == catalog_before
 
 
 def test_10_new_save_load_and_incompatible_metadata_are_nondestructive():
@@ -436,31 +460,46 @@ def test_15_textual_public_uplink_dispatch_uses_the_same_finite_records():
 
 
 def test_16_authorized_scheduler_primary_delivers_without_rewriting_historical_records():
-    state = create_initial_state_sandbox()
-    state.ship.docked_node_id = "ECHO_7"
-    lore.sync_node_pools_for_known_nodes(state)
-    pool = state.world.node_pools["ECHO_7"]
-    history = deepcopy(prepared(pool))
-    dest = pool.uplink_route_pool[0]
+    dest = "ARCHIVE_01"
     piece = dict(id="primary", kind="link", line=f"LINK: ECHO_7 -> {dest}", allowed_channels=["uplink_only"])
     arc = dict(arc_id="authorized_fixture", primary_intel=piece)
     key = "arc:authorized_fixture:primary"
-    entry = dict(piece_key=key, piece_id="primary", piece=piece,
-        arc_id="authorized_fixture", role="primary", channels=["uplink_only"])
-    with patch.object(lore, "load_arcs", return_value=[arc]), patch.dict(state.world.narrative_snapshot, arcs=[arc]):
-        assert dest not in lore.disclosable_uplink_destinations(state, pool)
-        assert lore._assign_piece_to_node(state, entry, "ECHO_7")
-        output(repl._handle_uplink, state)
-        assert key in state.world.lore.delivered and key in pool.delivered_piece_ids
-        assert key not in pool.pending_push_piece_ids
-        assert state.world.arc_placements["authorized_fixture"]["primary"]["unlocked"]
-        assert dest in state.world.known_links["ECHO_7"] and prepared(pool) == history
-        with TemporaryDirectory() as folder:
-            slot = save_load.save_single_slot(state, Path(folder) / "primary.dat")
-            loaded = save_load.load_single_slot(slot).state
-            counters, fs, links = deepcopy(loaded.world.lore.counters), deepcopy(loaded.os.fs), deepcopy(loaded.world.known_links)
-            output(repl._handle_uplink, loaded)
-            assert loaded.world.lore.counters == counters and loaded.os.fs == fs and loaded.world.known_links == links
+    with TemporaryDirectory(prefix="retorno-h1-primary-") as directory:
+        root = Path(directory) / "data"
+        shutil.copytree(data._DATA_ROOT, root)
+        (root / "arcs/authorized_fixture.json").write_text(json.dumps(arc), encoding="utf-8")
+        with patch.object(data, "_DATA_ROOT", root):
+            state = create_initial_state_sandbox()
+            state.ship.docked_node_id = "ECHO_7"
+            lore.sync_node_pools_for_known_nodes(state)
+            pool = state.world.node_pools["ECHO_7"]
+            history = deepcopy(prepared(pool))
+            assert any(item["arc_id"] == "authorized_fixture" for item in state.world.narrative_snapshot["arcs"])
+            entry = next(item for item in lore._iter_all_pieces(state) if item["piece_key"] == key)
+            assert entry["channels"] == ["uplink_only"]
+            assert manifest.resolve_operative_id(universe_definition(state), dest) is not None
+            assert pool.uplink_route_pool
+            assert lore._assign_piece_to_node(state, entry, "ECHO_7")
+            output(repl._handle_uplink, state)
+            assert key in state.world.lore.delivered and key in pool.delivered_piece_ids
+            assert key not in pool.pending_push_piece_ids
+            assert state.world.arc_placements["authorized_fixture"]["primary"]["unlocked"]
+            assert dest in state.world.known_links["ECHO_7"] and prepared(pool) == history
+            narrative_intel = [item for item in state.world.intel if item.source_kind == "uplink_only"]
+            assert len(narrative_intel) == 1
+            assert (narrative_intel[0].from_id, narrative_intel[0].to_id) == ("ECHO_7", dest)
+            with TemporaryDirectory() as folder:
+                slot = save_load.save_single_slot(state, Path(folder) / "primary.dat")
+                loaded = save_load.load_single_slot(slot).state
+                assert key in loaded.world.lore.delivered
+                assert loaded.world.arc_placements["authorized_fixture"]["primary"]["unlocked"]
+                assert prepared(loaded.world.node_pools["ECHO_7"]) == history
+                counters, fs, links, intel = (deepcopy(loaded.world.lore.counters),
+                    deepcopy(loaded.os.fs), deepcopy(loaded.world.known_links), deepcopy(loaded.world.intel))
+                output(repl._handle_uplink, loaded)
+                assert (loaded.world.lore.counters == counters and loaded.os.fs == fs
+                    and loaded.world.known_links == links and loaded.world.intel == intel)
+                assert prepared(loaded.world.node_pools["ECHO_7"]) == history
 
 
 def main():

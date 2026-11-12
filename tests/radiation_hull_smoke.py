@@ -173,7 +173,7 @@ def main() -> None:
         for e in baseline_events
     )
 
-    _set_node(state, "CARNAVAL_34")
+    _set_node(state, "ARCHIVE_01")
     ship_change_events = engine.tick(state, 1.0)
     ship_rad_events = [
         e
@@ -188,7 +188,7 @@ def main() -> None:
     drone.location = DroneLocation(kind="ship_sector", id="BUS-A2")
     drone.dose_rad = Balance.RAD_LEVEL_DRONE_DOSE_HIGH - 0.01
     drone.radiation_level = "elevated"
-    drone_cross_events = engine.tick(state, 1.0)
+    drone_cross_events = engine.tick(state, 5.0)
     drone_rad_events = [
         e
         for e in drone_cross_events

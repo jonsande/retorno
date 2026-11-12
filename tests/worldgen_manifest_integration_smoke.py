@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import pickle
 import random
+import shutil
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -127,7 +128,15 @@ def test_04_z_outlier_inverse_completeness_against_wider_sources():
     generate(a,(IDS[3],target))
     generate(b,(target,IDS[3]))
     assert a.world == b.world
-    nid = m.operative_id(d,spill)
+    pinned = gen.universe_definition(a)
+    pinned_result = m.query_physical_sectors(pinned,(target,))
+    pinned_spill = next(s for s in pinned_result.sites if s.identity.local_id == spill.identity.local_id)
+    assert pinned.scope != d.scope
+    assert pinned_spill.identity.scope == pinned.scope
+    assert (pinned_spill.position_ly,pinned_spill.generation_sector_id,pinned_spill.physical_sector_id) == (
+        spill.position_ly,spill.generation_sector_id,spill.physical_sector_id)
+    nid = m.operative_id(pinned,pinned_spill)
+    assert a.world.space.nodes[nid].historical_key == pinned_spill.identity.encoded
     assert a.world.space.nodes[nid].generation_sector_id == IDS[3]
     assert nid in a.world.sector_states[target].node_ids
     assert nid not in a.world.sector_states[IDS[3]].node_ids
@@ -214,20 +223,27 @@ def test_07_matching_reciprocity_maximality_budgets_and_hop_cap():
 
 
 def test_08_authored_declaration_is_not_revelation_or_prose():
-    from retorno.bootstrap import load_locations
-    locations = copy.deepcopy(load_locations())
-    locations.append({'node':{'node_id':'ARC_STATION_FIXED','name':'Arc Station','kind':'station',
-        'x_ly':207.0,'y_ly':208.0,'z_ly':5.0,'is_hub':True}, 'salvage':{}})
-    with patch('retorno.bootstrap.load_locations',return_value=locations), \
-         patch('retorno.worldgen.manifest.load_locations',return_value=locations), \
-         patch('retorno.worldgen.generator.load_locations',return_value=locations):
-        s = state()
-        assert 'ARC_STATION_FIXED' in s.world.space.nodes
-        assert 'ARC_STATION_FIXED' not in s.world.known_nodes | s.world.known_contacts
-        before = (set(s.world.known_nodes),set(s.world.known_contacts),copy.deepcopy(s.world.known_links))
-        gen.ensure_sector_generated(s,IDS[0])
-        assert before == (s.world.known_nodes,s.world.known_contacts,s.world.known_links)
-        assert m.resolve_operative_id(gen.universe_definition(s),'ARC_STATION_FIXED')
+    from retorno.runtime import data_loader as data
+    location = {'node':{'node_id':'ARC_STATION_FIXED','name':'Arc Station','kind':'station',
+        'x_ly':207.0,'y_ly':208.0,'z_ly':5.0,'is_hub':True}, 'salvage':{}}
+    with TemporaryDirectory(prefix='retorno-manifest-authored-') as directory:
+        root = Path(directory) / 'data'
+        shutil.copytree(data._DATA_ROOT, root)
+        (root / 'locations/arc_station_fixed.json').write_text(json.dumps(location), encoding='utf-8')
+        with patch.object(data, '_DATA_ROOT', root):
+            s = state()
+            assert any(loc['node'] == location['node'] for loc in s.world.narrative_snapshot['locations'])
+            definition = gen.universe_definition(s)
+            authored = next(a for a in definition.authored if a.raw_id == 'ARC_STATION_FIXED')
+            assert (authored.kind,authored.position_ly,authored.is_hub) == ('station',(207.0,208.0,5.0),True)
+            site = m.resolve_operative_id(definition,'ARC_STATION_FIXED')
+            assert site is not None and site.identity.scope == definition.scope
+            assert 'ARC_STATION_FIXED' in s.world.space.nodes
+            assert 'ARC_STATION_FIXED' not in s.world.known_nodes | s.world.known_contacts
+            before = (set(s.world.known_nodes),set(s.world.known_contacts),copy.deepcopy(s.world.known_links))
+            gen.ensure_sector_generated(s,IDS[0])
+            assert before == (s.world.known_nodes,s.world.known_contacts,s.world.known_links)
+            assert m.resolve_operative_id(gen.universe_definition(s),'ARC_STATION_FIXED') == site
     s = state()
     before = copy.deepcopy(s.world)
     _run_intel_import(s,'A rumour mentions ARC_STATION_FIXED and a far station.\n')

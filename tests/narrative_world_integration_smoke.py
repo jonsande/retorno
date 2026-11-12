@@ -24,7 +24,8 @@ from retorno.model.systems import SystemState
 from retorno.model.world import sector_id_for_pos, region_for_pos
 from retorno.runtime import data_loader as data
 from retorno.worldgen import generator as gen, manifest as m
-from retorno.worldgen.narrative import ContentError, collect_catalog, compile_catalog
+from retorno.worldgen.narrative import ContentError, collect_catalog, compile_catalog, fingerprint, validate_catalog
+from retorno.worldgen.radio import physical_catalog
 
 FIXTURES = Path(__file__).parent / "fixtures/narrative_world"
 KEY = "arc:synthetic_alpha:primary"
@@ -92,7 +93,16 @@ def test_01_bootstrap_identity_and_no_secret_revelation():
     with installed():
         s = create_initial_state_prologue(seed=1)
         snap = s.world.narrative_snapshot
-        assert s.world.manifest_definition.narrative_key == snap["catalog_key"]
+        catalog = collect_catalog()
+        compiled, compiled_snap = compile_catalog(1, catalog)
+        assert snap["physical_catalog_key"] == fingerprint(physical_catalog(catalog))
+        assert snap["catalog_key"] == fingerprint(catalog)
+        assert s.world.manifest_definition.narrative_key == snap["physical_catalog_key"]
+        assert s.world.manifest_definition.scope == compiled.scope
+        assert s.world.manifest_definition.authored == compiled.authored
+        assert snap["positions"] == compiled_snap["positions"]
+        assert snap["declarations"] == compiled_snap["declarations"]
+        validate_catalog(s)
         assert snap["reservations"][KEY]["node_id"] == "TEST_HOST"
         for ident in ("TEST_HOST", "TEST_STATION", "TEST_WRECK", "TEST_RELAY"):
             assert ident not in s.world.space.nodes
@@ -624,7 +634,21 @@ def test_20_essential_payload_matches_real_delivery_and_language_fallback():
                     lore.run_lore_scheduler_tick(s)
                     assert s.world.lore_placements.piece_channel_bindings[KEY] == channel
                     if channel == "salvage_data":
-                        content = s.world.node_pools["TEST_HOST"].injected_files[0]["content"]
+                        files = s.world.node_pools["TEST_HOST"].injected_files
+                        assert len({entry["path"] for entry in files}) == len(files)
+                        variants = {entry["path"]: entry["content"] for entry in files
+                                    if entry["path"].startswith("/logs/records/synthetic_alpha.")}
+                        active_path = f"/logs/records/synthetic_alpha.{locale.value}.txt"
+                        if scenario in {"valid", "empty_with_line"}:
+                            assert set(variants) == {"/logs/records/synthetic_alpha.en.txt",
+                                                     "/logs/records/synthetic_alpha.es.txt"}
+                            expected_en = "NODE: TEST_RELAY" if scenario == "empty_with_line" else "Recovered archive."
+                            expected_es = "NODE: TEST_RELAY" if scenario == "empty_with_line" else "Archivo recuperado."
+                            assert variants["/logs/records/synthetic_alpha.en.txt"].strip() == expected_en
+                            assert variants["/logs/records/synthetic_alpha.es.txt"].strip() == expected_es
+                        else:
+                            assert set(variants) == {active_path}
+                        content = variants[active_path]
                     else:
                         _radio_at_host(s, "TEST_HOST")
                         delivery = lore.maybe_deliver_lore(s, "dock", lore.build_lore_context(s, "TEST_HOST"))

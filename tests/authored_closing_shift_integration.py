@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager, redirect_stdout
 from copy import deepcopy
+from dataclasses import replace
 import io
 import json
 import math
@@ -82,7 +83,27 @@ def test_compilation_and_hidden_knowledge():
             catalog["records"].reverse()
             assert (definition, snap) == compile_catalog(seed, catalog)
             state = create_initial_state_prologue(seed=seed)
-            assert state.world.manifest_definition == definition
+            pinned = state.world.manifest_definition
+            assert pinned is not None
+            assert replace(pinned, prologue_version="", prologue_identity=None,
+                           prologue_fallback=None, prologue_excluded=()) == definition
+            assert pinned.scope == definition.scope
+            witness = manifest.validate_prologue(pinned)
+            assert witness.identity == pinned.prologue_identity
+            assert state.world.narrative_snapshot["prologue_chain"]["host_id"] == manifest.operative_id(pinned, witness)
+            for ident in (STATION, RELAY, WRECK):
+                compiled_site = manifest.resolve_operative_id(definition, ident)
+                pinned_site = manifest.resolve_operative_id(pinned, ident)
+                assert compiled_site is not None and pinned_site is not None
+                assert compiled_site.identity == pinned_site.identity
+                assert compiled_site.position_ly == pinned_site.position_ly
+            for key in ("catalog_key", "physical_catalog_key", "positions", "declarations"):
+                assert state.world.narrative_snapshot[key] == snap[key]
+            reservations = state.world.narrative_snapshot["reservations"]
+            assert all(reservations.get(key) == value for key, value in snap["reservations"].items())
+            for reservation in reservations.values():
+                site = manifest.resolve_operative_id(pinned, reservation["node_id"])
+                assert site is not None and site.identity.encoded == reservation["historical_key"]
             assert all(result["status"] == "certified" for result in snap["relation_results"])
             positions = snap["positions"]
             assert math.isclose(math.dist(positions[STATION], positions[RELAY]), .002)
