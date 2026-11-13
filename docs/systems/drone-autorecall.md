@@ -51,8 +51,43 @@ receives no free energy; the ordinary 5% recall minimum still blocks it.
 Autorecall OFF permits deliberate risk within existing operation gates.
 
 Public commands remain `drone autorecall D1 on|off|<percent>`, `drone status D1`,
-`drone repair D1 <system_id>`, `drone recall D1`, `jobs`, and `wait <seconds>` in
-DEBUG. Help and diegetic drone/repair manuals are maintained in EN/ES.
+`drone repair D1 <system_id>`, `drone recall D1`, `drone recall! D1|all`,
+`jobs`, and `wait <seconds>` in DEBUG. Help and diegetic drone/repair manuals are
+maintained in EN/ES.
+
+## Emergency recall and transit
+
+`drone recall! <drone_id|all>` reuses the existing `DroneRecall` action with an
+`emergency` flag. Before cancelling anything it validates the ordinary recall
+gates: deployed status, minimum integrity, minimum battery and, for a drone at an
+external installation, ship co-location. A blocked emergency recall therefore
+leaves the drone and its work intact. When validated, it cancels every queued or
+running job owned by the target drone(s), refunds reserved repair scrap through
+the same helper used by autorecall, finalizes each job with the ordinary terminal
+cancellation path, and inserts one recall job at the front of the queue. An
+already active `RECALL_DRONE` job is preserved rather than duplicated. This is
+not an instant docking; the return keeps its normal ETA and success rules.
+
+The transit gate in `Engine.apply_action` now accepts `JobCancel` and
+`RepairAutoMoveDecision` in addition to the existing actions. This lets the ship
+cancel work and answer a deferred repair decision while in transit. The earlier
+failure was that the transit gate rejected the decision, so the prompt was
+consumed and never re-emitted while the job stayed `awaiting_auto_move_confirmation`
+with a frozen ETA.
+
+Prompts are now recoverable. CLI and Textual rebuild pending prompts from live
+job state (`_pending_repair_auto_move_prompts`) during the command-level
+auto-event drain, after hibernation, and after a queued confirmation is
+answered. Textual keeps
+a deduplicated queue so a prompt is neither dropped while another confirmation is
+open nor shown twice. The job's `awaiting_auto_move_confirmation` flag remains the
+single source of truth; a stale event cannot resurrect a job that is no longer
+waiting.
+
+`tests/drone_recall_emergency_smoke.py` covers the parser, transit decisions and
+cancellation, single/all emergency recall, blocked recall preserving work, and
+prompt re-arming. Existing recall, autorecall and completion suites continue to
+pass.
 
 `tests/drone_autorecall_reserve_smoke.py` covers immediate refusal/refund,
 completion/failure debits, queue budgets and priority, start revalidation,

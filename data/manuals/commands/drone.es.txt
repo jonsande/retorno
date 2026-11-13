@@ -13,7 +13,8 @@ drone salvage drone <drone_id> [node_id]
 drone salvage drones <drone_id> [node_id]
 drone salvage data <drone_id> [node_id]
 drone reboot <drone_id>
-drone recall <drone_id>
+drone recall [<drone_id>|all]
+drone recall! <drone_id|all>
 
 Propósito
 - Familia unificada para despliegue, movimiento, recuperacion, salvage y operaciones de modulos de dron.
@@ -54,6 +55,17 @@ Autorretorno y reserva de batería
 - drone status muestra un bloqueo de autorretorno si falta batería o integridad, o si la nave no está acoplada en la instalación de un dron externo. Los bloqueos idénticos repetidos no saturan el registro.
 - autorecall OFF permite asumir riesgo deliberado bajo los requisitos normales de las tareas. No se aplica reserva protectora al reinicio de recuperación ni a operaciones sin consumo sobre un dron en bahía. El modo dios no reserva batería para consumos que evita.
 - Esta protección no recupera energía ya gastada ni evita requisitos de integridad, acoplamiento o éxito del retorno.
+
+Recall de emergencia
+- `drone recall! <drone_id|all>` es una anulación explícita para una emergencia. Cancela todo trabajo en cola o en ejecución del dron o drones objetivo, devuelve íntegra la chatarra de reparación reservada y coloca un único trabajo de retorno al frente de la cola.
+- El recall de emergencia se acepta mientras la nave está en tránsito. El recall normal, la cancelación de trabajos y la decisión diferida de auto-movimiento de reparación también se aceptan en tránsito.
+- Siguen aplicándose las compuertas normales de recall: el dron debe estar desplegado, cumplir la integridad y batería mínimas y estar co-localizado con la nave cuando trabaja en una instalación externa. Si falla alguna compuerta, no se cancela nada y se conserva el trabajo existente.
+- Un trabajo de recall activo para el dron se mantiene; el recall de emergencia no lo duplica. El retorno sigue consumiendo su ETA normal y no es un acoplamiento instantáneo.
+- `drone recall! all` cubre todos los drones desplegados; los drones en bahía no se modifican.
+
+Decisiones diferidas de reparación
+- Cuando una reparación espera una decisión de auto-movimiento, el aviso sigue siendo respondible durante el tránsito. La decisión se acepta y el movimiento o la cancelación en cola continúa con normalidad.
+- Si el aviso no se mostró (por ejemplo tras despertar, recargar o descartar un evento), se rearma desde el estado del trabajo en lugar de perderse en silencio.
 
 Bloqueos frecuentes
 - `drone_not_in_bay` en install/uninstall de modulo de dron si el objetivo no esta acoplado en bahia.

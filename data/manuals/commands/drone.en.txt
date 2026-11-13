@@ -13,7 +13,8 @@ drone salvage drone <drone_id> [node_id]
 drone salvage drones <drone_id> [node_id]
 drone salvage data <drone_id> [node_id]
 drone reboot <drone_id>
-drone recall <drone_id>
+drone recall [<drone_id>|all]
+drone recall! <drone_id|all>
 
 Purpose
 - Unified command family for drone deployment, movement, recovery, salvage, and module operations.
@@ -54,6 +55,17 @@ Automatic return and battery reserve
 - drone status shows an automatic-return block when battery or integrity is too low, or the ship is not docked at an external drone's installation. Repeated identical blocks do not flood the log.
 - autorecall OFF permits deliberate risk under the ordinary task requirements. No protective reserve applies to a recovery reboot or non-consuming work on a docked drone. God mode does not reserve battery for consumption it bypasses.
 - This protection does not restore previously spent energy or bypass recall damage, docking or success requirements.
+
+Emergency recall
+- `drone recall! <drone_id|all>` is an explicit override for an emergency. It cancels every queued or running job owned by the target drone(s), refunds reserved repair scrap in full, and places a single return job at the front of the queue.
+- Emergency recall is accepted while the ship is in transit. Ordinary recall, job cancellation and the deferred repair auto-move decision are also accepted in transit.
+- The ordinary recall gates still apply: the drone must be deployed, meet minimum integrity and battery, and be co-located with the ship when working at an external installation. If any gate fails, nothing is cancelled and the existing work is preserved.
+- An active recall job for the drone is kept; emergency recall does not duplicate it. The return still takes its normal ETA and is not an instant docking.
+- `drone recall! all` covers every deployed drone; docked drones are untouched.
+
+Deferred repair decisions
+- When a repair is waiting for an auto-move decision, the prompt remains answerable during transit. The decision is accepted, and the queued movement or cancellation proceeds normally.
+- If the prompt was not shown (for example after a wake-up, reload or discarded event), it is re-armed from the job state instead of being silently lost.
 
 Common block reasons
 - `drone_not_in_bay` for drone-module install/uninstall when target drone is not docked in bay.

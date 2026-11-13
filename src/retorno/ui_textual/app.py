@@ -258,6 +258,7 @@ class RetornoTextualApp(App):
         self._pending_confirm_action = None
         self._pending_confirm_prompt = ""
         self._pending_confirm_locale = "en"
+        self._deferred_repair_prompt_queue: list[repl.DeferredRepairAutoMovePrompt] = []
         self._pending_years: float = 0.0
         self._pending_hibernate_parsed = None
         self._pending_wake_on_low_battery: bool = False
@@ -563,6 +564,7 @@ class RetornoTextualApp(App):
             self._hibernate_sequence_running = False
             self.refresh_panels()
             self.call_later(input_widget.focus)
+            self.call_later(self._rearm_deferred_repair_prompts)
 
     def action_startup_skip(self) -> None:
         if not self._startup_sequence_running:
@@ -1049,10 +1051,10 @@ class RetornoTextualApp(App):
             return []
         if cmd == "drone":
             if len(tokens) == 2:
-                return [c for c in ["status", "deploy", "deploy!", "move", "survey", "reboot", "recall", "autorecall", "repair", "install", "uninstall", "salvage"] if c.startswith(text)]
+                return [c for c in ["status", "deploy", "deploy!", "move", "survey", "reboot", "recall", "recall!", "autorecall", "repair", "install", "uninstall", "salvage"] if c.startswith(text)]
             if len(tokens) == 3 and tokens[1] in {"status", "deploy", "deploy!", "reboot", "autorecall", "repair", "move", "install", "uninstall", "survey"}:
                 return [d for d in drones if d.startswith(text)]
-            if len(tokens) == 3 and tokens[1] == "recall":
+            if len(tokens) == 3 and tokens[1] in {"recall", "recall!"}:
                 recall_targets = [c for c in ["all"] if c.startswith(text)]
                 recall_targets += [d for d in drones if d.startswith(text)]
                 return recall_targets
@@ -1442,13 +1444,33 @@ class RetornoTextualApp(App):
             self._queue_deferred_repair_auto_move_prompt(auto_events)
 
     def _queue_deferred_repair_auto_move_prompt(self, auto_events) -> None:
+        self._enqueue_deferred_repair_prompts(repl._deferred_repair_auto_move_actions(auto_events))
+
+    def _rearm_deferred_repair_prompts(self) -> None:
+        with self.loop.with_lock() as state:
+            pending = repl._pending_repair_auto_move_prompts(state)
+        self._enqueue_deferred_repair_prompts(pending)
+
+    def _enqueue_deferred_repair_prompts(self, deferred_prompts) -> None:
+        known = {prompt.job_id for prompt in self._deferred_repair_prompt_queue}
+        if isinstance(self._pending_confirm_action, tuple) and self._pending_confirm_action[0] == "REPAIR_AUTO_MOVE_DEFERRED":
+            known.add(self._pending_confirm_action[1].job_id)
+        for prompt in deferred_prompts:
+            if prompt.job_id in known:
+                continue
+            known.add(prompt.job_id)
+            self._deferred_repair_prompt_queue.append(prompt)
+        self._show_next_deferred_repair_prompt()
+
+    def _show_next_deferred_repair_prompt(self) -> None:
         if self._pending_confirm_action is not None:
             return
-        deferred_prompts = repl._deferred_repair_auto_move_actions(auto_events)
-        if not deferred_prompts:
-            return
-        with self.loop.with_lock() as state:
-            for deferred_prompt in deferred_prompts:
+        while self._deferred_repair_prompt_queue:
+            deferred_prompt = self._deferred_repair_prompt_queue.pop(0)
+            with self.loop.with_lock() as state:
+                job = state.jobs.jobs.get(deferred_prompt.job_id)
+                if not job or not bool(job.params.get("awaiting_auto_move_confirmation")):
+                    continue
                 prompt = repl._repair_auto_move_confirmation_prompt(
                     state,
                     deferred_prompt.repair,
@@ -1460,7 +1482,7 @@ class RetornoTextualApp(App):
                 self._pending_confirm_prompt = prompt
                 self._pending_confirm_locale = state.os.locale.value
                 self._log_line(repl.public_text(self.loop.state, self._pending_confirm_prompt))
-                break
+                return
 
     def _startup_tips(self, locale: str) -> list[str]:
         tips = {
@@ -1500,6 +1522,7 @@ class RetornoTextualApp(App):
             if notice:
                 self._log_line(notice)
         self._queue_deferred_repair_auto_move_prompt(auto_events)
+        self._rearm_deferred_repair_prompts()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         text = event.value.strip()
@@ -1521,6 +1544,7 @@ class RetornoTextualApp(App):
             confirm_payload = action[1] if isinstance(action, tuple) and len(action) > 1 else action
             self._pending_confirm_action = None
             self._pending_confirm_prompt = ""
+            self.call_later(self._show_next_deferred_repair_prompt)
             if action == "HIBERNATE_WAKE":
                 wake = reply in yes
                 self._pending_wake_on_low_battery = wake

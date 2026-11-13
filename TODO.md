@@ -49,7 +49,20 @@ La escasez no es únicamente un obstáculo. Es también el mecanismo que hace qu
 
 - [] Las cinemáticas no deben ser un adorno añadido al viaje actual, sino la representación visible de estados reales de la nave. Hay que revisar, por tanto, la cinemática inicial del juego, así como la de hibernación y deshibernación. Para ello habrá que modelar en el canon cómo funciona el sarcófago y la criogenización.
 
-- [BUG 001] La nave está en tránsito y estaba haciendo algunos trabajos de reparación. El dron tenía varios trabajos en cola. Al acabar el primero, me ha salido este mensaje:
+- [BUG 003] Si aceptaste “¿Despertar si algún dron alcanza batería baja?”, la
+       hibernación avanza en tramos de 1 hora (repl.py:6670-6673) de forma
+       síncrona, bloqueando la UI. Medí ~1,8 ms por tick: un viaje de 13,6
+       años son ~119.000 ticks, es decir unos 3,5 minutos de interfaz
+       congelada. En Textual además bloquea el bucle de eventos, así que la
+       ventana deja de responder. Con tramos de 7 días (sin ese aviso) tarda
+       décimas de segundo.
+
+Para el problema de la ui bloqueada al hibernar y aceptar despertar si algún dron alcanza batería baja, has propuesto estas soluciones: "o tramos mayores con detección de cruce de umbral (para no bloquear la UI varios minutos), o ejecutarla fuera del hilo de UI." Qué consecuencias tiene cada una de esas decisiones? Puede afectar al funcionamiento de otros sistemas o cálculos del juego?
+
+
+
+
+- [x] [BUG 001] La nave está en tránsito y estaba haciendo algunos trabajos de reparación. El dron tenía varios trabajos en cola. Al acabar el primero, me ha salido este mensaje:
 
   [AUTO] [WARN] warning :: Repair waiting for decision: D1 is in BRG-01, but power_core requires PWR-A1
   WARNING: D1 is in BRG-01, but power_core is in PWR-A1. Auto-move the drone to PWR-A1 and queue the repair? [y/N]
@@ -58,9 +71,9 @@ No sé que he tocado (quizá he introducido un texto diferente de 'y' y de 'n') 
 
   [CMD] [WARN] boot_blocked :: Action blocked: ship in transit. Use 'hibernate until_arrival' to advance.
 
-No puedo cancelar ni ese trabajo ni ninguno de los que está en cola (debería poder cancelar trabajos aunque esté en tránsito). Tampoco puedo hacer "recall" del dron, pues lo encola como una tarea a llevar a cabo al terminar los demás trabajos, y los demás no pueden completarse, por lo dicho. He hecho "hibernate until_arrival" a ver qué pasa, y al acabar la cuanta atrás de la hibernación el juego se ha quedado como bloqueado.
+No puedo cancelar ni ese trabajo ni ninguno de los que está en cola (debería poder cancelar trabajos aunque esté en tránsito). Tampoco puedo hacer "recall" del dron, pues lo encola como una tarea a llevar a cabo al terminar los demás trabajos, y los demás no pueden completarse, por lo dicho. He hecho "hibernate until_arrival" a ver qué pasa, y al acabar la cuenta atrás de la hibernación el juego se ha quedado como bloqueado.
 
-- [!] Necesitamos un comando del tipo a "drone recall D1 now", o mejor "drone recall! D1", que haga que el dron cancele todo trabajo activo y vuelva inmediatamente.
+- [x] Necesitamos un comando del tipo a "drone recall D1 now", o mejor "drone recall! D1", que haga que el dron cancele todo trabajo activo y vuelva inmediatamente.
 
 
 - [] No se puede encontrar un id para los destinos que sea más legible humanamente? El actual me parece muy poco amigable para los nuevos jugadores. Deberíamos valorar otras opciones. (Con ello solucionaríamos de paso el bug 002)

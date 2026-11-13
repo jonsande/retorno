@@ -12,6 +12,7 @@ Comportamiento operativo
 
 Notas de uso
 - Usa el id con `job cancel <job_id>` para abortar tareas activas.
+- La cancelación funciona mientras la nave está en tránsito; `drone recall! <drone_id|all>` cancela el trabajo de un dron y lo envía de vuelta a la bahía.
 
 Comandos relacionados
 - `job cancel <job_id>`, `status`, `logs`

@@ -12,6 +12,7 @@ Operational behavior
 
 Usage notes
 - Use job id with `job cancel <job_id>` to abort active tasks.
+- Cancellation works while the ship is in transit; `drone recall! <drone_id|all>` cancels a drone's work and sends it back to the bay.
 
 Related commands
 - `job cancel <job_id>`, `status`, `logs`

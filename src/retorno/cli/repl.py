@@ -499,6 +499,7 @@ def print_help(locale: str = "en", verbose: bool = False) -> None:
                 ("drone salvage data <drone_id> [node_id]", "salvage data from node", "recupera datos del nodo"),
                 ("drone reboot <drone_id>", "reboot drone", "reinicia dron"),
                 ("drone recall [<drone_id>|all]", "recall one or all drones to ship", "retorna uno o todos los drones a la nave"),
+                ("drone recall! <drone_id|all>", "emergency recall: cancel active work and return now", "recall de emergencia: cancela trabajo activo y retorna ya"),
             ],
         ),
         (
@@ -1406,6 +1407,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         "job_cancelled_autorecall": {
             "en": "Job {job_id} cancelled for {drone_id}'s automatic return; refunded {scrap_refunded} scrap.",
             "es": "Trabajo {job_id} cancelado para el autorretorno de {drone_id}; devuelta chatarra: {scrap_refunded}.",
+        },
+        "job_cancelled_emergency_recall": {
+            "en": "Job {job_id} cancelled for {drone_id}'s emergency recall; refunded {scrap_refunded} scrap.",
+            "es": "Trabajo {job_id} cancelado para el recall de emergencia de {drone_id}; devuelta chatarra: {scrap_refunded}.",
         },
     }
     def _safe_format(tmpl: str, payload: dict) -> str:
@@ -6156,6 +6161,33 @@ def _deferred_repair_auto_move_actions(events: list[tuple[str, Event]]) -> list[
     return actions
 
 
+def _pending_repair_auto_move_prompts(state) -> list[DeferredRepairAutoMovePrompt]:
+    """Rebuilds prompts from live state so a lost event can be re-armed.
+
+    A job can remain ``awaiting_auto_move_confirmation`` after a hibernation
+    wake, a reload or an event that was never rendered. The job flag is the
+    source of truth; no prompt is duplicated while the job is no longer waiting.
+    """
+    prompts: list[DeferredRepairAutoMovePrompt] = []
+    for job_key in list(state.jobs.active_job_ids):
+        job = state.jobs.jobs.get(job_key)
+        if not job or job.job_type != JobType.REPAIR_SYSTEM:
+            continue
+        if not bool(job.params.get("awaiting_auto_move_confirmation")):
+            continue
+        drone_id = str(job.params.get("drone_id", "") or "")
+        system_id = str(job.target.id if job.target else job.params.get("system_id", "") or "")
+        if not (drone_id and system_id):
+            continue
+        prompts.append(
+            DeferredRepairAutoMovePrompt(
+                job_id=str(job.internal_id or job.job_id),
+                repair=Repair(drone_id=drone_id, system_id=system_id),
+            )
+        )
+    return prompts
+
+
 def _confirm_abandon_drones(state, action) -> bool:
     if not state.ship.drones:
         return True
@@ -7606,12 +7638,12 @@ def main() -> None:
                 elif cmd == "drone":
                     if len(tokens) == 2:
                         candidates = [
-                            c for c in ["status", "deploy", "deploy!", "move", "survey", "reboot", "recall", "autorecall", "repair", "install", "uninstall", "salvage"]
+                            c for c in ["status", "deploy", "deploy!", "move", "survey", "reboot", "recall", "recall!", "autorecall", "repair", "install", "uninstall", "salvage"]
                             if c.startswith(text)
                         ]
                     elif len(tokens) == 3 and tokens[1] in {"status", "deploy", "deploy!", "reboot", "autorecall", "repair", "move", "install", "uninstall", "survey"}:
                         candidates = [d for d in drones if d.startswith(text)]
-                    elif len(tokens) == 3 and tokens[1] == "recall":
+                    elif len(tokens) == 3 and tokens[1] in {"recall", "recall!"}:
                         candidates = [c for c in ["all"] if c.startswith(text)]
                         candidates += [d for d in drones if d.startswith(text)]
                     elif len(tokens) == 4 and tokens[1] in {"deploy", "deploy!"}:
@@ -7704,10 +7736,12 @@ def main() -> None:
         except Exception:
             pass
 
-    def _handle_deferred_repair_auto_move_prompts(events: list[tuple[str, Event]]) -> None:
-        deferred_repairs = _deferred_repair_auto_move_actions(events)
+    def _handle_repair_auto_move_prompts(deferred_repairs: list[DeferredRepairAutoMovePrompt]) -> None:
         for deferred_prompt in deferred_repairs:
             with loop.with_lock() as locked_state:
+                job = locked_state.jobs.jobs.get(deferred_prompt.job_id)
+                if not job or not bool(job.params.get("awaiting_auto_move_confirmation")):
+                    continue
                 auto_move = _confirm_repair_auto_move(
                     locked_state,
                     deferred_prompt.repair,
@@ -7729,6 +7763,15 @@ def main() -> None:
                 if notice:
                     print(notice)
 
+    def _handle_deferred_repair_auto_move_prompts(events: list[tuple[str, Event]]) -> None:
+        _handle_repair_auto_move_prompts(_deferred_repair_auto_move_actions(events))
+
+    def _rearm_pending_repair_auto_move_prompts() -> None:
+        with loop.with_lock() as locked_state:
+            pending = _pending_repair_auto_move_prompts(locked_state)
+        if pending:
+            _handle_repair_auto_move_prompts(pending)
+
     def _drain_auto_events() -> None:
         auto_ev = loop.drain_events()
         if auto_ev:
@@ -7743,6 +7786,7 @@ def main() -> None:
                 if notice:
                     print(notice)
             _handle_deferred_repair_auto_move_prompts(auto_ev)
+        _rearm_pending_repair_auto_move_prompts()
 
     # print("RETORNO (prologue)")
     # print("\nTip: cat /mail/inbox/0000.notice.txt")
@@ -8313,6 +8357,7 @@ def main() -> None:
                 time.sleep(blackout_s)
             _play_hibernate_wake_sequence(locale, result)
             _render_hibernate_result(loop, result)
+            _rearm_pending_repair_auto_move_prompts()
             continue
 
         # Acciones del motor

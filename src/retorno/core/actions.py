@@ -110,6 +110,7 @@ class DroneReboot(Action):
 class DroneRecall(Action):
     drone_id: str | None = None
     all_drones: bool = False
+    emergency: bool = False
 
 
 @dataclass(slots=True)

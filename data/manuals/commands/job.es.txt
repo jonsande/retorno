@@ -5,6 +5,7 @@ Propósito
 
 Comportamiento operativo
 - Retira el job del pipeline activo cuando es cancelable.
+- La cancelación se acepta mientras la nave está en tránsito.
 - Cancelar no deshace retroactivamente efectos ya aplicados.
 
 Notas de uso

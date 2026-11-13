@@ -5,6 +5,7 @@ Purpose
 
 Operational behavior
 - Removes job from active execution pipeline when cancellable.
+- Cancellation is accepted while the ship is in transit.
 - Cancellation does not retroactively undo already-applied effects.
 
 Usage notes

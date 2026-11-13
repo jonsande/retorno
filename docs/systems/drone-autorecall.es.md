@@ -56,9 +56,44 @@ normal del 5% sigue impidiendo su retorno. Autorecall OFF permite asumir riesgo
 deliberado dentro de los requisitos existentes de operación.
 
 Los comandos públicos siguen siendo `drone autorecall D1 on|off|<porcentaje>`,
-`drone status D1`, `drone repair D1 <system_id>`, `drone recall D1`, `jobs` y
-`wait <segundos>` en DEBUG. La ayuda y los manuales diegéticos de drone/repair se
-mantienen en EN/ES.
+`drone status D1`, `drone repair D1 <system_id>`, `drone recall D1`,
+`drone recall! D1|all`, `jobs` y `wait <segundos>` en DEBUG. La ayuda y los
+manuales diegéticos de drone/repair se mantienen en EN/ES.
+
+## Recall de emergencia y tránsito
+
+`drone recall! <drone_id|all>` reutiliza la acción existente `DroneRecall` con un
+indicador `emergency`. Antes de cancelar nada valida las compuertas normales de
+recall: estado desplegado, integridad mínima, batería mínima y, para un dron en
+una instalación externa, co-localización con la nave. Por tanto, un recall de
+emergencia bloqueado deja intactos el dron y su trabajo. Cuando valida, cancela
+todo trabajo en cola o en ejecución del dron o drones objetivo, devuelve la
+chatarra de reparación reservada mediante el mismo helper que usa el autorretorno,
+finaliza cada trabajo con la ruta terminal ordinaria de cancelación e inserta un
+único trabajo de recall al frente de la cola. Un trabajo `RECALL_DRONE` ya activo
+se conserva en lugar de duplicarse. No es un acoplamiento instantáneo; el retorno
+mantiene su ETA y reglas de éxito normales.
+
+La compuerta de tránsito de `Engine.apply_action` ahora acepta `JobCancel` y
+`RepairAutoMoveDecision`, además de las acciones existentes. Esto permite a la
+nave cancelar trabajo y responder una decisión diferida de reparación durante el
+tránsito. El fallo anterior era que la compuerta rechazaba la decisión, de modo
+que el aviso se consumía y nunca se reemitía mientras el trabajo seguía en
+`awaiting_auto_move_confirmation` con ETA congelada.
+
+Los avisos ahora son recuperables. CLI y Textual reconstruyen los avisos
+pendientes desde el estado vivo del trabajo (`_pending_repair_auto_move_prompts`)
+durante el drenaje de eventos automáticos a nivel de comando, tras la
+hibernación y al responder la confirmación en cola. Textual mantiene una cola
+deduplicada para no descartar un aviso mientras
+otra confirmación está abierta ni mostrarlo dos veces. El indicador
+`awaiting_auto_move_confirmation` del trabajo sigue siendo la única fuente de
+verdad; un evento obsoleto no puede resucitar un trabajo que ya no espera.
+
+`tests/drone_recall_emergency_smoke.py` cubre el parser, decisiones y cancelación
+en tránsito, recall de emergencia individual/todos, recall bloqueado que preserva
+el trabajo y el rearme de avisos. Las suites existentes de recall, autorretorno y
+autocompletado siguen pasando.
 
 `tests/drone_autorecall_reserve_smoke.py` cubre rechazo/devolución inmediatos,
 descuentos al completar/fallar, presupuesto y prioridad de colas, revalidación al
