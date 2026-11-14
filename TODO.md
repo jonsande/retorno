@@ -97,7 +97,7 @@ No puedo cancelar ni ese trabajo ni ninguno de los que está en cola (debería p
   Contrasta los registros navegacionales con observaciones independientes.
 
 El mail tiene "FROM:" pero no tiene "TO:". Por qué? Cómo se explica este mail diegéticamente?
-En este mail aparece alguna información interesante (y algunas expresiones un poco confusas, como "Clase de extremo predominante"): da a entender que en la región "disk" de la galaxia hay mayormente derelictos. ¿Es correcto? Qué más información útil le ofrece al jugador? ¿Cómo ha generado el juego este mail?
+En este mail aparece alguna información interesante: da a entender que en la región "disk" de la galaxia hay mayormente derelictos. ¿Es correcto? Qué más información útil le ofrece al jugador? ¿Cómo ha generado el juego este mail? Por otra parte, en el mail hay algunas expresiones un poco confusas, como "Clase de extremo predominante". Deberíamos encontrar una expresión más clara.
 
 - [] Al intentar iniciar un viaje estando atracado me sale este mensaje:
 
