@@ -119,7 +119,7 @@ A positive horizon, job ETA or proper-time limit that cannot advance the
 floating-point clock raises the same controlled error. The selector does not
 round a causal instant forward to manufacture progress.
 
-## Required causal integration in 01B3C
+## Causal integration contract
 
 At an interval start, resolve eligible QUEUED activation checks and sample the
 effective electrical load, power quality, radiation, wear rate, propulsion
@@ -130,10 +130,10 @@ At the cut, classify the resulting integrity (with the existing strict `<`
 threshold), then process job interruption/failure/completion in scheduler order
 and apply successful repairs/module effects exactly once. Finally resample
 power, wear, thrust and trajectory before using any remaining time. Multiple
-jobs and phase changes at the same instant must all be considered. This will
-require separating timer advancement from completion effects in the productive
-scheduler: today `_process_jobs()` precedes `_apply_degradation()`, so merely
-splitting `Engine.tick()` still permits a repair to affect earlier wear.
+jobs and phase changes at the same instant must all be considered. NAV-BRAKE-01B3D
+separates timer advancement from completion effects in the productive scheduler.
+The historical `_tick_interval()` still calls `_process_jobs()` before
+`_apply_degradation()`; splitting `Engine.tick()` alone does not fix that order.
 
 01B2 does not model changing electrical regulation, brownout onset, radiation,
 unpredicted interruptions, stochastic job outcomes, or mid-interval external
@@ -192,10 +192,48 @@ occur earlier under changing conditions. These effects are not yet cut at the
 same instants as a changing-β `MotionSegment`. Arbitrarily small ticks supply
 neither an exact failure instant nor a verified error bound.
 
-The adapter requires a productive scheduler split into activation, timer
-advance and completion effects without changing checks or RNG order; electrical
-and radiation boundaries or a verified continuous-integration error bound;
+The adapter still requires electrical and radiation boundaries or a verified
+continuous-integration error bound;
 wear before same-instant repair outcomes; exact 35% and 15% zero-cut handling;
 and verified fuel reservation for every powered segment. Only then can the
 segment's proper-time integral replace fixed-β clock calculation on the
 internal path. Legacy public travel remains the only advancing path here.
+
+## 01B3D scheduler phases
+
+`Engine._begin_job_interval(state)` uses the productive activation, owner,
+route-solve, drone-reserve and interruption checks at the current instant. It
+returns a one-use `_JobInterval` and events. The frozen work list contains jobs
+permitted to advance during the interval. The ordinary `_compute_load_kw`
+counts every job marked RUNNING, including one paused for confirmation and
+excluded from that work list; this historical load rule is unchanged. A blocked
+QUEUED job contributes no load.
+
+`_next_job_completion_s(state, interval)` returns the earliest advancing ETA in
+**galactic seconds**, including zero, without changing state or RNG. It includes
+unrelated jobs because their completion may release an owner for relevant
+queued work. This is a candidate: interruption and random failure can prevent
+completion. The pure `nav_coordinator.py` does not execute this scheduler; a
+future engine adapter must pass this limit to the coordinator alongside the
+physical segment and other limits.
+
+`_advance_job_timers(state, interval, dt)` debits only ETA, rejects intervals
+that pass a completion boundary, and applies no job effect. The future caller
+must first integrate the preceding physical/electrical/wear interval and set
+the galactic game clock to the boundary. Then
+`_resolve_job_interval(state, interval)` rechecks interruption, performs the
+existing emergency-risk and repair-result checks in scheduler order, applies
+each due effect through the single productive `_apply_job_effect()`, and returns
+events. A second resolution of the token raises. Calling `_begin_job_interval`
+again at that same instant can start newly unblocked QUEUED jobs, including an
+ETA-zero job, without advancing the clock artificially. The caller owns event
+recording and must not reuse a token across unrelated state changes.
+
+`_process_jobs()` uses those same operations one job at a time, retaining the
+old public order and its position before wear. For causal batches, completion
+effects may follow wear, so a repair at T cannot affect the preceding interval.
+The emergency failure probability still depends on the supplied `dt`; slicing
+an interval can change stochastic outcomes and RNG timing. No stochastic
+partition invariance is claimed and no balance probability was changed.
+Electrical regulation, radiation, wear prediction and powered motion remain
+outside this scheduler refactor. `Engine.tick()` still rejects physical transit.

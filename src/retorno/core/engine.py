@@ -5,6 +5,7 @@ import hashlib
 from typing import Iterable
 import difflib
 import math
+from dataclasses import dataclass, field
 
 from retorno.core.temporal import SPEED_OF_LIGHT_KM_S, biological_time_interval, proper_time_interval
 from retorno.core.nav_boundaries import ordinary_wear_rate
@@ -100,6 +101,24 @@ from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path, mo
 from retorno.model.systems import Dependency, ShipSystem, SystemState
 from retorno.config.balance import Balance
 from retorno.worldgen.generator import ensure_sector_generated
+
+
+@dataclass(slots=True)
+class _JobActivationContext:
+    running_owners: set[str] = field(default_factory=set)
+    route_solve_running: bool = False
+
+
+@dataclass(slots=True)
+class _JobInterval:
+    """One-use scheduler slice; its work list is frozen at activation."""
+
+    state_id: int
+    job_keys: tuple[str, ...]
+    causal: bool
+    eta_before: dict[str, float] = field(default_factory=dict)
+    dt_s: float | None = None
+    resolved: bool = False
 
 
 class Engine:
@@ -3414,62 +3433,177 @@ class Engine:
         return []
 
     def _process_jobs(self, state: GameState, dt: float) -> list[Event]:
+        """Historical per-job order, composed from the causal scheduler steps.
+
+        Unlike an interval batch, each job is resolved before the next job is
+        prepared. This preserves the public scheduler's observable ordering.
+        """
         events: list[Event] = []
         jobs_state = state.jobs
         completed: list[str] = []
-        running_by_owner: set[str] = set()
-        route_solve_running = False
-
+        context = self._job_activation_context(state)
         for job_id in list(jobs_state.active_job_ids):
-            job = jobs_state.jobs.get(job_id)
-            if not job:
-                continue
-            if job.status == JobStatus.RUNNING and job.owner_id:
-                running_by_owner.add(job.owner_id)
-            if job.status == JobStatus.RUNNING and job.job_type == JobType.ROUTE_SOLVE:
-                route_solve_running = True
-
-        for job_id in list(jobs_state.active_job_ids):
-            job = jobs_state.jobs.get(job_id)
-            if not job or job.status in (JobStatus.COMPLETED, JobStatus.CANCELLED, JobStatus.FAILED):
+            disposition, prepared_events = self._prepare_job_at_boundary(state, job_id, context)
+            events.extend(prepared_events)
+            if disposition == "terminal":
                 completed.append(job_id)
                 continue
-            if job.status == JobStatus.QUEUED:
-                if job.owner_id and job.owner_id in running_by_owner:
-                    continue
-                if job.job_type == JobType.ROUTE_SOLVE and route_solve_running:
-                    continue
-            required = self._drone_task_reserve_requirement(state, job)
-            if required is not None:
-                events.extend(self._cancel_drone_task_for_return(state, job))
-                events.append(self._drone_reserve_block_event(state, job.owner_id, required))
-                events.extend(self._enqueue_drone_autorecall(state, state.ship.drones[job.owner_id]))
+            if disposition != "run":
                 continue
-            if job.status == JobStatus.QUEUED:
-                job.status = JobStatus.RUNNING
-                if job.owner_id:
-                    running_by_owner.add(job.owner_id)
-                if job.job_type == JobType.ROUTE_SOLVE:
-                    route_solve_running = True
-            interrupted = self._check_job_interruption(state, job)
-            if interrupted is not None:
-                if str(interrupted.data.get("reason", "")) == "repair_auto_move_confirmation_required":
+            interval = _JobInterval(id(state), (job_id,), causal=False)
+            self._advance_job_timers(state, interval, dt)
+            finished_events, finished = self._resolve_job_interval(state, interval, remove_terminal=False)
+            events.extend(finished_events)
+            if job_id in finished:
+                completed.append(job_id)
+        for job_id in completed:
+            if job_id in jobs_state.active_job_ids:
+                jobs_state.active_job_ids.remove(job_id)
+        return events
+
+    def _job_activation_context(self, state: GameState) -> _JobActivationContext:
+        context = _JobActivationContext()
+        for job_id in list(state.jobs.active_job_ids):
+            job = state.jobs.jobs.get(job_id)
+            if not job or job.status != JobStatus.RUNNING:
+                continue
+            if job.owner_id:
+                context.running_owners.add(job.owner_id)
+            if job.job_type == JobType.ROUTE_SOLVE:
+                context.route_solve_running = True
+        return context
+
+    def _prepare_job_at_boundary(
+        self, state: GameState, job_id: str, context: _JobActivationContext,
+    ) -> tuple[str, list[Event]]:
+        """Apply productive activation, reserve and interruption checks once.
+
+        Returns run, skip or terminal. A skipped job may be awaiting owner or
+        confirmation; only run jobs belong in the following interval slice.
+        """
+        job = state.jobs.jobs.get(job_id)
+        if not job or job.status in (JobStatus.COMPLETED, JobStatus.CANCELLED, JobStatus.FAILED):
+            return "terminal", []
+        if job.status == JobStatus.QUEUED:
+            if job.owner_id and job.owner_id in context.running_owners:
+                return "skip", []
+            if job.job_type == JobType.ROUTE_SOLVE and context.route_solve_running:
+                return "skip", []
+        required = self._drone_task_reserve_requirement(state, job)
+        if required is not None:
+            events = self._cancel_drone_task_for_return(state, job)
+            events.append(self._drone_reserve_block_event(state, job.owner_id, required))
+            events.extend(self._enqueue_drone_autorecall(state, state.ship.drones[job.owner_id]))
+            return "skip", events
+        if job.status == JobStatus.QUEUED:
+            job.status = JobStatus.RUNNING
+            if job.owner_id:
+                context.running_owners.add(job.owner_id)
+            if job.job_type == JobType.ROUTE_SOLVE:
+                context.route_solve_running = True
+        interrupted = self._check_job_interruption(state, job)
+        if interrupted is not None:
+            if str(interrupted.data.get("reason", "")) == "repair_auto_move_confirmation_required":
+                return "skip", [interrupted]
+            job.status = JobStatus.FAILED
+            return "terminal", [interrupted]
+        if bool(job.params.get("awaiting_auto_move_confirmation")):
+            return "skip", []
+        return "run", []
+
+    def _begin_job_interval(self, state: GameState) -> tuple[_JobInterval, list[Event]]:
+        """Activate eligible jobs at this instant, without advancing ETA or RNG.
+
+        A future causal consumer must record returned events, integrate the
+        preceding interval, then advance and resolve this one-use slice.
+        Calling this again after resolution reevaluates newly unblocked queues.
+        """
+        context = self._job_activation_context(state)
+        running: list[str] = []
+        terminal: list[str] = []
+        events: list[Event] = []
+        for job_id in list(state.jobs.active_job_ids):
+            disposition, prepared_events = self._prepare_job_at_boundary(state, job_id, context)
+            events.extend(prepared_events)
+            if disposition == "run":
+                running.append(job_id)
+            elif disposition == "terminal":
+                terminal.append(job_id)
+        for job_id in terminal:
+            if job_id in state.jobs.active_job_ids:
+                state.jobs.active_job_ids.remove(job_id)
+        return _JobInterval(id(state), tuple(running), causal=True), events
+
+    def _next_job_completion_s(self, state: GameState, interval: _JobInterval) -> float | None:
+        """Earliest current RUNNING ETA, including zero; no state or RNG change.
+
+        Conditional candidate only: interruption and emergency risk may prevent
+        completion. Unrelated jobs count because they may unblock queued work.
+        """
+        if interval.state_id != id(state) or interval.dt_s is not None or interval.resolved:
+            raise ValueError("job interval is stale or belongs to another state")
+        raw_etas = [state.jobs.jobs[key].eta_s for key in interval.job_keys]
+        if any(not math.isfinite(eta) for eta in raw_etas):
+            raise ValueError("job ETA must be finite")
+        etas = [max(0.0, eta) for eta in raw_etas]
+        return min(etas) if etas else None
+
+    def _advance_job_timers(self, state: GameState, interval: _JobInterval, dt: float) -> None:
+        """Debit galactic ETA only; effects and risk checks wait for resolution."""
+        if interval.state_id != id(state) or interval.dt_s is not None or interval.resolved:
+            raise ValueError("job interval is stale or belongs to another state")
+        if not math.isfinite(dt) or dt < 0:
+            raise ValueError("job interval duration must be finite and nonnegative")
+        if interval.causal:
+            next_completion = self._next_job_completion_s(state, interval)
+            if next_completion is not None and dt > next_completion:
+                raise ValueError("causal job interval would pass a completion boundary")
+        if any(state.jobs.jobs[key].status != JobStatus.RUNNING for key in interval.job_keys):
+            raise ValueError("job changed status before interval advancement")
+        for key in interval.job_keys:
+            job = state.jobs.jobs[key]
+            interval.eta_before[key] = job.eta_s
+            job.eta_s -= dt
+        interval.dt_s = dt
+
+    def _resolve_job_interval(
+        self, state: GameState, interval: _JobInterval, *, remove_terminal: bool = True,
+    ) -> tuple[list[Event], tuple[str, ...]]:
+        """Resolve productive risk and due effects once, in scheduler order.
+
+        Call after interval effects such as wear in the future causal path.
+        Historical `_process_jobs` calls this per job at its old location.
+        """
+        if interval.state_id != id(state) or interval.dt_s is None or interval.resolved:
+            raise ValueError("job interval was not advanced or was already resolved")
+        events: list[Event] = []
+        completed: list[str] = []
+        if any(state.jobs.jobs[key].status != JobStatus.RUNNING for key in interval.job_keys):
+            raise ValueError("job changed status before interval resolution")
+        for job_id in interval.job_keys:
+            job = state.jobs.jobs[job_id]
+            if job.status != JobStatus.RUNNING:
+                # An earlier same-instant outcome can cancel a later job.
+                completed.append(job_id)
+                continue
+            if interval.causal:
+                interrupted = self._check_job_interruption(state, job)
+                if interrupted is not None:
                     events.append(interrupted)
+                    if str(interrupted.data.get("reason", "")) == "repair_auto_move_confirmation_required":
+                        continue
+                    job.status = JobStatus.FAILED
+                    completed.append(job_id)
                     continue
-                job.status = JobStatus.FAILED
-                events.append(interrupted)
-                completed.append(job_id)
-                continue
-            if bool(job.params.get("awaiting_auto_move_confirmation")):
-                continue
+                if bool(job.params.get("awaiting_auto_move_confirmation")):
+                    continue
             if job.params.get("emergency"):
-                failed_event = self._maybe_fail_emergency_job(state, job, dt)
+                failed_event = self._maybe_fail_emergency_job(state, job, interval.dt_s)
                 if failed_event:
+                    job.eta_s = interval.eta_before[job_id]
                     events.append(failed_event)
                     completed.append(job_id)
                     continue
-
-            job.eta_s -= dt
             if job.eta_s <= 0:
                 failed_event = self._maybe_fail_repair_job(state, job)
                 if failed_event is not None:
@@ -3481,12 +3615,12 @@ class Engine:
                 events.extend(self._apply_job_effect(state, job))
                 if job.status == JobStatus.COMPLETED and job.terminal_seq is None:
                     self._finalize_job(state.jobs, job, JobStatus.COMPLETED)
-
-        for job_id in completed:
-            if job_id in jobs_state.active_job_ids:
-                jobs_state.active_job_ids.remove(job_id)
-
-        return events
+        if remove_terminal:
+            for job_id in completed:
+                if job_id in state.jobs.active_job_ids:
+                    state.jobs.active_job_ids.remove(job_id)
+        interval.resolved = True
+        return events, tuple(completed)
 
     def _check_job_interruption(self, state: GameState, job: Job) -> Event | None:
         if job.job_type == JobType.BOOT_SERVICE:

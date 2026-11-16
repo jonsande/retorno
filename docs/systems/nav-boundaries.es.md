@@ -124,7 +124,7 @@ avanzar el tiempo. Un horizonte positivo, ETA de trabajo o límite propio que
 no pueda avanzar el reloj de coma flotante produce el mismo error controlado.
 El selector no redondea un instante causal hacia delante para fabricar progreso.
 
-## Integración causal necesaria en 01B3C
+## Contrato de integración causal
 
 Al inicio de cada intervalo, resolver las comprobaciones de activación QUEUED
 e identificar carga eléctrica, calidad, radiación, tasa de desgaste, estado de
@@ -136,11 +136,10 @@ con el umbral estricto `<`, y después procesar interrupción, fallo y
 finalización de trabajos en el orden del scheduler, aplicando reparaciones y
 módulos con éxito una sola vez. Por último, recalcular electricidad, desgaste,
 empuje y trayectoria antes de consumir tiempo restante. Deben considerarse
-todos los trabajos y cambios de fase del mismo instante. Será necesario
-separar avance de contadores y efectos de finalización en el scheduler
-productivo: ahora `_process_jobs()` precede a `_apply_degradation()`, por lo
-que dividir `Engine.tick()` sin más aún permitiría que una reparación afectara
-retroactivamente el desgaste anterior.
+todos los trabajos y cambios de fase del mismo instante. NAV-BRAKE-01B3D separa
+avance de contadores y efectos de finalización en el scheduler productivo.
+El `_tick_interval()` histórico aún llama a `_process_jobs()` antes de
+`_apply_degradation()`; dividir `Engine.tick()` sin más no corrige ese orden.
 
 01B2 no modela la regulación eléctrica cambiante, inicio de brownout,
 radiación, interrupciones imprevistas, resultados aleatorios ni acciones
@@ -205,11 +204,51 @@ cambiantes. Esos efectos todavía no se cortan en los mismos instantes que un
 `MotionSegment` con β variable. Los ticks arbitrariamente pequeños no aportan
 un instante exacto de fallo ni una cota de error verificada.
 
-El adaptador necesita separar el scheduler productivo en activación, avance de
-temporizadores y efectos de finalización sin cambiar comprobaciones ni orden de
-RNG; límites eléctricos y radiológicos o una cota verificada del error de
+El adaptador aún necesita límites eléctricos y radiológicos o una cota
+verificada del error de
 integración continua; desgaste anterior a reparaciones simultáneas; tratamiento
 exacto de cortes cero del 35 % y 15 %; y reserva de combustible verificada para
 cada tramo propulsivo. Solo entonces podrá sustituirse el cálculo del reloj con
 β fija por la integral de tiempo propio del segmento en la vía interna. El
 viaje público antiguo sigue siendo la única vía que avanza en esta fase.
+
+## Fases del scheduler en 01B3D
+
+`Engine._begin_job_interval(state)` utiliza las comprobaciones productivas de
+activación, exclusividad por responsable, cálculo de rutas, reserva de dron e
+interrupción en el instante actual. Devuelve un `_JobInterval` de un solo uso y
+eventos. La lista congelada contiene los trabajos autorizados a avanzar durante
+el intervalo. El `_compute_load_kw` ordinario cuenta todos los trabajos marcados
+RUNNING, incluso los pausados por confirmación y excluidos de esa lista; esta
+regla histórica de carga no cambia. Un QUEUED bloqueado no añade carga.
+
+`_next_job_completion_s(state, interval)` devuelve la ETA en avance más próxima
+en **segundos galácticos**, incluido cero, sin modificar estado ni RNG. Incluye
+trabajos ajenos a propulsión porque pueden liberar a un responsable para
+trabajos en cola relevantes. Es un candidato: una interrupción o un fallo
+aleatorio puede impedir la finalización. El `nav_coordinator.py` puro no ejecuta
+el scheduler; un futuro adaptador del motor deberá suministrarle ese límite
+junto con el segmento físico y los otros límites.
+
+`_advance_job_timers(state, interval, dt)` solo descuenta ETA, rechaza un
+intervalo que sobrepase una finalización y no aplica efectos. El futuro
+consumidor debe integrar primero el intervalo físico, eléctrico y de desgaste
+precedente y situar el reloj galáctico del juego en el límite. Después,
+`_resolve_job_interval(state, interval)` vuelve a comprobar interrupciones,
+ejecuta las reglas existentes de riesgo de emergencia y resultado de reparación
+en orden del scheduler, aplica cada efecto vencido mediante el único
+`_apply_job_effect()` productivo y devuelve eventos. Resolver dos veces el
+token produce un error. Una nueva llamada a `_begin_job_interval` en el mismo
+instante puede arrancar trabajos QUEUED recién desbloqueados, incluso con ETA
+cero, sin avance artificial del reloj. El consumidor debe registrar los eventos
+y no reutilizar un token tras cambios ajenos del estado.
+
+`_process_jobs()` usa las mismas operaciones trabajo por trabajo, conservando
+el orden público anterior y su posición previa al desgaste. En lotes causales
+los efectos de finalización pueden seguir al desgaste, por lo que una reparación
+en T no afecta al intervalo precedente. La probabilidad de fallo de emergencia
+sigue dependiendo del `dt` suministrado; la subdivisión puede cambiar resultados
+estocásticos y el instante de RNG. No se afirma invariancia estocástica ni se
+modificó ningún parámetro probabilístico. Regulación eléctrica, radiación,
+predicción de desgaste y movimiento propulsivo siguen fuera de esta
+refactorización. `Engine.tick()` continúa rechazando el tránsito físico.
