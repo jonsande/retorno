@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from dataclasses import MISSING, dataclass, field, fields
 import math
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from retorno.core.nav_state import PhysicalTransitState
 
 from retorno.model.drones import DroneState, Inventory
 from retorno.model.systems import ShipSystem, SystemState
@@ -65,6 +69,8 @@ class ShipState:
     transit_prev_op_mode: str = ""
     transit_prev_op_mode_source: str = ""
     docked_node_id: str | None = None
+    # Internal-only physical navigation state; legacy travel never creates it.
+    physical_transit: PhysicalTransitState | None = None
 
     location: ShipLocation = field(default_factory=ShipLocation)
     hull_integrity: float = 1.0

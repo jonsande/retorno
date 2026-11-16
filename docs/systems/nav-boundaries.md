@@ -1,0 +1,201 @@
+# Navigation temporal boundaries (NAV-BRAKE-01B1 to 01B3C)
+
+This internal API is implemented in `src/retorno/core/nav_boundaries.py` and
+`src/retorno/core/nav_coordinator.py`, and tested by their matching test files.
+It is not connected to playable
+navigation. `Engine.tick()`, travel, abort, clocks, fuel, and save files still
+use their previous behavior.
+
+## Shared wear rate
+
+`ordinary_wear_rate(system, power_quality, brownout_sustained, internal_rad,
+in_transit=..., op_mode=..., god_active=...)` returns health loss **per ship
+proper second** under the supplied, fixed conditions. `Engine._apply_degradation`
+uses that same function and retains its existing clamp, system-state events,
+ordering, and god-mode early return. The factors are base decay, power-quality
+deficit, clamped internal radiation, the NORMAL transit multiplier, and the
+existing sustained-brownout multipliers for `energy_distribution` and
+`power_core`. The function does not integrate changing conditions.
+
+## Thrust and health threshold
+
+`thrust_available(ship)` delegates to the **existing normal-thrust**
+classification in `ShipState.engine_operating_state()`. It is not the future
+emergency-braking capability classifier. It does not test target speed,
+physical speed, fuel, or a new electrical-quality threshold. Isolation uses
+the existing `forced_offline` contract.
+
+`predict_engine_health_limit(ship, wear_rate_per_proper_s, god_active=...)`
+returns an immutable `TemporalLimit` for the mathematical arrival at
+`Balance.SYSTEM_HEALTH_CRITICAL`. Its domain is `proper`. At exact equality
+the engine is still DAMAGED because production classifies CRITICAL with `<`.
+Thus `time_s=0` means *threshold reached*, not already unable to brake. A
+positive rate produces the existing CRITICAL classification immediately after
+that instant; future emergency braking may still be available. A zero rate, god
+mode, or health already below the threshold yields no future crossing; the
+`validity` field explains which case applies. Isolation does not erase a
+separately calculable health threshold.
+
+The predicted time is exact only while the supplied wear rate and all its
+inputs remain constant. A change in power quality, brownout, radiation, mode,
+base decay, repair, or isolation invalidates the prediction. A consumer must
+sample the new state and recompute it.
+
+## Job candidates
+
+`propulsion_job_limits(jobs)` returns immutable `TemporalLimit` values in the
+scheduler's active-job order, with `domain="galactic"`. It includes repairs
+of engines, power core and energy distribution, relevant module changes, and
+jobs whose power draw may change electrical conditions when they finish.
+`engine_speed_upgrade_01` changes the physical speed ceiling;
+`bus_stabilizer`, `aux_battery_cell`, and `micro_reactor_patch` change
+electrical quality, capacity, or generation and thereby can change wear.
+Other module installations are not assumed to change thrust directly.
+
+For a RUNNING job, `time_s` is its current ETA **conditional on continued
+execution**. Completion, repair success, and unchanged operating conditions
+are not guaranteed; `uncertainty_reason` records this. An eligible QUEUED job
+has a time-zero `job_activation` *check*, not a completion ETA. A queued job
+blocked by an already running owner or route solve, or a RUNNING job awaiting
+player confirmation, has `time_s=None`. A QUEUED job awaiting confirmation can
+still activate and change load at time zero. The productive scheduler can still reject an
+activation for other reasons. Unrelated zero-load jobs are omitted. A job
+starting, stopping, being interrupted, or changing power draw invalidates the
+snapshot. The consumer may use known candidate ETAs as cuts, but must let the
+productive scheduler decide outcomes exactly once. It must not
+apply a repair or alter RNG during prediction.
+
+The API does not predict future electrical regulation, variable-rate wear,
+random job outcomes, or the time at which blocked queued work will start.
+
+## Pure coordinator (01B2)
+
+`select_next_boundary(plan, elapsed_galactic_s, horizon_galactic_s, *,
+health_limit=None, job_limits=(), invalidation_reasons=(),
+seen_zero_selections=())` returns an immutable `BoundarySelection`.
+`plan` may be the original `TravelPlan` or the **active** `MotionSegment`.
+For a plan, `elapsed_galactic_s` and `at_galactic_s` are elapsed seconds since
+departure. For a segment, they are absolute seconds in its cumulative galactic
+clock; the caller supplies a query time inside that segment. `horizon_galactic_s`, `advance_galactic_s`,
+and every input `TemporalLimit.time_s` are remaining seconds from the query.
+`accumulated_proper_s` is ship time since departure. `causes` contains immutable
+`BoundaryCause` values with the original conditional limit and its converted
+galactic instant. `deferred` retains relevant limits with unknown time.
+`requires_reevaluation` marks phase, health, job, or invalidation cuts.
+
+For a nominal plan, the selector considers acceleration end, braking start and
+profile end. For an active segment, it considers **only that segment's end**,
+never the invalidated plan's phases or arrival. Both forms consider the
+requested horizon, a supplied health threshold, RUNNING completion candidates, eligible QUEUED
+activation checks, and explicit invalidations. It never runs their effects.
+The horizon may extend past arrival; profile end cuts first. An invalidation
+forces a zero cut and suppresses stale timed predictions until a fresh snapshot
+is supplied. The selector is deterministic and does not mutate the plan or
+game state.
+
+`galactic_time_at_proper(plan, accumulated_proper_s)` in `nav_physics.py`
+inverts the same trajectory used by `sample_travel`: hyperbolic sine during
+acceleration, constant peak-beta gamma only during cruise, and time reversal
+of acceleration during braking. Exact phase endpoints are taken from the plan.
+No fixed step solver or fixed-beta approximation spans acceleration or braking.
+Floating-point roundoff remains possible near endpoints. For a segment,
+`proper_time_in_segment()` obtains local proper time without subtracting large
+accumulated clocks, and `galactic_time_at_segment_proper()` performs the
+analytic inverse for the remaining health duration. The returned
+`accumulated_proper_s` remains the cumulative ship clock.
+
+The earliest instant is the cut. Causes within four ULPs of that instant are
+retained, each with its own `at_galactic_s`; later near causes are **not** due
+at the earlier cut and must be rechecked. A limit at the current instant yields
+zero duration. The caller must resolve or resample it, or stop; retrying the
+same snapshot is not progress. No positive epsilon is added. Exact engine
+health equality is still DAMAGED; continuous positive wear crosses into
+CRITICAL immediately to its right under the current classifier. A repair completed at equality can change
+that right-hand state, but the coordinator does not assume repair success.
+`seen_zero_selections` lets the caller pass zero cuts already resolved at this
+instant. Repeating the same due causes raises `TemporalResolutionError`, even
+if the requested horizon changes; clear the collection only after time advances.
+A positive horizon, job ETA or proper-time limit that cannot advance the
+floating-point clock raises the same controlled error. The selector does not
+round a causal instant forward to manufacture progress.
+
+## Required causal integration in 01B3C
+
+At an interval start, resolve eligible QUEUED activation checks and sample the
+effective electrical load, power quality, radiation, wear rate, propulsion
+state, and job ETAs. Select a cut. Integrate physical motion and interval
+effects using the **pre-cut** state, including electrical regulation and wear;
+advance running job timers without applying their completion effects early.
+At the cut, classify the resulting integrity (with the existing strict `<`
+threshold), then process job interruption/failure/completion in scheduler order
+and apply successful repairs/module effects exactly once. Finally resample
+power, wear, thrust and trajectory before using any remaining time. Multiple
+jobs and phase changes at the same instant must all be considered. This will
+require separating timer advancement from completion effects in the productive
+scheduler: today `_process_jobs()` precedes `_apply_degradation()`, so merely
+splitting `Engine.tick()` still permits a repair to affect earlier wear.
+
+01B2 does not model changing electrical regulation, brownout onset, radiation,
+unpredicted interruptions, stochastic job outcomes, or mid-interval external
+actions. Those changes invalidate supplied limits and require a fresh cut.
+No operational partition invariance is claimed by the mathematical tests.
+
+01B3A adds [motion segments](nav-physics.md); 01B3B selects on the active
+segment without scanning its history. Once a segment is consolidated, its
+endpoint state and the current active segment suffice for future selection;
+full history is optional for diagnostics, while cumulative clocks, physical
+position/speed, active maneuver, destination intent and any unresolved cuts
+would need persistence later.
+
+### Approved future operating policy (not implemented here)
+
+At engine health **at least 35%**, normal acceleration and braking remain
+available, with preventive safety braking initiated at the 35% boundary.
+From **15% inclusive to below 35%**, only emergency braking is available.
+Below **15%**, or with effectively isolated engines, motion is inertial.
+NAV-BRAKE-01B3C adds `Balance.ENGINE_EMERGENCY_BRAKE_MIN_HEALTH`,
+`acceleration_available(ship)`, `braking_available(ship)` and
+`predict_engine_braking_limit(ship, rate)`. The 15% boundary is inclusive:
+braking remains available at equality; positive wear removes it immediately
+afterward. The 35% predictor and strict operating-state classifier are unchanged.
+`thrust_available()` retains its legacy normal-thrust meaning. These queries
+do not authorize fuel use or evaluate maneuver feasibility.
+
+Emergency braking may carry the ship beyond its destination when stopping
+before it is impossible; crossing the coordinate at positive speed is not a
+successful arrival. After repair, replanning starts from the real position and
+speed, preserves the destination where possible, and never accelerates again
+if braking had already begun before the failure. Later phases must provide
+terminal and hibernation mail warnings on overshoot, a waypoint at the physical
+stop even beyond the destination, a block on departure and `route solve` during
+physical transit, the current 45-light-year operational waypoint connection
+limit, a documented future collision model, and fuel-reservation checks for
+every additional powered maneuver. None of those behaviors is active in 01B3C.
+
+## 01B3C causal integration status
+
+The powered `Engine.tick()` adapter is **blocked**. Optional
+`ShipState.physical_transit` holds `PhysicalTransitState`; its active
+`MotionSegment` and elapsed time alone determine physical position, speed and
+local proper time. It also stores original destination, intent, safety-braking
+and braking-start flags, and whether replanning is required. Old saves load
+with this field set to `None`. No public travel action creates it. If present,
+`Engine.tick()` raises before modifying state, preventing silent advancement
+of an unimplemented physical maneuver.
+
+The blocker is causal. `Engine._process_jobs()` applies a completed repair
+before `Engine._apply_degradation()` for the interval, so the repair may affect
+earlier wear. `Engine._integrate_power_interval()` changes battery charge,
+quality, shedding and brownout timers, but wear uses one end-of-interval quality
+and radiation sample. Thus a threshold predicted at the initial wear rate may
+occur earlier under changing conditions. These effects are not yet cut at the
+same instants as a changing-β `MotionSegment`. Arbitrarily small ticks supply
+neither an exact failure instant nor a verified error bound.
+
+The adapter requires a productive scheduler split into activation, timer
+advance and completion effects without changing checks or RNG order; electrical
+and radiation boundaries or a verified continuous-integration error bound;
+wear before same-instant repair outcomes; exact 35% and 15% zero-cut handling;
+and verified fuel reservation for every powered segment. Only then can the
+segment's proper-time integral replace fixed-β clock calculation on the
+internal path. Legacy public travel remains the only advancing path here.

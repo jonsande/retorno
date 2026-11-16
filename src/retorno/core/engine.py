@@ -7,6 +7,7 @@ import difflib
 import math
 
 from retorno.core.temporal import SPEED_OF_LIGHT_KM_S, biological_time_interval, proper_time_interval
+from retorno.core.nav_boundaries import ordinary_wear_rate
 
 from retorno.core.actions import (
     Action,
@@ -105,6 +106,8 @@ class Engine:
     _MAX_RECENT_EVENTS = 50
 
     def tick(self, state: GameState, dt: float) -> list[Event]:
+        if state.ship.physical_transit is not None:
+            raise RuntimeError("Physical transit cannot advance until causal power, wear and job cuts are integrated")
         # Stop at drone decision/completion boundaries. A large wait must not
         # jump from a safe reserve to an exhausted drone before checking recall.
         events: list[Event] = []
@@ -5341,23 +5344,16 @@ class Engine:
         """Ordinary system ageing in proper seconds; optional sampled flight context."""
         if state.os.god_active:
             return []
-        internal_rad_norm = self._clamp(internal_rad / Balance.R_REF)
         events: list[Event] = []
-        wear_mult = 1.0
         moving = state.ship.in_transit if in_transit is None else in_transit
         mode = state.ship.op_mode if op_mode is None else op_mode
-        if moving and mode != "CRUISE":
-            wear_mult = Balance.TRANSIT_WEAR_MULT_NORMAL
         for system in state.ship.systems.values():
-            s_factor = 1.0 + system.k_power * (1.0 - power_quality) + system.k_rad * internal_rad_norm
-            if brownout_sustained:
-                if system.system_id == "energy_distribution":
-                    s_factor *= Balance.BROWNOUT_DEGRADE_MULT_DISTRIBUTION
-                elif system.system_id == "power_core":
-                    s_factor *= Balance.BROWNOUT_DEGRADE_MULT_POWER_CORE
             system.health = max(
                 0.0,
-                system.health - system.base_decay_per_s * s_factor * wear_mult * dt_ship,
+                system.health - ordinary_wear_rate(
+                    system, power_quality, brownout_sustained, internal_rad,
+                    in_transit=moving, op_mode=mode,
+                ) * dt_ship,
             )
             self._apply_health_state(system, state, events, cause="degradation")
         return events
