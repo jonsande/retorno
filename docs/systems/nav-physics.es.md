@@ -139,3 +139,52 @@ Las rutas productivas de CLI, Textual, persistencia y eventos siguen esa
 regla. Las pruebas ejercitan referencias superiores conservadas a través de
 un `GameLoop` y el presentador Textual reales, movimiento, guardado/carga y
 errores de prevalidación y ejecución tardía.
+
+## Primeros intervalos propulsivos del motor (NAV-BRAKE-01B3H-A)
+
+`Engine.tick()` procesa ahora segmentos internos `accelerate`, `coast` y
+`brake` mediante el mismo adaptador acotado `_tick_physical_segment()`.
+Muestrea el `MotionSegment` inmutable en el extremo galáctico solicitado,
+obtiene el tiempo propio con `proper_time_in_segment()` y actualiza posición,
+velocidad, tiempo de la nave y edad biológica sin reconstruirlos desde una ETA.
+La aceleración admite reposo o beta positiva y se detiene en la velocidad
+definida por el segmento. El frenado mantiene avance hasta el extremo, donde
+beta puede ser exactamente cero. Cruzar el destino no declara llegada.
+Se rechaza un tick posterior al fin del segmento hasta preparar una
+continuación física. Ningún comando público crea tránsito físico.
+
+La API interna `Engine.prepare_physical_segment()` comprueba relojes,
+geometría, continuidad, intención, capacidad de motores y límite vigente de
+velocidad. Cada tramo propulsivo requiere un `pricing_speed` discreto no menor
+que las velocidades de ambos extremos. La preparación descuenta una vez
+`Engine.engine_fuel_cost()` del saldo contable `antimatter_capsules` y guarda
+un recibo inmutable `PropulsionAuthorization` asociado a ese segmento y al
+destino original. Los ticks posteriores no vuelven a descontarlo. Cada tramo
+propulsivo adicional necesita preparación y cobro propios; la inercia no los
+necesita. Es una aplicación interna y provisional por tramo de la tarifa
+existente por viaje, sin modelo de consumo continuo ni cambio del precio
+público. El recibo es fiable cuando procede de esta preparación interna;
+editar arbitrariamente un guardado queda fuera del contrato de integridad.
+
+El clasificador existente conserva su comparación estricta en el 35 %.
+Se usan por separado `acceleration_available()` y `braking_available()`,
+además del aislamiento efectivo y el funcionamiento de núcleo y distribución.
+En el 35 % se rechaza acelerar porque aún falta la transición de frenado
+preventivo. Se puede frenar exactamente al 15 % si el desgaste del intervalo
+no rebasa ese valor. Se rechazan atómicamente los intervalos que atraviesan
+el límite de su capacidad. Siguen vigentes las restricciones de salud,
+electricidad, radiación, narrativa, trabajos, radio, recuperación y
+supervivencia de 01B3G. Se reutilizan la calidad eléctrica en tiempo propio,
+la radiación espacial, el desgaste acoplado de casco y sistemas y
+`select_next_boundary()` con beta variable. La propulsión no añade una carga
+eléctrica inventada: rige el balance productivo existente.
+
+Preparación y tick trabajan sobre una copia profunda y publican una vez,
+conservando identidades de `GameState` y propietarios inmediatos. Un rechazo
+conserva combustible, relojes, eventos y RNG. Las pruebas cubren referencias
+analíticas de aceleración y frenado, subdivisión, umbrales, recibos pagados,
+guardado/carga, hibernación, sobrepaso y cortes fallidos. NAV-BRAKE-01B3H-B
+deberá resolver cortes anteriores y transiciones simultáneas, finalizaciones
+de trabajos, regulación eléctrica, replanificación, frenado preventivo y
+llegada física antes de la activación pública. Las descripciones anteriores de
+01B3G conservan el alcance más estrecho de aquella fase.

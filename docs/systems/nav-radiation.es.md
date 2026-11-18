@@ -128,12 +128,13 @@ El consumidor debe proporcionar las instantáneas de posición y operación para
 comprobarlas y repetir la consulta tras cambios de destino o radiación de los
 extremos, interrupción de segmento, reparación o daño extraordinario del casco.
 Ninguna consulta modifica `GameState` ni consume RNG.
-Antes de activar el movimiento físico, el futuro adaptador causal debe combinar
+Antes de activar el movimiento físico público, el adaptador causal debe combinar
 estos límites y las integrales propias de desgaste con la calidad eléctrica,
 integridad de motores y límites galácticos de trabajos, resolver efectos
 simultáneos y replantear desde posición y velocidad reales. Los límites
 internos diferidos cerca de tangencias o del límite de resolución numérica
-aún necesitan cotas certificadas de raíces antes de activar el movimiento.
-Reserva de combustible y frenado
-de emergencia son dependencias independientes. Cruzar B no es una llegada
+aún necesitan cotas certificadas de raíces antes de aceptar esos intervalos.
+Desde 01B3H-A, el adaptador propulsivo interno rechaza límites diferidos sin
+resolver y exige un recibo de tramo pagado; el frenado automático de emergencia
+sigue pendiente. Cruzar B no es una llegada
 satisfactoria y no crea waypoint.

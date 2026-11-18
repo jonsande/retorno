@@ -3,7 +3,8 @@
 This internal API is implemented in `src/retorno/core/nav_boundaries.py` and
 `src/retorno/core/nav_coordinator.py`, and tested by their matching test files.
 It is not connected to playable navigation. Since 01B3G, `Engine.tick()` uses
-these limits for a restricted internal inertial interval; public travel,
+these limits for restricted internal physical intervals, including powered
+segments since 01B3H-A; public travel,
 abort, fuel, and save format retain their previous behavior.
 
 ## Shared wear rate
@@ -326,3 +327,14 @@ Numerically ambiguous contacts remain deferred. Powered physical movement
 remains guarded. The first internal productive coast interval uses these
 forecasts only when no earlier cut or unresolved deferred limit exists; see
 [navigation segments](nav-physics.md).
+
+## 01B3H-A internal powered status
+
+The historical 01B3C and 01B3F statements above describe those phases.
+The current internal engine adapter also advances prepaid acceleration and
+braking segments under the same restrictions as coast. At 35% it rejects
+acceleration pending the safety transition; at exactly 15% braking remains
+possible only if the proposed interval does not wear engines below 15%.
+Unresolved earlier and deferred cuts still reject the whole interval. The
+public navigation path and the strict engine classifier are unchanged; see
+[navigation segments](nav-physics.md) for the receipt and preparation contract.

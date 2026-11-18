@@ -78,14 +78,14 @@ def test_physical_state_derives_pose_and_old_ship_state_still_loads():
     assert restored.physical_transit is None
 
 
-def test_engine_refuses_unimplemented_physical_thrust_without_advancing_time():
+def test_engine_refuses_unpaid_physical_thrust_without_advancing_time():
     game = _state()
     start = MotionState(0.0, 0.0, 0.0, 0.0)
     game.ship.physical_transit = PhysicalTransitState(
         accelerate_to(start, 0.01, 10.0), 0.0, "TARGET", "accelerate",
     )
     before = game.clock.t
-    with pytest.raises(RuntimeError, match="Physical transit cannot advance"):
+    with pytest.raises(RuntimeError, match="segment authorization"):
         Engine().tick(game, 5.0)
     assert game.clock.t == before
     assert game.ship.physical_transit.motion == start

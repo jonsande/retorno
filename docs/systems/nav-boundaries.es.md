@@ -3,7 +3,8 @@
 Esta API técnica está implementada en `src/retorno/core/nav_boundaries.py` y
 `src/retorno/core/nav_coordinator.py`, y probada por sus archivos de prueba.
 No está conectada a la navegación jugable. Desde 01B3G, `Engine.tick()` usa
-estos límites para un intervalo inercial interno restringido; el viaje
+estos límites para intervalos físicos internos restringidos, también
+propulsivos desde 01B3H-A; el viaje
 público, aborto, combustible y formato de guardado conservan su comportamiento.
 
 ## Tasa de desgaste compartida
@@ -193,6 +194,18 @@ replanteo. Los guardados antiguos se leen con este campo a `None`. Ningún viaje
 público lo crea. En 01B3C, `Engine.tick()` lanzaba una excepción antes de
 modificar el estado. El adaptador inercial restringido de 01B3G se describe en
 [segmentos físicos](nav-physics.es.md).
+
+## Estado propulsivo interno de 01B3H-A
+
+Las afirmaciones anteriores de 01B3C y 01B3F reflejan aquellas fases.
+El adaptador interno actual también avanza segmentos pagados de aceleración
+y frenado bajo las mismas restricciones que la inercia. En el 35 % rechaza
+acelerar hasta disponer de la transición preventiva; exactamente al 15 %
+permite frenar solo si el intervalo propuesto no desgasta los motores por
+debajo de ese valor. Los cortes anteriores y diferidos sin resolver siguen
+rechazando el intervalo entero. La navegación pública y el clasificador
+estricto de motores no cambian; véanse los [segmentos físicos](nav-physics.es.md)
+para el contrato de preparación y recibo.
 
 El bloqueo es causal. `Engine._process_jobs()` aplica una reparación finalizada
 antes de `Engine._apply_degradation()` para el intervalo, de modo que la

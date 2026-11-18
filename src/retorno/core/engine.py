@@ -11,12 +11,14 @@ from dataclasses import dataclass, field
 
 from retorno.core.temporal import SPEED_OF_LIGHT_KM_S, biological_time_interval, proper_time_interval
 from retorno.core.nav_boundaries import (TemporalLimit, ordinary_wear_rate,
-                                         predict_engine_health_limit, predict_engine_braking_limit)
+                                         predict_engine_health_limit, predict_engine_braking_limit,
+                                         acceleration_available, braking_available)
 from retorno.core.nav_coordinator import select_next_boundary
 from retorno.core.nav_electricity import (battery_energy_after, power_quality_components,
                                          capture_power_snapshot, power_limits, integrate_quality,
                                          invalidation_reasons)
-from retorno.core.nav_physics import light_years_to_metres, proper_time_in_segment, sample_segment
+from retorno.core.nav_physics import MotionSegment, light_years_to_metres, proper_time_in_segment, sample_segment
+from retorno.core.nav_state import PhysicalTransitState, PropulsionAuthorization
 from retorno.core.nav_radiation import (RadiationProfile, hull_decay_rate, internal_radiation_rate,
                                         integrate_segment_radiation, integrated_system_wear,
                                         radiation_limits)
@@ -137,7 +139,7 @@ class Engine:
 
     def tick(self, state: GameState, dt: float) -> list[Event]:
         if state.ship.physical_transit is not None:
-            return self._tick_physical_coast(state, dt)
+            return self._tick_physical_segment(state, dt)
         # Stop at drone decision/completion boundaries. A large wait must not
         # jump from a safe reserve to an exhausted drone before checking recall.
         events: list[Event] = []
@@ -170,8 +172,101 @@ class Engine:
             remaining = max(0.0, remaining - step)
         return events
 
-    def _tick_physical_coast(self, state: GameState, dt: float) -> list[Event]:
-        """One causal inertial interval. Commit only after all staged effects succeed.
+    @staticmethod
+    def _physical_propulsion_available(state: GameState, intent: str) -> bool:
+        """Check separate engine capabilities and the current power path."""
+        ship = state.ship
+        if intent == "coast":
+            return True
+        engine = ship.systems.get("engines")
+        if engine is None or engine.forced_offline or engine.state == SystemState.OFFLINE:
+            return False
+        for key in ("power_core", "energy_distribution"):
+            system = ship.systems.get(key)
+            if system is None or system.forced_offline or system.state == SystemState.OFFLINE:
+                return False
+        return (acceleration_available(ship) if intent == "accelerate"
+                else braking_available(ship))
+
+    def prepare_physical_segment(
+        self, state: GameState, segment: MotionSegment, destination_id: str,
+        intent: str, *, pricing_speed: float | None = None,
+    ) -> PhysicalTransitState:
+        """Internal-only, atomic preparation; debit one existing journey tariff per powered leg.
+
+        The receipt covers exactly this immutable segment and destination. A
+        continuation, including a second powered leg, needs a fresh preparation.
+        Public travel does not call this method in 01B3H-A.
+        """
+        if intent not in {"accelerate", "brake", "coast"}:
+            raise ValueError("unknown physical navigation intent")
+        if segment.duration_galactic_s <= 0:
+            raise ValueError("physical segment must have positive duration")
+        if ((intent == "accelerate" and segment.proper_acceleration_m_s2 <= 0)
+                or (intent == "brake" and segment.proper_acceleration_m_s2 >= 0)
+                or (intent == "coast" and segment.proper_acceleration_m_s2 != 0)):
+            raise ValueError("physical intent disagrees with segment acceleration")
+        ship = state.ship
+        if ship.in_transit or ship.docked_node_id is not None:
+            raise RuntimeError("physical preparation requires undocked nonlegacy transit")
+        previous = ship.physical_transit
+        origin_id = ship.transit_from or ship.current_node_id
+        if previous is None:
+            if (segment.start.galactic_s != state.clock.t
+                    or segment.start.proper_s != state.clock.ship_elapsed_s
+                    or segment.start.distance_m != 0):
+                raise ValueError("initial physical segment must start at current clocks and origin")
+        else:
+            if (previous.elapsed_galactic_s != previous.active_segment.duration_galactic_s
+                    or previous.motion != segment.start):
+                raise RuntimeError("physical continuation must start at the previous endpoint")
+            if destination_id != previous.original_destination_id:
+                raise RuntimeError("physical continuation must retain the original destination")
+            if previous.braking_started and intent == "accelerate":
+                raise RuntimeError("physical braking cannot resume acceleration")
+        if (state.clock.t != segment.start.galactic_s
+                or state.clock.ship_elapsed_s != segment.start.proper_s):
+            raise ValueError("physical preparation requires aligned clocks")
+        distance_ly = distance_between_nodes_ly(state.world, origin_id, destination_id)
+        if distance_ly is None or distance_ly <= 0:
+            raise RuntimeError("physical preparation requires known endpoint geometry")
+        if not self._physical_propulsion_available(state, intent):
+            raise RuntimeError("physical propulsion is unavailable")
+        if (intent == "accelerate"
+                and ship.systems["engines"].health <= Balance.SYSTEM_HEALTH_CRITICAL):
+            raise RuntimeError("physical acceleration requires the unresolved 35% safety transition")
+        if intent == "accelerate" and segment.end_beta > ship.maximum_cruise_speed():
+            raise RuntimeError("physical acceleration exceeds current engine speed capability")
+        receipt = None
+        price = 0.0
+        if intent != "coast":
+            if (pricing_speed not in Balance.ENGINE_SPEED_FUEL_MULTIPLIERS
+                    or pricing_speed < max(segment.start.beta, segment.end_beta)):
+                raise ValueError("pricing speed must be a supported ceiling for this maneuver")
+            price = self.engine_fuel_cost(state, distance_ly, pricing_speed)
+            if (not math.isfinite(price) or price <= 0
+                    or not math.isfinite(ship.antimatter_capsules)
+                    or ship.antimatter_capsules < price):
+                raise RuntimeError("physical propulsion requires available prepaid antimatter")
+            receipt = PropulsionAuthorization(segment, destination_id, pricing_speed, price)
+        elif pricing_speed is not None:
+            raise ValueError("coast does not need a propulsion tariff")
+        physical = PhysicalTransitState(
+            segment, 0.0, destination_id, intent,
+            safety_braking=previous.safety_braking if previous else False,
+            braking_started=(intent == "brake" or bool(previous and previous.braking_started)),
+            replan_required=False, propulsion_authorization=receipt,
+        )
+        staged = deepcopy(state)
+        staged.ship.antimatter_capsules -= price
+        staged.ship.transit_from = origin_id
+        staged.ship.physical_transit = physical
+        self._commit_physical_state(state, staged)
+        assert state.ship.physical_transit is not None
+        return state.ship.physical_transit
+
+    def _tick_physical_segment(self, state: GameState, dt: float) -> list[Event]:
+        """One causal physical interval. Commit only after all staged effects succeed.
 
         A selected internal cut needs a new forecast and is deliberately rejected
         until the physical scheduler can resolve that cut. No partial time passes.
@@ -179,58 +274,73 @@ class Engine:
         physical = state.ship.physical_transit
         assert physical is not None
         segment = physical.active_segment
-        if physical.intent != "coast" or segment.proper_acceleration_m_s2 != 0:
-            raise RuntimeError("Physical transit cannot advance: propulsion is not integrated")
+        powered = physical.intent != "coast"
+        if ((physical.intent == "coast" and segment.proper_acceleration_m_s2 != 0)
+                or (physical.intent == "accelerate" and segment.proper_acceleration_m_s2 <= 0)
+                or (physical.intent == "brake" and segment.proper_acceleration_m_s2 >= 0)):
+            raise RuntimeError("Physical segment intent and acceleration disagree")
+        if powered:
+            receipt = physical.propulsion_authorization
+            if (receipt is None or receipt.segment != segment
+                    or receipt.destination_id != physical.original_destination_id
+                    or receipt.pricing_speed not in Balance.ENGINE_SPEED_FUEL_MULTIPLIERS
+                    or receipt.pricing_speed < max(segment.start.beta, segment.end_beta)
+                    or receipt.capsules_paid <= 0):
+                raise RuntimeError("Physical propulsion lacks a valid segment authorization")
+            if not self._physical_propulsion_available(state, physical.intent):
+                raise RuntimeError("Physical propulsion capacity is unavailable")
+        elif physical.propulsion_authorization is not None:
+            raise RuntimeError("Physical coast cannot carry a propulsion authorization")
         if not math.isfinite(dt) or dt < 0:
             raise ValueError("physical tick duration must be finite and nonnegative")
         if dt == 0:
             return []
         if state.ship.in_transit or state.ship.docked_node_id is not None:
-            raise RuntimeError("Physical coast requires an undocked, non-legacy transit")
+            raise RuntimeError("Physical segment requires an undocked, non-legacy transit")
         if state.jobs.active_job_ids or any(j.status in {JobStatus.RUNNING, JobStatus.QUEUED}
                                             for j in state.jobs.jobs.values()):
-            raise RuntimeError("Physical coast with active jobs needs causal scheduler cuts")
+            raise RuntimeError("Physical segment with active jobs needs causal scheduler cuts")
         if state.ship.drones:
-            raise RuntimeError("Physical coast with drones needs causal drone cuts")
+            raise RuntimeError("Physical segment with drones needs causal drone cuts")
         comms = state.ship.systems.get("comms")
         if (state.world.radio_opportunities or radio_block_reason(state) is None
                 or (comms is not None and not comms.forced_offline
                     and comms.state != SystemState.OFFLINE)):
-            raise RuntimeError("Physical coast with radio reception needs spatial cuts")
+            raise RuntimeError("Physical segment with radio reception needs spatial cuts")
         if (state.world.lore_placements.next_non_forced_eval_t <= state.clock.t + dt
                 and Balance.LORE_SCHEDULER_ENABLED):
-            raise RuntimeError("Physical coast with a scheduled narrative evaluation needs a causal cut")
+            raise RuntimeError("Physical segment with a scheduled narrative evaluation needs a causal cut")
         if any(plan.status in {"active", "stage_consumed", "receipt_pending"}
                for plan in state.world.recovery_plans.values()):
-            raise RuntimeError("Physical coast with recovery plans needs spatial cuts")
+            raise RuntimeError("Physical segment with recovery plans needs spatial cuts")
         if (state.os.terminal_lock or state.ship.systems.get("core_os") is None
                 or state.ship.systems.get("life_support") is None
                 or state.ship.systems["core_os"].state == SystemState.OFFLINE
                 or state.ship.systems["life_support"].state == SystemState.OFFLINE):
-            raise RuntimeError("Physical coast with critical survival transitions needs causal cuts")
+            raise RuntimeError("Physical segment with critical survival transitions needs causal cuts")
         distribution = state.ship.systems.get("energy_distribution")
         if (distribution is not None
                 and distribution.state in {SystemState.DAMAGED, SystemState.CRITICAL}
                 and state.clock.t < Balance.BUS_INSTABILITY_AFTER_S < state.clock.t + dt):
-            raise RuntimeError("Physical coast crosses an unresolved power-bus alert time")
+            raise RuntimeError("Physical segment crosses an unresolved power-bus alert time")
         now = physical.motion
         if state.clock.t != now.galactic_s or state.clock.ship_elapsed_s != now.proper_s:
             raise ValueError("physical and global clocks are misaligned")
         local_end = physical.elapsed_galactic_s + dt
         if local_end > segment.duration_galactic_s or local_end == physical.elapsed_galactic_s:
-            raise RuntimeError("Physical coast cannot advance beyond this segment or clock resolution")
+            raise RuntimeError("Physical segment cannot advance beyond this segment or clock resolution")
         end = sample_segment(segment, local_end)
         proper_dt = (proper_time_in_segment(segment, local_end)
                      - proper_time_in_segment(segment, physical.elapsed_galactic_s))
         if proper_dt <= 0 or end.galactic_s == now.galactic_s or end.proper_s == now.proper_s:
-            raise RuntimeError("Physical coast is below clock resolution")
+            raise RuntimeError("Physical segment is below clock resolution")
 
         origin_id = state.ship.transit_from or state.ship.current_node_id
         origin = state.world.space.nodes.get(origin_id)
         destination = state.world.space.nodes.get(physical.original_destination_id)
         route_ly = distance_between_nodes_ly(state.world, origin_id, physical.original_destination_id)
         if origin is None or destination is None or route_ly is None or route_ly <= 0:
-            raise RuntimeError("Physical coast requires known route endpoint geometry")
+            raise RuntimeError("Physical segment requires known route endpoint geometry")
         route_m = light_years_to_metres(route_ly)
         profile = RadiationProfile(0.0, route_m, origin.radiation_rad_per_s,
                                    destination.radiation_rad_per_s)
@@ -241,7 +351,7 @@ class Engine:
         if (state.os.god_active or generation < load or snapshot.brownout
                 or snapshot.brownout_sustained_s or snapshot.low_q_shed_timer_s
                 or quality.start != 1.0 or quality.end != 1.0):
-            raise RuntimeError("Physical coast electrical regime is not yet supported")
+            raise RuntimeError("Physical segment electrical regime is not yet supported")
         exposure = integrate_segment_radiation(
             profile, segment, physical.elapsed_galactic_s, local_end,
             state.ship.hull_integrity, hibernating=state.ship.is_hibernating,
@@ -255,6 +365,17 @@ class Engine:
         wear = {key: integrated_system_wear(system, exposure, quality.quality_proper_s,
                                            in_transit=True, op_mode=state.ship.op_mode)
                 for key, system in state.ship.systems.items()}
+        if powered:
+            engine = state.ship.systems["engines"]
+            remaining_health = engine.health - wear["engines"]
+            if (physical.intent == "accelerate"
+                    and remaining_health <= Balance.SYSTEM_HEALTH_CRITICAL):
+                raise RuntimeError("Physical acceleration reaches the unresolved 35% safety boundary")
+            if (physical.intent == "brake"
+                    and (remaining_health < Balance.ENGINE_EMERGENCY_BRAKE_MIN_HEALTH
+                         or (engine.health == Balance.ENGINE_EMERGENCY_BRAKE_MIN_HEALTH
+                             and wear["engines"] > 0))):
+                raise RuntimeError("Physical braking crosses the 15% propulsion boundary")
         health_limits = []
         for key, system in state.ship.systems.items():
             if system.state_locked and key != "engines":
@@ -294,12 +415,12 @@ class Engine:
             cause.at_galactic_s < end.galactic_s and cause.limit.kind != "requested_horizon"
             for cause in selected.causes
         ):
-            raise RuntimeError("Physical coast interval has an unresolved causal boundary")
+            raise RuntimeError("Physical segment interval has an unresolved causal boundary")
         if exposure.hull_end == 0 and state.ship.hull_integrity > 0:
-            raise RuntimeError("Physical coast reaches the hull floor")
+            raise RuntimeError("Physical segment reaches the hull floor")
         for key, system in state.ship.systems.items():
             if wear[key] > system.health and system.health > 0:
-                raise RuntimeError("Physical coast reaches a system health floor")
+                raise RuntimeError("Physical segment reaches a system health floor")
 
         staged = deepcopy(state)
         staged.clock.last_dt = dt
@@ -320,7 +441,7 @@ class Engine:
         after = capture_power_snapshot(staged, self._compute_p_gen(staged), self._compute_load_kw(staged))
         unexpected = set(invalidation_reasons(snapshot, after, elapsed_proper_s=proper_dt))
         if unexpected or events:
-            raise RuntimeError("Physical coast electrical forecast changed during execution")
+            raise RuntimeError("Physical segment electrical forecast changed during execution")
         staged.ship.hull_integrity = exposure.hull_end
         staged.ship.radiation_env_rad_per_s = profile.ambient_at(end.distance_m)
         for key, system in staged.ship.systems.items():
@@ -328,9 +449,9 @@ class Engine:
             system.health = max(0.0, system.health - wear[key])
             self._apply_health_state(system, staged, events, cause="degradation")
             if system.state != old_state:
-                raise RuntimeError("Physical coast crossed a system state boundary")
+                raise RuntimeError("Physical segment crossed a system state boundary")
         if events:
-            raise RuntimeError("Physical coast produced an unresolved health event")
+            raise RuntimeError("Physical segment produced an unresolved health event")
         internal = internal_radiation_rate(staged.ship.radiation_env_rad_per_s,
                                            staged.ship.hull_integrity)
         events.extend(self._update_ship_radiation_level_alerts(

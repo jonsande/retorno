@@ -131,3 +131,52 @@ each tick. Existing CLI, Textual, persistence, and event paths do so. Tests
 exercise held top-level references through a real `GameLoop` and Textual
 presenter, successful movement, save/load, and both prevalidation and late
 execution failures.
+
+## First powered engine intervals (NAV-BRAKE-01B3H-A)
+
+`Engine.tick()` now passes internal `accelerate`, `coast`, and `brake` segments
+through the same bounded `_tick_physical_segment()` adapter. It samples the
+immutable `MotionSegment` at the requested galactic endpoint, obtains proper
+time from `proper_time_in_segment()`, and carries physical position, speed,
+ship time, and biological age forward without an ETA based reconstruction.
+Acceleration starts from rest or positive beta and stops at the segment's
+specified speed. Braking retains forward motion until its endpoint, where
+beta can be exactly zero. Crossing the destination never declares arrival.
+A tick beyond the segment is rejected until a continuous successor is
+prepared. No public command creates physical travel.
+
+The internal `Engine.prepare_physical_segment()` API checks clocks, endpoint
+geometry, segment continuity, intent, engine capacity, and the existing speed
+ceiling. A powered leg requires a discrete `pricing_speed` at least as high as
+both endpoint speeds. Preparation debits `Engine.engine_fuel_cost()` once from
+the ship's authoritative `antimatter_capsules` balance and stores an immutable
+`PropulsionAuthorization` receipt bound to that one segment and original
+destination. Subsequent ticks never debit again. Each additional powered leg
+needs a new preparation and debit; a coast leg needs neither. This is an
+internal provisional per-leg use of the existing journey tariff, not a
+continuous fuel-burn model or a change to public travel pricing. A receipt is
+trusted only when created by this internal preparation path; arbitrary save
+editing is outside the state integrity contract.
+
+The existing operating-state classifier remains strict at 35%. The separate
+`acceleration_available()` and `braking_available()` capabilities apply, along
+with effective engine isolation and an operational core and distribution.
+At 35% acceleration is rejected because the required safety-braking transition
+is not yet implemented. Braking remains possible at exactly 15% if no wear
+would lower integrity during the interval. Acceleration or braking intervals
+that cross their respective capability boundaries are rejected atomically.
+Other health, electrical, radiological, narrative, job, radio, recovery, and
+survival restrictions from 01B3G still apply. Proper-time electrical quality,
+spatial radiation, coupled hull and system wear, and `select_next_boundary()`
+are reused with changing beta. Propulsion adds no invented electrical load;
+the existing productive power balance is the current policy.
+
+Preparation and tick stage changes on a deep copy and publish once while
+preserving `GameState` and immediate owner identities. Rejected intervals
+leave fuel, clocks, events, and RNG unchanged. Tests cover analytic acceleration
+and braking references, split intervals, capacity thresholds, paid receipts,
+save/load, hibernation, overshoot, and failed cuts. NAV-BRAKE-01B3H-B must
+resolve earlier cuts and same-instant transitions, job completions, power
+regulation, dynamic propulsion replanning, safety braking, and physical
+arrival before public activation. The earlier 01B3G descriptions above record
+that phase's narrower scope.

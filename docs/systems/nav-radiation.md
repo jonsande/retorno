@@ -118,10 +118,12 @@ unexpected hull integrity, physical position, or operating snapshot
 caller must supply the latter two snapshots if it wants those checks and
 resample after destination/radiation endpoint changes, segment interruption,
 repair or extraordinary hull damage. No query
-mutates `GameState` or consumes RNG. Before physical movement can be enabled,
-the future causal adapter must combine these proper-time limits and wear
+mutates `GameState` or consumes RNG. Before public physical movement can be enabled,
+the causal adapter must combine these proper-time limits and wear
 integrals with electric quality, engine-health and galactic job limits, resolve
 same-instant effects, and replan from real position/speed. Deferred internal
 limits near tangencies or floating-point resolution still need certified root
-enclosures before enabling physical movement. Fuel reservation and emergency braking remain separate
-dependencies. Crossing B is not a successful arrival and creates no waypoint.
+enclosures before those intervals can be accepted. Since 01B3H-A, the
+internal powered adapter rejects unresolved deferred limits and requires a
+prepaid segment receipt; automatic emergency braking remains pending. Crossing
+B is not a successful arrival and creates no waypoint.
