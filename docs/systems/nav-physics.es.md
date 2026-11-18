@@ -188,3 +188,61 @@ deberá resolver cortes anteriores y transiciones simultáneas, finalizaciones
 de trabajos, regulación eléctrica, replanificación, frenado preventivo y
 llegada física antes de la activación pública. Las descripciones anteriores de
 01B3G conservan el alcance más estrecho de aquella fase.
+
+## Viajes nominales con pago único (NAV-BRAKE-01B3H-B1)
+
+`Engine.prepare_nominal_physical_travel(state, destination_id,
+target_beta=None, proper_acceleration_m_s2=1.0)` es una API **interna** de
+salida. Exige nave libre y desacoplada en el origen, destino conocido con
+enlace existente dentro del límite de 45 al, aceleración ordinaria disponible
+y velocidad objetivo discreta admitida sin superar el máximo actual. Convierte
+la distancia geométrica conocida mediante `light_years_to_metres()`, llama a
+`plan_travel()` y construye una cadena continua con `accelerate_to()`,
+`coast_for()` opcional, `brake_to_stop()` y `append_segment()`. No crea ni
+descubre rutas. `Travel` público conserva su vía histórica.
+
+`NominalTravelState` guarda origen y destino, `TravelPlan` inmutable, dos o
+tres segmentos inmutables, velocidad y coste de tarifa, índice acotado de
+fase e indicadores explícitos de finalización e invalidación.
+`PhysicalTransitState` mantiene el segmento activo y tiempo galáctico
+transcurrido; su propiedad `motion` sigue siendo la fuente de posición, beta
+y ambos relojes físicos. El registro nominal persiste y vincula toda la
+cadena autorizada al destino original. Un pickle de estado físico de 01B3H-A
+se carga con `nominal_plan=None`. La API anterior de preparación por segmento
+y su recibo siguen disponibles para maniobras internas aisladas.
+
+La preparación nominal llama a la preparación por segmento sobre una copia
+privada para reutilizar validación de capacidad y la tarifa
+`Engine.engine_fuel_cost()`. Después sustituye el recibo temporal por una
+única autorización del plan y publica la copia una vez. Se descuenta
+`ship.antimatter_capsules` una sola vez al salir; es el único saldo de
+combustible. Aceleración y frenado previstos usan esa autorización sin nuevo
+cobro; el crucero es inercial. Otro destino, fase o maniobra añadida no pueden
+reutilizarla. Las maniobras extraordinarias o replanteadas no están cubiertas.
+
+`Engine.tick()` ejecuta el intervalo nominal sobre un `GameState` privado,
+separándolo solo en los finales analíticos de fase y reutilizando
+`_tick_physical_segment()` para cada parte. Cada segmento siguiente comienza
+en el `MotionState` exacto del anterior. Salud, electricidad, radiación,
+desgaste, posición y relojes mantienen continuidad. Los pronósticos se
+calculan otra vez desde el estado preparado al cambiar de fase. El estado
+original recibe un solo commit si todas las partes terminan. Un corte
+anterior o diferido sin resolver rechaza el intervalo **completo**, incluso
+si la segunda o tercera fase falla. No hay pasos fijos de un segundo.
+
+Al terminar el frenado, beta vale exactamente cero y la distancia física
+debe coincidir con el destino dentro de `max(1 metro, 64 ulp(distancia_m))`.
+El registro pasa a `completed`; un tick físico positivo posterior se rechaza
+sin reiniciar el empuje ni cobrar. No se producen llegada pública, visita,
+cambio de manifiesto, waypoint ni acoplamiento. Una petición posterior al
+extremo final se rechaza sin avance parcial.
+
+Esta fase solo admite intervalos nominales no interrumpidos bajo las
+restricciones de electricidad, radiación, salud, trabajos, drones, radio,
+narrativa y supervivencia de 01B3H-A. Se conservan las reglas exactas del
+35 % y 15 %, mientras el frenado preventivo y de emergencia automáticos
+siguen pendientes. Con aceleración nominal de 1 m/s² pueden completarse
+trayectos cortos; los intervalos largos pueden encontrar un corte operativo
+y se rechazan hasta que B2 lo resuelva. B2 deberá invalidar planes nominales
+obsoletos, resolver cortes simultáneos y averías, autorizar aparte cualquier
+maniobra propulsiva nueva y replantear desde posición y beta reales.

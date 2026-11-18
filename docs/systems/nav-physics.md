@@ -180,3 +180,59 @@ resolve earlier cuts and same-instant transitions, job completions, power
 regulation, dynamic propulsion replanning, safety braking, and physical
 arrival before public activation. The earlier 01B3G descriptions above record
 that phase's narrower scope.
+
+## Prepaid nominal journeys (NAV-BRAKE-01B3H-B1)
+
+`Engine.prepare_nominal_physical_travel(state, destination_id,
+target_beta=None, proper_acceleration_m_s2=1.0)` is an **internal** departure
+API. It requires an idle undocked ship at the origin, a known linked destination
+within the existing 45 ly hop cap, available normal acceleration, and a
+supported discrete target speed no greater than the ship's current maximum.
+It converts the known geometric distance with `light_years_to_metres()`, calls
+`plan_travel()`, and builds an exact continuous chain using `accelerate_to()`,
+optional `coast_for()`, `brake_to_stop()`, and `append_segment()`. No route is
+created or discovered. Public `Travel` remains on its historical path.
+
+`NominalTravelState` stores origin and destination IDs, the immutable
+`TravelPlan`, two or three immutable segments, the tariff speed and amount
+paid, a bounded phase index, and explicit completed/invalidated flags.
+`PhysicalTransitState` still owns the active segment and elapsed galactic time;
+its motion property remains the source for position, beta, and both physical
+clocks. The nominal record is persistent and binds the entire authorized
+chain to the original destination. An old 01B3H-A physical-state pickle loads
+with `nominal_plan=None`. The existing per-segment preparation API and receipt
+remain available for isolated internal maneuvers.
+
+The nominal preparation calls the existing segment preparation on a private
+copy to reuse capacity validation and `Engine.engine_fuel_cost()` pricing.
+It then replaces the temporary segment receipt with one plan authorization
+and publishes the copy once. `ship.antimatter_capsules` is debited once at
+departure and remains the only fuel balance. The planned acceleration and
+braking phases consume that authorization without another debit; coast is
+inertial. A changed destination, active phase, or additional maneuver cannot
+reuse it. Emergency and replanned maneuvers are not funded by this contract.
+
+`Engine.tick()` runs a nominal interval on a private `GameState`, splitting
+only at its analytic phase ends and reusing `_tick_physical_segment()` for each
+part. Each next segment starts at the exact previous `MotionState`. Health,
+electricity, radiation, wear, position, and all clocks carry forward. All
+forecasts are taken again from the staged state at the new phase. The original
+state receives one final commit if every part succeeds. Any unsupported
+earlier or deferred cut rejects the *whole* requested interval, including a
+failure in the second or third phase. There are no fixed one-second steps.
+
+At the last braking endpoint, beta is exactly zero and physical distance must
+match the destination within `max(1 metre, 64 ulp(distance_m))`. The nominal
+record becomes `completed`; a later positive physical tick is rejected and
+cannot restart propulsion or charge fuel. No public arrival event, visit,
+manifest change, waypoint, or docking is performed. A request past the final
+endpoint is rejected without partial advancement.
+
+This phase accepts only nominal uninterrupted intervals under the restricted
+01B3H-A electrical, radiological, health, job, drone, radio, narrative, and
+survival conditions. The exact 35% and 15% propulsion rules remain, but
+automatic safety and emergency braking are pending. With the nominal 1 m/s²
+acceleration, short routes can complete; long intervals can encounter an
+operational cut and are rejected until B2 resolves it. B2 must invalidate
+stale nominal plans, resolve same-instant cuts and failures, authorize any new
+powered maneuver separately, and replan from actual position and beta.

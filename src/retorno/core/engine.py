@@ -17,8 +17,10 @@ from retorno.core.nav_coordinator import select_next_boundary
 from retorno.core.nav_electricity import (battery_energy_after, power_quality_components,
                                          capture_power_snapshot, power_limits, integrate_quality,
                                          invalidation_reasons)
-from retorno.core.nav_physics import MotionSegment, light_years_to_metres, proper_time_in_segment, sample_segment
-from retorno.core.nav_state import PhysicalTransitState, PropulsionAuthorization
+from retorno.core.nav_physics import (MotionSegment, MotionState, accelerate_to, append_segment,
+                                      brake_to_stop, coast_for, light_years_to_metres,
+                                      plan_travel, proper_time_in_segment, sample_segment)
+from retorno.core.nav_state import PhysicalTransitState, PropulsionAuthorization, NominalTravelState
 from retorno.core.nav_radiation import (RadiationProfile, hull_decay_rate, internal_radiation_rate,
                                         integrate_segment_radiation, integrated_system_wear,
                                         radiation_limits)
@@ -139,6 +141,8 @@ class Engine:
 
     def tick(self, state: GameState, dt: float) -> list[Event]:
         if state.ship.physical_transit is not None:
+            if state.ship.physical_transit.nominal_plan is not None:
+                return self._tick_nominal_physical_travel(state, dt)
             return self._tick_physical_segment(state, dt)
         # Stop at drone decision/completion boundaries. A large wait must not
         # jump from a safe reserve to an exhausted drone before checking recall.
@@ -265,6 +269,145 @@ class Engine:
         assert state.ship.physical_transit is not None
         return state.ship.physical_transit
 
+    @staticmethod
+    def _nominal_distance_tolerance(distance_m: float) -> float:
+        """Metre-scale arrival tolerance, widened only by binary resolution."""
+        return max(1.0, 64 * math.ulp(max(1.0, distance_m)))
+
+    def prepare_nominal_physical_travel(
+        self, state: GameState, destination_id: str, *,
+        target_beta: float | None = None, proper_acceleration_m_s2: float = 1.0,
+    ) -> PhysicalTransitState:
+        """Prepare a known rest-to-rest route and pay its existing tariff once.
+
+        This internal API never invokes public Travel or changes acquired links.
+        It reuses segment preparation on a private copy for the sole debit.
+        """
+        ship, world = state.ship, state.world
+        origin_id = ship.current_node_id
+        if (ship.physical_transit is not None or ship.in_transit
+                or ship.docked_node_id is not None):
+            raise RuntimeError("nominal physical departure requires an idle undocked ship")
+        if (not origin_id or origin_id != world.current_node_id
+                or destination_id == origin_id
+                or destination_id not in (world.known_nodes | set(world.known_intel))
+                or destination_id not in world.known_links.get(origin_id, set())):
+            raise RuntimeError("nominal physical departure requires a known linked destination")
+        origin = world.space.nodes.get(origin_id)
+        destination = world.space.nodes.get(destination_id)
+        if origin is None or destination is None:
+            raise RuntimeError("nominal physical departure requires endpoint geometry")
+        if math.dist(world.current_pos_ly, (origin.x_ly, origin.y_ly, origin.z_ly)) > 1e-12:
+            raise RuntimeError("nominal physical departure must begin at the origin position")
+        distance_ly = distance_between_nodes_ly(world, origin_id, destination_id)
+        if distance_ly is None or distance_ly <= 0 or not is_hop_within_cap(world, origin_id, destination_id):
+            raise RuntimeError("nominal physical route is invalid or exceeds the hop cap")
+        speed = ship.effective_cruise_speed() if target_beta is None else target_beta
+        if (speed not in Balance.ENGINE_SPEED_FUEL_MULTIPLIERS
+                or speed > ship.maximum_cruise_speed()):
+            raise ValueError("nominal physical target speed is unavailable")
+        if not self._physical_propulsion_available(state, "accelerate"):
+            raise RuntimeError("nominal physical acceleration capacity is unavailable")
+        profile = plan_travel(light_years_to_metres(distance_ly), speed,
+                              proper_acceleration_m_s2)
+        start = MotionState(state.clock.t, 0.0, 0.0, state.clock.ship_elapsed_s)
+        first = accelerate_to(start, profile.peak_beta, proper_acceleration_m_s2)
+        segments = (first,)
+        endpoint = sample_segment(first, first.duration_galactic_s)
+        if profile.has_cruise:
+            middle = coast_for(endpoint, profile.cruise_galactic_s)
+            segments = append_segment(segments, middle)
+            endpoint = sample_segment(middle, middle.duration_galactic_s)
+        final = brake_to_stop(endpoint, proper_acceleration_m_s2)
+        segments = append_segment(segments, final)
+        stop = sample_segment(final, final.duration_galactic_s)
+        if (stop.beta != 0 or abs(stop.distance_m - profile.distance_m)
+                > self._nominal_distance_tolerance(profile.distance_m)):
+            raise RuntimeError("nominal physical segments do not close at the destination")
+        staged = deepcopy(state)
+        staged.ship.transit_from = origin_id
+        paid = self.prepare_physical_segment(
+            staged, first, destination_id, "accelerate", pricing_speed=speed)
+        assert paid.propulsion_authorization is not None
+        nominal = NominalTravelState(
+            origin_id, destination_id, profile, segments, speed,
+            paid.propulsion_authorization.capsules_paid,
+        )
+        staged.ship.physical_transit = replace(
+            paid, propulsion_authorization=None, nominal_plan=nominal)
+        self._commit_physical_state(state, staged)
+        assert state.ship.physical_transit is not None
+        return state.ship.physical_transit
+
+    def _tick_nominal_physical_travel(self, state: GameState, dt: float) -> list[Event]:
+        """Resolve phase ends on a private state; publish only the complete tick."""
+        if not math.isfinite(dt) or dt < 0:
+            raise ValueError("physical tick duration must be finite and nonnegative")
+        if dt == 0:
+            return []
+        physical = state.ship.physical_transit
+        assert physical is not None and physical.nominal_plan is not None
+        nominal = physical.nominal_plan
+        if nominal.completed or nominal.invalidated:
+            raise RuntimeError("nominal physical plan is completed or invalidated")
+        route_ly = distance_between_nodes_ly(
+            state.world, nominal.origin_id, nominal.destination_id)
+        if (nominal.origin_id != state.ship.transit_from
+                or nominal.destination_id != physical.original_destination_id
+                or route_ly is None or route_ly <= 0
+                or abs(light_years_to_metres(route_ly) - nominal.profile.distance_m)
+                > self._nominal_distance_tolerance(nominal.profile.distance_m)):
+            raise RuntimeError("nominal physical plan no longer matches route geometry")
+        last = nominal.segments[-1]
+        final_time = last.start.galactic_s + last.duration_galactic_s
+        requested_end = state.clock.t + dt
+        if not math.isfinite(requested_end) or requested_end == state.clock.t:
+            raise RuntimeError("nominal physical tick is below clock resolution")
+        if requested_end > final_time:
+            raise RuntimeError("physical tick exceeds the nominal journey endpoint")
+        staged = deepcopy(state)
+        events: list[Event] = []
+        remaining = dt
+        while remaining > 0:
+            active = staged.ship.physical_transit
+            assert active is not None and active.nominal_plan is not None
+            segment = active.active_segment
+            available = segment.duration_galactic_s - active.elapsed_galactic_s
+            if available <= 0:
+                raise RuntimeError("nominal physical phase cannot advance")
+            step = min(remaining, available)
+            events.extend(self._tick_physical_segment(staged, step))
+            remaining = max(0.0, requested_end - staged.clock.t)
+            active = staged.ship.physical_transit
+            assert active is not None and active.nominal_plan is not None
+            nominal = active.nominal_plan
+            if active.elapsed_galactic_s == segment.duration_galactic_s:
+                if nominal.phase_index + 1 < len(nominal.segments):
+                    next_index = nominal.phase_index + 1
+                    next_segment = nominal.segments[next_index]
+                    if next_segment.start != active.motion:
+                        raise RuntimeError("nominal physical phase has a discontinuous endpoint")
+                    next_intent = ("brake" if next_index == len(nominal.segments) - 1
+                                   else "coast")
+                    if not self._physical_propulsion_available(staged, next_intent):
+                        raise RuntimeError("nominal physical next phase lacks propulsion capacity")
+                    staged.ship.physical_transit = replace(
+                        active, active_segment=next_segment, elapsed_galactic_s=0.0,
+                        intent=next_intent, braking_started=next_intent == "brake",
+                        nominal_plan=replace(nominal, phase_index=next_index),
+                    )
+                else:
+                    endpoint = active.motion
+                    if (endpoint.beta != 0
+                            or abs(endpoint.distance_m - nominal.profile.distance_m)
+                            > self._nominal_distance_tolerance(nominal.profile.distance_m)):
+                        raise RuntimeError("nominal physical arrival is outside physical tolerance")
+                    staged.ship.physical_transit = replace(
+                        active, nominal_plan=replace(nominal, completed=True))
+        staged.clock.last_dt = dt
+        self._commit_physical_state(state, staged)
+        return events
+
     def _tick_physical_segment(self, state: GameState, dt: float) -> list[Event]:
         """One causal physical interval. Commit only after all staged effects succeed.
 
@@ -275,17 +418,31 @@ class Engine:
         assert physical is not None
         segment = physical.active_segment
         powered = physical.intent != "coast"
+        nominal = physical.nominal_plan
+        if nominal is not None and (
+            nominal.invalidated or nominal.completed
+            or nominal.origin_id != state.ship.transit_from
+            or nominal.destination_id != physical.original_destination_id
+            or nominal.segments[nominal.phase_index] != segment
+            or physical.propulsion_authorization is not None
+        ):
+            raise RuntimeError("Physical phase lacks its nominal plan authorization")
         if ((physical.intent == "coast" and segment.proper_acceleration_m_s2 != 0)
                 or (physical.intent == "accelerate" and segment.proper_acceleration_m_s2 <= 0)
                 or (physical.intent == "brake" and segment.proper_acceleration_m_s2 >= 0)):
             raise RuntimeError("Physical segment intent and acceleration disagree")
         if powered:
             receipt = physical.propulsion_authorization
-            if (receipt is None or receipt.segment != segment
-                    or receipt.destination_id != physical.original_destination_id
-                    or receipt.pricing_speed not in Balance.ENGINE_SPEED_FUEL_MULTIPLIERS
-                    or receipt.pricing_speed < max(segment.start.beta, segment.end_beta)
-                    or receipt.capsules_paid <= 0):
+            if nominal is not None:
+                if (nominal.pricing_speed not in Balance.ENGINE_SPEED_FUEL_MULTIPLIERS
+                        or nominal.pricing_speed < max(segment.start.beta, segment.end_beta)
+                        or nominal.capsules_paid <= 0):
+                    raise RuntimeError("Physical propulsion lacks a valid nominal authorization")
+            elif (receipt is None or receipt.segment != segment
+                  or receipt.destination_id != physical.original_destination_id
+                  or receipt.pricing_speed not in Balance.ENGINE_SPEED_FUEL_MULTIPLIERS
+                  or receipt.pricing_speed < max(segment.start.beta, segment.end_beta)
+                  or receipt.capsules_paid <= 0):
                 raise RuntimeError("Physical propulsion lacks a valid segment authorization")
             if not self._physical_propulsion_available(state, physical.intent):
                 raise RuntimeError("Physical propulsion capacity is unavailable")
