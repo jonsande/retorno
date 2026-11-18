@@ -2,9 +2,9 @@
 
 Esta API técnica está implementada en `src/retorno/core/nav_boundaries.py` y
 `src/retorno/core/nav_coordinator.py`, y probada por sus archivos de prueba.
-No está conectada a la navegación
-jugable. `Engine.tick()`, viaje, aborto, relojes, combustible y guardado siguen
-con su comportamiento anterior.
+No está conectada a la navegación jugable. Desde 01B3G, `Engine.tick()` usa
+estos límites para un intervalo inercial interno restringido; el viaje
+público, aborto, combustible y formato de guardado conservan su comportamiento.
 
 ## Tasa de desgaste compartida
 
@@ -190,9 +190,9 @@ El adaptador propulsivo de `Engine.tick()` está **bloqueado**. El campo opciona
 posición, velocidad y tiempo propio locales. También conserva destino original,
 intención, marcas de frenado de seguridad e inicio del frenado y necesidad de
 replanteo. Los guardados antiguos se leen con este campo a `None`. Ningún viaje
-público lo crea. Si está presente, `Engine.tick()` lanza una excepción antes de
-modificar el estado, impidiendo que una maniobra física sin implementar avance
-silenciosamente.
+público lo crea. En 01B3C, `Engine.tick()` lanzaba una excepción antes de
+modificar el estado. El adaptador inercial restringido de 01B3G se describe en
+[segmentos físicos](nav-physics.es.md).
 
 El bloqueo es causal. `Engine._process_jobs()` aplica una reparación finalizada
 antes de `Engine._apply_degradation()` para el intervalo, de modo que la
@@ -251,7 +251,8 @@ sigue dependiendo del `dt` suministrado; la subdivisión puede cambiar resultado
 estocásticos y el instante de RNG. No se afirma invariancia estocástica ni se
 modificó ningún parámetro probabilístico. Regulación eléctrica, radiación,
 predicción de desgaste y movimiento propulsivo siguen fuera de esta
-refactorización. `Engine.tick()` continúa rechazando el tránsito físico.
+refactorización de esa fase. El adaptador posterior de 01B3G admite solo el
+caso inercial interno restringido.
 
 ## 01B3E: electricidad condicional y desgaste integrado
 
@@ -341,4 +342,7 @@ e interna acoplada y calcula contribuciones de desgaste ordinario del casco y
 los sistemas. Sus candidatos de umbral en tiempo propio usan este coordinador;
 el primer cruce interno con radiación ambiental decreciente se aísla cuando la
 rama puede resolverse. Los contactos numéricamente ambiguos siguen diferidos.
-El movimiento físico productivo continúa protegido.
+El movimiento físico propulsivo continúa protegido. El primer intervalo
+inercial productivo interno usa estas predicciones solo si no hay cortes
+anteriores ni límites diferidos sin resolver; véanse
+[segmentos físicos](nav-physics.es.md).

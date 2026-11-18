@@ -1,8 +1,9 @@
 # Predicción radiológica del tránsito físico (NAV-BRAKE-01B3F)
 
 `src/retorno/core/nav_radiation.py` es una predicción pura y condicional para
-las posiciones unidimensionales de `MotionSegment` en `nav_physics.py`. El
-tránsito físico sigue protegido en `Engine.tick()`; este módulo no cambia el
+las posiciones unidimensionales de `MotionSegment` en `nav_physics.py`.
+`Engine.tick()` admite un intervalo inercial interno restringido, descrito en
+[segmentos físicos](nav-physics.es.md); este módulo no cambia el
 viaje público, las alertas, la hibernación ni la persistencia. La ruta jugable
 anterior interpola la radiación ambiental según la ETA transcurrida en
 `_compute_env_radiation_rad_per_s()`; 01B3F usa los metros realmente recorridos.

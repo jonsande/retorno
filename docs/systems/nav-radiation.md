@@ -1,8 +1,9 @@
 # Physical transit radiation forecast (NAV-BRAKE-01B3F)
 
 `src/retorno/core/nav_radiation.py` is a pure, conditional forecast for the
-one-dimensional `MotionSegment` positions in `nav_physics.py`. Physical travel
-is still guarded in `Engine.tick()`; this module does not change public travel,
+one-dimensional `MotionSegment` positions in `nav_physics.py`. `Engine.tick()`
+now admits a restricted internal inertial interval, described in
+[navigation segments](nav-physics.md); this module does not change public travel,
 alerts, hibernation or persistence. The earlier playable route interpolates
 ambient radiation by elapsed ETA in `_compute_env_radiation_rad_per_s()`;
 01B3F uses actual travelled metres instead.

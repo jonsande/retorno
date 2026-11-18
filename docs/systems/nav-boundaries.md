@@ -2,9 +2,9 @@
 
 This internal API is implemented in `src/retorno/core/nav_boundaries.py` and
 `src/retorno/core/nav_coordinator.py`, and tested by their matching test files.
-It is not connected to playable
-navigation. `Engine.tick()`, travel, abort, clocks, fuel, and save files still
-use their previous behavior.
+It is not connected to playable navigation. Since 01B3G, `Engine.tick()` uses
+these limits for a restricted internal inertial interval; public travel,
+abort, fuel, and save format retain their previous behavior.
 
 ## Shared wear rate
 
@@ -179,9 +179,9 @@ The powered `Engine.tick()` adapter is **blocked**. Optional
 `MotionSegment` and elapsed time alone determine physical position, speed and
 local proper time. It also stores original destination, intent, safety-braking
 and braking-start flags, and whether replanning is required. Old saves load
-with this field set to `None`. No public travel action creates it. If present,
-`Engine.tick()` raises before modifying state, preventing silent advancement
-of an unimplemented physical maneuver.
+with this field set to `None`. No public travel action creates it. In 01B3C,
+`Engine.tick()` raised before modifying state. The restricted
+01B3G coast adapter is described in [navigation segments](nav-physics.md).
 
 The blocker is causal. `Engine._process_jobs()` applies a completed repair
 before `Engine._apply_degradation()` for the interval, so the repair may affect
@@ -236,7 +236,8 @@ The emergency failure probability still depends on the supplied `dt`; slicing
 an interval can change stochastic outcomes and RNG timing. No stochastic
 partition invariance is claimed and no balance probability was changed.
 Electrical regulation, radiation, wear prediction and powered motion remain
-outside this scheduler refactor. `Engine.tick()` still rejects physical transit.
+outside that scheduler refactor. The later 01B3G adapter accepts only the
+restricted internal inertial case.
 
 ## 01B3E conditional electricity and integrated wear
 
@@ -311,7 +312,7 @@ job and electric candidates, cut at the earliest, integrate preceding
 electricity and wear, apply same-instant effects in causal order, then take a
 fresh snapshot. It must establish a bound for varying internal radiation and
 resolve fuel reservations and emergency-braking policy before enabling physical
-movement. Existing `Engine.tick()` and public travel remain unchanged; their
+movement. At that stage `Engine.tick()` and public travel remained unchanged; their
 current end-sampled wear is not replaced by this preparatory integral.
 
 ## 01B3F spatial radiation forecast
@@ -321,5 +322,7 @@ from actual segment position, integrates environmental and coupled internal
 dose, and calculates ordinary hull and system wear contributions. Its proper
 threshold candidates use this coordinator; the first internal crossing under
 decreasing ambient radiation is isolated when the branch can be resolved.
-Numerically ambiguous contacts remain deferred. Productive physical movement
-remains guarded.
+Numerically ambiguous contacts remain deferred. Powered physical movement
+remains guarded. The first internal productive coast interval uses these
+forecasts only when no earlier cut or unresolved deferred limit exists; see
+[navigation segments](nav-physics.md).

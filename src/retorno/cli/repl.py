@@ -1202,6 +1202,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Action blocked: ship in transit. Use 'hibernate until_arrival' to advance.",
             "es": "Acción bloqueada: nave en tránsito. Usa 'hibernate until_arrival' para avanzar.",
         },
+        "physical_in_transit": {
+            "en": "Navigation blocked: ship already moving.",
+            "es": "Navegación bloqueada: la nave ya está en movimiento.",
+        },
         "power_quality_low": {
             "en": "Action blocked: power quality too low (Q={q:.2f}, requires >= {required:.2f})",
             "es": "Acción bloqueada: calidad de energía demasiado baja (Q={q:.2f}, requiere >= {required:.2f})",
@@ -5533,7 +5537,8 @@ def _nav_departure_blocked(state) -> bool:
     """Known onboard blockers for presentation; Engine remains the action authority."""
     ship = state.ship
     core_os = ship.systems.get("core_os")
-    return bool(ship.in_transit or ship.docked_node_id or state.os.terminal_lock
+    return bool(ship.in_transit or ship.physical_transit is not None
+                or ship.docked_node_id or state.os.terminal_lock
                 or (core_os and core_os.state in {SystemState.DAMAGED, SystemState.OFFLINE})
                 or is_critical_power_state(state))
 

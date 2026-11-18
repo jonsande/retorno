@@ -2,15 +2,24 @@ from __future__ import annotations
 
 import random
 import hashlib
+from copy import deepcopy
+from dataclasses import fields, replace
 from typing import Iterable
 import difflib
 import math
 from dataclasses import dataclass, field
 
 from retorno.core.temporal import SPEED_OF_LIGHT_KM_S, biological_time_interval, proper_time_interval
-from retorno.core.nav_boundaries import ordinary_wear_rate
-from retorno.core.nav_electricity import battery_energy_after, power_quality_components
-from retorno.core.nav_radiation import hull_decay_rate, internal_radiation_rate
+from retorno.core.nav_boundaries import (TemporalLimit, ordinary_wear_rate,
+                                         predict_engine_health_limit, predict_engine_braking_limit)
+from retorno.core.nav_coordinator import select_next_boundary
+from retorno.core.nav_electricity import (battery_energy_after, power_quality_components,
+                                         capture_power_snapshot, power_limits, integrate_quality,
+                                         invalidation_reasons)
+from retorno.core.nav_physics import light_years_to_metres, proper_time_in_segment, sample_segment
+from retorno.core.nav_radiation import (RadiationProfile, hull_decay_rate, internal_radiation_rate,
+                                        integrate_segment_radiation, integrated_system_wear,
+                                        radiation_limits)
 
 from retorno.core.actions import (
     Action,
@@ -63,7 +72,7 @@ from retorno.core.lore import (
 )
 from retorno.core.deadnodes import evaluate_dead_nodes
 from retorno.core.exploration_recovery import ensure_exploration_recovery
-from retorno.core.communications import retry_radio_opportunities
+from retorno.core.communications import retry_radio_opportunities, radio_block_reason
 from retorno.core.power_policy import (
     is_action_allowed_in_critical_state,
     is_critical_power_state,
@@ -128,7 +137,7 @@ class Engine:
 
     def tick(self, state: GameState, dt: float) -> list[Event]:
         if state.ship.physical_transit is not None:
-            raise RuntimeError("Physical transit cannot advance until causal power, wear and job cuts are integrated")
+            return self._tick_physical_coast(state, dt)
         # Stop at drone decision/completion boundaries. A large wait must not
         # jump from a safe reserve to an exhausted drone before checking recall.
         events: list[Event] = []
@@ -160,6 +169,205 @@ class Engine:
             events.extend(self._tick_interval(state, step))
             remaining = max(0.0, remaining - step)
         return events
+
+    def _tick_physical_coast(self, state: GameState, dt: float) -> list[Event]:
+        """One causal inertial interval. Commit only after all staged effects succeed.
+
+        A selected internal cut needs a new forecast and is deliberately rejected
+        until the physical scheduler can resolve that cut. No partial time passes.
+        """
+        physical = state.ship.physical_transit
+        assert physical is not None
+        segment = physical.active_segment
+        if physical.intent != "coast" or segment.proper_acceleration_m_s2 != 0:
+            raise RuntimeError("Physical transit cannot advance: propulsion is not integrated")
+        if not math.isfinite(dt) or dt < 0:
+            raise ValueError("physical tick duration must be finite and nonnegative")
+        if dt == 0:
+            return []
+        if state.ship.in_transit or state.ship.docked_node_id is not None:
+            raise RuntimeError("Physical coast requires an undocked, non-legacy transit")
+        if state.jobs.active_job_ids or any(j.status in {JobStatus.RUNNING, JobStatus.QUEUED}
+                                            for j in state.jobs.jobs.values()):
+            raise RuntimeError("Physical coast with active jobs needs causal scheduler cuts")
+        if state.ship.drones:
+            raise RuntimeError("Physical coast with drones needs causal drone cuts")
+        comms = state.ship.systems.get("comms")
+        if (state.world.radio_opportunities or radio_block_reason(state) is None
+                or (comms is not None and not comms.forced_offline
+                    and comms.state != SystemState.OFFLINE)):
+            raise RuntimeError("Physical coast with radio reception needs spatial cuts")
+        if (state.world.lore_placements.next_non_forced_eval_t <= state.clock.t + dt
+                and Balance.LORE_SCHEDULER_ENABLED):
+            raise RuntimeError("Physical coast with a scheduled narrative evaluation needs a causal cut")
+        if any(plan.status in {"active", "stage_consumed", "receipt_pending"}
+               for plan in state.world.recovery_plans.values()):
+            raise RuntimeError("Physical coast with recovery plans needs spatial cuts")
+        if (state.os.terminal_lock or state.ship.systems.get("core_os") is None
+                or state.ship.systems.get("life_support") is None
+                or state.ship.systems["core_os"].state == SystemState.OFFLINE
+                or state.ship.systems["life_support"].state == SystemState.OFFLINE):
+            raise RuntimeError("Physical coast with critical survival transitions needs causal cuts")
+        distribution = state.ship.systems.get("energy_distribution")
+        if (distribution is not None
+                and distribution.state in {SystemState.DAMAGED, SystemState.CRITICAL}
+                and state.clock.t < Balance.BUS_INSTABILITY_AFTER_S < state.clock.t + dt):
+            raise RuntimeError("Physical coast crosses an unresolved power-bus alert time")
+        now = physical.motion
+        if state.clock.t != now.galactic_s or state.clock.ship_elapsed_s != now.proper_s:
+            raise ValueError("physical and global clocks are misaligned")
+        local_end = physical.elapsed_galactic_s + dt
+        if local_end > segment.duration_galactic_s or local_end == physical.elapsed_galactic_s:
+            raise RuntimeError("Physical coast cannot advance beyond this segment or clock resolution")
+        end = sample_segment(segment, local_end)
+        proper_dt = (proper_time_in_segment(segment, local_end)
+                     - proper_time_in_segment(segment, physical.elapsed_galactic_s))
+        if proper_dt <= 0 or end.galactic_s == now.galactic_s or end.proper_s == now.proper_s:
+            raise RuntimeError("Physical coast is below clock resolution")
+
+        origin_id = state.ship.transit_from or state.ship.current_node_id
+        origin = state.world.space.nodes.get(origin_id)
+        destination = state.world.space.nodes.get(physical.original_destination_id)
+        route_ly = distance_between_nodes_ly(state.world, origin_id, physical.original_destination_id)
+        if origin is None or destination is None or route_ly is None or route_ly <= 0:
+            raise RuntimeError("Physical coast requires known route endpoint geometry")
+        route_m = light_years_to_metres(route_ly)
+        profile = RadiationProfile(0.0, route_m, origin.radiation_rad_per_s,
+                                   destination.radiation_rad_per_s)
+        generation = self._compute_p_gen(state)
+        load = self._compute_load_kw(state)
+        snapshot = capture_power_snapshot(state, generation, load)
+        quality = integrate_quality(snapshot, proper_dt)
+        if (state.os.god_active or generation < load or snapshot.brownout
+                or snapshot.brownout_sustained_s or snapshot.low_q_shed_timer_s
+                or quality.start != 1.0 or quality.end != 1.0):
+            raise RuntimeError("Physical coast electrical regime is not yet supported")
+        exposure = integrate_segment_radiation(
+            profile, segment, physical.elapsed_galactic_s, local_end,
+            state.ship.hull_integrity, hibernating=state.ship.is_hibernating,
+        )
+        limits = power_limits(snapshot) + radiation_limits(
+            profile, segment, physical.elapsed_galactic_s, state.ship.hull_integrity,
+            hibernating=state.ship.is_hibernating,
+        )
+        # Ordinary wear is integrated over the actual varying radiation field.
+        # Reject all health-state transitions before this interval's end.
+        wear = {key: integrated_system_wear(system, exposure, quality.quality_proper_s,
+                                           in_transit=True, op_mode=state.ship.op_mode)
+                for key, system in state.ship.systems.items()}
+        health_limits = []
+        for key, system in state.ship.systems.items():
+            if system.state_locked and key != "engines":
+                continue
+            thresholds = (Balance.SYSTEM_HEALTH_OFFLINE, Balance.SYSTEM_HEALTH_CRITICAL,
+                          Balance.SYSTEM_HEALTH_DAMAGED, Balance.SYSTEM_HEALTH_LIMITED)
+            if key == "engines":
+                thresholds += (Balance.ENGINE_EMERGENCY_BRAKE_MIN_HEALTH,)
+            upper_rate = ordinary_wear_rate(
+                system, min(quality.start, quality.end), False,
+                max(profile.start_rad_per_s, profile.end_rad_per_s)
+                * Balance.HULL_INTERNAL_RAD_MAX_INGRESS,
+                in_transit=True, op_mode=state.ship.op_mode,
+            )
+            for threshold in thresholds:
+                if system.health > threshold and upper_rate > 0:
+                    seconds = (system.health - threshold) / upper_rate
+                    if seconds < proper_dt:
+                        health_limits.append(TemporalLimit(
+                            "system_health_threshold", "proper", seconds, system_id=key,
+                            validity="conservative_fixed_upper_wear_rate"))
+        engine = state.ship.systems.get("engines")
+        if engine is not None:
+            engine_upper = ordinary_wear_rate(
+                engine, 1.0, False,
+                max(profile.start_rad_per_s, profile.end_rad_per_s)
+                * Balance.HULL_INTERNAL_RAD_MAX_INGRESS,
+                in_transit=True, op_mode=state.ship.op_mode,
+            )
+            for forecast in (predict_engine_health_limit(state.ship, engine_upper),
+                             predict_engine_braking_limit(state.ship, engine_upper)):
+                if forecast.time_s is not None and 0 < forecast.time_s < proper_dt:
+                    health_limits.append(forecast)
+        selected = select_next_boundary(
+            segment, now.galactic_s, dt, proper_limits=tuple(limits + tuple(health_limits)))
+        if selected.deferred or selected.at_galactic_s < end.galactic_s or any(
+            cause.at_galactic_s < end.galactic_s and cause.limit.kind != "requested_horizon"
+            for cause in selected.causes
+        ):
+            raise RuntimeError("Physical coast interval has an unresolved causal boundary")
+        if exposure.hull_end == 0 and state.ship.hull_integrity > 0:
+            raise RuntimeError("Physical coast reaches the hull floor")
+        for key, system in state.ship.systems.items():
+            if wear[key] > system.health and system.health > 0:
+                raise RuntimeError("Physical coast reaches a system health floor")
+
+        staged = deepcopy(state)
+        staged.clock.last_dt = dt
+        staged.clock.t = end.galactic_s
+        staged.clock.ship_elapsed_s = end.proper_s
+        staged.clock.bio_elapsed_s += biological_time_interval(proper_dt, staged.ship.is_hibernating)
+        staged.ship.physical_transit = replace(physical, elapsed_galactic_s=local_end)
+        fraction = end.distance_m / route_m
+        staged.world.current_pos_ly = (
+            origin.x_ly + fraction * (destination.x_ly - origin.x_ly),
+            origin.y_ly + fraction * (destination.y_ly - origin.y_ly),
+            origin.z_ly + fraction * (destination.z_ly - origin.z_ly),
+        )
+        events: list[Event] = []
+        run_lore_scheduler_tick(staged)
+        staged.ship.power.p_gen_kw = generation
+        events.extend(self._integrate_power_interval(staged, proper_dt))
+        after = capture_power_snapshot(staged, self._compute_p_gen(staged), self._compute_load_kw(staged))
+        unexpected = set(invalidation_reasons(snapshot, after, elapsed_proper_s=proper_dt))
+        if unexpected or events:
+            raise RuntimeError("Physical coast electrical forecast changed during execution")
+        staged.ship.hull_integrity = exposure.hull_end
+        staged.ship.radiation_env_rad_per_s = profile.ambient_at(end.distance_m)
+        for key, system in staged.ship.systems.items():
+            old_state = system.state
+            system.health = max(0.0, system.health - wear[key])
+            self._apply_health_state(system, staged, events, cause="degradation")
+            if system.state != old_state:
+                raise RuntimeError("Physical coast crossed a system state boundary")
+        if events:
+            raise RuntimeError("Physical coast produced an unresolved health event")
+        internal = internal_radiation_rate(staged.ship.radiation_env_rad_per_s,
+                                           staged.ship.hull_integrity)
+        events.extend(self._update_ship_radiation_level_alerts(
+            staged, staged.ship.radiation_env_rad_per_s, internal))
+        events.extend(self._apply_critical_system_consequences(staged, dt))
+        events.extend(self._update_alerts(staged, after.load_kw, after.generation_kw,
+                                          staged.ship.power.power_quality))
+        from retorno.core.structural_recovery import advance_recovery_plans
+        advance_recovery_plans(staged)
+        events.extend(retry_radio_opportunities(staged))
+        for event in events:
+            self._record_event(staged.events, event)
+        self._update_alert_timers(staged.events, dt)
+        self._commit_physical_state(state, staged)
+        return events
+
+    @staticmethod
+    def _commit_physical_state(state: GameState, staged: GameState) -> None:
+        """Publish a completed transaction without replacing shared state owners.
+
+        The root and its immediate slotted components are stable references for
+        GameLoop and consumers. Their fields may take staged values only here.
+        """
+        owners = tuple((getattr(state, spec.name), getattr(staged, spec.name))
+                       for spec in fields(GameState))
+        originals = tuple((owner, tuple((spec.name, getattr(owner, spec.name))
+                                         for spec in fields(owner)))
+                          for owner, _ in owners)
+        try:
+            for owner, source in owners:
+                for spec in fields(owner):
+                    setattr(owner, spec.name, getattr(source, spec.name))
+        except Exception:
+            for owner, values in reversed(originals):
+                for name, value in values:
+                    setattr(owner, name, value)
+            raise
 
     def _tick_interval(self, state: GameState, dt: float) -> list[Event]:
         if dt <= 0:
@@ -305,6 +513,16 @@ class Engine:
 
         if isinstance(action, Diag):
             return []
+
+        if state.ship.physical_transit is not None and isinstance(action, (Travel, RouteSolve)):
+            event = self._make_event(
+                state, EventType.BOOT_BLOCKED, Severity.WARN,
+                SourceRef(kind="ship", id=state.ship.ship_id),
+                "Navigation blocked: ship already moving",
+                data={"message_key": "boot_blocked", "reason": "physical_in_transit"},
+            )
+            self._record_event(state.events, event)
+            return [event]
 
         blocked = self._check_power_action_block(state, action)
         if blocked:
