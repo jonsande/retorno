@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from retorno.core.temporal import SPEED_OF_LIGHT_KM_S, biological_time_interval, proper_time_interval
 from retorno.core.nav_boundaries import ordinary_wear_rate
 from retorno.core.nav_electricity import battery_energy_after, power_quality_components
+from retorno.core.nav_radiation import hull_decay_rate, internal_radiation_rate
 
 from retorno.core.actions import (
     Action,
@@ -6840,29 +6841,16 @@ class Engine:
         return fallback
 
     def _compute_internal_radiation_rad_per_s(self, state: GameState, env_rad: float) -> float:
-        hull = self._clamp(state.ship.hull_integrity)
-        ingress = (
-            Balance.HULL_INTERNAL_RAD_MIN_INGRESS
-            + (1.0 - hull) * (Balance.HULL_INTERNAL_RAD_MAX_INGRESS - Balance.HULL_INTERNAL_RAD_MIN_INGRESS)
-        )
-        ingress = self._clamp(
-            ingress,
-            Balance.HULL_INTERNAL_RAD_MIN_INGRESS,
-            Balance.HULL_INTERNAL_RAD_MAX_INGRESS,
-        )
-        return max(0.0, env_rad) * ingress
+        return internal_radiation_rate(env_rad, state.ship.hull_integrity)
 
     def _apply_hull_degradation(
         self, state: GameState, dt_ship: float, env_rad: float,
         *, in_transit: bool | None = None,
     ) -> None:
         """Ordinary hull ageing in proper seconds, distinct from instantaneous damage."""
-        env_norm = self._clamp(env_rad / Balance.HULL_RAD_REF) if Balance.HULL_RAD_REF > 0 else 0.0
-        env_mult = 1.0 + env_norm * (Balance.HULL_RAD_DECAY_MULT_MAX - 1.0)
         moving = state.ship.in_transit if in_transit is None else in_transit
-        if moving or state.ship.is_hibernating:
-            env_mult *= Balance.HULL_TRANSIT_DECAY_MULT
-        amount = Balance.HULL_BASE_DECAY_PER_S * env_mult * dt_ship
+        amount = hull_decay_rate(env_rad, in_transit=moving,
+                                 hibernating=state.ship.is_hibernating) * dt_ship
         self._damage_hull(state, amount)
 
     def _damage_hull(self, state: GameState, amount: float) -> None:

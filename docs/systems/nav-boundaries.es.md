@@ -332,3 +332,12 @@ causal y obtener una fotografía nueva. Antes de activar el movimiento físico
 faltan una cota para la radiación interna variable, la reserva de combustible y
 la política de frenado de emergencia. `Engine.tick()` y el viaje público no
 cambian; su desgaste actual por muestra final no se sustituye en esta fase.
+
+## 01B3F: predicción radiológica espacial
+
+El [modelo radiológico físico](nav-radiation.es.md) puro predice tasas
+ambientales a partir de la posición real del segmento, integra dosis ambiental
+e interna acoplada y calcula contribuciones de desgaste ordinario del casco y
+los sistemas. Sus candidatos de umbral en tiempo propio usan este coordinador;
+con radiación ambiental decreciente y casco en deterioro los umbrales internos
+siguen diferidos. El movimiento físico productivo continúa protegido.

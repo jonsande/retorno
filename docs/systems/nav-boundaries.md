@@ -313,3 +313,12 @@ fresh snapshot. It must establish a bound for varying internal radiation and
 resolve fuel reservations and emergency-braking policy before enabling physical
 movement. Existing `Engine.tick()` and public travel remain unchanged; their
 current end-sampled wear is not replaced by this preparatory integral.
+
+## 01B3F spatial radiation forecast
+
+The pure [physical radiation model](nav-radiation.md) predicts ambient rates
+from actual segment position, integrates environmental and coupled internal
+dose, and calculates ordinary hull and system wear contributions. Its proper
+threshold candidates use this coordinator; decreasing ambient radiation with
+a wearing hull still yields deferred internal thresholds. Productive physical
+movement remains guarded.
