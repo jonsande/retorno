@@ -319,6 +319,7 @@ current end-sampled wear is not replaced by this preparatory integral.
 The pure [physical radiation model](nav-radiation.md) predicts ambient rates
 from actual segment position, integrates environmental and coupled internal
 dose, and calculates ordinary hull and system wear contributions. Its proper
-threshold candidates use this coordinator; decreasing ambient radiation with
-a wearing hull still yields deferred internal thresholds. Productive physical
-movement remains guarded.
+threshold candidates use this coordinator; the first internal crossing under
+decreasing ambient radiation is isolated when the branch can be resolved.
+Numerically ambiguous contacts remain deferred. Productive physical movement
+remains guarded.

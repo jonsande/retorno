@@ -203,7 +203,8 @@ def test_downward_ambient_equality_requires_one_post_side_check():
     marker = resolve_radiation_limit(route, segment, at, 1, pending)
     later = select_next_boundary(segment, at, 10,
                                  proper_limits=environmental_limits(
-                                     route, segment, at, resolved=frozenset({marker})),
+                                     route, segment, at, hull_integrity=1,
+                                     resolved=frozenset({marker})),
                                  seen_zero_selections=(selected,))
     assert later.advance_galactic_s > 0
     assert "ambient_high" in {limit.kind for limit in environmental_limits(
@@ -224,8 +225,8 @@ def test_internal_thresholds_hull_floor_and_deferred_nonmonotone_case():
     near_zero_hull = radiation_limits(increasing, segment, 0, 1e-6)
     assert "hull_integrity_zero" in {limit.kind for limit in near_zero_hull}
     decreasing = profile_for(segment, .02, .001)
-    uncertain = radiation_limits(decreasing, segment, 0, .5)
-    assert next(limit for limit in uncertain if limit.kind == "internal_high").time_s is None
+    predicted = radiation_limits(decreasing, segment, 0, .5)
+    assert next(limit for limit in predicted if limit.kind == "internal_high").time_s is not None
     fixed = radiation_limits(decreasing, segment, 0, .5, god_active=True)
     assert next(limit for limit in fixed if limit.kind == "internal_high").time_s is not None
 

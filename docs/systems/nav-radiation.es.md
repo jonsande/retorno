@@ -72,21 +72,50 @@ exige una cota certificada.
 `environmental_limits()` predice cruces ambientales elevado/alto/extremo,
 saturación radiológica del casco y umbral ascendente de despertar si se solicita
 hibernación. `radiation_limits()` añade casco cero e internos
-elevado/alto/extremo y saturación de desgaste cuando la radiación interna es
-demostrablemente monótona: radiación ambiental no decreciente, casco fijo en
-God mode o casco ya agotado. Si la radiación ambiental baja mientras el casco
-se deteriora, ambos efectos compiten y los límites internos se difieren
-(`time_s=None`) en lugar de inventar un cruce. Los límites calculables son
-`TemporalLimit` en tiempo propio; `select_next_boundary()` los convierte usando
-el segmento activo.
+elevado/alto/extremo y saturación de desgaste, incluso cuando la radiación
+ambiental baja mientras aumenta el ingreso por deterioro del casco. Divide en
+A, B, saturación del deterioro y casco cero. En cada rama suave, para la tasa
+interna `R=E*I`, se cumple `E' = pendiente_espacial*c*beta*gamma` e
+`I' = amplitud_ingreso*hull_decay_rate(E)` hasta casco cero (o cero en God
+mode). Los rangos de extremos de `E`, `I`, `E'` e `I'` acotan el producto y su
+derivada en la rama. La cota del producto puede excluir un umbral; la de la
+derivada puede demostrar una dirección de cambio y entonces una bisección
+acotada localiza el primer cruce. Se subdividen primero los intervalos más
+tempranos, de modo que ninguna raíz posterior oculte un intervalo anterior
+indeterminado. Los campos constantes antes de A y después de B se reconocen
+por su pendiente local nula aunque el perfil global sea decreciente. Los
+límites calculables son `TemporalLimit` en tiempo propio;
+`select_next_boundary()` los convierte con el segmento activo y conserva
+simultaneidades y límites diferidos.
 
-Las clasificaciones radiológicas productivas usan `>=`. En una igualdad
+La aritmética de intervalos usa coma flotante ordinaria y amplía las cotas un
+ULP hacia fuera; **no constituye una cota matemática certificada**. Solo se
+acepta una raíz candidata si las tasas cercanas separan el umbral por 64 ULP.
+La comprobación comienza al mayor de 1024 ULP temporales y `1e-12` del
+segmento restante y puede ampliarse. Si no se puede decidir una rama tras 48
+bisecciones, 8192 nodos o sin progreso representable en tiempo propio, se
+devuelve `time_s=None` con causa explícita de incertidumbre. Un contacto
+tangencial en un máximo interior, incluido el umbral exactamente igual al
+máximo, puede quedar diferido. Un umbral algo superior al máximo puede
+excluirse; uno algo inferior puede producir el primero de dos cruces. No hay
+muestreo fijo por segundos ni tiempos inventados. El movimiento productivo
+deberá detenerse ante un límite diferido hasta disponer de una cota certificada
+u otra resolución válida.
+
+Las clasificaciones radiológicas productivas usan `>=`. Una tasa inicial a
+menos de dos ULP del umbral se trata como igualdad para absorber el redondeo
+del producto entre tasa del extremo e ingreso; es una heurística numérica, no
+un cambio del clasificador productivo. En una igualdad
 ascendente la categoría nueva ya se cumple. En igualdad descendente, la
 categoría inferior comienza solo en el lado posterior: se devuelve
 `post_crossing_check` en cero. Tras procesarlo,
-`resolve_radiation_limit()` produce una marca ligada al perfil, segmento e
-instante. Devolverla al predictor elimina solamente ese cero. Las marcas se
-descartan cuando avanza el tiempo. Corte matemático, cambio de clasificación,
+`resolve_radiation_limit()` produce una marca ligada al perfil, segmento,
+instante, integridad del casco y condiciones operativas. Devolverla al
+predictor con la misma instantánea elimina solamente ese cero. Las llamadas
+directas a `environmental_limits()` deben aportar `hull_integrity` y las
+condiciones operativas al reutilizarla. Una reparación, daño, cambio de
+hibernación o God mode, nuevo perfil o segmento, o avance temporal hacen que
+la marca anterior ya no sea aplicable. Corte matemático, cambio de clasificación,
 alerta futura y despertar de hibernación son hechos distintos; el predictor no
 emite notificaciones. Las mesetas fuera de los extremos no generan cruces
 descendentes ficticios.
@@ -102,7 +131,8 @@ Antes de activar el movimiento físico, el futuro adaptador causal debe combinar
 estos límites y las integrales propias de desgaste con la calidad eléctrica,
 integridad de motores y límites galácticos de trabajos, resolver efectos
 simultáneos y replantear desde posición y velocidad reales. Los límites
-internos diferidos con radiación ambiental decreciente aún necesitan aislamiento
-certificado de raíces o análisis de monotonía. Reserva de combustible y frenado
+internos diferidos cerca de tangencias o del límite de resolución numérica
+aún necesitan cotas certificadas de raíces antes de activar el movimiento.
+Reserva de combustible y frenado
 de emergencia son dependencias independientes. Cruzar B no es una llegada
 satisfactoria y no crea waypoint.

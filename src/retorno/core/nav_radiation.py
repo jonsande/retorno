@@ -393,12 +393,16 @@ def integrated_system_wear(
 
 @dataclass(frozen=True, slots=True)
 class ResolvedRadiationLimit:
-    """A processed zero cut bound to this profile, segment and exact instant."""
+    """A processed zero cut bound to the complete radiological snapshot."""
 
     kind: str
     profile: RadiationProfile
     segment: MotionSegment
     at_galactic_s: float
+    hull_integrity: float | None = None
+    in_transit: bool = True
+    hibernating: bool = False
+    god_active: bool = False
 
 
 def _radiation_limit(
@@ -410,7 +414,8 @@ def _radiation_limit(
 
 def environmental_limits(
     profile: RadiationProfile, segment: MotionSegment, current_galactic_s: float,
-    *, hibernating: bool = False,
+    *, hibernating: bool = False, hull_integrity: float | None = None,
+    in_transit: bool = True, god_active: bool = False,
     resolved: frozenset[ResolvedRadiationLimit] = frozenset(),
 ) -> tuple[TemporalLimit, ...]:
     """Future spatial/ambient classification and wake candidates in proper s.
@@ -422,6 +427,10 @@ def environmental_limits(
     _nonnegative(current_galactic_s, "current_galactic_s")
     if current_galactic_s > segment.duration_galactic_s:
         raise ValueError("current time exceeds segment")
+    if hull_integrity is not None:
+        _nonnegative(hull_integrity, "hull_integrity")
+        if hull_integrity > 1:
+            raise ValueError("hull integrity must not exceed one")
     now = sample_segment(segment, current_galactic_s)
     end = sample_segment(segment, segment.duration_galactic_s)
     if now.distance_m >= end.distance_m or profile.slope_rad_per_s_m == 0:
@@ -455,7 +464,9 @@ def environmental_limits(
             if slope >= 0 or kind in {"hibernate_ambient_wake", "hull_radiation_saturation"}:
                 continue
             limit = _radiation_limit(kind, 0.0, "post_crossing_check")
-            if ResolvedRadiationLimit(kind, profile, segment, current_galactic_s) not in resolved:
+            marker = ResolvedRadiationLimit(kind, profile, segment, current_galactic_s,
+                                            hull_integrity, in_transit, hibernating, god_active)
+            if marker not in resolved:
                 limits.append(limit)
             continue
         if not now.distance_m < position < end.distance_m:
@@ -469,21 +480,164 @@ def environmental_limits(
     return tuple(sorted(limits, key=lambda limit: (limit.time_s, limit.kind)))
 
 
+def _first_internal_crossing(
+    profile: RadiationProfile, segment: MotionSegment, cuts: tuple[float, ...],
+    threshold: float, hull_at: Callable[[float], float], *, god_active: bool,
+    in_transit: bool, hibernating: bool,
+) -> tuple[float | None, bool]:
+    """Left-first root isolation; an unresolved interval precedes later roots.
+
+    E is monotone on every spatial branch and ingress is nondecreasing. Their
+    endpoint products enclose E*I. On a smooth branch the proper-time derivative
+    is E' I + E I'; interval endpoint bounds can prove its sign. Floating-point
+    ambiguity or an unresolved tangency returns uncertainty, never a guessed cut.
+    """
+    start, end = cuts[0], cuts[-1]
+    delta_ingress = (Balance.HULL_INTERNAL_RAD_MAX_INGRESS
+                     - Balance.HULL_INTERNAL_RAD_MIN_INGRESS)
+    cached: dict[float, tuple[float, float, float]] = {}
+
+    def state(at: float) -> tuple[float, float, float]:
+        if at not in cached:
+            motion = sample_segment(segment, at)
+            env = profile.ambient_at(motion.distance_m)
+            hull = hull_at(at)
+            ingress = Balance.HULL_INTERNAL_RAD_MIN_INGRESS + (1-hull)*delta_ingress
+            cached[at] = env, ingress, motion.beta
+        return cached[at]
+
+    def rate(at: float) -> float:
+        env, ingress, _ = state(at)
+        return env * ingress
+
+    def bounds(a: float, b: float) -> tuple[float, float, float, float]:
+        ea, ia, ba = state(a)
+        eb, ib, bb = state(b)
+        # E is monotone in position; hull loss makes I nondecreasing.
+        low = min(ea, eb) * min(ia, ib)
+        high = max(ea, eb) * max(ia, ib)
+        midpoint_x = sample_segment(segment, a + (b-a)/2).distance_m
+        slope = (profile.slope_rad_per_s_m
+                 if profile.start_m < midpoint_x < profile.end_m else 0.0)
+        pa = ba / math.sqrt((1-ba)*(1+ba))
+        pb = bb / math.sqrt((1-bb)*(1+bb))
+        ep_a, ep_b = slope * LIGHT_SPEED_M_S * pa, slope * LIGHT_SPEED_M_S * pb
+        if god_active or hull_at(a) == 0:
+            ip_a = ip_b = 0.0
+        else:
+            ip_a = delta_ingress * hull_decay_rate(
+                ea, in_transit=in_transit, hibernating=hibernating)
+            ip_b = delta_ingress * hull_decay_rate(
+                eb, in_transit=in_transit, hibernating=hibernating)
+        derivative_terms = (ep * ingress for ep in (ep_a, ep_b)
+                            for ingress in (ia, ib))
+        first = tuple(derivative_terms)
+        second = tuple(env * ip for env in (ea, eb) for ip in (ip_a, ip_b))
+        derivative_low = min(first) + min(second)
+        derivative_high = max(first) + max(second)
+        return (math.nextafter(low, -math.inf), math.nextafter(high, math.inf),
+                math.nextafter(derivative_low, -math.inf),
+                math.nextafter(derivative_high, math.inf))
+
+    initial = rate(start)
+    if abs(initial-threshold) <= 2*max(math.ulp(initial), math.ulp(threshold)):
+        # Equality belongs to the upper productive category. Its descending
+        # posterior side needs a zero cut; a tangency cannot be decided here.
+        if (state(start)[0] == state(end)[0]
+                and (state(start)[0] == 0 or hull_at(start) == hull_at(end))):
+            return None, False
+        first_b = cuts[1]
+        _, _, derivative_low, derivative_high = bounds(start, first_b)
+        if derivative_high < 0:
+            return start, False
+        if derivative_low > 0 and (
+                profile.slope_rad_per_s_m >= 0
+                or state(start)[0] == state(end)[0]):
+            return None, False
+        return None, True
+
+    visited = 0
+
+    def confirm(root: float) -> tuple[float | None, bool]:
+        """Reject roots whose side separation is below numerical resolution."""
+        probe = max(1024 * math.ulp(root), 1e-12 * (end-start))
+        margin = 64 * math.ulp(threshold)
+
+        def side(at: float) -> int:
+            value = rate(at)
+            return -1 if value < threshold-margin else 1 if value > threshold+margin else 0
+
+        for _ in range(40):
+            before = max(start, root-probe)
+            after = min(end, root+probe)
+            earlier, later = side(before), side(after)
+            if (earlier * later == -1 or (root == end and earlier != 0)
+                    or (root in cuts and earlier != 0
+                        and abs(rate(root)-threshold) <= margin)):
+                return root, False
+            if earlier != 0 and later != 0:
+                break
+            if before == start and after == end:
+                break
+            probe *= 2
+        return None, True
+
+    def search(a: float, b: float, depth: int) -> tuple[float | None, bool]:
+        nonlocal visited
+        visited += 1
+        if visited > 8192:
+            return None, True
+        lower, upper, dlow, dhigh = bounds(a, b)
+        if threshold < lower or threshold > upper:
+            return None, False
+        fa, fb = rate(a), rate(b)
+        if dlow > 0 or dhigh < 0 or (dlow == 0 and dhigh == 0):
+            if fa == threshold:
+                return confirm(a)
+            if fb == threshold:
+                return confirm(b)
+            if (fa < threshold < fb) or (fb < threshold < fa):
+                rising = fb > fa
+                lo, hi = a, b
+                for _ in range(256):
+                    mid = lo + (hi-lo)/2
+                    if mid == lo or mid == hi:
+                        break
+                    if (rate(mid) < threshold) == rising:
+                        lo = mid
+                    else:
+                        hi = mid
+                return confirm(hi)
+            return None, False
+        mid = a + (b-a)/2
+        if depth == 0 or mid == a or mid == b:
+            return None, True
+        first_root, uncertain = search(a, mid, depth-1)
+        if first_root is not None or uncertain:
+            return first_root, uncertain
+        return search(mid, b, depth-1)
+
+    for a, b in zip(cuts, cuts[1:]):
+        root, uncertain = search(a, b, 48)
+        if root is not None or uncertain:
+            return root, uncertain
+    return None, False
+
+
 def radiation_limits(
     profile: RadiationProfile, segment: MotionSegment, current_galactic_s: float,
     hull_integrity: float, *, in_transit: bool = True, hibernating: bool = False,
     god_active: bool = False, resolved: frozenset[ResolvedRadiationLimit] = frozenset(),
 ) -> tuple[TemporalLimit, ...]:
-    """Ambient, hull-floor, and provably monotone internal-radiation cuts.
-
-    On a decreasing ambient slope with evolving hull, internal radiation may
-    have an interior extremum. Its threshold times are explicitly deferred.
-    """
+    """Ambient, hull-floor and first internal cuts, with explicit uncertainty."""
     _nonnegative(hull_integrity, "hull_integrity")
     if hull_integrity > 1:
         raise ValueError("hull integrity must not exceed one")
     limits = list(environmental_limits(profile, segment, current_galactic_s,
-                                       hibernating=hibernating, resolved=resolved))
+                                       hibernating=hibernating,
+                                       hull_integrity=hull_integrity,
+                                       in_transit=in_transit, god_active=god_active,
+                                       resolved=resolved))
     now = sample_segment(segment, current_galactic_s)
     end_time = segment.duration_galactic_s
     end = sample_segment(segment, end_time)
@@ -495,6 +649,7 @@ def radiation_limits(
                                in_transit=in_transit, hibernating=hibernating,
                                god_active=god_active)
 
+    floor_at = None
     if hull_integrity > 0 and not god_active and hull_at(end_time) == 0:
         lo, hi = current_galactic_s, end_time
         for _ in range(256):
@@ -508,57 +663,49 @@ def radiation_limits(
         proper = (proper_time_in_segment(segment, hi)
                   - proper_time_in_segment(segment, current_galactic_s))
         if proper > 0:
+            floor_at = hi
             limits.append(_radiation_limit("hull_integrity_zero", proper,
                                            "ordinary_hull_wear_only"))
 
-    slope = profile.slope_rad_per_s_m
-    monotone = slope >= 0 or god_active or hull_integrity == 0
+    cuts = list(_spatial_cuts(profile, segment, current_galactic_s, end_time))
+    if floor_at is not None and cuts[0] < floor_at < cuts[-1]:
+        cuts.append(floor_at)
+    cuts = tuple(sorted(set(cuts)))
     thresholds = (
         ("internal_elevated", Balance.RAD_LEVEL_INTERNAL_ELEVATED),
         ("internal_high", Balance.RAD_LEVEL_INTERNAL_HIGH),
         ("internal_extreme", Balance.RAD_LEVEL_INTERNAL_EXTREME),
         ("internal_wear_saturation", Balance.R_REF),
     )
-    if not monotone:
-        limits.extend(TemporalLimit(kind, "proper", None,
-                                    validity="requires_internal_monotonicity_analysis",
-                                    uncertainty_reason="decreasing_ambient_opposes_increasing_hull_ingress")
-                      for kind, _ in thresholds)
-        return tuple(sorted(limits, key=lambda limit: (limit.time_s is None,
-                                                       math.inf if limit.time_s is None else limit.time_s,
-                                                       limit.kind)))
-
-    def internal_at(at: float) -> float:
-        motion = sample_segment(segment, at)
-        return internal_radiation_rate(profile.ambient_at(motion.distance_m), hull_at(at))
-
-    start_rate, end_rate = internal_at(current_galactic_s), internal_at(end_time)
     for kind, threshold in thresholds:
         if not math.isfinite(threshold) or threshold < 0:
             continue
-        at_equality = abs(start_rate - threshold) <= 2 * max(
-            math.ulp(start_rate), math.ulp(threshold))
-        if at_equality:
-            if (end_rate < threshold
-                    and ResolvedRadiationLimit(kind, profile, segment, current_galactic_s) not in resolved):
-                limits.append(_radiation_limit(kind, 0, "post_crossing_check"))
+        at, uncertain = _first_internal_crossing(
+            profile, segment, cuts, threshold, hull_at, god_active=god_active,
+            in_transit=in_transit, hibernating=hibernating)
+        if uncertain:
+            limits.append(TemporalLimit(
+                kind, "proper", None, validity="numerical_isolation_unresolved",
+                uncertainty_reason="first_internal_crossing_not_guaranteed"))
             continue
-        if not min(start_rate, end_rate) < threshold < max(start_rate, end_rate):
+        if at is None:
             continue
-        rising = end_rate > start_rate
-        lo, hi = current_galactic_s, end_time
-        for _ in range(256):
-            mid = lo + (hi-lo)/2
-            if mid == lo or mid == hi:
-                break
-            if (internal_at(mid) < threshold) == rising:
-                lo = mid
-            else:
-                hi = mid
-        proper = (proper_time_in_segment(segment, hi)
+        proper = (proper_time_in_segment(segment, at)
                   - proper_time_in_segment(segment, current_galactic_s))
-        if proper > 0:
-            limits.append(_radiation_limit(kind, proper, "fixed_segment_profile_and_hull_wear"))
+        if at > current_galactic_s and proper <= 0:
+            limits.append(TemporalLimit(
+                kind, "proper", None, validity="proper_time_resolution_exhausted",
+                uncertainty_reason="positive_crossing_not_representable"))
+            continue
+        if at == current_galactic_s:
+            marker = ResolvedRadiationLimit(
+                kind, profile, segment, current_galactic_s, hull_integrity,
+                in_transit, hibernating, god_active)
+            if marker not in resolved:
+                limits.append(_radiation_limit(kind, 0, "post_crossing_check"))
+        else:
+            limits.append(_radiation_limit(kind, proper,
+                                           "fixed_segment_profile_and_hull_wear"))
     return tuple(sorted(limits, key=lambda limit: (limit.time_s is None,
                                                    math.inf if limit.time_s is None else limit.time_s,
                                                    limit.kind)))
@@ -574,7 +721,8 @@ def resolve_radiation_limit(
             profile, segment, current_galactic_s, hull_integrity,
             in_transit=in_transit, hibernating=hibernating, god_active=god_active):
         raise ValueError("limit must be a pending zero radiation limit")
-    return ResolvedRadiationLimit(limit.kind, profile, segment, current_galactic_s)
+    return ResolvedRadiationLimit(limit.kind, profile, segment, current_galactic_s,
+                                  hull_integrity, in_transit, hibernating, god_active)
 
 
 def radiation_invalidation_reasons(

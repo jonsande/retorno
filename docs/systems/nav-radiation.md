@@ -67,19 +67,46 @@ a certified bound is required for powered movement.
 `environmental_limits()` predicts ambient elevated/high/extreme crossings,
 hull-radiation saturation, and an upward hibernation wake threshold when
 hibernating is requested. `radiation_limits()` adds ordinary hull-zero and
-internal elevated/high/extreme and wear-saturation thresholds when internal
-radiation is provably monotone: nondecreasing ambient, fixed hull in God mode,
-or already-zero hull. Decreasing ambient with a wearing hull has competing
-effects and returns deferred internal limits (`time_s=None`) rather than
-inventing a crossing. All calculable limits are proper-time `TemporalLimit`s;
-the existing `select_next_boundary()` converts them through the active segment.
+the first internal elevated/high/extreme and wear-saturation threshold even
+when ambient radiation falls while ingress rises. It splits at A, B, hull wear
+saturation and hull zero. On each smooth branch, with internal rate `R=E*I`,
+`E' = spatial_slope*c*beta*gamma` and `I' = ingress_range*hull_decay_rate(E)`
+until hull zero (or zero throughout God mode). Endpoint ranges for `E`, `I`,
+`E'` and `I'` enclose the product and derivative over a branch. A product bound
+can exclude a threshold; a derivative bound can prove one direction of motion,
+after which bracketed bisection finds its first crossing. Ambiguous intervals
+are bisected left first, so a later root cannot hide an earlier unresolved
+interval. Constant fields before A and after B are recognized by their local
+zero slope even if the route's overall slope is negative. All calculable limits
+are proper-time `TemporalLimit`s; `select_next_boundary()` converts them using
+the active segment and retains simultaneous causes and deferred limits.
 
-The productive radiation classifications use `>=`. At an upward equality the
+The interval arithmetic is evaluated in ordinary floating point, with outward
+one-ULP padding, and is **not a formally certified enclosure**. A candidate
+root is accepted only if nearby rates separate the threshold by 64 ULPs; the
+probe starts at the larger of 1024 time ULPs and `1e-12` of the remaining
+segment, then expands. A branch that cannot be classified within 48 bisections,
+8192 nodes, or representable proper-time progress returns `time_s=None` with
+an explicit uncertainty reason. A tangency at an interior maximum, including
+an exact threshold equal to that maximum, may therefore remain deferred. A
+threshold just above the maximum can be excluded; one just below can yield the
+first of two crossings. No fixed-second samples or invented times are used.
+Productive movement must stop at a deferred limit until a certified enclosure
+or another valid resolution is available.
+
+The productive radiation classifications use `>=`. An initial rate within two
+ULPs of a threshold is treated as equality to absorb the rounding of a
+product of endpoint rate and ingress; this is a numerical heuristic, not a
+change to the productive classifier. At an upward equality the
 new category is already active. At a downward equality, the lower category is
 entered only on the posterior side: a `post_crossing_check` at zero is emitted.
 After processing it, `resolve_radiation_limit()` returns a marker bound to the
-profile, segment and instant. Passing it back to the predictor removes only
-that zero. Markers must be discarded when time advances. Mathematical cuts,
+profile, segment, instant, hull integrity and operating flags. Passing it back
+to a predictor with the same snapshot removes only that zero. Direct calls to
+`environmental_limits()` must pass `hull_integrity` and operating flags when
+reusing such a marker. Repair, damage, hibernation or God-mode changes, a new
+profile or segment, or time advance make the old marker inapplicable.
+Mathematical cuts,
 classification changes, future alerts and a hibernation wake remain separate;
 the predictor sends no notifications. Endpoint plateaus do not generate false
 downward crossings.
@@ -94,6 +121,6 @@ mutates `GameState` or consumes RNG. Before physical movement can be enabled,
 the future causal adapter must combine these proper-time limits and wear
 integrals with electric quality, engine-health and galactic job limits, resolve
 same-instant effects, and replan from real position/speed. Deferred internal
-limits on decreasing ambient profiles still need a certified root-isolation or
-monotonicity analysis. Fuel reservation and emergency braking remain separate
+limits near tangencies or floating-point resolution still need certified root
+enclosures before enabling physical movement. Fuel reservation and emergency braking remain separate
 dependencies. Crossing B is not a successful arrival and creates no waypoint.

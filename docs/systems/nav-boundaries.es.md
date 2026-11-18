@@ -339,5 +339,6 @@ El [modelo radiológico físico](nav-radiation.es.md) puro predice tasas
 ambientales a partir de la posición real del segmento, integra dosis ambiental
 e interna acoplada y calcula contribuciones de desgaste ordinario del casco y
 los sistemas. Sus candidatos de umbral en tiempo propio usan este coordinador;
-con radiación ambiental decreciente y casco en deterioro los umbrales internos
-siguen diferidos. El movimiento físico productivo continúa protegido.
+el primer cruce interno con radiación ambiental decreciente se aísla cuando la
+rama puede resolverse. Los contactos numéricamente ambiguos siguen diferidos.
+El movimiento físico productivo continúa protegido.
