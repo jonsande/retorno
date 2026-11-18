@@ -252,3 +252,83 @@ estocásticos y el instante de RNG. No se afirma invariancia estocástica ni se
 modificó ningún parámetro probabilístico. Regulación eléctrica, radiación,
 predicción de desgaste y movimiento propulsivo siguen fuera de esta
 refactorización. `Engine.tick()` continúa rechazando el tránsito físico.
+
+## 01B3E: electricidad condicional y desgaste integrado
+
+`nav_electricity.py` captura un `PowerSnapshot` inmutable con generación y
+carga efectivas, límites y eficiencias de batería, calidad y déficit muestreados,
+temporizadores de brownout y deslastre, modo operativo, identificadores de
+módulos instalados y firmas de distribución, sistemas y trabajos. La fotografía
+es una hipótesis para un intervalo, no estado persistente.
+`capture_power_snapshot()` no recalcula potencias: quien llama aporta generación
+y carga productivas en el instante de consulta. Un trabajo RUNNING suma carga
+según `_compute_load_kw()`; la lista de trabajos cuyos temporizadores avanzan
+es independiente. Las potencias efectivas y los identificadores de módulos
+representan sus modificadores eléctricos.
+
+Con generación y carga constantes, `battery_energy_after()` conserva los topes,
+eficiencias y saturación productivos en **segundos propios de nave**.
+`power_quality_components()` se comparte con el motor productivo, manteniendo
+la escritura de `deficit_ratio` en `_compute_power_quality()`. Entre
+regulaciones, la calidad es una función afín por tramos y recortada de la energía
+de batería: su rama de carga cambia al 10 % y 50 %, y el recorte exterior al
+alcanzar calidad 0 o 1. `integrate_quality()` divide en esas ramas matemáticas
+y en batería 0/llena, e integra cada tramo lineal por sus extremos.
+`integrated_wear()` utiliza `ordinary_wear_rate()` compartida en calidad 0 y 1:
+la dependencia afín produce un resultado exacto para un sistema fijo,
+radiación interna constante, tránsito/modo y multiplicador de brownout sostenido
+constantes. Devuelve pérdida calculada y no la aplica a la integridad. Se
+mantiene el redondeo de coma flotante.
+
+`power_limits()` devuelve `TemporalLimit` condicionales en tiempo propio:
+batería 0/10 %/50 %/llena, calidad 0,25/0,40/0,55, regulación inmediata por
+capacidad, carga baja o colapso, temporizador de deslastre de 10 segundos y
+temporizador de brownout sostenido de 30 segundos o reinicios inmediatos. Un
+corte con `validity="mathematical_crossing"` representa igualdad matemática,
+no una acción aplicada. Los cruces futuros siguen siendo candidatos. Si la
+fotografía empieza exactamente en un cruce, `power_limits()` devuelve un corte
+cero y deduce su sentido del flujo de batería. Tras tratarlo, el consumidor
+devuelve a la consulta su `ResolvedElectricalLimit`, obtenido mediante
+`resolve_electrical_limit()`, en `resolved`. Así se omite solamente el corte cero
+ya procesado, sin ocultar un cruce futuro. Cada marca está vinculada a la
+fotografía inmutable y no afecta a condiciones distintas. Debe descartarse
+al avanzar el tiempo. Un cero sin resolver sigue activando la protección
+`seen_zero_selections` de `nav_coordinator.py`, sin añadir tiempo artificial.
+La inversión de calidad permite solo dos ULP de coma flotante para reconocer
+igualdad tras la propagación analítica.
+
+Las comprobaciones estrictas `<` se valoran por el lado al que se entra tras
+un cruce descendente. Por eso el SOC del 10 % y la calidad 0,25 pueden devolver
+una regulación cero con `validity="post_crossing_check"` aunque su condición
+estricta sea falsa en la igualdad. El cruce de calidad 0,40 inicia el contador
+de deslastre por ese lado; la igualdad no significa que haya vencido. Resolver
+el cruce matemático no elimina las comprobaciones operativas cero: requieren
+resolución aparte después de que el motor ejecute o descarte la acción. La
+disponibilidad de batería usa `SOC > 0`; los temporizadores vencen con `>=`.
+Con brownout activo y contador igual o superior a 30 segundos no se emite un
+nuevo umbral sostenido ni un reinicio. Solo se informa un reinicio cuando el
+brownout termina con contador positivo. La regulación puede alterar la carga y
+deja obsoletos todos los límites posteriores de la fotografía. Los predictores
+no deslastran, no deciden una carga posterior y no anticipan resultados
+aleatorios.
+
+`invalidation_reasons()` detecta cambios de potencia o límites efectivos,
+operación o distribución, módulos, sistemas (incluidas reparación y aislamiento),
+estado/potencia de trabajos y estado de brownout o temporizadores de deslastre.
+Con `elapsed_proper_s` detecta además energía de
+batería distinta de la evolución prevista. El consumidor debe invalidar también
+tras cambios del reactor, activación/finalización de trabajos, deslastre,
+saturación de batería, cambio de modo o cualquier acontecimiento que altere las
+hipótesis. Un cambio de rama de calidad requiere reevaluación aunque la integral
+analítica siga definida. La calidad y déficit muestreados son diagnósticos; la
+calidad prevista se obtiene de las entradas compartidas, no de muestras antiguas.
+
+`select_next_boundary(..., proper_limits=...)` acepta ahora varios límites
+propios junto al de integridad. Convierte cada uno mediante el segmento
+relativista activo; los trabajos siguen en tiempo galáctico. Un adaptador futuro
+deberá reunir fase, integridad, trabajos y electricidad, cortar en el primero,
+integrar electricidad y desgaste previos, aplicar efectos simultáneos en orden
+causal y obtener una fotografía nueva. Antes de activar el movimiento físico
+faltan una cota para la radiación interna variable, la reserva de combustible y
+la política de frenado de emergencia. `Engine.tick()` y el viaje público no
+cambian; su desgaste actual por muestra final no se sustituye en esta fase.

@@ -58,6 +58,7 @@ def select_next_boundary(
     horizon_galactic_s: float,
     *,
     health_limit: TemporalLimit | None = None,
+    proper_limits: tuple[TemporalLimit, ...] = (),
     job_limits: tuple[TemporalLimit, ...] = (),
     invalidation_reasons: tuple[str, ...] = (),
     seen_zero_selections: tuple[BoundarySelection, ...] = (),
@@ -82,11 +83,14 @@ def select_next_boundary(
         if not isinstance(reason, str) or not reason:
             raise ValueError("invalidation reasons must be nonempty strings")
 
-    sources = (() if health_limit is None else (health_limit,)) + tuple(job_limits)
+    own_limits = (() if health_limit is None else (health_limit,)) + tuple(proper_limits)
+    sources = own_limits + tuple(job_limits)
     for limit in sources:
         _validate_limit(limit)
     if health_limit is not None and health_limit.domain != "proper":
         raise ValueError("health_limit must use proper time")
+    if any(limit.domain != "proper" for limit in proper_limits):
+        raise ValueError("proper_limits must use proper time")
     if any(limit.domain != "galactic" for limit in job_limits):
         raise ValueError("job_limits must use galactic time")
     deferred = tuple(limit for limit in sources if limit.time_s is None)
@@ -151,18 +155,20 @@ def select_next_boundary(
         profile_end)
 
     if not invalidation_reasons:
-        if health_limit is not None and health_limit.time_s is not None:
-            target_proper = current_proper + health_limit.time_s
+        for proper_limit in own_limits:
+            if proper_limit.time_s is None:
+                continue
+            target_proper = current_proper + proper_limit.time_s
             if not math.isfinite(target_proper):
                 raise ValueError("proper-time limit exceeds floating-point range")
-            if health_limit.time_s > 0 and target_proper == current_proper:
+            if proper_limit.time_s > 0 and target_proper == current_proper:
                 raise TemporalResolutionError("positive proper limit is below clock resolution")
             if target_proper <= total_local_proper:
-                at = (elapsed_galactic_s if health_limit.time_s == 0
+                at = (elapsed_galactic_s if proper_limit.time_s == 0
                       else galactic_at_proper(target_proper))
-                if at < elapsed_galactic_s or (health_limit.time_s > 0 and at == elapsed_galactic_s):
+                if at < elapsed_galactic_s or (proper_limit.time_s > 0 and at == elapsed_galactic_s):
                     raise TemporalResolutionError("proper limit cannot advance the galactic clock")
-                add(health_limit, at)
+                add(proper_limit, at)
         for limit in job_limits:
             if limit.time_s is not None:
                 at = elapsed_galactic_s + limit.time_s

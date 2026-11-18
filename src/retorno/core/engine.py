@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 
 from retorno.core.temporal import SPEED_OF_LIGHT_KM_S, biological_time_interval, proper_time_interval
 from retorno.core.nav_boundaries import ordinary_wear_rate
+from retorno.core.nav_electricity import battery_energy_after, power_quality_components
 
 from retorno.core.actions import (
     Action,
@@ -7350,52 +7351,23 @@ class Engine:
     def _update_battery(self, state: GameState, dt_ship: float, p_gen: float, p_load: float) -> None:
         if state.os.god_active:
             return
-        p_charge_max = state.ship.power.p_charge_max_kw
-        p_discharge_max = state.ship.power.p_discharge_max_kw
-        net = p_gen - p_load
-        if net >= 0:
-            charge_kw = min(net, p_charge_max)
-            delta_e = (charge_kw * dt_ship / 3600.0) * state.ship.power.eta_charge
-            state.ship.power.e_batt_kwh = min(
-                state.ship.power.e_batt_max_kwh,
-                state.ship.power.e_batt_kwh + delta_e,
-            )
-        else:
-            discharge_kw = min(-net, p_discharge_max)
-            delta_e = (discharge_kw * dt_ship / 3600.0) / max(state.ship.power.eta_discharge, 1e-6)
-            state.ship.power.e_batt_kwh = max(
-                0.0,
-                state.ship.power.e_batt_kwh - delta_e,
-            )
+        power = state.ship.power
+        power.e_batt_kwh = battery_energy_after(
+            power.e_batt_kwh, power.e_batt_max_kwh,
+            power.p_charge_max_kw, power.p_discharge_max_kw,
+            power.eta_charge, power.eta_discharge, p_gen, p_load, dt_ship,
+        )
 
     def _compute_power_quality(self, state: GameState, p_gen: float, p_load: float) -> float:
-        if state.os.god_active:
-            state.ship.power.deficit_ratio = 0.0
-            return 1.0
-        if state.ship.power.e_batt_max_kwh > 0:
-            soc = state.ship.power.e_batt_kwh / state.ship.power.e_batt_max_kwh
-        else:
-            soc = 0.0
-        q_soc = self._clamp((soc - 0.10) / (0.50 - 0.10))
-        p_deficit = max(0.0, p_load - p_gen)
-        p_deficit_ratio = (
-            self._clamp(p_deficit / state.ship.power.p_discharge_max_kw)
-            if state.ship.power.p_discharge_max_kw > 0
-            else 1.0
-        )
-        state.ship.power.deficit_ratio = p_deficit_ratio
-        q_def = 1.0 - 0.7 * p_deficit_ratio
-        power_quality = 0.6 * q_soc + 0.4 * q_def
-
         distribution = state.ship.systems.get("energy_distribution")
-        if distribution:
-            if distribution.state == SystemState.CRITICAL:
-                power_quality -= 0.20
-            elif distribution.state in (SystemState.DAMAGED, SystemState.LIMITED):
-                power_quality -= 0.10
-
-        power_quality += state.ship.power.quality_offset
-        return self._clamp(power_quality)
+        quality, deficit_ratio = power_quality_components(
+            state.ship.power.e_batt_kwh, state.ship.power.e_batt_max_kwh,
+            p_gen, p_load, state.ship.power.p_discharge_max_kw,
+            distribution.state if distribution else None,
+            state.ship.power.quality_offset, god_active=state.os.god_active,
+        )
+        state.ship.power.deficit_ratio = deficit_ratio
+        return quality
 
     def _compute_p_gen(self, state: GameState) -> float:
         if state.os.god_active:

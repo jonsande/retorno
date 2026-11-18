@@ -237,3 +237,79 @@ an interval can change stochastic outcomes and RNG timing. No stochastic
 partition invariance is claimed and no balance probability was changed.
 Electrical regulation, radiation, wear prediction and powered motion remain
 outside this scheduler refactor. `Engine.tick()` still rejects physical transit.
+
+## 01B3E conditional electricity and integrated wear
+
+`nav_electricity.py` captures a frozen `PowerSnapshot` from effective generation,
+effective load, battery limits and efficiencies, sampled quality/deficit,
+brownout and shedding timers, operating mode, installed module IDs, and
+distribution/system/job signatures. The snapshot is an assumption for a single
+interval, not persistent state. `capture_power_snapshot()` does not recompute
+power: the caller supplies the productive generation and load at the query
+instant. A RUNNING job contributes to load according to `_compute_load_kw()`;
+the scheduler's advancing work list is a separate matter. Module power effects
+are represented by effective powers and module IDs.
+
+For constant generation and load, `battery_energy_after()` uses the productive
+charge/discharge caps, efficiencies and battery clamp in **ship proper seconds**.
+`power_quality_components()` is shared with the productive engine and retains
+the `deficit_ratio` write in `_compute_power_quality()`. Between regulation
+events, quality is a clipped piecewise affine function of battery energy: its
+SOC branch changes at 10% and 50%, and its outer clamp at quality 0 and 1.
+`integrate_quality()` splits at those exact mathematical branches and battery
+0/full, then integrates each linear piece by its endpoints. `integrated_wear()`
+uses the shared `ordinary_wear_rate()` at quality 0 and 1; affine dependence on
+quality makes the result exact for a fixed system, constant internal radiation,
+fixed transit/mode, and fixed sustained-brownout multiplier. It returns a loss
+amount and never applies it to health. Floating-point rounding remains.
+
+`power_limits()` reports conditional `TemporalLimit`s in proper seconds:
+battery 0/10%/50%/full, quality 0.25/0.40/0.55, immediate capacity/low-SOC/
+collapse regulation, the 10-second low-quality shedding timer, and the
+30-second sustained-brownout timer or immediate timer resets. A threshold cut
+with `validity="mathematical_crossing"` is equality, not an applied action.
+Future crossings remain candidates. If a snapshot starts exactly on a crossing,
+`power_limits()` emits a zero cut with its direction inferred from battery flow.
+After handling that cut, the caller passes its `ResolvedElectricalLimit` from
+`resolve_electrical_limit()` back as `resolved`. This suppresses only that
+processed zero cut; it does not suppress a future crossing. Each marker binds
+the immutable snapshot and is ignored for different conditions. It must be
+cleared after time advances. An unresolved zero still triggers the existing
+`seen_zero_selections` guard in `nav_coordinator.py`; no clock padding is used.
+Quality inversion allows only two floating-point ULPs when identifying an
+equality reached by analytic propagation.
+
+Strict `<` checks are evaluated from the side entered after a descending
+crossing. Thus 10% SOC and quality 0.25 may report a
+`validity="post_crossing_check"` regulation at zero even though their strict
+condition is false at equality. The 0.40 quality crossing starts the shedding
+timer on that side; equality alone is not an expired timer. Operational zero
+checks remain pending after a mathematical crossing is resolved and require a
+separate resolution after the engine performs or rejects the corresponding
+action. Battery availability uses `SOC > 0`; timer expiry uses `>=`.
+Sustained brownout already at or above 30 seconds emits neither a new
+sustained threshold nor a reset while brownout remains active. A reset is
+reported only after brownout ends with a positive timer. Regulation can change
+load, so all later cuts from that snapshot become stale. These limits do not
+themselves perform shedding, decide the subsequent load, or predict random
+outcomes.
+
+`invalidation_reasons()` detects changed effective power/limits, operation or
+distribution, modules, systems (including repair/forced isolation), job
+status/power, and brownout/shedding timer state. With `elapsed_proper_s`, it also detects battery energy that
+departs from the fixed-power prediction. The caller must also invalidate on
+reactor changes, job activation/completion, shedding, battery saturation,
+mode changes, and any intervening event that changes assumptions. A changed
+quality branch calls for reevaluation even when the analytic integral remains
+well-defined. The sampled quality/deficit are diagnostic fields; predicted
+quality is derived from shared inputs, not from stale sampled values.
+
+`select_next_boundary(..., proper_limits=...)` now accepts multiple proper-time
+limits alongside the health limit. It maps each through the active relativistic
+segment; job limits stay galactic. A future adapter should gather phase, health,
+job and electric candidates, cut at the earliest, integrate preceding
+electricity and wear, apply same-instant effects in causal order, then take a
+fresh snapshot. It must establish a bound for varying internal radiation and
+resolve fuel reservations and emergency-braking policy before enabling physical
+movement. Existing `Engine.tick()` and public travel remain unchanged; their
+current end-sampled wear is not replaced by this preparatory integral.
