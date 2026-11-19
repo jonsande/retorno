@@ -11,7 +11,6 @@ from dataclasses import dataclass, field
 
 from retorno.core.temporal import SPEED_OF_LIGHT_KM_S, biological_time_interval, proper_time_interval
 from retorno.core.nav_boundaries import (TemporalLimit, ordinary_wear_rate,
-                                         predict_engine_health_limit, predict_engine_braking_limit,
                                          acceleration_available, braking_available)
 from retorno.core.nav_coordinator import select_next_boundary
 from retorno.core.nav_electricity import (battery_energy_after, power_quality_components,
@@ -23,6 +22,7 @@ from retorno.core.nav_physics import (MotionSegment, MotionState, accelerate_to,
 from retorno.core.nav_state import PhysicalTransitState, PropulsionAuthorization, NominalTravelState
 from retorno.core.nav_radiation import (RadiationProfile, hull_decay_rate, internal_radiation_rate,
                                         integrate_segment_radiation, integrated_system_wear,
+                                        first_integrated_wear_at,
                                         radiation_limits)
 
 from retorno.core.actions import (
@@ -381,6 +381,10 @@ class Engine:
             active = staged.ship.physical_transit
             assert active is not None and active.nominal_plan is not None
             nominal = active.nominal_plan
+            if active.pending_transition is not None:
+                if remaining > 0:
+                    raise RuntimeError("physical transition after engine wear is not yet supported")
+                break
             if active.elapsed_galactic_s == segment.duration_galactic_s:
                 if nominal.phase_index + 1 < len(nominal.segments):
                     next_index = nominal.phase_index + 1
@@ -416,6 +420,8 @@ class Engine:
         """
         physical = state.ship.physical_transit
         assert physical is not None
+        if physical.pending_transition is not None:
+            raise RuntimeError("pending physical transition must be resolved before further motion")
         segment = physical.active_segment
         powered = physical.intent != "coast"
         nominal = physical.nominal_plan
@@ -522,17 +528,27 @@ class Engine:
         wear = {key: integrated_system_wear(system, exposure, quality.quality_proper_s,
                                            in_transit=True, op_mode=state.ship.op_mode)
                 for key, system in state.ship.systems.items()}
-        if powered:
+        engine_boundary = None
+        engine_threshold = None
+        if powered or (nominal is not None and physical.intent == "coast"):
             engine = state.ship.systems["engines"]
-            remaining_health = engine.health - wear["engines"]
-            if (physical.intent == "accelerate"
-                    and remaining_health <= Balance.SYSTEM_HEALTH_CRITICAL):
-                raise RuntimeError("Physical acceleration reaches the unresolved 35% safety boundary")
-            if (physical.intent == "brake"
-                    and (remaining_health < Balance.ENGINE_EMERGENCY_BRAKE_MIN_HEALTH
-                         or (engine.health == Balance.ENGINE_EMERGENCY_BRAKE_MIN_HEALTH
-                             and wear["engines"] > 0))):
-                raise RuntimeError("Physical braking crosses the 15% propulsion boundary")
+            engine_threshold = (Balance.SYSTEM_HEALTH_CRITICAL if physical.intent != "brake"
+                                else Balance.ENGINE_EMERGENCY_BRAKE_MIN_HEALTH)
+            target_wear = engine.health - engine_threshold
+            if target_wear == 0 and wear["engines"] > 0:
+                raise RuntimeError(
+                    "Physical nominal travel cannot continue after 35% integrity" if physical.intent != "brake"
+                    else "Physical braking cannot continue after 15% integrity")
+            if target_wear > 0:
+                engine_boundary = first_integrated_wear_at(
+                    engine, profile, segment, physical.elapsed_galactic_s, local_end,
+                    state.ship.hull_integrity, engine_threshold,
+                    in_transit=True, op_mode=state.ship.op_mode,
+                    hibernating=state.ship.is_hibernating,
+                    quality_proper_s_at=lambda exposure: integrate_quality(snapshot, exposure.proper_s).quality_proper_s,
+                )
+                if engine_boundary is not None and engine_boundary < local_end:
+                    raise RuntimeError("Physical tick extends beyond the 35% or 15% causal boundary")
         health_limits = []
         for key, system in state.ship.systems.items():
             if system.state_locked and key != "engines":
@@ -540,7 +556,7 @@ class Engine:
             thresholds = (Balance.SYSTEM_HEALTH_OFFLINE, Balance.SYSTEM_HEALTH_CRITICAL,
                           Balance.SYSTEM_HEALTH_DAMAGED, Balance.SYSTEM_HEALTH_LIMITED)
             if key == "engines":
-                thresholds += (Balance.ENGINE_EMERGENCY_BRAKE_MIN_HEALTH,)
+                thresholds = tuple(t for t in thresholds if t != engine_threshold)
             upper_rate = ordinary_wear_rate(
                 system, min(quality.start, quality.end), False,
                 max(profile.start_rad_per_s, profile.end_rad_per_s)
@@ -554,18 +570,6 @@ class Engine:
                         health_limits.append(TemporalLimit(
                             "system_health_threshold", "proper", seconds, system_id=key,
                             validity="conservative_fixed_upper_wear_rate"))
-        engine = state.ship.systems.get("engines")
-        if engine is not None:
-            engine_upper = ordinary_wear_rate(
-                engine, 1.0, False,
-                max(profile.start_rad_per_s, profile.end_rad_per_s)
-                * Balance.HULL_INTERNAL_RAD_MAX_INGRESS,
-                in_transit=True, op_mode=state.ship.op_mode,
-            )
-            for forecast in (predict_engine_health_limit(state.ship, engine_upper),
-                             predict_engine_braking_limit(state.ship, engine_upper)):
-                if forecast.time_s is not None and 0 < forecast.time_s < proper_dt:
-                    health_limits.append(forecast)
         selected = select_next_boundary(
             segment, now.galactic_s, dt, proper_limits=tuple(limits + tuple(health_limits)))
         if selected.deferred or selected.at_galactic_s < end.galactic_s or any(
@@ -573,6 +577,11 @@ class Engine:
             for cause in selected.causes
         ):
             raise RuntimeError("Physical segment interval has an unresolved causal boundary")
+        if engine_boundary is not None and any(
+            cause.limit.kind not in {"requested_horizon", "segment_end"}
+            for cause in selected.causes
+        ):
+            raise RuntimeError("Engine wear coincides with an unresolved causal boundary")
         if exposure.hull_end == 0 and state.ship.hull_integrity > 0:
             raise RuntimeError("Physical segment reaches the hull floor")
         for key, system in state.ship.systems.items():
@@ -584,7 +593,15 @@ class Engine:
         staged.clock.t = end.galactic_s
         staged.clock.ship_elapsed_s = end.proper_s
         staged.clock.bio_elapsed_s += biological_time_interval(proper_dt, staged.ship.is_hibernating)
-        staged.ship.physical_transit = replace(physical, elapsed_galactic_s=local_end)
+        pending_transition = ("safety_brake" if physical.intent in {"accelerate", "coast"} else "inertia"
+                              if physical.intent == "brake" else None) if engine_boundary is not None else None
+        staged.ship.physical_transit = replace(
+            physical, elapsed_galactic_s=local_end,
+            replan_required=physical.replan_required or pending_transition is not None,
+            pending_transition=pending_transition,
+            nominal_plan=(replace(nominal, invalidated=True)
+                          if pending_transition is not None and nominal is not None else nominal),
+        )
         fraction = end.distance_m / route_m
         staged.world.current_pos_ly = (
             origin.x_ly + fraction * (destination.x_ly - origin.x_ly),
@@ -603,7 +620,8 @@ class Engine:
         staged.ship.radiation_env_rad_per_s = profile.ambient_at(end.distance_m)
         for key, system in staged.ship.systems.items():
             old_state = system.state
-            system.health = max(0.0, system.health - wear[key])
+            system.health = (engine_threshold if key == "engines" and pending_transition is not None
+                             else max(0.0, system.health - wear[key]))
             self._apply_health_state(system, staged, events, cause="degradation")
             if system.state != old_state:
                 raise RuntimeError("Physical segment crossed a system state boundary")

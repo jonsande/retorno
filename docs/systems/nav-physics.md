@@ -236,3 +236,54 @@ acceleration, short routes can complete; long intervals can encounter an
 operational cut and are rejected until B2 resolves it. B2 must invalidate
 stale nominal plans, resolve same-instant cuts and failures, authorize any new
 powered maneuver separately, and replan from actual position and beta.
+
+## First causal engine-wear cut (NAV-BRAKE-01B3H-B2A)
+
+Within the restricted electrical and radiological regime of 01B3H-A,
+`first_integrated_wear_at()` brackets the first engine-integrity event in the
+requested physical interval. Every bisection probe recomputes
+`integrate_segment_radiation()` and `integrated_system_wear()` from the same
+initial hull, engine, and power snapshot. The endpoint is checked first; the
+search stops when the upper and lower bounds are adjacent representable
+galactic instants. It tests the same rounded `health - wear <= threshold`
+comparison as the state update. The bracket is one floating-point step wide
+for the **numerically integrated** wear; the radiation integrator's reported
+quadrature error and floating-point accumulation also limit physical-time
+accuracy. Safe subdivision can shift a variable-radiation cut by several
+tenths of a nanosecond, so callers must query the next limit again from the
+new state instead of treating an old forecast as authoritative. No fixed tick
+or positive epsilon is inserted at a strict threshold. If a positive interval
+or its proper clock cannot be represented, the interval is rejected.
+
+At 35% during acceleration, `_tick_physical_segment()` commits position,
+beta, galactic/proper/biological clocks, hull loss, and ordinary wear through
+the limit only. Engine health is recorded at exactly 0.35; the existing
+`SystemState` classifier remains unchanged. `PhysicalTransitState` sets
+`pending_transition="safety_brake"` and `replan_required=True`, while the
+prepaid `NominalTravelState` becomes `invalidated` and retains the original
+destination. `safety_braking` and `braking_started` remain false: no new
+braking segment has run. At 15% during braking, the equivalent pending value
+is `"inertia"`; the real nonzero beta is retained. At equality, braking is
+still capable, but any further positive wear on the old segment is rejected.
+Effective engine isolation continues to prohibit propulsion at entry.
+The same 35% preventive cut is handled during nominal coast; beta remains
+constant and no braking is claimed to have begun.
+
+`Engine.tick()` accepts an interval ending at a resolvable engine event. A
+request extending beyond it fails atomically, even when an earlier nominal
+phase has already been evaluated on the private state. A simultaneous nominal
+phase end can suspend its current phase; a simultaneous unsupported electrical,
+radiological, health, or other cut rejects the whole interval. The existing
+`select_next_boundary()` still checks those other limits. The invalidated
+nominal ETA and authorization cannot drive another tick or pay for a new
+maneuver. The suspension marker is included in save/load; eight-field
+01B3H-A and nine-field 01B3H-B1 physical-state pickles remain readable.
+No arrival, waypoint, public journey, or new fuel charge occurs.
+
+Future work must replace the pending marker with a newly authorized safety
+braking or inertial segment from the stored physical position and beta, resolve
+simultaneous non-engine cuts in causal order, and define how already-paid
+nominal braking and any additional propulsion are accounted for. Electrical
+quality changes, work, drones, radio/narrative cuts, engine state changes
+outside the handled capability threshold, and unresolved radiation limits
+still reject the interval.

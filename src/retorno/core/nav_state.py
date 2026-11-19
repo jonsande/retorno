@@ -13,6 +13,7 @@ from retorno.core.nav_physics import MotionSegment, MotionState, TravelPlan, sam
 
 
 NavigationIntent = Literal["accelerate", "brake", "coast"]
+PendingTransition = Literal["safety_brake", "inertia"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +102,7 @@ class PhysicalTransitState:
     replan_required: bool = False
     propulsion_authorization: PropulsionAuthorization | None = None
     nominal_plan: NominalTravelState | None = None
+    pending_transition: PendingTransition | None = None
 
     def __post_init__(self) -> None:
         if (not math.isfinite(self.elapsed_galactic_s)
@@ -121,6 +123,15 @@ class PhysicalTransitState:
             raise ValueError("active braking requires braking_started")
         if self.safety_braking and not self.braking_started:
             raise ValueError("safety braking requires braking_started")
+        if self.pending_transition not in (None, "safety_brake", "inertia"):
+            raise ValueError("unknown pending physical transition")
+        if self.pending_transition is not None and not self.replan_required:
+            raise ValueError("pending physical transition requires replanning")
+        if self.pending_transition == "safety_brake" and (self.intent not in {"accelerate", "coast"}
+                                                          or self.safety_braking):
+            raise ValueError("pending safety braking is not active braking")
+        if self.pending_transition == "inertia" and self.intent != "brake":
+            raise ValueError("pending inertia requires an interrupted braking segment")
         if self.propulsion_authorization is not None and (
             self.propulsion_authorization.segment != self.active_segment
             or self.propulsion_authorization.destination_id != self.original_destination_id
@@ -138,6 +149,8 @@ class PhysicalTransitState:
             or (nominal.completed and self.elapsed_galactic_s != self.active_segment.duration_galactic_s)
         ):
             raise ValueError("nominal plan does not authorize this physical phase")
+        if self.pending_transition is not None and nominal is not None and not nominal.invalidated:
+            raise ValueError("pending transition must invalidate the nominal plan")
 
     @property
     def motion(self) -> MotionState:
@@ -148,12 +161,14 @@ class PhysicalTransitState:
         return [getattr(self, spec.name) for spec in fields(self)]
 
     def __setstate__(self, values: list[object]) -> None:
-        """Old 01B3H-A slot pickles contain the first eight fields only."""
+        """Load the eight-field 01B3H-A and nine-field 01B3H-B1 payloads."""
         specs = fields(self)
-        if not isinstance(values, (list, tuple)) or len(values) not in (len(specs) - 1, len(specs)):
+        if not isinstance(values, (list, tuple)) or len(values) not in (len(specs) - 2, len(specs) - 1, len(specs)):
             raise ValueError("unsupported physical transit pickle payload")
         for spec, value in zip(specs, values):
             object.__setattr__(self, spec.name, value)
-        if len(values) == len(specs) - 1:
+        if len(values) == len(specs) - 2:
             object.__setattr__(self, "nominal_plan", None)
+        if len(values) < len(specs):
+            object.__setattr__(self, "pending_transition", None)
         self.__post_init__()

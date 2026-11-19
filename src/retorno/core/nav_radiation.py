@@ -155,7 +155,8 @@ def _integrate_controlled(
     width = right - left
 
     def value(u: float) -> float:
-        result = function(left + u * width) * width
+        # A rounded left + width may exceed right by one ULP near a segment end.
+        result = function(min(right, max(left, left + u * width))) * width
         if not math.isfinite(result):
             raise ValueError("radiation integrand is not finite")
         return result
@@ -389,6 +390,56 @@ def integrated_system_wear(
     return (base * exposure.proper_s
             + power_delta * (exposure.proper_s - quality_proper_s)
             + radiation_delta * exposure.normalized_internal_proper_s)
+
+
+def first_integrated_wear_at(
+    system: ShipSystem, profile: RadiationProfile, segment: MotionSegment,
+    start_galactic_s: float, end_galactic_s: float, hull_integrity: float,
+    target_health: float, *, in_transit: bool, op_mode: str,
+    hibernating: bool, quality_proper_s_at: Callable[[RadiationIntegral], float],
+) -> float | None:
+    """First representable local galactic instant attaining cumulative wear.
+
+    The caller guarantees a fixed electrical regime and nondecreasing ordinary
+    wear on this interval. Each probe reintegrates radiation and hull loss from
+    the *same* initial state; a point wear rate is never extrapolated. The
+    returned upper bracket differs from the last below-target float by one
+    representable instant. None means the verified endpoint is below target.
+    """
+    if not math.isfinite(target_health) or target_health < 0:
+        raise ValueError("target health must be finite and nonnegative")
+    if (not math.isfinite(start_galactic_s) or not math.isfinite(end_galactic_s)
+            or not 0 <= start_galactic_s <= end_galactic_s <= segment.duration_galactic_s):
+        raise ValueError("wear search must remain inside the active segment")
+    if system.health <= target_health:
+        return start_galactic_s
+
+    def wear_at(at: float) -> float:
+        exposure = integrate_segment_radiation(
+            profile, segment, start_galactic_s, at, hull_integrity,
+            hibernating=hibernating,
+        )
+        return integrated_system_wear(
+            system, exposure, quality_proper_s_at(exposure),
+            in_transit=in_transit, op_mode=op_mode,
+        )
+
+    if system.health - wear_at(end_galactic_s) > target_health:
+        return None
+    lower, upper = start_galactic_s, end_galactic_s
+    for _ in range(1075):  # Binary64 has at most 1074 positive subnormal steps.
+        midpoint = lower + (upper - lower) / 2
+        if midpoint == lower or midpoint == upper:
+            break
+        if system.health - wear_at(midpoint) <= target_health:
+            upper = midpoint
+        else:
+            lower = midpoint
+    else:
+        raise ValueError("integrated wear threshold could not be isolated")
+    if upper <= start_galactic_s:
+        raise ValueError("positive wear threshold is below galactic resolution")
+    return upper
 
 
 @dataclass(frozen=True, slots=True)

@@ -246,3 +246,58 @@ trayectos cortos; los intervalos largos pueden encontrar un corte operativo
 y se rechazan hasta que B2 lo resuelva. B2 deberá invalidar planes nominales
 obsoletos, resolver cortes simultáneos y averías, autorizar aparte cualquier
 maniobra propulsiva nueva y replantear desde posición y beta reales.
+
+## Primer corte causal por desgaste de motores (NAV-BRAKE-01B3H-B2A)
+
+Dentro del régimen eléctrico y radiológico restringido de 01B3H-A,
+`first_integrated_wear_at()` acota el primer acontecimiento de integridad de
+motores en el intervalo físico solicitado. Cada evaluación de la bisección
+recalcula `integrate_segment_radiation()` e `integrated_system_wear()` desde
+el mismo casco, motor y estado eléctrico iniciales. Primero se comprueba el
+extremo del intervalo; la búsqueda termina cuando las cotas son instantes
+galácticos representables adyacentes. Utiliza la misma comparación redondeada
+`health - wear <= threshold` que la actualización del estado. La anchura de
+la cota es un paso de coma flotante para el desgaste **integrado
+numéricamente**; también limitan la precisión temporal el error estimado de
+cuadratura radiológica y la acumulación en coma flotante. Subdividir un caso
+de radiación variable puede desplazar el corte varias décimas de nanosegundo:
+hay que consultar de nuevo el límite desde el estado actualizado, sin
+considerar autoritativa una predicción anterior. No se usa tick fijo ni se
+inventa un épsilon positivo en un umbral estricto. Si el intervalo positivo o
+el reloj propio no son representables, se rechaza.
+
+Al alcanzar el 35 % mientras acelera, `_tick_physical_segment()` confirma la
+posición, beta, relojes galáctico/propio/biológico, pérdida de casco y desgaste
+ordinario solo hasta el límite. La integridad de motores queda exactamente en
+0,35 sin alterar el clasificador vigente de `SystemState`.
+`PhysicalTransitState` registra `pending_transition="safety_brake"` y
+`replan_required=True`; el `NominalTravelState` pagado pasa a `invalidated` y
+conserva el destino original. `safety_braking` y `braking_started` siguen
+falsos: no se ha ejecutado un segmento nuevo de frenado. Al alcanzar el 15 %
+durante un frenado, el valor pendiente es `"inertia"` y se conserva la beta
+real no nula. En la igualdad todavía hay capacidad de frenar, pero se rechaza
+el desgaste positivo posterior del segmento antiguo. El aislamiento efectivo
+de motores sigue impidiendo la propulsión desde el inicio.
+El mismo corte preventivo del 35 % se trata durante el crucero nominal; beta
+permanece constante y no se declara iniciado ningún frenado.
+
+`Engine.tick()` admite un intervalo que termina en un acontecimiento de motor
+resoluble. Si pretende continuar después, falla atómicamente aunque ya se
+haya evaluado una fase nominal anterior en el estado privado. Un final de
+fase nominal simultáneo puede suspender su fase actual; un límite eléctrico,
+radiológico, de salud u otro no resuelto y simultáneo rechaza todo el
+intervalo. `select_next_boundary()` sigue comprobando esos otros límites.
+La ETA y la autorización del plan nominal invalidado no pueden impulsar otro
+tick ni pagar una maniobra nueva. La marca de suspensión persiste en
+guardado/carga; los pickles físicos de ocho campos de 01B3H-A y nueve de
+01B3H-B1 siguen siendo legibles. No hay llegada, waypoint, viaje público ni
+cobro nuevo de combustible.
+
+La siguiente intervención deberá sustituir la marca pendiente por un nuevo
+segmento autorizado de frenado de seguridad o inercia desde la posición y
+beta físicas conservadas, resolver cortes no motores simultáneos según el
+orden causal y definir la contabilidad del frenado nominal ya pagado y de
+cualquier propulsión adicional. Los cambios de calidad eléctrica, trabajos,
+drones, cortes de radio/narrativa, cambios de estado de motor fuera del umbral
+de capacidad tratado y límites radiológicos no resueltos aún rechazan el
+intervalo.
