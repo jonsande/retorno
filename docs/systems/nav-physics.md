@@ -333,3 +333,39 @@ requested motion past a causal boundary reject the entire operation without
 partially activating braking. B2B2 must resolve the pending inertial cut;
 later work must handle repair and replanning, public arrival and waypoints,
 and any additional powered maneuver with its own valid fuel authorization.
+
+## Automatic inertial continuation (NAV-BRAKE-01B3H-B2B2)
+
+After a braking interval ends at the causal 15% engine cut with residual beta,
+the next positive `Engine.tick()` creates a zero-thrust `coast_for()` segment
+from the exact stored `MotionState`. Its start preserves distance, beta,
+galactic time, and proper time. A zero-duration tick does nothing. The engine
+simulates the requested interval on a private state and commits the transition
+and advance together; an unsupported electrical, radiological, health, job,
+or other causal limit rejects the whole request and leaves the pending marker.
+A request that *contains* the 15% cut still rejects as before: the caller
+must end one tick at that cut and request the inertial interval separately.
+
+`InertialContinuation` retains the interrupted braking segment and elapsed
+time, original destination, and spent nominal or independent authorization.
+For substituted safety braking it also retains the paid nominal plan and
+`NominalBrakingSubstitution`; for direct nominal braking it retains the
+invalidated paid plan; for an independent brake it retains its spent
+`PropulsionAuthorization`. The active physical state has no propulsion receipt
+or active substitution. The old plan remains invalidated, no antimatter is
+charged or refunded, and new powered maneuvers cannot use this history.
+Earlier physical save payloads remain readable. Each unpowered segment has
+only the duration requested for that tick; after its administrative endpoint,
+the next tick renews it from the exact previous endpoint. There is no
+inertial arrival ETA or fixed-step scheduler.
+
+The existing physical interval path advances position, battery, radiation,
+hull and system wear, galactic/proper/biological clocks, and events. Engine
+health may fall below 15%, or engines may be isolated or OFFLINE, without
+altering inertial beta. Other operational cuts retain conservative rejection.
+Crossing and moving beyond the original destination at positive beta does not
+declare arrival, dock, create a waypoint, change the current node, or add a
+route. The provisional radiation profile clamps to its endpoint beyond B.
+Public `Travel` and `RouteSolve` remain prohibited while physical transit
+exists. Repair, replanning, resumed braking, public waypoints and overshoot
+warnings require later work and separate authorization for any new thrust.

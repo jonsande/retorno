@@ -9,7 +9,8 @@ from dataclasses import dataclass, fields
 import math
 from typing import Literal
 
-from retorno.core.nav_physics import MotionSegment, MotionState, TravelPlan, brake_to_stop, sample_segment
+from retorno.core.nav_physics import (LIGHT_SPEED_M_S, MotionSegment, MotionState,
+                                      TravelPlan, brake_to_stop, sample_segment)
 
 
 NavigationIntent = Literal["accelerate", "brake", "coast"]
@@ -119,6 +120,65 @@ class NominalBrakingSubstitution:
 
 
 @dataclass(frozen=True, slots=True)
+class InertialContinuation:
+    """Spent braking authority and the current unpowered continuation."""
+
+    interrupted_segment: MotionSegment
+    interrupted_elapsed_galactic_s: float
+    destination_id: str
+    current_segment: MotionSegment
+    nominal_plan: NominalTravelState | None = None
+    braking_substitution: NominalBrakingSubstitution | None = None
+    propulsion_receipt: PropulsionAuthorization | None = None
+
+    def __post_init__(self) -> None:
+        if (not math.isfinite(self.interrupted_elapsed_galactic_s)
+                or not 0 <= self.interrupted_elapsed_galactic_s <= self.interrupted_segment.duration_galactic_s
+                or self.interrupted_segment.proper_acceleration_m_s2 >= 0
+                or not self.destination_id):
+            raise ValueError("inertial continuation requires interrupted braking")
+        cut = sample_segment(self.interrupted_segment, self.interrupted_elapsed_galactic_s)
+        coast = self.current_segment
+        if (cut.beta <= 0 or coast.proper_acceleration_m_s2 != 0
+                or coast.start.beta != cut.beta or coast.end_beta != cut.beta
+                or coast.start.galactic_s < cut.galactic_s
+                or coast.start.proper_s < cut.proper_s
+                or coast.start.distance_m < cut.distance_m):
+            raise ValueError("inertial continuation must retain the interrupted speed")
+        elapsed = coast.start.galactic_s - cut.galactic_s
+        expected_distance = cut.distance_m + LIGHT_SPEED_M_S * cut.beta * elapsed
+        expected_proper = cut.proper_s + elapsed * math.sqrt((1 - cut.beta) * (1 + cut.beta))
+        if (abs(coast.start.distance_m - expected_distance)
+                > max(1.0, 64 * math.ulp(max(1.0, expected_distance)))
+                or abs(coast.start.proper_s - expected_proper)
+                > max(1e-6, 64 * math.ulp(max(1.0, expected_proper)))):
+            raise ValueError("inertial continuation is discontinuous from its braking cut")
+        nominal = self.nominal_plan
+        replacement = self.braking_substitution
+        receipt = self.propulsion_receipt
+        if receipt is not None:
+            receipt.__post_init__()
+        if nominal is not None:
+            nominal.__post_init__()
+            if (not nominal.invalidated or nominal.completed
+                    or nominal.destination_id != self.destination_id
+                    or receipt is not None):
+                raise ValueError("inertial nominal history must be invalidated")
+            if replacement is not None:
+                replacement.__post_init__()
+                if (replacement.completed or replacement.paid_plan != nominal
+                        or replacement.braking_segment != self.interrupted_segment):
+                    raise ValueError("inertial substituted braking history is invalid")
+            elif (nominal.phase_index != len(nominal.segments) - 1
+                  or nominal.segments[nominal.phase_index] != self.interrupted_segment):
+                raise ValueError("inertial nominal braking history is invalid")
+        elif (replacement is not None or receipt is None
+              or receipt.segment != self.interrupted_segment
+              or receipt.destination_id != self.destination_id):
+            raise ValueError("inertial independent braking needs its spent receipt")
+
+
+@dataclass(frozen=True, slots=True)
 class PhysicalTransitState:
     """An active maneuver and the original requested destination.
 
@@ -138,6 +198,7 @@ class PhysicalTransitState:
     nominal_plan: NominalTravelState | None = None
     pending_transition: PendingTransition | None = None
     nominal_braking_substitution: NominalBrakingSubstitution | None = None
+    inertial_continuation: InertialContinuation | None = None
 
     def __post_init__(self) -> None:
         if (not math.isfinite(self.elapsed_galactic_s)
@@ -175,6 +236,18 @@ class PhysicalTransitState:
         nominal = self.nominal_plan
         if nominal is not None:
             nominal.__post_init__()  # Also validate plans restored from a pickle.
+        inertia = self.inertial_continuation
+        if inertia is not None:
+            inertia.__post_init__()
+            if (self.active_segment != inertia.current_segment
+                    or self.original_destination_id != inertia.destination_id
+                    or self.intent != "coast" or not self.braking_started
+                    or not self.replan_required or self.pending_transition is not None
+                    or self.safety_braking or self.propulsion_authorization is not None
+                    or self.nominal_braking_substitution is not None
+                    or nominal != inertia.nominal_plan):
+                raise ValueError("inertial motion cannot reuse braking authorization")
+            return
         substitution = self.nominal_braking_substitution
         if substitution is not None:
             substitution.__post_init__()
@@ -213,7 +286,7 @@ class PhysicalTransitState:
     def __setstate__(self, values: list[object]) -> None:
         """Load physical payloads since 01B3H-A, defaulting newer fields."""
         specs = fields(self)
-        if not isinstance(values, (list, tuple)) or len(values) not in (8, 9, 10, len(specs)):
+        if not isinstance(values, (list, tuple)) or len(values) not in (8, 9, 10, 11, len(specs)):
             raise ValueError("unsupported physical transit pickle payload")
         for spec, value in zip(specs, values):
             object.__setattr__(self, spec.name, value)
@@ -222,5 +295,7 @@ class PhysicalTransitState:
         if len(values) < 10:
             object.__setattr__(self, "pending_transition", None)
         if len(values) < len(specs):
+            object.__setattr__(self, "inertial_continuation", None)
+        if len(values) < 11:
             object.__setattr__(self, "nominal_braking_substitution", None)
         self.__post_init__()

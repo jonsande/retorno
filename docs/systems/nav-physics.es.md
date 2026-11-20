@@ -350,3 +350,41 @@ parcialmente el frenado. B2B2 deberá resolver la inercia pendiente;
 intervenciones posteriores deberán tratar reparaciones y replanteamiento,
 llegada pública y waypoints, y autorizar con combustible válido cualquier
 maniobra propulsiva adicional.
+
+## Continuación inercial automática (NAV-BRAKE-01B3H-B2B2)
+
+Cuando un intervalo de frenado termina en el corte causal del 15 % con beta
+residual, el siguiente `Engine.tick()` positivo crea un segmento `coast_for()`
+sin empuje desde el `MotionState` exacto conservado. Su inicio mantiene
+distancia, beta, tiempo galáctico y tiempo propio. Un tick de duración cero no
+hace nada. El motor simula el intervalo solicitado sobre un estado privado y
+confirma la transición y el avance juntos; un límite eléctrico, radiológico,
+de salud, trabajo u otro límite causal no soportado rechaza toda la petición
+y conserva la marca pendiente. Una petición que *contiene* el corte del 15 %
+sigue rechazándose: el llamante debe terminar un tick en ese instante y
+solicitar después el intervalo inercial.
+
+`InertialContinuation` conserva el segmento y tiempo transcurrido del frenado
+interrumpido, el destino original y la autorización nominal o independiente
+ya utilizada. En el frenado preventivo sustitutivo conserva además el plan
+nominal pagado y `NominalBrakingSubstitution`; en el frenado nominal directo,
+el plan pagado e invalidado; y en un frenado independiente, su
+`PropulsionAuthorization` gastada. El estado físico activo carece de recibo
+propulsivo y de sustitución activa. El plan antiguo permanece invalidado, no
+se cobra ni devuelve antimateria y este historial no autoriza nuevo empuje.
+Siguen siendo legibles los estados físicos guardados anteriormente. Cada
+segmento inercial dura solo el intervalo solicitado en ese tick; tras su
+extremo administrativo, el siguiente tick lo renueva desde el extremo físico
+exacto. No hay ETA inercial de llegada ni scheduler de pasos fijos.
+
+La vía física existente actualiza posición, batería, radiación, casco,
+desgaste de sistemas, relojes galáctico/propio/biológico y acontecimientos.
+La integridad de motores puede bajar del 15 %, o los motores pueden quedar
+aislados u OFFLINE, sin cambiar beta inercial. Los demás cortes operativos
+conservan el rechazo conservador. Cruzar y sobrepasar el destino original con
+beta positiva no declara llegada, no acopla, no crea waypoint, no cambia el
+nodo actual ni agrega rutas. La política radiológica provisional se satura
+al valor del extremo más allá de B. `Travel` y `RouteSolve` públicos siguen
+prohibidos mientras existe tránsito físico. Reparaciones, replanteamiento,
+reanudación del frenado, waypoints y avisos de sobrepaso requerirán fases
+posteriores y autorización separada para cualquier empuje nuevo.

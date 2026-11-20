@@ -20,7 +20,8 @@ from retorno.core.nav_physics import (MotionSegment, MotionState, accelerate_to,
                                       brake_to_stop, coast_for, light_years_to_metres,
                                       plan_travel, proper_time_in_segment, sample_segment)
 from retorno.core.nav_state import (PhysicalTransitState, PropulsionAuthorization,
-                                    NominalTravelState, NominalBrakingSubstitution)
+                                    NominalTravelState, NominalBrakingSubstitution,
+                                    InertialContinuation)
 from retorno.core.nav_radiation import (RadiationProfile, hull_decay_rate, internal_radiation_rate,
                                         integrate_segment_radiation, integrated_system_wear,
                                         first_integrated_wear_at,
@@ -144,6 +145,9 @@ class Engine:
         if state.ship.physical_transit is not None:
             if state.ship.physical_transit.pending_transition == "safety_brake":
                 return self._tick_safety_braking(state, dt)
+            if (state.ship.physical_transit.pending_transition == "inertia"
+                    or state.ship.physical_transit.inertial_continuation is not None):
+                return self._tick_inertial(state, dt)
             if (state.ship.physical_transit.nominal_plan is not None
                     and state.ship.physical_transit.nominal_braking_substitution is None):
                 return self._tick_nominal_physical_travel(state, dt)
@@ -227,6 +231,8 @@ class Engine:
         else:
             if previous.nominal_braking_substitution is not None:
                 raise RuntimeError("safety braking cannot prepare another physical maneuver")
+            if previous.inertial_continuation is not None:
+                raise RuntimeError("inertial motion cannot prepare another physical maneuver")
             if (previous.elapsed_galactic_s != previous.active_segment.duration_galactic_s
                     or previous.motion != segment.start):
                 raise RuntimeError("physical continuation must start at the previous endpoint")
@@ -459,6 +465,54 @@ class Engine:
             pending_transition=None, nominal_braking_substitution=substitution,
         )
 
+    def _tick_inertial(self, state: GameState, dt: float) -> list[Event]:
+        """Renew unpowered coast from the real motion and commit only a safe tick."""
+        if not math.isfinite(dt) or dt < 0:
+            raise ValueError("physical tick duration must be finite and nonnegative")
+        if dt == 0:
+            return []
+        staged = deepcopy(state)
+        physical = staged.ship.physical_transit
+        assert physical is not None
+        history = physical.inertial_continuation
+        if history is None:
+            if physical.pending_transition != "inertia" or not physical.replan_required:
+                raise RuntimeError("inertial motion lacks a causal braking cut")
+            if physical.nominal_braking_substitution is not None:
+                physical.__post_init__()
+            elif physical.nominal_plan is not None:
+                physical.__post_init__()
+            elif (physical.propulsion_authorization is None
+                  or physical.propulsion_authorization.segment != physical.active_segment):
+                raise RuntimeError("inertial motion lacks its spent propulsion receipt")
+            cut = physical.motion
+            if cut.beta <= 0:
+                raise RuntimeError("inertial continuation requires residual speed")
+            coast = coast_for(cut, dt)
+            history = InertialContinuation(
+                physical.active_segment, physical.elapsed_galactic_s,
+                physical.original_destination_id, coast, physical.nominal_plan,
+                physical.nominal_braking_substitution, physical.propulsion_authorization,
+            )
+            staged.ship.physical_transit = replace(
+                physical, active_segment=coast, elapsed_galactic_s=0.0,
+                intent="coast", safety_braking=False, braking_started=True,
+                pending_transition=None, propulsion_authorization=None,
+                nominal_braking_substitution=None, inertial_continuation=history,
+            )
+        else:
+            physical.__post_init__()
+            if physical.elapsed_galactic_s != physical.active_segment.duration_galactic_s:
+                raise RuntimeError("inertial continuation must end its current horizon")
+            coast = coast_for(physical.motion, dt)
+            staged.ship.physical_transit = replace(
+                physical, active_segment=coast, elapsed_galactic_s=0.0,
+                inertial_continuation=replace(history, current_segment=coast),
+            )
+        events = self._tick_physical_segment(staged, dt)
+        self._commit_physical_state(state, staged)
+        return events
+
     def _tick_physical_segment(self, state: GameState, dt: float) -> list[Event]:
         """One causal physical interval. Commit only after all staged effects succeed.
 
@@ -474,6 +528,9 @@ class Engine:
         if physical.pending_transition is not None:
             raise RuntimeError("pending physical transition must be resolved before further motion")
         substitution = physical.nominal_braking_substitution
+        inertia = physical.inertial_continuation
+        if inertia is not None:
+            physical.__post_init__()
         if substitution is not None:
             physical.__post_init__()
             if substitution.completed:
@@ -482,10 +539,11 @@ class Engine:
         powered = physical.intent != "coast"
         nominal = physical.nominal_plan
         if nominal is not None and (
-            (nominal.invalidated and substitution is None) or nominal.completed
+            (nominal.invalidated and substitution is None and inertia is None) or nominal.completed
             or nominal.origin_id != state.ship.transit_from
             or nominal.destination_id != physical.original_destination_id
-            or (substitution is None and nominal.segments[nominal.phase_index] != segment)
+            or (substitution is None and inertia is None
+                and nominal.segments[nominal.phase_index] != segment)
             or physical.propulsion_authorization is not None
         ):
             raise RuntimeError("Physical phase lacks its nominal plan authorization")
@@ -582,7 +640,7 @@ class Engine:
                 for key, system in state.ship.systems.items()}
         engine_boundary = None
         engine_threshold = None
-        if powered or (nominal is not None and physical.intent == "coast"):
+        if powered or (nominal is not None and physical.intent == "coast" and inertia is None):
             engine = state.ship.systems["engines"]
             engine_threshold = (Balance.SYSTEM_HEALTH_CRITICAL if physical.intent != "brake"
                                 else Balance.ENGINE_EMERGENCY_BRAKE_MIN_HEALTH)

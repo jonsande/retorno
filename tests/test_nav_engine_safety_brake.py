@@ -224,8 +224,11 @@ def test_15_percent_during_safety_brake_defers_inertia_without_stopping():
     assert stopped.motion.beta > 0
     assert game.ship.systems["engines"].health == .15
     loaded = save_and_load(game)
-    with pytest.raises(RuntimeError, match="pending physical transition"):
-        Engine().tick(loaded, 1)
+    prior = loaded.ship.physical_transit.motion
+    Engine().tick(loaded, 1)
+    assert loaded.ship.physical_transit.intent == "coast"
+    assert loaded.ship.physical_transit.motion.beta == prior.beta
+    assert loaded.ship.physical_transit.motion.distance_m > prior.distance_m
 
 
 def test_exact_15_percent_allows_safety_braking_when_wear_is_zero():

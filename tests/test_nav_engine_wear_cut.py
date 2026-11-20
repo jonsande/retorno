@@ -225,8 +225,11 @@ def test_braking_cut_at_15_percent_preserves_motion_and_rejects_extension():
         restored = loaded.state
     assert restored.ship.physical_transit.pending_transition == "inertia"
     assert restored.ship.physical_transit.motion == game.ship.physical_transit.motion
-    with pytest.raises(RuntimeError, match="pending physical transition"):
-        Engine().tick(restored, 1)
+    prior = restored.ship.physical_transit.motion
+    Engine().tick(restored, 1)
+    assert restored.ship.physical_transit.intent == "coast"
+    assert restored.ship.physical_transit.motion.beta == prior.beta
+    assert restored.ship.physical_transit.motion.distance_m > prior.distance_m
 
 
 def test_nominal_braking_cut_invalidates_prepaid_plan_without_recharging():
