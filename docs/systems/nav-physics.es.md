@@ -301,3 +301,52 @@ cualquier propulsión adicional. Los cambios de calidad eléctrica, trabajos,
 drones, cortes de radio/narrativa, cambios de estado de motor fuera del umbral
 de capacidad tratado y límites radiológicos no resueltos aún rechazan el
 intervalo.
+
+## Frenado preventivo automático pagado (NAV-BRAKE-01B3H-B2B1)
+
+En el siguiente `Engine.tick()` positivo tras un corte de B2A en aceleración
+o crucero nominal, `pending_transition="safety_brake"` se sustituye en el
+instante conservado por `brake_to_stop(physical.motion, aceleración propia
+nominal)`. El nuevo segmento empieza en la posición, beta, reloj galáctico y
+reloj propio reales. La transición en sí no consume tiempo, electricidad,
+desgaste, RNG ni combustible. Un tick de duración cero sigue siendo inocuo.
+El segmento recorre la vía física causal existente, con electricidad,
+radiación, pérdida de casco, desgaste y tiempo propio y biológico. El plan
+nominal permanece invalidado y `replan_required` sigue siendo verdadero.
+
+`NominalBrakingSubstitution` conserva el plan pagado e invalidado, la fase y
+el tiempo transcurrido al interrumpirse, el destino original, el segmento
+sustitutivo exacto y el acontecimiento de motores al 35 %. El estado valida
+que sea un frenado continuo desde el movimiento interrumpido hasta beta cero,
+con la desaceleración nominal y sin superar la beta máxima del plan. Es el
+único frenado ya incluido en la tarifa nominal: no crea otro recibo ni cambia
+el saldo de antimateria. No permite cambiar de destino, preparar otro
+segmento ni reanudar la aceleración. Un segmento físico pagado por separado
+carece de cobertura nominal para esta sustitución y sigue rechazándola. La
+autorización y su marca de finalización persisten en guardado/carga; siguen
+siendo legibles los payloads físicos anteriores.
+
+La integridad exactamente igual al 35 % permite iniciar el frenado. Desde el
+15 % inclusive y por debajo del 35 %, los motores pueden frenar, pero no
+acelerar. El acontecimiento de cambio DAMAGED a CRITICAL provocado por el
+primer intervalo positivo se conserva una sola vez. En un corte exactamente
+al 15 % con beta positiva, se detiene el avance del segmento y
+`pending_transition="inertia"` conserva el movimiento real; B2B2 deberá
+activar la continuación inercial. Si beta llega antes a cero, la sustitución
+queda finalizada en la posición real de parada y los ticks positivos
+posteriores no pueden reiniciarla. No hay llegada pública ni waypoint aunque
+se cruce el destino con velocidad positiva. Más allá de la ruta se utiliza
+la política radiológica espacial provisional. Con geometría nominal fija y
+la misma desaceleración, un corte en aceleración o crucero detiene la nave en
+B o antes; desplazar la geometría del destino tras partir permite comprobar
+el caso espacial de sobrepaso, que no se produce en el viaje ordinario B2B1.
+
+La activación y el intervalo positivo solicitado se ejecutan sobre un
+`GameState` preparado en privado y se confirman juntos. La falta de
+alimentación, el aislamiento, los límites eléctricos o radiológicos sin
+resolver, los acontecimientos de salud incompatibles y la petición de un
+intervalo posterior al corte causal rechazan toda la operación sin activar
+parcialmente el frenado. B2B2 deberá resolver la inercia pendiente;
+intervenciones posteriores deberán tratar reparaciones y replanteamiento,
+llegada pública y waypoints, y autorizar con combustible válido cualquier
+maniobra propulsiva adicional.

@@ -19,7 +19,8 @@ from retorno.core.nav_electricity import (battery_energy_after, power_quality_co
 from retorno.core.nav_physics import (MotionSegment, MotionState, accelerate_to, append_segment,
                                       brake_to_stop, coast_for, light_years_to_metres,
                                       plan_travel, proper_time_in_segment, sample_segment)
-from retorno.core.nav_state import PhysicalTransitState, PropulsionAuthorization, NominalTravelState
+from retorno.core.nav_state import (PhysicalTransitState, PropulsionAuthorization,
+                                    NominalTravelState, NominalBrakingSubstitution)
 from retorno.core.nav_radiation import (RadiationProfile, hull_decay_rate, internal_radiation_rate,
                                         integrate_segment_radiation, integrated_system_wear,
                                         first_integrated_wear_at,
@@ -141,7 +142,10 @@ class Engine:
 
     def tick(self, state: GameState, dt: float) -> list[Event]:
         if state.ship.physical_transit is not None:
-            if state.ship.physical_transit.nominal_plan is not None:
+            if state.ship.physical_transit.pending_transition == "safety_brake":
+                return self._tick_safety_braking(state, dt)
+            if (state.ship.physical_transit.nominal_plan is not None
+                    and state.ship.physical_transit.nominal_braking_substitution is None):
                 return self._tick_nominal_physical_travel(state, dt)
             return self._tick_physical_segment(state, dt)
         # Stop at drone decision/completion boundaries. A large wait must not
@@ -221,6 +225,8 @@ class Engine:
                     or segment.start.distance_m != 0):
                 raise ValueError("initial physical segment must start at current clocks and origin")
         else:
+            if previous.nominal_braking_substitution is not None:
+                raise RuntimeError("safety braking cannot prepare another physical maneuver")
             if (previous.elapsed_galactic_s != previous.active_segment.duration_galactic_s
                     or previous.motion != segment.start):
                 raise RuntimeError("physical continuation must start at the previous endpoint")
@@ -412,6 +418,47 @@ class Engine:
         self._commit_physical_state(state, staged)
         return events
 
+    def _tick_safety_braking(self, state: GameState, dt: float) -> list[Event]:
+        """Replace a paid nominal brake and execute a positive interval atomically."""
+        if not math.isfinite(dt) or dt < 0:
+            raise ValueError("physical tick duration must be finite and nonnegative")
+        if dt == 0:
+            return []
+        staged = deepcopy(state)
+        self._activate_safety_braking(staged)
+        events = self._tick_physical_segment(staged, dt)
+        self._commit_physical_state(state, staged)
+        return events
+
+    def _activate_safety_braking(self, state: GameState) -> None:
+        """Change only the internal navigation record at the existing instant."""
+        physical = state.ship.physical_transit
+        assert physical is not None
+        nominal = physical.nominal_plan
+        if (physical.pending_transition != "safety_brake" or nominal is None
+                or physical.nominal_braking_substitution is not None
+                or not nominal.invalidated or nominal.completed
+                or not physical.replan_required or physical.braking_started
+                or physical.safety_braking or physical.propulsion_authorization is not None
+                or physical.active_segment != nominal.segments[nominal.phase_index]
+                or nominal.phase_index >= len(nominal.segments) - 1
+                or physical.original_destination_id != nominal.destination_id
+                or state.ship.transit_from != nominal.origin_id):
+            raise RuntimeError("pending safety brake lacks a valid paid nominal journey")
+        if not self._physical_propulsion_available(state, "brake"):
+            raise RuntimeError("physical safety braking capacity is unavailable")
+        start = physical.motion
+        braking = brake_to_stop(start, nominal.profile.proper_acceleration_m_s2)
+        substitution = NominalBrakingSubstitution(
+            nominal, physical.active_segment, physical.elapsed_galactic_s,
+            braking, physical.original_destination_id,
+        )
+        state.ship.physical_transit = replace(
+            physical, active_segment=braking, elapsed_galactic_s=0.0,
+            intent="brake", safety_braking=True, braking_started=True,
+            pending_transition=None, nominal_braking_substitution=substitution,
+        )
+
     def _tick_physical_segment(self, state: GameState, dt: float) -> list[Event]:
         """One causal physical interval. Commit only after all staged effects succeed.
 
@@ -420,16 +467,25 @@ class Engine:
         """
         physical = state.ship.physical_transit
         assert physical is not None
+        if not math.isfinite(dt) or dt < 0:
+            raise ValueError("physical tick duration must be finite and nonnegative")
+        if dt == 0:
+            return []
         if physical.pending_transition is not None:
             raise RuntimeError("pending physical transition must be resolved before further motion")
+        substitution = physical.nominal_braking_substitution
+        if substitution is not None:
+            physical.__post_init__()
+            if substitution.completed:
+                raise RuntimeError("safety braking is already complete")
         segment = physical.active_segment
         powered = physical.intent != "coast"
         nominal = physical.nominal_plan
         if nominal is not None and (
-            nominal.invalidated or nominal.completed
+            (nominal.invalidated and substitution is None) or nominal.completed
             or nominal.origin_id != state.ship.transit_from
             or nominal.destination_id != physical.original_destination_id
-            or nominal.segments[nominal.phase_index] != segment
+            or (substitution is None and nominal.segments[nominal.phase_index] != segment)
             or physical.propulsion_authorization is not None
         ):
             raise RuntimeError("Physical phase lacks its nominal plan authorization")
@@ -454,10 +510,6 @@ class Engine:
                 raise RuntimeError("Physical propulsion capacity is unavailable")
         elif physical.propulsion_authorization is not None:
             raise RuntimeError("Physical coast cannot carry a propulsion authorization")
-        if not math.isfinite(dt) or dt < 0:
-            raise ValueError("physical tick duration must be finite and nonnegative")
-        if dt == 0:
-            return []
         if state.ship.in_transit or state.ship.docked_node_id is not None:
             raise RuntimeError("Physical segment requires an undocked, non-legacy transit")
         if state.jobs.active_job_ids or any(j.status in {JobStatus.RUNNING, JobStatus.QUEUED}
@@ -595,12 +647,17 @@ class Engine:
         staged.clock.bio_elapsed_s += biological_time_interval(proper_dt, staged.ship.is_hibernating)
         pending_transition = ("safety_brake" if physical.intent in {"accelerate", "coast"} else "inertia"
                               if physical.intent == "brake" else None) if engine_boundary is not None else None
+        stopped_safety_brake = substitution is not None and local_end == segment.duration_galactic_s
+        if stopped_safety_brake:
+            pending_transition = None  # At beta zero there is no inertial continuation to schedule.
         staged.ship.physical_transit = replace(
             physical, elapsed_galactic_s=local_end,
             replan_required=physical.replan_required or pending_transition is not None,
             pending_transition=pending_transition,
             nominal_plan=(replace(nominal, invalidated=True)
                           if pending_transition is not None and nominal is not None else nominal),
+            nominal_braking_substitution=(replace(substitution, completed=True)
+                                          if stopped_safety_brake else substitution),
         )
         fraction = end.distance_m / route_m
         staged.world.current_pos_ly = (
@@ -620,12 +677,20 @@ class Engine:
         staged.ship.radiation_env_rad_per_s = profile.ambient_at(end.distance_m)
         for key, system in staged.ship.systems.items():
             old_state = system.state
-            system.health = (engine_threshold if key == "engines" and pending_transition is not None
+            system.health = (engine_threshold if key == "engines" and engine_boundary is not None
                              else max(0.0, system.health - wear[key]))
+            health_event_count = len(events)
             self._apply_health_state(system, staged, events, cause="degradation")
             if system.state != old_state:
-                raise RuntimeError("Physical segment crossed a system state boundary")
-        if events:
+                if not (substitution is not None and key == "engines"
+                        and old_state == SystemState.DAMAGED
+                        and system.state == SystemState.CRITICAL
+                        and state.ship.systems["engines"].health == Balance.SYSTEM_HEALTH_CRITICAL
+                        and len(events) == health_event_count + 1):
+                    raise RuntimeError("Physical segment crossed a system state boundary")
+        if events and not (substitution is not None and len(events) == 1
+                           and events[0].type == EventType.SYSTEM_STATE_CHANGED
+                           and events[0].source == SourceRef(kind="ship_system", id="engines")):
             raise RuntimeError("Physical segment produced an unresolved health event")
         internal = internal_radiation_rate(staged.ship.radiation_env_rad_per_s,
                                            staged.ship.hull_integrity)

@@ -287,3 +287,49 @@ nominal braking and any additional propulsion are accounted for. Electrical
 quality changes, work, drones, radio/narrative cuts, engine state changes
 outside the handled capability threshold, and unresolved radiation limits
 still reject the interval.
+
+## Automatic paid safety braking (NAV-BRAKE-01B3H-B2B1)
+
+On the next positive `Engine.tick()` after a B2A nominal acceleration or
+coast cut, `pending_transition="safety_brake"` is replaced at the stored
+instant by `brake_to_stop(physical.motion, nominal proper acceleration)`.
+This starts at the actual position, beta, galactic clock, and proper clock.
+The transition itself uses no time, electricity, wear, RNG, or fuel. A zero
+duration tick remains a no-op. The new segment runs through the existing
+causal physical path, including electricity, radiation, hull loss, system
+wear, and proper and biological time. The original nominal plan stays
+invalidated and `replan_required` remains true.
+
+`NominalBrakingSubstitution` records the invalidated paid plan, interrupted
+phase and elapsed time, original destination, exact replacement segment, and
+the 35% engine event. The state validates the segment as continuous braking
+from the interrupted motion to beta zero at the nominal deceleration, no
+faster than the plan's peak beta. It is the one braking maneuver already
+included in the paid nominal fare; it neither creates a second receipt nor
+changes the antimatter balance. It cannot authorize a changed destination,
+another segment, or renewed acceleration. An independently paid physical
+segment has no nominal braking allowance and still rejects this transition.
+The authorization and completion marker survive save/load; earlier physical
+pickle payloads remain readable.
+
+Exactly 35% engine health permits the transition. Between 15% inclusive and
+35%, engines may brake but cannot accelerate. The DAMAGED to CRITICAL state
+event caused by the first positive braking interval is preserved once. At an
+exact 15% cut with beta still positive, the segment stops advancing and
+`pending_transition="inertia"` retains the real motion; automatic inertial
+continuation belongs to B2B2. If beta reaches zero first, the substitution
+becomes completed at the actual stopping position and later positive ticks
+cannot restart it. No public arrival or waypoint is created, even if the
+ship crosses the destination while moving. Radiation uses the provisional
+endpoint policy beyond the route. With an unchanged, fixed nominal geometry
+and the same deceleration, an interruption in acceleration or coast stops at
+or before B; moving the destination geometry after departure can exercise
+the beyond-B spatial path, but ordinary B2B1 travel does not produce it.
+
+The activation and requested positive interval run on a private staged
+`GameState` and commit together. Missing propulsion power, isolation,
+unresolved electrical or radiation limits, unsupported health events, and
+requested motion past a causal boundary reject the entire operation without
+partially activating braking. B2B2 must resolve the pending inertial cut;
+later work must handle repair and replanning, public arrival and waypoints,
+and any additional powered maneuver with its own valid fuel authorization.

@@ -131,10 +131,10 @@ def test_acceleration_cut_matches_independent_constant_wear_reference_and_is_ato
     assert not any(event.type == EventType.ARRIVED for event in events)
     assert all(current is original for current, original in zip(
         (game.ship, game.clock, game.world, game.events, game.meta), owners))
-    suspended = pickle.dumps(game)
-    with pytest.raises(RuntimeError, match="invalidated"):
-        Engine().tick(game, 1)
-    assert pickle.dumps(game) == suspended
+    Engine().tick(game, 1)
+    assert game.ship.physical_transit.safety_braking
+    assert game.ship.physical_transit.nominal_plan.invalidated
+    assert game.ship.antimatter_capsules == fuel
 
 
 def test_nominal_cut_save_load_and_phase_end_simultaneity():
@@ -167,8 +167,9 @@ def test_nominal_cut_save_load_and_phase_end_simultaneity():
         restored = loaded.state
     assert restored.ship.physical_transit == physical
     assert restored.ship.antimatter_capsules == game.ship.antimatter_capsules
-    with pytest.raises(RuntimeError, match="invalidated"):
-        Engine().tick(restored, 1)
+    Engine().tick(restored, 1)
+    assert restored.ship.physical_transit.safety_braking
+    assert restored.ship.physical_transit.nominal_plan.invalidated
 
 
 def test_safe_acceleration_before_cut_survives_save_and_reforecast():

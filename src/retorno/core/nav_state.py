@@ -9,7 +9,7 @@ from dataclasses import dataclass, fields
 import math
 from typing import Literal
 
-from retorno.core.nav_physics import MotionSegment, MotionState, TravelPlan, sample_segment
+from retorno.core.nav_physics import MotionSegment, MotionState, TravelPlan, brake_to_stop, sample_segment
 
 
 NavigationIntent = Literal["accelerate", "brake", "coast"]
@@ -85,6 +85,40 @@ class NominalTravelState:
 
 
 @dataclass(frozen=True, slots=True)
+class NominalBrakingSubstitution:
+    """One use of the braking already included in an invalidated paid journey.
+
+    The immutable source plan remains the historical payment record. The
+    interruption and new segment bind this permission to one physical stop;
+    this is not another fuel receipt or a reusable antimatter balance.
+    """
+
+    paid_plan: NominalTravelState
+    interrupted_segment: MotionSegment
+    interrupted_elapsed_galactic_s: float
+    braking_segment: MotionSegment
+    destination_id: str
+    cause: Literal["engine_integrity_35"] = "engine_integrity_35"
+    completed: bool = False
+
+    def __post_init__(self) -> None:
+        plan = self.paid_plan
+        plan.__post_init__()
+        if (not plan.invalidated or plan.completed
+                or plan.phase_index >= len(plan.segments) - 1
+                or self.interrupted_segment != plan.segments[plan.phase_index]
+                or not math.isfinite(self.interrupted_elapsed_galactic_s)
+                or not 0 <= self.interrupted_elapsed_galactic_s <= self.interrupted_segment.duration_galactic_s
+                or self.destination_id != plan.destination_id
+                or self.cause != "engine_integrity_35"):
+            raise ValueError("braking substitution requires an interrupted paid nominal journey")
+        start = sample_segment(self.interrupted_segment, self.interrupted_elapsed_galactic_s)
+        if (start.beta <= 0 or start.beta > plan.profile.peak_beta
+                or self.braking_segment != brake_to_stop(start, plan.profile.proper_acceleration_m_s2)):
+            raise ValueError("braking substitution must stop from the original interruption")
+
+
+@dataclass(frozen=True, slots=True)
 class PhysicalTransitState:
     """An active maneuver and the original requested destination.
 
@@ -103,6 +137,7 @@ class PhysicalTransitState:
     propulsion_authorization: PropulsionAuthorization | None = None
     nominal_plan: NominalTravelState | None = None
     pending_transition: PendingTransition | None = None
+    nominal_braking_substitution: NominalBrakingSubstitution | None = None
 
     def __post_init__(self) -> None:
         if (not math.isfinite(self.elapsed_galactic_s)
@@ -140,7 +175,20 @@ class PhysicalTransitState:
         nominal = self.nominal_plan
         if nominal is not None:
             nominal.__post_init__()  # Also validate plans restored from a pickle.
-        if nominal is not None and (
+        substitution = self.nominal_braking_substitution
+        if substitution is not None:
+            substitution.__post_init__()
+            if (nominal != substitution.paid_plan
+                    or self.original_destination_id != substitution.destination_id
+                    or self.active_segment != substitution.braking_segment
+                    or self.intent != "brake" or not self.safety_braking
+                    or not self.braking_started or not self.replan_required
+                    or self.propulsion_authorization is not None
+                    or self.pending_transition not in (None, "inertia")
+                    or (substitution.completed != (
+                        self.elapsed_galactic_s == self.active_segment.duration_galactic_s))):
+                raise ValueError("substituted braking is not bound to its paid journey and segment")
+        if nominal is not None and substitution is None and (
             self.propulsion_authorization is not None
             or nominal.destination_id != self.original_destination_id
             or nominal.segments[nominal.phase_index] != self.active_segment
@@ -151,6 +199,8 @@ class PhysicalTransitState:
             raise ValueError("nominal plan does not authorize this physical phase")
         if self.pending_transition is not None and nominal is not None and not nominal.invalidated:
             raise ValueError("pending transition must invalidate the nominal plan")
+        if self.safety_braking and substitution is None:
+            raise ValueError("safety braking requires a one-use nominal substitution")
 
     @property
     def motion(self) -> MotionState:
@@ -161,14 +211,16 @@ class PhysicalTransitState:
         return [getattr(self, spec.name) for spec in fields(self)]
 
     def __setstate__(self, values: list[object]) -> None:
-        """Load the eight-field 01B3H-A and nine-field 01B3H-B1 payloads."""
+        """Load physical payloads since 01B3H-A, defaulting newer fields."""
         specs = fields(self)
-        if not isinstance(values, (list, tuple)) or len(values) not in (len(specs) - 2, len(specs) - 1, len(specs)):
+        if not isinstance(values, (list, tuple)) or len(values) not in (8, 9, 10, len(specs)):
             raise ValueError("unsupported physical transit pickle payload")
         for spec, value in zip(specs, values):
             object.__setattr__(self, spec.name, value)
-        if len(values) == len(specs) - 2:
+        if len(values) == 8:
             object.__setattr__(self, "nominal_plan", None)
-        if len(values) < len(specs):
+        if len(values) < 10:
             object.__setattr__(self, "pending_transition", None)
+        if len(values) < len(specs):
+            object.__setattr__(self, "nominal_braking_substitution", None)
         self.__post_init__()
