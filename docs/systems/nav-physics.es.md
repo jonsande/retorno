@@ -430,3 +430,72 @@ narrativos no resueltos continúan rechazándose atómicamente. `Travel`,
 físico. El futuro replanteamiento deberá partir de posición y beta reales,
 conservar el historial de trabajos y combustible ya gastado y obtener nueva autorización
 de combustible para cualquier maniobra propulsiva.
+
+## Cálculo condicional de recuperación tras reparar (NAV-BRAKE-01B3H-C2A)
+
+`nav_recovery.plan_inertial_recovery()` es una consulta interna pura. Recibe
+un `PhysicalTransitState` válido con `InertialContinuation` y lee su
+`MotionState` actual: distancia recorrida en metros sobre la línea original
+A–B, beta, segundos galácticos y segundos propios de la nave. La distancia al
+destino procede de la geometría real de los nodos A y B, convertida con el año
+luz físico juliano. Por defecto usa la desaceleración propia del frenado
+interrumpido; el llamador puede indicar otra desaceleración disponible en ese
+momento. Ni la ETA nominal antigua ni el índice de su fase pagada intervienen.
+
+El `braking_profile()` relativista existente da la distancia mínima de
+detención. Si la distancia restante es mayor, el plan propone inercia a beta
+constante hasta el último punto posible de frenado, seguida de
+`brake_to_stop()`. La igualdad exacta propone frenado inmediato, sin un tramo
+inerte de duración cero. Si falta distancia, incluso cuando la nave ya está
+más allá de B, propone frenado de emergencia inmediato e identifica la
+posición física de detención más allá de B. Ninguna rama acelera, invierte la
+marcha, declara llegada o crea waypoint. Se representan tanto el punto
+recomendado como el último físicamente posible; coinciden porque no se ha
+aprobado un margen operativo adicional. La tolerancia numérica de cierre
+solo valida el cálculo de los segmentos y no modifica la frontera estricta
+de decisión.
+
+El `RecoveryPlan` inmutable separa la capacidad física de frenar, la
+disponibilidad operativa actual según la vía eléctrica existente y la
+autorización pendiente para todo segmento propulsivo nuevo. Bajo el 15 % de
+integridad o con aislamiento efectivo de motores devuelve `no_propulsion`;
+una vía eléctrica deshabilitada produce el mismo resultado, conservando la
+distinción de capacidad física. Una entrada mal formada o ajena a la inercia
+devuelve `invalid`. La viabilidad de un plan propulsivo solo es cinemática y
+condicional a mantener la desaceleración propia: desgaste, radiación,
+electricidad, drones y trabajos futuros pueden interrumpirlo. `is_current()`
+compara estado físico, relojes, geometría, sistemas pertinentes, electricidad,
+carga de trabajos activos y saldo de combustible; una desaceleración externa
+debe volver a suministrarse al comprobar vigencia. Los planes
+no se persisten como segundo estado autoritativo de navegación.
+
+C2A no cambia `Engine.tick()`, instala segmentos ni descuenta antimateria.
+`InertialContinuation` conserva la autoridad de frenado nominal, sustitutiva
+o independiente ya utilizada solo como historial. C2B tendrá que revalidar
+el plan justo antes de ejecutarlo, definir y reservar una nueva autorización
+de combustible y después aplicar los cortes causales existentes de
+electricidad, radiación, desgaste y trabajos. Las futuras políticas de límite
+de inercia, sobrepaso, llegada o waypoint son independientes.
+
+### Precisión numérica y origen de la desaceleración (C2A-R1)
+
+La comprobación original del perfil escalaba su tolerancia solo con las
+posiciones inicial y de B. Cuando la distancia de frenado supera mucho a
+ambas, la suma y resta en coma flotante pueden producir una diferencia de
+unos metros entre el perfil y el segmento, provocando un `invalid` erróneo.
+La comprobación del perfil utiliza ahora 64 ULP de la mayor magnitud
+pertinente: posición inicial, distancia de frenado o posición final prevista,
+con un suelo de 1 m. La comprobación separada del cierre tras inercia usa la
+posición inicial, B, distancia de frenado, extremo de inercia y posición
+final. Ambas tolerancias comprueban coherencia numérica; la comparación
+entre **distancia restante y distancia de frenado sigue siendo estricta**.
+Ninguna tolerancia concede distancia adicional para detenerse en B. Una
+incoherencia material sigue produciendo `invalid`.
+
+`RecoveryPlan.deceleration_source` registra `history` o `external`. Cuando
+se usa la desaceleración del frenado interrumpido, puede recuperarse del
+historial físico actual. Para una desaceleración externa, `is_current()`
+devuelve falso si el llamador no proporciona el valor disponible en ese
+momento; también devuelve falso si el valor cambió. C2B debe verificarlo
+antes de autorizar o ejecutar ninguna maniobra y seguir evaluando los cortes
+operativos durante la ejecución.

@@ -408,3 +408,67 @@ radiological, health or narrative cuts still reject atomically. Public
 motion. Future replanning must start from actual position and beta, retain
 the spent job and fuel history, and obtain a new fuel authorization for any
 powered maneuver.
+
+## Conditional recovery calculation after repair (NAV-BRAKE-01B3H-C2A)
+
+`nav_recovery.plan_inertial_recovery()` is a pure internal query. It accepts a
+validated `PhysicalTransitState` with `InertialContinuation` and reads its
+current `MotionState`: distance along the original A–B line in metres, beta,
+galactic seconds and ship proper seconds. The destination distance comes from
+the actual A and B node geometry, converted with the physical Julian light
+year. It uses the interrupted braking segment's proper deceleration by
+default; a caller may supply a different currently available deceleration.
+The old nominal ETA and paid phase index play no part in the calculation.
+
+The existing relativistic `braking_profile()` gives the minimum stopping
+distance. If the remaining distance exceeds that distance, the proposal is a
+constant beta coast to the last possible braking point followed by
+`brake_to_stop()`. Exact equality proposes immediate braking with no zero
+duration coast. If there is less room, including a ship already past B, it
+proposes immediate emergency braking and identifies the predicted physical
+stop beyond B. No branch accelerates, reverses, declares arrival or creates a
+waypoint. The recommended and last physically possible braking positions are
+both represented; they coincide because no additional operational safety
+margin has been approved. Numerical closure tolerance is only for validating
+the segment calculation and does not alter the strict decision boundary.
+
+The frozen `RecoveryPlan` separates engine braking capacity, current
+operational braking availability through the existing power path, and the
+pending authorization for any newly powered segment. Below 15% engine health
+or with effective engine isolation it returns `no_propulsion`; a disabled
+power path also returns `no_propulsion` while retaining the distinct physical
+capacity result. A malformed or noninertial source returns `invalid`. A
+powered proposal is only kinematically feasible under constant available
+proper deceleration: future wear, radiation, power, drone and job events can
+interrupt it. The plan's `is_current()` compares the source physical state,
+clocks, geometry, relevant systems, power, active job load and fuel balance;
+an external acceleration override must be passed again when checking freshness.
+Plans are not persisted as an authoritative navigation state.
+
+C2A does not change `Engine.tick()`, install segments or debit antimatter.
+`InertialContinuation` retains its spent nominal, substituted or independent
+braking authority solely as history. C2B must revalidate the plan immediately
+before execution, define and reserve a new fuel authorization, then run the
+existing causal electrical, radiation, wear and job cuts. Any later coast
+boundary, emergency overshoot, arrival or waypoint policy remains separate.
+
+### Numerical precision and acceleration provenance (C2A-R1)
+
+The original profile check scaled its tolerance only from the initial and B
+positions. A braking distance much larger than both can therefore differ by
+a few metres from the sampled segment solely through floating-point
+addition and subtraction, yet be rejected as `invalid`. The profile check
+now uses 64 ULPs of the largest relevant magnitude: initial position,
+stopping distance or predicted stop position, with a 1 m floor. The separate
+coast-then-brake closure check uses the initial position, B, stopping
+distance, coast endpoint and final position. Both are checks of numerical
+consistency; the comparison of **remaining distance against braking distance
+is still strict**. Neither tolerance grants extra room to stop at B. A
+materially inconsistent profile still returns `invalid`.
+
+`RecoveryPlan.deceleration_source` records `history` or `external`. A plan
+using the interrupted brake's recorded acceleration can rederive it from the
+current physical history. For an external acceleration, `is_current()` now
+returns false unless the caller supplies the currently available value;
+changed values also return false. C2B must check this before any authorization
+or maneuver and must still reassess operational cuts during execution.
