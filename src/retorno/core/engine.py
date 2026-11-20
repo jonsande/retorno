@@ -466,54 +466,89 @@ class Engine:
         )
 
     def _tick_inertial(self, state: GameState, dt: float) -> list[Event]:
-        """Renew unpowered coast from the real motion and commit only a safe tick."""
+        """Advance inertial motion and eligible repair jobs in causal order."""
         if not math.isfinite(dt) or dt < 0:
             raise ValueError("physical tick duration must be finite and nonnegative")
         if dt == 0:
             return []
         staged = deepcopy(state)
-        physical = staged.ship.physical_transit
-        assert physical is not None
-        history = physical.inertial_continuation
-        if history is None:
-            if physical.pending_transition != "inertia" or not physical.replan_required:
-                raise RuntimeError("inertial motion lacks a causal braking cut")
-            if physical.nominal_braking_substitution is not None:
+        if state.clock.t + dt == state.clock.t:
+            raise RuntimeError("inertial interval is below galactic clock resolution")
+        events: list[Event] = []
+        remaining = dt
+        while remaining > 0:
+            interval, activation_events = self._begin_job_interval(staged)
+            if activation_events:
+                raise RuntimeError("physical job activation requires an unsupported causal event")
+            if (len(interval.job_keys) > 1
+                    or (staged.jobs.active_job_ids and not interval.job_keys)):
+                raise RuntimeError("physical jobs require one eligible repair interval")
+            if interval.job_keys:
+                job = staged.jobs.jobs[interval.job_keys[0]]
+                if (job.job_type != JobType.REPAIR_SYSTEM
+                        or not job.target or job.target.kind != "ship_system"
+                        or job.target.id != "engines"
+                        or job.owner_id not in staged.ship.drones):
+                    raise RuntimeError("physical job is outside the supported engine repair slice")
+            due = self._next_job_completion_s(staged, interval)
+            if due == 0:
+                self._advance_job_timers(staged, interval, 0.0)
+                finished_events, _ = self._resolve_job_interval(staged, interval)
+                if any(staged.jobs.jobs[key].status == JobStatus.RUNNING
+                       and staged.jobs.jobs[key].eta_s <= 0
+                       for key in interval.job_keys):
+                    raise RuntimeError("zero-time physical repair did not resolve")
+                for event in finished_events:
+                    if not any(event is prior for prior in staged.events.recent):
+                        self._record_event(staged.events, event)
+                events.extend(finished_events)
+                continue
+            step = min(remaining, due if due is not None else math.inf)
+            physical = staged.ship.physical_transit
+            assert physical is not None
+            history = physical.inertial_continuation
+            if history is None:
+                if physical.pending_transition != "inertia" or not physical.replan_required:
+                    raise RuntimeError("inertial motion lacks a causal braking cut")
                 physical.__post_init__()
-            elif physical.nominal_plan is not None:
+                if physical.motion.beta <= 0:
+                    raise RuntimeError("inertial continuation requires residual speed")
+                coast = coast_for(physical.motion, step)
+                history = InertialContinuation(
+                    physical.active_segment, physical.elapsed_galactic_s,
+                    physical.original_destination_id, coast, physical.nominal_plan,
+                    physical.nominal_braking_substitution, physical.propulsion_authorization,
+                )
+                staged.ship.physical_transit = replace(
+                    physical, active_segment=coast, elapsed_galactic_s=0.0,
+                    intent="coast", safety_braking=False, braking_started=True,
+                    pending_transition=None, propulsion_authorization=None,
+                    nominal_braking_substitution=None, inertial_continuation=history,
+                )
+            else:
                 physical.__post_init__()
-            elif (physical.propulsion_authorization is None
-                  or physical.propulsion_authorization.segment != physical.active_segment):
-                raise RuntimeError("inertial motion lacks its spent propulsion receipt")
-            cut = physical.motion
-            if cut.beta <= 0:
-                raise RuntimeError("inertial continuation requires residual speed")
-            coast = coast_for(cut, dt)
-            history = InertialContinuation(
-                physical.active_segment, physical.elapsed_galactic_s,
-                physical.original_destination_id, coast, physical.nominal_plan,
-                physical.nominal_braking_substitution, physical.propulsion_authorization,
-            )
-            staged.ship.physical_transit = replace(
-                physical, active_segment=coast, elapsed_galactic_s=0.0,
-                intent="coast", safety_braking=False, braking_started=True,
-                pending_transition=None, propulsion_authorization=None,
-                nominal_braking_substitution=None, inertial_continuation=history,
-            )
-        else:
-            physical.__post_init__()
-            if physical.elapsed_galactic_s != physical.active_segment.duration_galactic_s:
-                raise RuntimeError("inertial continuation must end its current horizon")
-            coast = coast_for(physical.motion, dt)
-            staged.ship.physical_transit = replace(
-                physical, active_segment=coast, elapsed_galactic_s=0.0,
-                inertial_continuation=replace(history, current_segment=coast),
-            )
-        events = self._tick_physical_segment(staged, dt)
+                if physical.elapsed_galactic_s != physical.active_segment.duration_galactic_s:
+                    raise RuntimeError("inertial continuation must end its current horizon")
+                coast = coast_for(physical.motion, step)
+                staged.ship.physical_transit = replace(
+                    physical, active_segment=coast, elapsed_galactic_s=0.0,
+                    inertial_continuation=replace(history, current_segment=coast),
+                )
+            events.extend(self._tick_physical_segment(
+                staged, step, allow_repair_drone=bool(staged.ship.drones)))
+            if interval.job_keys:
+                self._advance_job_timers(staged, interval, step)
+                finished_events, _ = self._resolve_job_interval(staged, interval)
+                for event in finished_events:
+                    if not any(event is prior for prior in staged.events.recent):
+                        self._record_event(staged.events, event)
+                events.extend(finished_events)
+            remaining = max(0.0, remaining - step)
         self._commit_physical_state(state, staged)
         return events
 
-    def _tick_physical_segment(self, state: GameState, dt: float) -> list[Event]:
+    def _tick_physical_segment(self, state: GameState, dt: float, *,
+                               allow_repair_drone: bool = False) -> list[Event]:
         """One causal physical interval. Commit only after all staged effects succeed.
 
         A selected internal cut needs a new forecast and is deliberately rejected
@@ -570,11 +605,14 @@ class Engine:
             raise RuntimeError("Physical coast cannot carry a propulsion authorization")
         if state.ship.in_transit or state.ship.docked_node_id is not None:
             raise RuntimeError("Physical segment requires an undocked, non-legacy transit")
-        if state.jobs.active_job_ids or any(j.status in {JobStatus.RUNNING, JobStatus.QUEUED}
-                                            for j in state.jobs.jobs.values()):
+        if not allow_repair_drone and (state.jobs.active_job_ids or any(
+                j.status in {JobStatus.RUNNING, JobStatus.QUEUED}
+                for j in state.jobs.jobs.values())):
             raise RuntimeError("Physical segment with active jobs needs causal scheduler cuts")
-        if state.ship.drones:
+        if not allow_repair_drone and state.ship.drones:
             raise RuntimeError("Physical segment with drones needs causal drone cuts")
+        if allow_repair_drone and physical.inertial_continuation is None:
+            raise RuntimeError("physical repair drones require inertial motion")
         comms = state.ship.systems.get("comms")
         if (state.world.radio_opportunities or radio_block_reason(state) is None
                 or (comms is not None and not comms.forced_offline
@@ -629,6 +667,32 @@ class Engine:
             profile, segment, physical.elapsed_galactic_s, local_end,
             state.ship.hull_integrity, hibernating=state.ship.is_hibernating,
         )
+        if allow_repair_drone:
+            if len(state.ship.drones) != 1:
+                raise RuntimeError("physical repair supports one internal deployed drone")
+            drone = next(iter(state.ship.drones.values()))
+            if drone.status != DroneStatus.DEPLOYED or drone.location.kind != "ship_sector":
+                raise RuntimeError("physical repair requires a deployed internal drone")
+            work_cost = sum(self._drone_job_battery_cost(job.job_type)
+                            for job in state.jobs.jobs.values()
+                            if job.status == JobStatus.RUNNING and job.owner_id == drone.drone_id)
+            battery_after = (drone.battery
+                             - Balance.DRONE_BATTERY_IDLE_DRAIN_DEPLOYED_PER_S * dt
+                             - work_cost)
+            reserve = (self._drone_return_reserve(state, drone)
+                       if drone.autorecall_enabled else 0.0)
+            if battery_after <= reserve + 1e-12:
+                raise RuntimeError("physical drone would cross its return battery reserve")
+            dose_after = (drone.dose_rad
+                          + exposure.environmental_galactic_rad * drone.shield_factor)
+            if any(drone.dose_rad < threshold <= dose_after for threshold in (
+                    Balance.DRONE_RAD_DOSE_WARN, Balance.DRONE_RAD_DOSE_HIGH,
+                    Balance.DRONE_RAD_DOSE_CRITICAL)):
+                raise RuntimeError("physical drone would cross an unresolved radiation threshold")
+            if (drone.integrity - Balance.DRONE_BASE_DECAY_PER_S
+                    * self._drone_rad_decay_mult(dose_after) * dt
+                    <= Balance.DRONE_RECALL_MIN_INTEGRITY):
+                raise RuntimeError("physical drone would cross an unresolved integrity threshold")
         limits = power_limits(snapshot) + radiation_limits(
             profile, segment, physical.elapsed_galactic_s, state.ship.hull_integrity,
             hibernating=state.ship.is_hibernating,
@@ -733,6 +797,13 @@ class Engine:
             raise RuntimeError("Physical segment electrical forecast changed during execution")
         staged.ship.hull_integrity = exposure.hull_end
         staged.ship.radiation_env_rad_per_s = profile.ambient_at(end.distance_m)
+        if allow_repair_drone:
+            # Productive drone exposure and maintenance use galactic seconds.
+            # The physical radiation integral supplies the whole spatial dose.
+            self._apply_radiation(staged, dt, exposure.environmental_galactic_rad / dt)
+            self._update_drone_maintenance(staged, dt)
+            events.extend(self._update_drone_radiation_level_alerts(staged))
+            events.extend(self._update_drone_battery_alerts(staged))
         for key, system in staged.ship.systems.items():
             old_state = system.state
             system.health = (engine_threshold if key == "engines" and engine_boundary is not None
@@ -933,7 +1004,7 @@ class Engine:
         if isinstance(action, Diag):
             return []
 
-        if state.ship.physical_transit is not None and isinstance(action, (Travel, RouteSolve)):
+        if state.ship.physical_transit is not None and isinstance(action, (Travel, RouteSolve, Dock, Scan)):
             event = self._make_event(
                 state, EventType.BOOT_BLOCKED, Severity.WARN,
                 SourceRef(kind="ship", id=state.ship.ship_id),

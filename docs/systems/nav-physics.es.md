@@ -388,3 +388,45 @@ al valor del extremo más allá de B. `Travel` y `RouteSolve` públicos siguen
 prohibidos mientras existe tránsito físico. Reparaciones, replanteamiento,
 reanudación del frenado, waypoints y avisos de sobrepaso requerirán fases
 posteriores y autorización separada para cualquier empuje nuevo.
+
+## Reparación causal de motores durante la inercia (NAV-BRAKE-01B3H-C1)
+
+La vía inercial interna utiliza ahora las fases productivas del scheduler:
+`_begin_job_interval()`, `_next_job_completion_s()`, `_advance_job_timers()`
+y `_resolve_job_interval()`. En cada límite, los trabajos QUEUED admisibles
+se activan antes de tomar la fotografía eléctrica. La previsión incluye así
+el `power_draw_kw` existente de un trabajo RUNNING; actualmente la reparación
+ordinaria configura un consumo adicional nulo. El intervalo siguiente acaba
+en la primera finalización de trabajo o en el horizonte solicitado. Primero
+se integran movimiento físico, electricidad, radiación y desgaste de casco y
+sistemas; después se descuenta la ETA galáctica y se resuelve el resultado
+productivo en ese mismo instante. El intervalo siguiente vuelve a calcular
+todas las condiciones. Un trabajo con ETA cero se resuelve en el instante
+actual sin inventar movimiento. El scheduler público histórico conserva su
+orden previo.
+
+La vía admitida comprende un solo trabajo `REPAIR_SYSTEM` para `engines`,
+propiedad de un dron desplegado en un sector interior. `Engine.apply_action`
+con `Repair` sigue reservando chatarra y creando el trabajo real. El
+resolutor normal realiza el sorteo de fallo, el consumo o devolución de
+materiales, el gasto de batería del operador, el cambio de integridad y los
+eventos. La beta inercial y el historial propulsivo gastado permanecen
+inalterados aunque la reparación restablezca la capacidad de frenar. El
+nuevo empuje y el replanteamiento siguen prohibidos. El consumo de batería en
+espera, la dosis radiológica y el deterioro del dron usan los métodos
+productivos existentes en segundos galácticos; la integral radiológica física
+proporciona la dosis galáctica espacial completa. Se rechaza antes de
+confirmar un intervalo que cruce sin coordinación una reserva de retorno, un
+umbral radiológico del dron o su límite de integridad. Tampoco se aplica a
+todo el intervalo la tasa radiológica del extremo final.
+
+Todo el tick solicitado se ejecuta en un `GameState` privado; efectos del
+trabajo, movimiento, eventos y RNG se confirman una sola vez. Un límite
+posterior no soportado revierte una reparación simulada anterior. Más de un
+trabajo admisible, trabajos ajenos a motores, otras configuraciones de dron,
+límites de autorretorno y cortes eléctricos, radiológicos, de salud o
+narrativos no resueltos continúan rechazándose atómicamente. `Travel`,
+`RouteSolve`, `Dock` y `Scan` de nodo siguen bloqueados durante el movimiento
+físico. El futuro replanteamiento deberá partir de posición y beta reales,
+conservar el historial de trabajos y combustible ya gastado y obtener nueva autorización
+de combustible para cualquier maniobra propulsiva.

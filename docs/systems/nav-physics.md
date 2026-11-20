@@ -369,3 +369,42 @@ route. The provisional radiation profile clamps to its endpoint beyond B.
 Public `Travel` and `RouteSolve` remain prohibited while physical transit
 exists. Repair, replanning, resumed braking, public waypoints and overshoot
 warnings require later work and separate authorization for any new thrust.
+
+## Causal engine repair during inertia (NAV-BRAKE-01B3H-C1)
+
+The internal inertial path now uses the productive job scheduler's
+`_begin_job_interval()`, `_next_job_completion_s()`, `_advance_job_timers()`,
+and `_resolve_job_interval()` phases. At each boundary, eligible QUEUED jobs
+activate before the physical electrical snapshot. A RUNNING job's existing
+`power_draw_kw` is therefore included in the forecast; ordinary repair jobs
+currently configure zero additional draw. The next interval ends at the
+earliest job completion or the requested horizon. Physical motion,
+electricity, radiation, hull and system wear run first; galactic job ETA is
+then debited and the productive repair outcome is resolved at that instant.
+The next interval recomputes all conditions. A zero-ETA job resolves at the
+current instant without a fabricated motion step. The public historical
+scheduler retains its original order.
+
+The admitted slice is one `REPAIR_SYSTEM` job for `engines`, owned by one
+deployed drone in an internal ship sector. `Engine.apply_action(Repair)`
+continues to reserve scrap and create the real job. The normal job resolver
+performs its failure draw, refund or consumption, operator battery debit,
+health change, and events. Inertial beta and spent propulsion history remain
+unchanged even if repair restores braking capacity. New thrust and replanning
+are still prohibited. A deployed drone's idle battery drain, radiation dose
+and integrity decay use the existing productive methods in galactic seconds;
+the physical radiation integral supplies its spatially integrated galactic
+dose. The path rejects an interval before committing if a return reserve,
+drone radiation threshold or integrity floor would be crossed without a
+supported cut. This also prevents retrospective use of the endpoint radiation
+rate for the whole drone interval.
+
+The entire requested tick runs on a private `GameState`; job effects,
+movement, events and RNG commit once. A later unsupported limit rolls back an
+earlier simulated repair. More than one eligible job, non-engine jobs, other
+drone configurations, auto-recall boundaries, and unresolved electrical,
+radiological, health or narrative cuts still reject atomically. Public
+`Travel`, `RouteSolve`, `Dock`, and node `Scan` remain blocked during physical
+motion. Future replanning must start from actual position and beta, retain
+the spent job and fuel history, and obtain a new fuel authorization for any
+powered maneuver.
