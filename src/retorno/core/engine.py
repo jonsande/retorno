@@ -21,7 +21,8 @@ from retorno.core.nav_physics import (MotionSegment, MotionState, accelerate_to,
                                       plan_travel, proper_time_in_segment, sample_segment)
 from retorno.core.nav_state import (PhysicalTransitState, PropulsionAuthorization,
                                     NominalTravelState, NominalBrakingSubstitution,
-                                    InertialContinuation)
+                                    InertialContinuation, RecoveryExecution)
+from retorno.core.nav_recovery import RecoveryPlan, plan_inertial_recovery
 from retorno.core.nav_radiation import (RadiationProfile, hull_decay_rate, internal_radiation_rate,
                                         integrate_segment_radiation, integrated_system_wear,
                                         first_integrated_wear_at,
@@ -143,6 +144,8 @@ class Engine:
 
     def tick(self, state: GameState, dt: float) -> list[Event]:
         if state.ship.physical_transit is not None:
+            if state.ship.physical_transit.recovery_execution is not None:
+                return self._tick_recovery(state, dt)
             if state.ship.physical_transit.pending_transition == "safety_brake":
                 return self._tick_safety_braking(state, dt)
             if (state.ship.physical_transit.pending_transition == "inertia"
@@ -200,6 +203,20 @@ class Engine:
         return (acceleration_available(ship) if intent == "accelerate"
                 else braking_available(ship))
 
+    @staticmethod
+    def _recovery_jobs_pending(state: GameState) -> bool:
+        """Recovery has no causal job scheduler, even with a deployed drone."""
+        return bool(state.jobs.active_job_ids or any(
+            job.status in {JobStatus.QUEUED, JobStatus.RUNNING}
+            for job in state.jobs.jobs.values()))
+
+    def _recovery_braking_capable(self, state: GameState,
+                                 recovery: RecoveryExecution) -> bool:
+        """Historical brake magnitude is the provisional verified thrust cap."""
+        maximum = abs(recovery.inertial_history.interrupted_segment.proper_acceleration_m_s2)
+        requested = abs(recovery.segments[-1].proper_acceleration_m_s2)
+        return requested <= maximum and self._physical_propulsion_available(state, "brake")
+
     def prepare_physical_segment(
         self, state: GameState, segment: MotionSegment, destination_id: str,
         intent: str, *, pricing_speed: float | None = None,
@@ -233,6 +250,8 @@ class Engine:
                 raise RuntimeError("safety braking cannot prepare another physical maneuver")
             if previous.inertial_continuation is not None:
                 raise RuntimeError("inertial motion cannot prepare another physical maneuver")
+            if previous.recovery_execution is not None:
+                raise RuntimeError("recovery cannot prepare another physical maneuver")
             if (previous.elapsed_galactic_s != previous.active_segment.duration_galactic_s
                     or previous.motion != segment.start):
                 raise RuntimeError("physical continuation must start at the previous endpoint")
@@ -280,6 +299,131 @@ class Engine:
         self._commit_physical_state(state, staged)
         assert state.ship.physical_transit is not None
         return state.ship.physical_transit
+
+    def prepare_inertial_recovery(
+        self, state: GameState, plan: RecoveryPlan | None = None, *,
+        proper_deceleration_m_s2: float | None = None,
+    ) -> PhysicalTransitState:
+        """Authorize one current inertial recovery and debit its brake once."""
+        physical = state.ship.physical_transit
+        if physical is None or physical.inertial_continuation is None:
+            raise RuntimeError("recovery requires an interrupted physical brake")
+        if self._recovery_jobs_pending(state):
+            raise RuntimeError("recovery requires completed physical repair jobs")
+        plan = (plan_inertial_recovery(
+            state, proper_deceleration_m_s2=proper_deceleration_m_s2)
+            if plan is None else plan)
+        if not plan.is_current(state, proper_deceleration_m_s2=proper_deceleration_m_s2):
+            raise RuntimeError("recovery plan is stale or its deceleration is unverifiable")
+        if plan != plan_inertial_recovery(
+                state, proper_deceleration_m_s2=proper_deceleration_m_s2):
+            raise RuntimeError("recovery plan no longer matches its physical source")
+        if (plan.decision not in {"coast_then_brake", "brake_now", "emergency_brake"}
+                or not plan.physical_braking_available
+                or not plan.operational_braking_available
+                or not plan.requires_fuel_authorization
+                or not plan.segments or plan.start != physical.motion
+                or plan.destination_id != physical.original_destination_id
+                or not self._physical_propulsion_available(state, "brake")):
+            raise RuntimeError("recovery plan does not authorize propulsion")
+        # The existing electrical gate is a prerequisite, not an alternate tariff.
+        snapshot = capture_power_snapshot(
+            state, self._compute_p_gen(state), self._compute_load_kw(state))
+        if (state.os.god_active or snapshot.brownout or snapshot.brownout_sustained_s
+                or snapshot.low_q_shed_timer_s or snapshot.generation_kw < snapshot.load_kw
+                or snapshot.sampled_quality != 1.0):
+            raise RuntimeError("recovery electrical supply is unavailable")
+        braking = plan.braking_segment
+        assert braking is not None
+        maximum = abs(physical.inertial_continuation.interrupted_segment.proper_acceleration_m_s2)
+        if abs(braking.proper_acceleration_m_s2) > maximum:
+            raise RuntimeError("recovery deceleration exceeds verified physical capacity")
+        speeds = [speed for speed in Balance.ENGINE_SPEED_FUEL_MULTIPLIERS
+                  if speed >= max(braking.start.beta, braking.end_beta)]
+        if not speeds:
+            raise RuntimeError("recovery has no supported pricing speed")
+        pricing_speed = min(speeds)
+        origin_id = state.ship.transit_from or state.ship.current_node_id
+        distance_ly = distance_between_nodes_ly(
+            state.world, origin_id, plan.destination_id)
+        if distance_ly is None or distance_ly <= 0:
+            raise RuntimeError("recovery route geometry is unavailable")
+        price = self.engine_fuel_cost(state, distance_ly, pricing_speed)
+        if (not math.isfinite(price) or price <= 0
+                or not math.isfinite(state.ship.antimatter_capsules)
+                or state.ship.antimatter_capsules < price):
+            raise RuntimeError("recovery requires available prepaid antimatter")
+        receipt = PropulsionAuthorization(braking, plan.destination_id, pricing_speed, price)
+        recovery = RecoveryExecution(physical.inertial_continuation, plan.segments, receipt)
+        staged = deepcopy(state)
+        staged.ship.antimatter_capsules -= price
+        staged.ship.physical_transit = PhysicalTransitState(
+            plan.segments[0], 0.0, plan.destination_id,
+            "coast" if len(plan.segments) == 2 else "brake",
+            braking_started=True, recovery_execution=recovery,
+        )
+        self._commit_physical_state(state, staged)
+        assert state.ship.physical_transit is not None
+        return state.ship.physical_transit
+
+    def _tick_recovery(self, state: GameState, dt: float) -> list[Event]:
+        """Cross the paid coast/brake boundary on one private transaction."""
+        if not math.isfinite(dt) or dt < 0:
+            raise ValueError("physical tick duration must be finite and nonnegative")
+        if dt == 0:
+            return []
+        physical = state.ship.physical_transit
+        assert physical is not None and physical.recovery_execution is not None
+        recovery = physical.recovery_execution
+        if recovery.completed or recovery.invalidated:
+            raise RuntimeError("recovery is completed or invalidated")
+        if self._recovery_jobs_pending(state):
+            raise RuntimeError("recovery cannot advance pending physical jobs")
+        final = recovery.segments[-1]
+        requested_end = state.clock.t + dt
+        final_time = final.start.galactic_s + final.duration_galactic_s
+        if (not math.isfinite(requested_end) or requested_end == state.clock.t
+                or requested_end > final_time + math.ulp(final_time)):
+            raise RuntimeError("recovery tick exceeds its physical horizon")
+        # Summing two positive segment durations can round one ULP beyond the
+        # separately rounded absolute endpoint. It grants no extra motion.
+        requested_end = min(requested_end, final_time)
+        staged = deepcopy(state)
+        events: list[Event] = []
+        while staged.clock.t < requested_end:
+            active = staged.ship.physical_transit
+            assert active is not None and active.recovery_execution is not None
+            if self._recovery_jobs_pending(staged):
+                raise RuntimeError("recovery cannot advance pending physical jobs")
+            if (active.intent == "brake"
+                    and not self._recovery_braking_capable(staged, active.recovery_execution)):
+                raise RuntimeError("recovery braking capacity is no longer available")
+            segment = active.active_segment
+            available = segment.duration_galactic_s - active.elapsed_galactic_s
+            if available <= 0:
+                raise RuntimeError("recovery phase cannot advance")
+            phase_end = segment.start.galactic_s + segment.duration_galactic_s
+            step = (available if requested_end >= phase_end
+                    else requested_end - staged.clock.t)
+            events.extend(self._tick_physical_segment(
+                staged, step, allow_repair_drone=bool(staged.ship.drones)))
+            active = staged.ship.physical_transit
+            assert active is not None and active.recovery_execution is not None
+            if active.pending_transition is not None:
+                raise RuntimeError("recovery braking lost a causal propulsion boundary")
+            if active.elapsed_galactic_s == segment.duration_galactic_s:
+                recovery = active.recovery_execution
+                if recovery.phase_index == 0 and len(recovery.segments) == 2:
+                    brake = recovery.segments[1]
+                    if (brake.start != active.motion
+                            or not self._recovery_braking_capable(staged, recovery)):
+                        raise RuntimeError("recovery braking point is no longer operational")
+                    staged.ship.physical_transit = replace(
+                        active, active_segment=brake, elapsed_galactic_s=0.0,
+                        intent="brake", recovery_execution=replace(recovery, phase_index=1))
+        staged.clock.last_dt = staged.clock.t - state.clock.t
+        self._commit_physical_state(state, staged)
+        return events
 
     @staticmethod
     def _nominal_distance_tolerance(distance_m: float) -> float:
@@ -564,8 +708,13 @@ class Engine:
             raise RuntimeError("pending physical transition must be resolved before further motion")
         substitution = physical.nominal_braking_substitution
         inertia = physical.inertial_continuation
+        recovery = physical.recovery_execution
         if inertia is not None:
             physical.__post_init__()
+        if recovery is not None:
+            physical.__post_init__()
+            if recovery.completed or recovery.invalidated:
+                raise RuntimeError("recovery propulsion is no longer active")
         if substitution is not None:
             physical.__post_init__()
             if substitution.completed:
@@ -587,7 +736,8 @@ class Engine:
                 or (physical.intent == "brake" and segment.proper_acceleration_m_s2 >= 0)):
             raise RuntimeError("Physical segment intent and acceleration disagree")
         if powered:
-            receipt = physical.propulsion_authorization
+            receipt = (recovery.authorization if recovery is not None
+                       else physical.propulsion_authorization)
             if nominal is not None:
                 if (nominal.pricing_speed not in Balance.ENGINE_SPEED_FUEL_MULTIPLIERS
                         or nominal.pricing_speed < max(segment.start.beta, segment.end_beta)
@@ -611,8 +761,8 @@ class Engine:
             raise RuntimeError("Physical segment with active jobs needs causal scheduler cuts")
         if not allow_repair_drone and state.ship.drones:
             raise RuntimeError("Physical segment with drones needs causal drone cuts")
-        if allow_repair_drone and physical.inertial_continuation is None:
-            raise RuntimeError("physical repair drones require inertial motion")
+        if allow_repair_drone and inertia is None and recovery is None:
+            raise RuntimeError("physical repair drones require inertia or recovery")
         comms = state.ship.systems.get("comms")
         if (state.world.radio_opportunities or radio_block_reason(state) is None
                 or (comms is not None and not comms.forced_offline
@@ -780,6 +930,10 @@ class Engine:
                           if pending_transition is not None and nominal is not None else nominal),
             nominal_braking_substitution=(replace(substitution, completed=True)
                                           if stopped_safety_brake else substitution),
+            recovery_execution=(replace(recovery, completed=True)
+                                if recovery is not None and physical.intent == "brake"
+                                and local_end == segment.duration_galactic_s
+                                and pending_transition is None else recovery),
         )
         fraction = end.distance_m / route_m
         staged.world.current_pos_ly = (

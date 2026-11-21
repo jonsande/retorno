@@ -472,3 +472,71 @@ current physical history. For an external acceleration, `is_current()` now
 returns false unless the caller supplies the currently available value;
 changed values also return false. C2B must check this before any authorization
 or maneuver and must still reassess operational cuts during execution.
+
+## Internal execution of repaired inertial recovery (NAV-BRAKE-01B3H-C2B1)
+
+`Engine.prepare_inertial_recovery(state, plan=None,
+proper_deceleration_m_s2=None)` is an internal operation. It requires a real
+`InertialContinuation`, no active repair job, current braking capacity, and a
+fresh `RecoveryPlan`. A supplied plan must pass `is_current()` and match a new
+calculation from the current state. External deceleration must be supplied
+again to both checks. A stale plan, missing external value, changed systems,
+geometry, power, clocks, fuel or motion fails before payment. With no supplied
+plan, preparation calculates a current one. `no_propulsion` and `invalid` are
+never executable decisions.
+
+The provisional tariff is the existing `engine_fuel_cost()` route tariff,
+using the lowest supported pricing speed at or above the brake's initial
+beta. If no supported ceiling exists, preparation fails. One new
+`PropulsionAuthorization` is bound to the immutable recovery braking segment
+and original destination, charged once, and stored in `RecoveryExecution`.
+The preceding nominal and substituted braking payments remain in its nested
+`InertialContinuation` as spent history. The active physical state carries no
+second propulsion receipt and no revived nominal plan. Earlier physical
+pickle layouts still load; new states serialize the recovery record.
+
+`Engine.tick()` dispatches an active recovery through the existing physical
+segment integrator. A `coast_then_brake` recovery moves at constant beta to
+the calculated brake point, checks current propulsion there, and then brakes.
+`brake_now` and `emergency_brake` start braking at once. The latter retains
+the real position beyond B. The integrator advances galactic, proper and
+biological clocks, electrical state, spatial radiation, hull and system wear,
+and the deployed repair drone's maintenance. A tick may cross the coast to
+brake boundary; the entire requested interval commits once. Unsupported
+electrical, radiation, drone, job or engine integrity cuts reject the whole
+tick atomically. A brake reaching zero beta marks the recovery complete and
+leaves no active reusable receipt. Loading never debits again. Completion
+does not update the public node, create a waypoint, or emit an arrival.
+
+This phase does not start recovery automatically after repair. A further
+integration must trigger this internal API at a causal repair boundary,
+revalidate current deceleration and energy, and decide how to present the
+result. A newly lost 15% braking boundary during recovery currently rejects
+the affected tick atomically; persistible re-interruption and subsequent
+inertial continuation need a later adapter. The same applies to unsupported
+operational changes before the planned braking point. No extra fuel is
+charged or refunded on such rejection.
+
+### Job safety and verified deceleration cap (C2B1-R1)
+
+The C1 inertial continuation alone may run its limited productive engine
+repair job through the causal job scheduler. Recovery execution has no job
+scheduler. Preparation and every recovery tick therefore reject any active
+job ID or any `QUEUED` or `RUNNING` job, including inconsistent indexes, before
+moving the ship. A deployed drone still receives its ordinary maintenance
+when no job is pending; its presence is not permission to skip a job. For
+this internal phase, `Repair` remains a productive action and can queue a
+job after recovery preparation. The following recovery tick rejects without
+advancing that job, the ship, clocks, events or RNG. C2B2 must define how
+concurrent work is coordinated or prevented before public activation.
+
+No independent variable thrust-rating model exists yet. The interrupted
+braking segment in `InertialContinuation` provides the provisional maximum
+verified proper deceleration. A lower positive external value or the same
+value may be authorized; a higher value remains a mathematical proposal only
+and fails before fuel payment or recovery installation. `is_current()` still
+requires an external value to be supplied again. Engine integrity, isolation
+and the power path determine operational availability separately from this
+magnitude cap. `Engine.tick()` checks the cap again before braking and at a
+coast-to-brake transition. Unsupported capacity changes reject the complete
+requested tick atomically; no thrust is applied past a failed check.

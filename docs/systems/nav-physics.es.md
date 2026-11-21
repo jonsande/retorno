@@ -499,3 +499,77 @@ devuelve falso si el llamador no proporciona el valor disponible en ese
 momento; también devuelve falso si el valor cambió. C2B debe verificarlo
 antes de autorizar o ejecutar ninguna maniobra y seguir evaluando los cortes
 operativos durante la ejecución.
+
+## Ejecución interna de la recuperación tras reparar (NAV-BRAKE-01B3H-C2B1)
+
+`Engine.prepare_inertial_recovery(state, plan=None,
+proper_deceleration_m_s2=None)` es una operación interna. Exige un
+`InertialContinuation` real, ningún trabajo de reparación activo, capacidad
+actual de frenado y un `RecoveryPlan` vigente. Si se proporciona un plan,
+debe superar `is_current()` y coincidir con un cálculo nuevo desde el estado
+actual. La desaceleración externa debe suministrarse de nuevo en ambas
+comprobaciones. Los cambios de sistemas, geometría, electricidad, relojes,
+combustible o movimiento se rechazan antes del pago. Si no se aporta plan,
+se calcula uno vigente. `no_propulsion` e `invalid` nunca son ejecutables.
+
+La tarifa provisional reutiliza `engine_fuel_cost()` para la ruta, con la
+menor velocidad de tarificación admitida que alcance la beta inicial del
+frenado. Si no hay velocidad admisible, la preparación se rechaza. Se cobra
+una vez un `PropulsionAuthorization` nuevo, vinculado al segmento inmutable
+de frenado de recuperación y al destino original, y se guarda en
+`RecoveryExecution`. Los pagos nominal y sustitutivo anteriores permanecen
+en su `InertialContinuation` anidado como historial ya gastado. El estado
+físico activo no lleva un segundo recibo ni rehabilita el plan nominal. Los
+formatos físicos antiguos de pickle siguen cargando y los nuevos estados
+serializan la recuperación.
+
+`Engine.tick()` ejecuta la recuperación mediante el integrador de segmentos
+físicos existente. En `coast_then_brake` avanza con beta constante hasta el
+punto calculado, comprueba allí la capacidad propulsiva y frena. `brake_now`
+y `emergency_brake` frenan inmediatamente. El segundo conserva la posición
+real más allá de B. El integrador actualiza relojes galáctico, propio y
+biológico, electricidad, radiación espacial, casco, desgaste de sistemas y
+mantenimiento del dron de reparación desplegado. Un tick puede cruzar la
+frontera inercia→frenado; todo el intervalo solicitado se confirma una sola
+vez. Los cortes eléctricos, radiológicos, de dron, trabajos o integridad de
+motores no soportados rechazan el tick completo de forma atómica. Al llegar
+a beta cero, la recuperación queda completada y no conserva un permiso
+activo reutilizable. La carga de una partida nunca repite el cobro. La
+detención no cambia el nodo público, no crea waypoint y no emite llegada.
+
+Esta fase no inicia automáticamente la recuperación tras reparar. Una
+integración posterior debe activar esta API interna en el límite causal de
+la reparación, revalidar desaceleración y energía actuales y decidir cómo
+presentar el resultado. La nueva pérdida del umbral de frenado del 15 %
+durante la recuperación rechaza por ahora el tick afectado de forma
+atómica; la reinterrupción persistible y su posterior inercia requieren otra
+adaptación. Ocurre lo mismo con cambios operativos no soportados antes del
+punto de frenado previsto. Ese rechazo no cobra ni devuelve combustible.
+
+### Seguridad de trabajos y límite verificado de desaceleración (C2B1-R1)
+
+Solo la continuación inercial de C1 puede ejecutar su trabajo productivo
+limitado de reparación de motores mediante el scheduler causal. La ejecución
+de recuperación todavía no tiene scheduler de trabajos. Por ello, la
+preparación y cada tick de recuperación rechazan cualquier ID de trabajo
+activo o trabajo `QUEUED` o `RUNNING`, incluidos índices incoherentes, antes
+de mover la nave. Un dron desplegado sigue recibiendo su mantenimiento normal
+si no hay trabajos pendientes; su presencia no autoriza omitir trabajos. En
+esta fase interna, `Repair` conserva su acceso productivo y puede encolar un
+trabajo después de preparar la recuperación. El siguiente tick de
+recuperación se rechaza sin avanzar el trabajo, la nave, los relojes, los
+eventos ni el RNG. C2B2 deberá definir cómo coordinar o impedir el trabajo
+concurrente antes de activar públicamente esta vía.
+
+Todavía no existe un modelo independiente de rendimiento propulsivo
+variable. El segmento de frenado interrumpido en `InertialContinuation`
+proporciona el máximo provisional de desaceleración propia verificable. Un
+valor externo positivo menor o igual puede autorizarse; uno mayor sigue
+siendo solo una propuesta matemática y se rechaza antes de cobrar combustible
+o instalar la recuperación. `is_current()` continúa exigiendo que se vuelva
+a proporcionar el valor externo. La integridad de motores, el aislamiento y
+la vía eléctrica determinan la disponibilidad operativa por separado de este
+límite de magnitud. `Engine.tick()` vuelve a comprobar el límite antes de
+frenar y en la transición de inercia a frenado. Los cambios de capacidad no
+soportados rechazan de forma atómica todo el tick solicitado; no se aplica
+empuje después de fallar la comprobación.

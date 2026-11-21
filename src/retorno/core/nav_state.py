@@ -179,6 +179,36 @@ class InertialContinuation:
 
 
 @dataclass(frozen=True, slots=True)
+class RecoveryExecution:
+    """One prepaid recovery, retaining the earlier interrupted-brake history."""
+
+    inertial_history: InertialContinuation
+    segments: tuple[MotionSegment, ...]
+    authorization: PropulsionAuthorization
+    phase_index: int = 0
+    completed: bool = False
+    invalidated: bool = False
+
+    def __post_init__(self) -> None:
+        self.inertial_history.__post_init__()
+        self.authorization.__post_init__()
+        if (len(self.segments) not in (1, 2)
+                or not 0 <= self.phase_index < len(self.segments)
+                or self.completed and self.invalidated
+                or self.completed and self.phase_index != len(self.segments) - 1
+                or self.segments[-1].proper_acceleration_m_s2 >= 0
+                or self.segments[-1].end_beta != 0
+                or self.authorization.segment != self.segments[-1]
+                or self.authorization.destination_id != self.inertial_history.destination_id):
+            raise ValueError("recovery requires one paid final braking segment")
+        if len(self.segments) == 2:
+            coast, brake = self.segments
+            if (coast.proper_acceleration_m_s2 != 0
+                    or sample_segment(coast, coast.duration_galactic_s) != brake.start):
+                raise ValueError("recovery coast and brake must be continuous")
+
+
+@dataclass(frozen=True, slots=True)
 class PhysicalTransitState:
     """An active maneuver and the original requested destination.
 
@@ -199,6 +229,7 @@ class PhysicalTransitState:
     pending_transition: PendingTransition | None = None
     nominal_braking_substitution: NominalBrakingSubstitution | None = None
     inertial_continuation: InertialContinuation | None = None
+    recovery_execution: RecoveryExecution | None = None
 
     def __post_init__(self) -> None:
         if (not math.isfinite(self.elapsed_galactic_s)
@@ -237,6 +268,25 @@ class PhysicalTransitState:
         if nominal is not None:
             nominal.__post_init__()  # Also validate plans restored from a pickle.
         inertia = self.inertial_continuation
+        recovery = self.recovery_execution
+        if recovery is not None:
+            recovery.__post_init__()
+            if (inertia is not None or nominal is not None
+                    or self.nominal_braking_substitution is not None
+                    or self.propulsion_authorization is not None
+                    or self.safety_braking
+                    or self.original_destination_id != recovery.inertial_history.destination_id
+                    or self.active_segment != recovery.segments[recovery.phase_index]
+                    or self.intent != ("brake" if recovery.phase_index == len(recovery.segments) - 1
+                                       else "coast")
+                    or not self.braking_started
+                    or self.pending_transition is not None
+                    or self.replan_required != recovery.invalidated
+                    or recovery.completed != (
+                        self.elapsed_galactic_s == self.active_segment.duration_galactic_s
+                        and self.intent == "brake")):
+                raise ValueError("recovery execution does not match its paid physical phase")
+            return
         if inertia is not None:
             inertia.__post_init__()
             if (self.active_segment != inertia.current_segment
@@ -286,7 +336,7 @@ class PhysicalTransitState:
     def __setstate__(self, values: list[object]) -> None:
         """Load physical payloads since 01B3H-A, defaulting newer fields."""
         specs = fields(self)
-        if not isinstance(values, (list, tuple)) or len(values) not in (8, 9, 10, 11, len(specs)):
+        if not isinstance(values, (list, tuple)) or len(values) not in (8, 9, 10, 11, 12, len(specs)):
             raise ValueError("unsupported physical transit pickle payload")
         for spec, value in zip(specs, values):
             object.__setattr__(self, spec.name, value)
@@ -294,8 +344,10 @@ class PhysicalTransitState:
             object.__setattr__(self, "nominal_plan", None)
         if len(values) < 10:
             object.__setattr__(self, "pending_transition", None)
-        if len(values) < len(specs):
+        if len(values) < 12:
             object.__setattr__(self, "inertial_continuation", None)
+        if len(values) < len(specs):
+            object.__setattr__(self, "recovery_execution", None)
         if len(values) < 11:
             object.__setattr__(self, "nominal_braking_substitution", None)
         self.__post_init__()
