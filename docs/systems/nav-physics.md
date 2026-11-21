@@ -508,10 +508,8 @@ tick atomically. A brake reaching zero beta marks the recovery complete and
 leaves no active reusable receipt. Loading never debits again. Completion
 does not update the public node, create a waypoint, or emit an arrival.
 
-This phase does not start recovery automatically after repair. A further
-integration must trigger this internal API at a causal repair boundary,
-revalidate current deceleration and energy, and decide how to present the
-result. A newly lost 15% braking boundary during recovery currently rejects
+The explicitly armed automatic transition after a productive repair is
+described below. A newly lost 15% braking boundary during recovery currently rejects
 the affected tick atomically; persistible re-interruption and subsequent
 inertial continuation need a later adapter. The same applies to unsupported
 operational changes before the planned braking point. No extra fuel is
@@ -527,8 +525,8 @@ moving the ship. A deployed drone still receives its ordinary maintenance
 when no job is pending; its presence is not permission to skip a job. For
 this internal phase, `Repair` remains a productive action and can queue a
 job after recovery preparation. The following recovery tick rejects without
-advancing that job, the ship, clocks, events or RNG. C2B2 must define how
-concurrent work is coordinated or prevented before public activation.
+advancing that job, the ship, clocks, events or RNG. C2B2A handles one linked
+repair; public activation still needs preventive coordination with new work.
 
 No independent variable thrust-rating model exists yet. The interrupted
 braking segment in `InertialContinuation` provides the provisional maximum
@@ -540,3 +538,69 @@ and the power path determine operational availability separately from this
 magnitude cap. `Engine.tick()` checks the cap again before braking and at a
 coast-to-brake transition. Unsupported capacity changes reject the complete
 requested tick atomically; no thrust is applied past a failed check.
+
+### Authorized automatic recovery after repair (C2B2A)
+
+`Engine.arm_inertial_recovery(state, job_id, max_capsules=...)` is internal.
+It accepts an active, productive `engines` repair with a deployed owner drone
+only during positive-speed physical inertia. It stores one immutable,
+persisted `RecoveryIntent`: the job's internal ID, original destination,
+explicit authorization, positive finite spending ceiling, historical
+deceleration policy and pending status. Arming changes only this record. The
+ceiling is a limit, not reserved antimatter; no fuel is debited until a fresh
+plan can be installed. A second arm while an attempt is pending or used, and
+reuse of a cancelled authorization, are rejected.
+
+At the job's actual completion time, the C1 scheduler first integrates the
+inertial interval and its power, radiation and wear, resolves the productive
+repair and applies its effect. The linked pending intent then calls the
+existing `prepare_inertial_recovery()` on that state. Preparation replans
+from its real position and beta, checks current braking and electrical
+capacity, verifies the historical deceleration cap, recalculates the
+provisional route tariff, and charges once only if available antimatter and
+the authorized ceiling both cover it. The new `RecoveryExecution` preserves
+the interrupted brake history, and the intent becomes `used`. No clock,
+position, wear or RNG advances during preparation. A later tick follows
+`_tick_recovery()` without another instruction or debit.
+
+A failed or insufficient repair, isolation, unavailable power or fuel,
+unexecutable plan, or exceeded ceiling leaves the productive result in place
+and marks the intent `cancelled`; the ship keeps coasting. A failed attempt
+does not retry or charge. An unarmed repair has the C1 inertial behavior.
+Save/load preserves pending, used and cancelled states; older physical
+pickles default to no intent.
+
+For a tick extending past the repair, the engine advances the remaining
+duration through `_tick_recovery()` inside the same private simulation and
+commits once. If a later transition cannot be modeled, the whole requested
+tick rolls back, including the repair. Preexisting concurrent jobs still
+hit the C1 scheduler's atomic rejection; if another job is pending at the
+completion instant, the intent is cancelled and the completed repair remains.
+Active recovery retains the R1 defensive job block. Public navigation still
+needs preventive admission control for new jobs, handling of subsequent
+braking-capacity loss and unsupported temporal cuts, and public arrival and
+waypoint behavior.
+
+### New authorization after cancellation (C2B2A-R1)
+
+A cancelled intent is spent as an attempt, though it has paid no fuel. While
+the ship remains in physical inertia, `arm_inertial_recovery()` may issue a
+new intent for a *different active productive engine repair*. The old job
+cannot trigger the new one. If braking is already available and no new repair
+is needed, `authorize_manual_inertial_recovery(state, max_capsules=...)`
+issues a distinct unpaid manual intent. The existing
+`prepare_inertial_recovery()` then rechecks the current position, beta, power,
+braking capacity, historical deceleration cap, route tariff, available fuel
+and the new ceiling. A failed manual preparation leaves its pending intent
+unchanged; `cancel_manual_inertial_recovery()` explicitly ends it before a
+different ceiling can be authorized. None of these authorization operations
+moves the ship or spends fuel.
+
+Each intent has a monotonic attempt number and a bounded summary of the last
+cancelled attempt (number, linked job if any, and outcome). New issuance
+replaces the current cancelled intent with a new immutable object; it never
+changes that old object back to pending. Only a pending intent can prepare a
+recovery, and a used intent stays bound to the paid `RecoveryExecution`.
+Save/load retains these distinctions, accepts the earlier seven-field intent
+pickle, and does not repeat jobs or charges. The manual path remains internal;
+public admission control, later braking loss and arrival behavior remain open.

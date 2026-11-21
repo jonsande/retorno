@@ -537,10 +537,8 @@ a beta cero, la recuperación queda completada y no conserva un permiso
 activo reutilizable. La carga de una partida nunca repite el cobro. La
 detención no cambia el nodo público, no crea waypoint y no emite llegada.
 
-Esta fase no inicia automáticamente la recuperación tras reparar. Una
-integración posterior debe activar esta API interna en el límite causal de
-la reparación, revalidar desaceleración y energía actuales y decidir cómo
-presentar el resultado. La nueva pérdida del umbral de frenado del 15 %
+La transición automática interna tras una reparación productiva autorizada
+se describe más abajo. La nueva pérdida del umbral de frenado del 15 %
 durante la recuperación rechaza por ahora el tick afectado de forma
 atómica; la reinterrupción persistible y su posterior inercia requieren otra
 adaptación. Ocurre lo mismo con cambios operativos no soportados antes del
@@ -558,8 +556,8 @@ si no hay trabajos pendientes; su presencia no autoriza omitir trabajos. En
 esta fase interna, `Repair` conserva su acceso productivo y puede encolar un
 trabajo después de preparar la recuperación. El siguiente tick de
 recuperación se rechaza sin avanzar el trabajo, la nave, los relojes, los
-eventos ni el RNG. C2B2 deberá definir cómo coordinar o impedir el trabajo
-concurrente antes de activar públicamente esta vía.
+eventos ni el RNG. C2B2A coordina una reparación vinculada; la activación
+pública aún necesita impedir o coordinar nuevos trabajos concurrentes.
 
 Todavía no existe un modelo independiente de rendimiento propulsivo
 variable. El segmento de frenado interrumpido en `InertialContinuation`
@@ -573,3 +571,71 @@ límite de magnitud. `Engine.tick()` vuelve a comprobar el límite antes de
 frenar y en la transición de inercia a frenado. Los cambios de capacidad no
 soportados rechazan de forma atómica todo el tick solicitado; no se aplica
 empuje después de fallar la comprobación.
+
+### Recuperación automática autorizada tras reparar (C2B2A)
+
+`Engine.arm_inertial_recovery(state, job_id, max_capsules=...)` es una API
+interna. Solo admite una reparación productiva activa de `engines`, con dron
+propietario desplegado, durante una inercia física con velocidad positiva.
+Guarda una `RecoveryIntent` inmutable y persistente con ID interno del trabajo,
+destino original, autorización explícita, límite positivo y finito de gasto,
+política de desaceleración histórica y estado pendiente. Armar solo cambia
+este registro: el límite no reserva antimateria ni produce ningún cargo.
+Se rechazan otro armado mientras el intento esté pendiente o utilizado y
+la reutilización de una autorización cancelada.
+
+En el instante real de finalización, el scheduler C1 integra primero la
+inercia, electricidad, radiación y desgaste; luego resuelve la reparación
+productiva y aplica su efecto. La intención vinculada llama entonces a
+`prepare_inertial_recovery()` sobre ese estado. Se replantea desde posición
+y beta reales, se comprueban capacidad de frenado, vía eléctrica y límite
+histórico de desaceleración, y se recalcula la tarifa provisional. Solo si
+hay antimateria disponible y el precio cabe en el límite autorizado se cobra
+una vez y se instala `RecoveryExecution`. La intención pasa a `used` y conserva
+el historial del frenado interrumpido. La preparación no avanza relojes,
+posición, desgaste ni RNG. Un tick posterior ejecuta `_tick_recovery()` sin
+otra orden ni otro cargo.
+
+Una reparación fallida o insuficiente, aislamiento, indisponibilidad eléctrica
+o de combustible, plan no ejecutable o precio superior al límite dejan intacto
+el resultado productivo y marcan la intención `cancelled`; la nave sigue por
+inercia. No se reintenta ni se cobra. Sin intención armada, se mantiene el
+comportamiento inercial C1. Guardar y cargar conserva los estados pendiente,
+utilizado y cancelado; los pickles anteriores cargan sin intención.
+
+Si un tick sobrepasa la reparación, el tiempo restante se procesa mediante
+`_tick_recovery()` en la misma simulación privada y se confirma una sola vez.
+Una transición posterior no soportada revierte íntegramente ese tick, incluida
+la reparación. Los trabajos concurrentes preexistentes aún provocan el rechazo
+atómico del scheduler C1; si queda otro trabajo pendiente en T, se cancela
+la intención y se conserva la reparación completada. La recuperación activa
+mantiene el bloqueo defensivo R1 para trabajos. Antes de la navegación pública
+faltan el control preventivo de nuevas órdenes, la pérdida posterior de frenado,
+otros cortes temporales y la llegada y los waypoints públicos.
+
+### Nueva autorización tras una cancelación (C2B2A-R1)
+
+Una intención cancelada agotó su intento, aunque no pagó combustible. Si la
+nave sigue en inercia física, `arm_inertial_recovery()` puede emitir una
+intención nueva vinculada a *otra reparación productiva activa de motores*.
+El trabajo antiguo no puede activar la nueva. Si el frenado ya está disponible
+y no hace falta reparar de nuevo,
+`authorize_manual_inertial_recovery(state, max_capsules=...)` emite una intención
+manual distinta y sin pago. La API
+existente `prepare_inertial_recovery()` vuelve a comprobar posición y beta
+actuales, electricidad, capacidad de frenado, límite histórico de
+desaceleración, tarifa de ruta, combustible y nuevo límite autorizado. Una
+preparación manual rechazada deja pendiente esa intención;
+`cancel_manual_inertial_recovery()` la termina expresamente antes de autorizar
+otro límite. Ninguna de estas operaciones de autorización mueve la nave ni
+consume combustible.
+
+Cada intención tiene un número de intento creciente y un resumen acotado del
+último intento cancelado (número, trabajo vinculado si existe y resultado).
+La nueva emisión sustituye la intención cancelada por otro objeto inmutable;
+nunca cambia el objeto anterior a pendiente. Solo una intención pendiente
+puede preparar la recuperación, y la utilizada permanece vinculada al
+`RecoveryExecution` pagado. Guardar y cargar conserva estas distinciones,
+acepta el pickle previo de siete campos y no repite trabajos ni cargos. La
+vía manual sigue siendo interna; quedan pendientes el control de admisión
+público, la pérdida posterior de frenado y el comportamiento de llegada.

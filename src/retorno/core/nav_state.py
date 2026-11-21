@@ -209,6 +209,57 @@ class RecoveryExecution:
 
 
 @dataclass(frozen=True, slots=True)
+class RecoveryIntent:
+    """One explicit, unpaid attempt; a prior cancellation is only history."""
+
+    job_id: str | None
+    destination_id: str
+    authorized: bool
+    max_capsules: float
+    deceleration_policy: Literal["historical"] = "historical"
+    status: Literal["pending", "used", "cancelled"] = "pending"
+    outcome: str | None = None
+    attempt_id: int = 1
+    previous_cancelled: tuple[int, str | None, str] | None = None
+
+    def __post_init__(self) -> None:
+        prior = self.previous_cancelled
+        if ((self.job_id is not None and (not isinstance(self.job_id, str) or not self.job_id))
+                or not self.destination_id or self.authorized is not True
+                or isinstance(self.max_capsules, bool)
+                or not isinstance(self.max_capsules, (int, float))
+                or not math.isfinite(self.max_capsules) or self.max_capsules <= 0
+                or self.deceleration_policy != "historical"
+                or self.status not in {"pending", "used", "cancelled"}
+                or (self.status == "pending") != (self.outcome is None)
+                or isinstance(self.attempt_id, bool) or not isinstance(self.attempt_id, int)
+                or self.attempt_id < 1
+                or (self.attempt_id == 1) != (prior is None)
+                or (prior is not None and (
+                    not isinstance(prior, tuple) or len(prior) != 3
+                    or not isinstance(prior[0], int) or isinstance(prior[0], bool)
+                    or not 1 <= prior[0] < self.attempt_id
+                    or (prior[1] is not None and not isinstance(prior[1], str))
+                    or not isinstance(prior[2], str) or not prior[2]))):
+            raise ValueError("invalid one-use recovery intent")
+
+    def __getstate__(self) -> list[object]:
+        return [getattr(self, spec.name) for spec in fields(self)]
+
+    def __setstate__(self, values: list[object]) -> None:
+        """Accept C2B2A's seven-field intent without renewing its authority."""
+        specs = fields(self)
+        if not isinstance(values, (list, tuple)) or len(values) not in (7, len(specs)):
+            raise ValueError("unsupported recovery intent pickle payload")
+        for spec, value in zip(specs, values):
+            object.__setattr__(self, spec.name, value)
+        if len(values) == 7:
+            object.__setattr__(self, "attempt_id", 1)
+            object.__setattr__(self, "previous_cancelled", None)
+        self.__post_init__()
+
+
+@dataclass(frozen=True, slots=True)
 class PhysicalTransitState:
     """An active maneuver and the original requested destination.
 
@@ -230,6 +281,7 @@ class PhysicalTransitState:
     nominal_braking_substitution: NominalBrakingSubstitution | None = None
     inertial_continuation: InertialContinuation | None = None
     recovery_execution: RecoveryExecution | None = None
+    recovery_intent: RecoveryIntent | None = None
 
     def __post_init__(self) -> None:
         if (not math.isfinite(self.elapsed_galactic_s)
@@ -269,6 +321,14 @@ class PhysicalTransitState:
             nominal.__post_init__()  # Also validate plans restored from a pickle.
         inertia = self.inertial_continuation
         recovery = self.recovery_execution
+        armed = self.recovery_intent
+        if armed is not None:
+            armed.__post_init__()
+            if (armed.destination_id != self.original_destination_id
+                    or (recovery is None and inertia is None)
+                    or (recovery is not None and armed.status != "used")
+                    or (recovery is None and armed.status == "used")):
+                raise ValueError("recovery intent must match its physical history")
         if recovery is not None:
             recovery.__post_init__()
             if (inertia is not None or nominal is not None
@@ -336,7 +396,7 @@ class PhysicalTransitState:
     def __setstate__(self, values: list[object]) -> None:
         """Load physical payloads since 01B3H-A, defaulting newer fields."""
         specs = fields(self)
-        if not isinstance(values, (list, tuple)) or len(values) not in (8, 9, 10, 11, 12, len(specs)):
+        if not isinstance(values, (list, tuple)) or len(values) not in (8, 9, 10, 11, 12, 13, len(specs)):
             raise ValueError("unsupported physical transit pickle payload")
         for spec, value in zip(specs, values):
             object.__setattr__(self, spec.name, value)
@@ -346,8 +406,10 @@ class PhysicalTransitState:
             object.__setattr__(self, "pending_transition", None)
         if len(values) < 12:
             object.__setattr__(self, "inertial_continuation", None)
-        if len(values) < len(specs):
+        if len(values) < 13:
             object.__setattr__(self, "recovery_execution", None)
+        if len(values) < len(specs):
+            object.__setattr__(self, "recovery_intent", None)
         if len(values) < 11:
             object.__setattr__(self, "nominal_braking_substitution", None)
         self.__post_init__()

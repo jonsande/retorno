@@ -21,7 +21,7 @@ from retorno.core.nav_physics import (MotionSegment, MotionState, accelerate_to,
                                       plan_travel, proper_time_in_segment, sample_segment)
 from retorno.core.nav_state import (PhysicalTransitState, PropulsionAuthorization,
                                     NominalTravelState, NominalBrakingSubstitution,
-                                    InertialContinuation, RecoveryExecution)
+                                    InertialContinuation, RecoveryExecution, RecoveryIntent)
 from retorno.core.nav_recovery import RecoveryPlan, plan_inertial_recovery
 from retorno.core.nav_radiation import (RadiationProfile, hull_decay_rate, internal_radiation_rate,
                                         integrate_segment_radiation, integrated_system_wear,
@@ -308,6 +308,17 @@ class Engine:
         physical = state.ship.physical_transit
         if physical is None or physical.inertial_continuation is None:
             raise RuntimeError("recovery requires an interrupted physical brake")
+        armed = physical.recovery_intent
+        if armed is not None:
+            if (armed.status != "pending"
+                    or armed.destination_id != physical.original_destination_id):
+                raise RuntimeError("recovery intent is not pending for this destination")
+            if armed.job_id is not None:
+                job = state.jobs.jobs.get(armed.job_id)
+                if job is None or job.status != JobStatus.COMPLETED:
+                    raise RuntimeError("recovery intent lacks its completed engine repair")
+            if proper_deceleration_m_s2 is not None:
+                raise RuntimeError("armed recovery requires its historical deceleration")
         if self._recovery_jobs_pending(state):
             raise RuntimeError("recovery requires completed physical repair jobs")
         plan = (plan_inertial_recovery(
@@ -353,6 +364,8 @@ class Engine:
                 or not math.isfinite(state.ship.antimatter_capsules)
                 or state.ship.antimatter_capsules < price):
             raise RuntimeError("recovery requires available prepaid antimatter")
+        if armed is not None and price > armed.max_capsules:
+            raise RuntimeError("recovery exceeds its authorized spending limit")
         receipt = PropulsionAuthorization(braking, plan.destination_id, pricing_speed, price)
         recovery = RecoveryExecution(physical.inertial_continuation, plan.segments, receipt)
         staged = deepcopy(state)
@@ -361,10 +374,123 @@ class Engine:
             plan.segments[0], 0.0, plan.destination_id,
             "coast" if len(plan.segments) == 2 else "brake",
             braking_started=True, recovery_execution=recovery,
+            recovery_intent=(replace(armed, status="used", outcome="prepared")
+                             if armed is not None else None),
         )
         self._commit_physical_state(state, staged)
         assert state.ship.physical_transit is not None
         return state.ship.physical_transit
+
+    def arm_inertial_recovery(
+        self, state: GameState, job_id: str, *, max_capsules: float,
+    ) -> RecoveryIntent:
+        """Persist one unpaid historical-brake attempt for a real repair job."""
+        physical = state.ship.physical_transit
+        if (physical is None or physical.inertial_continuation is None
+                or physical.recovery_execution is not None
+                or (physical.recovery_intent is not None
+                    and physical.recovery_intent.status != "cancelled")):
+            raise RuntimeError("arming requires uncommitted physical inertia")
+        physical.__post_init__()
+        if (physical.motion.beta <= 0 or state.clock.t != physical.motion.galactic_s
+                or state.clock.ship_elapsed_s != physical.motion.proper_s):
+            raise RuntimeError("arming requires positive speed and aligned clocks")
+        origin_id = state.ship.transit_from or state.ship.current_node_id
+        destination_id = physical.original_destination_id
+        if (destination_id not in (state.world.known_nodes | set(state.world.known_intel))
+                or distance_between_nodes_ly(state.world, origin_id, destination_id) is None):
+            raise RuntimeError("arming requires the known original destination")
+        job = state.jobs.jobs.get(job_id)
+        drone = state.ship.drones.get(job.owner_id) if job is not None else None
+        engines = state.ship.systems.get("engines")
+        if (job is None or job.internal_id != job_id
+                or job_id not in state.jobs.active_job_ids
+                or job.job_type != JobType.REPAIR_SYSTEM
+                or job.status not in {JobStatus.QUEUED, JobStatus.RUNNING}
+                or job.target is None or job.target.kind != "ship_system"
+                or job.target.id != "engines" or engines is None
+                or drone is None or drone.status != DroneStatus.DEPLOYED
+                or drone.location.kind != "ship_sector"
+                or canonical_ship_sector_id(drone.location.id)
+                != canonical_ship_sector_id(engines.sector_id)):
+            raise RuntimeError("arming requires one active productive engine repair")
+        previous = physical.recovery_intent
+        if previous is not None and previous.job_id == job_id:
+            raise RuntimeError("a cancelled repair authorization cannot be reused")
+        intent = RecoveryIntent(
+            job_id, destination_id, True, max_capsules,
+            attempt_id=previous.attempt_id + 1 if previous is not None else 1,
+            previous_cancelled=(previous.attempt_id, previous.job_id, previous.outcome)
+            if previous is not None else None,
+        )
+        state.ship.physical_transit = replace(physical, recovery_intent=intent)
+        return intent
+
+    def authorize_manual_inertial_recovery(
+        self, state: GameState, *, max_capsules: float,
+    ) -> RecoveryIntent:
+        """Issue a distinct unpaid authorization without requiring another repair."""
+        physical = state.ship.physical_transit
+        if (physical is None or physical.inertial_continuation is None
+                or physical.recovery_execution is not None
+                or (physical.recovery_intent is not None
+                    and physical.recovery_intent.status != "cancelled")):
+            raise RuntimeError("manual authorization requires uncommitted physical inertia")
+        physical.__post_init__()
+        if (physical.motion.beta <= 0 or state.clock.t != physical.motion.galactic_s
+                or state.clock.ship_elapsed_s != physical.motion.proper_s
+                or self._recovery_jobs_pending(state)):
+            raise RuntimeError("manual authorization requires aligned job-free inertia")
+        origin_id = state.ship.transit_from or state.ship.current_node_id
+        destination_id = physical.original_destination_id
+        if (destination_id not in (state.world.known_nodes | set(state.world.known_intel))
+                or distance_between_nodes_ly(state.world, origin_id, destination_id) is None):
+            raise RuntimeError("manual authorization requires the known original destination")
+        previous = physical.recovery_intent
+        intent = RecoveryIntent(
+            None, destination_id, True, max_capsules,
+            attempt_id=previous.attempt_id + 1 if previous is not None else 1,
+            previous_cancelled=(previous.attempt_id, previous.job_id, previous.outcome)
+            if previous is not None else None,
+        )
+        state.ship.physical_transit = replace(physical, recovery_intent=intent)
+        return intent
+
+    def cancel_manual_inertial_recovery(self, state: GameState) -> RecoveryIntent:
+        """End an unused manual authorization so a new one may be issued."""
+        physical = state.ship.physical_transit
+        if physical is None or physical.inertial_continuation is None:
+            raise RuntimeError("manual cancellation requires physical inertia")
+        intent = physical.recovery_intent
+        if intent is None or intent.status != "pending" or intent.job_id is not None:
+            raise RuntimeError("only a pending manual authorization can be cancelled")
+        cancelled = replace(intent, status="cancelled", outcome="manual_cancelled")
+        state.ship.physical_transit = replace(physical, recovery_intent=cancelled)
+        return cancelled
+
+    def _settle_recovery_intent(self, state: GameState,
+                                resolved_job_ids: tuple[str, ...]) -> None:
+        """Attempt once, after the productive repair outcome has been applied."""
+        physical = state.ship.physical_transit
+        assert physical is not None
+        intent = physical.recovery_intent
+        if intent is None or intent.status != "pending" or intent.job_id not in resolved_job_ids:
+            return
+        job = state.jobs.jobs.get(intent.job_id)
+        if job is None or job.status != JobStatus.COMPLETED:
+            outcome = "repair_not_completed"
+        elif self._recovery_jobs_pending(state):
+            outcome = "concurrent_jobs"
+        else:
+            try:
+                self.prepare_inertial_recovery(state)
+                return
+            except (RuntimeError, ValueError):
+                outcome = "authorization_unavailable"
+        current = state.ship.physical_transit
+        assert current is not None
+        state.ship.physical_transit = replace(
+            current, recovery_intent=replace(intent, status="cancelled", outcome=outcome))
 
     def _tick_recovery(self, state: GameState, dt: float) -> list[Event]:
         """Cross the paid coast/brake boundary on one private transaction."""
@@ -637,7 +763,7 @@ class Engine:
             due = self._next_job_completion_s(staged, interval)
             if due == 0:
                 self._advance_job_timers(staged, interval, 0.0)
-                finished_events, _ = self._resolve_job_interval(staged, interval)
+                finished_events, resolved_ids = self._resolve_job_interval(staged, interval)
                 if any(staged.jobs.jobs[key].status == JobStatus.RUNNING
                        and staged.jobs.jobs[key].eta_s <= 0
                        for key in interval.job_keys):
@@ -646,6 +772,11 @@ class Engine:
                     if not any(event is prior for prior in staged.events.recent):
                         self._record_event(staged.events, event)
                 events.extend(finished_events)
+                self._settle_recovery_intent(staged, resolved_ids)
+                if staged.ship.physical_transit.recovery_execution is not None:
+                    events.extend(self._tick_recovery(staged, remaining))
+                    remaining = 0.0
+                    break
                 continue
             step = min(remaining, due if due is not None else math.inf)
             physical = staged.ship.physical_transit
@@ -682,12 +813,18 @@ class Engine:
                 staged, step, allow_repair_drone=bool(staged.ship.drones)))
             if interval.job_keys:
                 self._advance_job_timers(staged, interval, step)
-                finished_events, _ = self._resolve_job_interval(staged, interval)
+                finished_events, resolved_ids = self._resolve_job_interval(staged, interval)
                 for event in finished_events:
                     if not any(event is prior for prior in staged.events.recent):
                         self._record_event(staged.events, event)
                 events.extend(finished_events)
             remaining = max(0.0, remaining - step)
+            if interval.job_keys:
+                self._settle_recovery_intent(staged, resolved_ids)
+                if staged.ship.physical_transit.recovery_execution is not None:
+                    if remaining:
+                        events.extend(self._tick_recovery(staged, remaining))
+                    remaining = 0.0
         self._commit_physical_state(state, staged)
         return events
 
