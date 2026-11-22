@@ -539,10 +539,12 @@ detención no cambia el nodo público, no crea waypoint y no emite llegada.
 
 La transición automática interna tras una reparación productiva autorizada
 se describe más abajo. La nueva pérdida del umbral de frenado del 15 %
-durante la recuperación rechaza por ahora el tick afectado de forma
-atómica; la reinterrupción persistible y su posterior inercia requieren otra
-adaptación. Ocurre lo mismo con cambios operativos no soportados antes del
-punto de frenado previsto. Ese rechazo no cobra ni devuelve combustible.
+durante el frenado activo de recuperación alcanza exactamente el 15 % de
+integridad, C2B2B1 registra el corte y permite continuar por inercia. Un
+intervalo que sobrepase ese corte sin poder procesarse entero se rechaza de
+forma atómica. Los cambios operativos no soportados antes del punto de
+frenado previsto también se rechazan. Esos rechazos no cobran ni devuelven
+combustible.
 
 ### Seguridad de trabajos y límite verificado de desaceleración (C2B1-R1)
 
@@ -638,4 +640,34 @@ puede preparar la recuperación, y la utilizada permanece vinculada al
 `RecoveryExecution` pagado. Guardar y cargar conserva estas distinciones,
 acepta el pickle previo de siete campos y no repite trabajos ni cargos. La
 vía manual sigue siendo interna; quedan pendientes el control de admisión
-público, la pérdida posterior de frenado y el comportamiento de llegada.
+público y el comportamiento de llegada.
+
+### Segunda pérdida de frenado durante la recuperación (C2B2B1)
+
+Durante el segmento de frenado de `RecoveryExecution`, el integrador de
+desgaste existente localiza el primer cruce de `engines` al 15 %. Un tick
+que termina exactamente allí confirma posición, beta residual, relojes,
+electricidad, radiación y desgaste hasta ese instante. Si solicita más tiempo
+y todavía no puede continuar dentro de la misma transacción, se rechaza
+atómicamente. La recuperación queda `invalidated` y `replan_required`, con
+`pending_transition="inertia"`; no se declara llegada.
+
+`RecoveryInterruption` conserva una copia inmutable y acotada de la
+recuperación pagada, su segmento interrumpido, tiempo local del corte,
+posición, beta y causa. La recuperación guarda a su vez la primera
+`InertialContinuation`, con el recibo nominal o del frenado anterior. El
+segundo recibo de `PropulsionAuthorization` permanece gastado en
+`RecoveryExecution` y, tras la transición, en la nueva
+`InertialContinuation`. `RecoveryIntent` conserva el estado `used`. Ningún
+recibo se convierte en permiso nuevo ni se devuelve antimateria.
+
+El siguiente `Engine.tick()` crea un segmento inercial desde el corte exacto
+y avanza con beta constante sin empuje ni cargo. Se mantiene el destino
+original como referencia; la nave puede sobrepasarlo sin llegada, cambio de
+nodo, waypoint ni enlace nuevo. El historial permanece en guardado/carga;
+los pickles físicos anteriores, de hasta 14 campos, cargan sin segunda
+interrupción. Se bloquean otra autorización, una tercera maniobra y trabajos
+de reparación durante la segunda inercia. Siguen pendientes la pérdida de
+capacidad en la espera previa al frenado, nuevas reparaciones y
+replanificación tras este segundo fallo, así como la navegación y llegada
+públicas.

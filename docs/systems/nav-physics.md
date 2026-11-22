@@ -509,11 +509,11 @@ leaves no active reusable receipt. Loading never debits again. Completion
 does not update the public node, create a waypoint, or emit an arrival.
 
 The explicitly armed automatic transition after a productive repair is
-described below. A newly lost 15% braking boundary during recovery currently rejects
-the affected tick atomically; persistible re-interruption and subsequent
-inertial continuation need a later adapter. The same applies to unsupported
-operational changes before the planned braking point. No extra fuel is
-charged or refunded on such rejection.
+described below. During active recovery braking, C2B2B1 now records an exact
+15% integrity cut and permits inertial continuation. A request extending
+past that cut without a complete supported interval rejects atomically.
+Unsupported operational changes before the planned braking point still
+reject. Such rejection neither charges nor refunds fuel.
 
 ### Job safety and verified deceleration cap (C2B1-R1)
 
@@ -603,4 +603,31 @@ changes that old object back to pending. Only a pending intent can prepare a
 recovery, and a used intent stays bound to the paid `RecoveryExecution`.
 Save/load retains these distinctions, accepts the earlier seven-field intent
 pickle, and does not repeat jobs or charges. The manual path remains internal;
-public admission control, later braking loss and arrival behavior remain open.
+public admission control and arrival behavior remain open.
+
+### Second braking loss during recovery (C2B2B1)
+
+During an active `RecoveryExecution` braking segment, the existing integrated
+wear solver locates the first 15% engine integrity crossing. A tick ending
+exactly there commits position, residual beta, clocks, electrical state,
+radiation and wear up to the cut. A request for more time that cannot be
+completed in the same transaction rejects atomically. Recovery becomes
+`invalidated` and `replan_required`, with `pending_transition="inertia"`;
+no arrival is declared.
+
+An immutable, bounded `RecoveryInterruption` preserves the paid recovery,
+interrupted segment, local cut time, position, beta and cause. That recovery
+still contains the first `InertialContinuation` and its nominal or earlier
+braking receipt. The second `PropulsionAuthorization` remains spent in
+`RecoveryExecution`, then in the new `InertialContinuation` after transition.
+`RecoveryIntent` retains its `used` status. No receipt becomes fresh
+authority, and antimatter is not refunded.
+
+The next `Engine.tick()` starts unpowered motion at the exact cut and advances
+at constant beta without another charge. The original destination remains a
+reference; the ship may pass it without arrival, node changes, waypoints or
+new links. Save/load retains the bounded history; physical pickles with up to
+14 previous fields load without a second interruption. Further authorization,
+a third maneuver and repair jobs during the second inertia are blocked.
+Capacity loss during the preceding recovery coast, repairs and replanning
+after this second failure, and public navigation and arrival remain open.
