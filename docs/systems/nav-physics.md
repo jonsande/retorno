@@ -629,5 +629,36 @@ reference; the ship may pass it without arrival, node changes, waypoints or
 new links. Save/load retains the bounded history; physical pickles with up to
 14 previous fields load without a second interruption. Further authorization,
 a third maneuver and repair jobs during the second inertia are blocked.
-Capacity loss during the preceding recovery coast, repairs and replanning
-after this second failure, and public navigation and arrival remain open.
+Repairs and replanning after this second failure, and public navigation and
+arrival remain open.
+
+### Braking capacity loss during the recovery wait (C2B2B2)
+
+For `coast_then_brake`, the wait is unpowered but the later brake has already
+been paid. The existing integrated wear solver locates the first instant at
+which engine integrity reaches 15% during that wait. Reaching 35% does not
+cancel recovery: the ship may enter the braking-only band, emit the ordinary
+engine-state event and continue waiting. A tick ending exactly at 15% commits
+only the preceding motion and physical effects; a request crossing that cut
+without a fully supported interval rejects atomically. If the paid wait
+starts exactly at 15% with positive ordinary wear, its cut occurs at zero
+time and the same tick can continue inertially. The braking phase has not
+yet run.
+
+`RecoveryCoastInterruption` distinguishes this cancellation from
+`RecoveryInterruption`, which is reserved for an active brake. It retains the
+invalidated phase-zero `RecoveryExecution`, local cut time, position, beta,
+cause and spent fuel receipt. The execution still holds the first
+`InertialContinuation` and its history. The pending state uses
+`pending_transition="inertia"`; on the next tick, the original inertial
+history resumes at the exact cut, without treating the planned brake as
+executed or charging or refunding antimatter. Save/load retains the history;
+older physical pickles of up to 15 fields keep their meaning.
+
+The ship retains destination and beta, may pass B, and creates no arrival,
+waypoint or new link. A third authorization and jobs during this second
+inertia remain blocked. Engine isolation, electrical loss or another
+operational change not caused by ordinary wear retains atomic rejection
+until causal coordination exists; it is never recorded as a false integrity
+cut. Later repair and replanning, public admission control and public
+arrival remain open.

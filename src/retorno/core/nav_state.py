@@ -230,6 +230,27 @@ class RecoveryInterruption:
 
 
 @dataclass(frozen=True, slots=True)
+class RecoveryCoastInterruption:
+    """Paid recovery abandoned before its planned brake was ever executed."""
+
+    execution: RecoveryExecution
+    interrupted_elapsed_galactic_s: float
+    cut_motion: MotionState
+    cause: Literal["engine_integrity_15"] = "engine_integrity_15"
+
+    def __post_init__(self) -> None:
+        self.execution.__post_init__()
+        if (not self.execution.invalidated or self.execution.completed
+                or len(self.execution.segments) != 2 or self.execution.phase_index != 0
+                or not math.isfinite(self.interrupted_elapsed_galactic_s)
+                or not 0 <= self.interrupted_elapsed_galactic_s <= self.execution.segments[0].duration_galactic_s
+                or self.cut_motion != sample_segment(
+                    self.execution.segments[0], self.interrupted_elapsed_galactic_s)
+                or self.cut_motion.beta <= 0 or self.cause != "engine_integrity_15"):
+            raise ValueError("recovery coast interruption requires an unexecuted paid brake")
+
+
+@dataclass(frozen=True, slots=True)
 class RecoveryIntent:
     """One explicit, unpaid attempt; a prior cancellation is only history."""
 
@@ -304,6 +325,7 @@ class PhysicalTransitState:
     recovery_execution: RecoveryExecution | None = None
     recovery_intent: RecoveryIntent | None = None
     recovery_interruption: RecoveryInterruption | None = None
+    recovery_coast_interruption: RecoveryCoastInterruption | None = None
 
     def __post_init__(self) -> None:
         if (not math.isfinite(self.elapsed_galactic_s)
@@ -331,7 +353,8 @@ class PhysicalTransitState:
         if self.pending_transition == "safety_brake" and (self.intent not in {"accelerate", "coast"}
                                                           or self.safety_braking):
             raise ValueError("pending safety braking is not active braking")
-        if self.pending_transition == "inertia" and self.intent != "brake":
+        if (self.pending_transition == "inertia" and self.intent != "brake"
+                and not (self.intent == "coast" and self.recovery_coast_interruption is not None)):
             raise ValueError("pending inertia requires an interrupted braking segment")
         if self.propulsion_authorization is not None and (
             self.propulsion_authorization.segment != self.active_segment
@@ -345,6 +368,28 @@ class PhysicalTransitState:
         recovery = self.recovery_execution
         armed = self.recovery_intent
         interrupted = self.recovery_interruption
+        coast_interrupted = self.recovery_coast_interruption
+        if interrupted is not None and coast_interrupted is not None:
+            raise ValueError("a recovery cannot fail in both phases")
+        if coast_interrupted is not None:
+            coast_interrupted.__post_init__()
+            history = coast_interrupted.execution.inertial_history
+            if (self.original_destination_id != history.destination_id
+                    or (recovery is not None and (
+                        recovery != coast_interrupted.execution
+                        or self.elapsed_galactic_s != coast_interrupted.interrupted_elapsed_galactic_s
+                        or self.motion != coast_interrupted.cut_motion))
+                    or (recovery is None and (
+                        inertia is None or self.pending_transition is not None
+                        or inertia.interrupted_segment != history.interrupted_segment
+                        or inertia.interrupted_elapsed_galactic_s
+                        != history.interrupted_elapsed_galactic_s
+                        or inertia.nominal_plan != history.nominal_plan
+                        or inertia.braking_substitution != history.braking_substitution
+                        or inertia.propulsion_receipt != history.propulsion_receipt
+                        or inertia.current_segment.start.galactic_s
+                        < coast_interrupted.cut_motion.galactic_s))):
+                raise ValueError("abandoned recovery coast must bind its earlier inertia")
         if interrupted is not None:
             interrupted.__post_init__()
             if (self.original_destination_id != interrupted.execution.inertial_history.destination_id
@@ -364,10 +409,13 @@ class PhysicalTransitState:
         if armed is not None:
             armed.__post_init__()
             if (armed.destination_id != self.original_destination_id
-                    or (recovery is None and inertia is None and interrupted is None)
+                    or (recovery is None and inertia is None and interrupted is None
+                        and coast_interrupted is None)
                     or (recovery is not None and armed.status != "used")
-                    or (recovery is None and armed.status == "used" and interrupted is None)
-                    or (interrupted is not None and armed.status != "used")):
+                    or (recovery is None and armed.status == "used"
+                        and interrupted is None and coast_interrupted is None)
+                    or ((interrupted is not None or coast_interrupted is not None)
+                        and armed.status != "used")):
                 raise ValueError("recovery intent must match its physical history")
         if recovery is not None:
             recovery.__post_init__()
@@ -380,8 +428,9 @@ class PhysicalTransitState:
                     or self.intent != ("brake" if recovery.phase_index == len(recovery.segments) - 1
                                        else "coast")
                     or not self.braking_started
-                    or self.pending_transition != ("inertia" if interrupted is not None else None)
-                    or recovery.invalidated != (interrupted is not None)
+                    or self.pending_transition != (
+                        "inertia" if interrupted is not None or coast_interrupted is not None else None)
+                    or recovery.invalidated != (interrupted is not None or coast_interrupted is not None)
                     or self.replan_required != recovery.invalidated
                     or recovery.completed != (
                         self.elapsed_galactic_s == self.active_segment.duration_galactic_s
@@ -437,7 +486,7 @@ class PhysicalTransitState:
     def __setstate__(self, values: list[object]) -> None:
         """Load physical payloads since 01B3H-A, defaulting newer fields."""
         specs = fields(self)
-        if not isinstance(values, (list, tuple)) or len(values) not in (8, 9, 10, 11, 12, 13, 14, len(specs)):
+        if not isinstance(values, (list, tuple)) or len(values) not in (8, 9, 10, 11, 12, 13, 14, 15, len(specs)):
             raise ValueError("unsupported physical transit pickle payload")
         for spec, value in zip(specs, values):
             object.__setattr__(self, spec.name, value)
@@ -451,8 +500,10 @@ class PhysicalTransitState:
             object.__setattr__(self, "recovery_execution", None)
         if len(values) < 14:
             object.__setattr__(self, "recovery_intent", None)
-        if len(values) < len(specs):
+        if len(values) < 15:
             object.__setattr__(self, "recovery_interruption", None)
+        if len(values) < 16:
+            object.__setattr__(self, "recovery_coast_interruption", None)
         if len(values) < 11:
             object.__setattr__(self, "nominal_braking_substitution", None)
         self.__post_init__()

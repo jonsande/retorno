@@ -667,7 +667,38 @@ original como referencia; la nave puede sobrepasarlo sin llegada, cambio de
 nodo, waypoint ni enlace nuevo. El historial permanece en guardado/carga;
 los pickles físicos anteriores, de hasta 14 campos, cargan sin segunda
 interrupción. Se bloquean otra autorización, una tercera maniobra y trabajos
-de reparación durante la segunda inercia. Siguen pendientes la pérdida de
-capacidad en la espera previa al frenado, nuevas reparaciones y
-replanificación tras este segundo fallo, así como la navegación y llegada
-públicas.
+de reparación durante la segunda inercia. Siguen pendientes nuevas
+reparaciones y replanificación tras este segundo fallo, así como la
+navegación y llegada públicas.
+
+### Pérdida de capacidad en la espera de recuperación (C2B2B2)
+
+En `coast_then_brake`, la espera es inercial pero el frenado posterior ya
+está pagado. El integrador de desgaste existente localiza el primer instante
+en que `engines` alcanza el 15 % durante esa espera. El 35 % no cancela la
+recuperación: la nave puede pasar a la banda de solo frenado, con el evento
+normal de estado de motores, y seguir esperando. Un tick que termina
+exactamente en el 15 % confirma solo el movimiento y los efectos físicos
+previos al corte; uno que lo sobrepasa sin poder procesarse entero se
+rechaza atómicamente. Si la espera pagada empieza exactamente al 15 % y el
+desgaste ordinario es positivo, el corte ocurre en tiempo cero y ese mismo
+tick puede continuar por inercia. La fase de frenado aún no se ejecuta.
+
+`RecoveryCoastInterruption` distingue esta cancelación de
+`RecoveryInterruption`, reservado al frenado activo. Conserva la
+`RecoveryExecution` invalidada en fase de espera, el tiempo local, la
+posición, beta, causa y recibo de combustible gastado. Esa ejecución guarda
+la primera `InertialContinuation` y su historial. La transición pendiente
+usa `pending_transition="inertia"`; en el siguiente tick se recupera la
+inercia original desde el punto exacto del corte, sin tratar el frenado
+planificado como ejecutado ni cobrar o reembolsar antimateria. El historial
+persiste en guardado/carga; los pickles anteriores de hasta 15 campos
+conservan su interpretación.
+
+La nave conserva destino y beta, puede sobrepasar B y no produce llegada,
+waypoint ni enlace nuevo. La tercera autorización y los trabajos durante
+esta segunda inercia siguen bloqueados. Un aislamiento, pérdida eléctrica u
+otro cambio operativo no causado por el desgaste ordinario conserva el
+rechazo atómico hasta disponer de coordinación causal; no se registra como
+un falso corte de integridad. Quedan pendientes reparación y replanteamiento
+posteriores, control de admisión público y llegada pública.

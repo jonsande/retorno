@@ -22,7 +22,7 @@ from retorno.core.nav_physics import (MotionSegment, MotionState, accelerate_to,
 from retorno.core.nav_state import (PhysicalTransitState, PropulsionAuthorization,
                                     NominalTravelState, NominalBrakingSubstitution,
                                     InertialContinuation, RecoveryExecution, RecoveryIntent,
-                                    RecoveryInterruption)
+                                    RecoveryInterruption, RecoveryCoastInterruption)
 from retorno.core.nav_recovery import RecoveryPlan, plan_inertial_recovery
 from retorno.core.nav_radiation import (RadiationProfile, hull_decay_rate, internal_radiation_rate,
                                         integrate_segment_radiation, integrated_system_wear,
@@ -309,7 +309,8 @@ class Engine:
         physical = state.ship.physical_transit
         if physical is None or physical.inertial_continuation is None:
             raise RuntimeError("recovery requires an interrupted physical brake")
-        if physical.recovery_interruption is not None:
+        if (physical.recovery_interruption is not None
+                or physical.recovery_coast_interruption is not None):
             raise RuntimeError("a second interrupted recovery cannot authorize another maneuver")
         armed = physical.recovery_intent
         if armed is not None:
@@ -392,6 +393,7 @@ class Engine:
         if (physical is None or physical.inertial_continuation is None
                 or physical.recovery_execution is not None
                 or physical.recovery_interruption is not None
+                or physical.recovery_coast_interruption is not None
                 or (physical.recovery_intent is not None
                     and physical.recovery_intent.status != "cancelled")):
             raise RuntimeError("arming requires uncommitted physical inertia")
@@ -438,6 +440,7 @@ class Engine:
         if (physical is None or physical.inertial_continuation is None
                 or physical.recovery_execution is not None
                 or physical.recovery_interruption is not None
+                or physical.recovery_coast_interruption is not None
                 or (physical.recovery_intent is not None
                     and physical.recovery_intent.status != "cancelled")):
             raise RuntimeError("manual authorization requires uncommitted physical inertia")
@@ -516,6 +519,25 @@ class Engine:
         if (not math.isfinite(requested_end) or requested_end == state.clock.t
                 or requested_end > final_time + math.ulp(final_time)):
             raise RuntimeError("recovery tick exceeds its physical horizon")
+        # A paid wait can begin exactly at the inclusive braking threshold.
+        # Positive ordinary wear then makes the first loss a zero-time cut.
+        engine = state.ship.systems["engines"]
+        if (physical.intent == "coast"
+                and engine.health == Balance.ENGINE_EMERGENCY_BRAKE_MIN_HEALTH
+                and engine.base_decay_per_s > 0):
+            if not self._recovery_braking_capable(state, recovery):
+                raise RuntimeError("recovery braking capacity is no longer operational")
+            staged = deepcopy(state)
+            spent = replace(recovery, invalidated=True)
+            staged.ship.physical_transit = replace(
+                physical, recovery_execution=spent, replan_required=True,
+                pending_transition="inertia",
+                recovery_coast_interruption=RecoveryCoastInterruption(
+                    spent, physical.elapsed_galactic_s, physical.motion),
+            )
+            events = self._tick_inertial(staged, dt)
+            self._commit_physical_state(state, staged)
+            return events
         # Summing two positive segment durations can round one ULP beyond the
         # separately rounded absolute endpoint. It grants no extra motion.
         remaining = (dt if requested_end <= final_time
@@ -757,7 +779,8 @@ class Engine:
         while remaining > 0:
             physical = staged.ship.physical_transit
             assert physical is not None
-            if (physical.recovery_interruption is not None
+            if ((physical.recovery_interruption is not None
+                    or physical.recovery_coast_interruption is not None)
                     and self._recovery_jobs_pending(staged)):
                 raise RuntimeError("second inertial continuation cannot process repair jobs")
             interval, activation_events = self._begin_job_interval(staged)
@@ -803,19 +826,25 @@ class Engine:
                     raise RuntimeError("inertial continuation requires residual speed")
                 coast = coast_for(physical.motion, step)
                 interrupted = physical.recovery_interruption
-                history = InertialContinuation(
-                    physical.active_segment, physical.elapsed_galactic_s,
-                    physical.original_destination_id, coast,
-                    physical.nominal_plan if interrupted is None else None,
-                    physical.nominal_braking_substitution if interrupted is None else None,
-                    (interrupted.execution.authorization if interrupted is not None
-                     else physical.propulsion_authorization),
-                )
+                coast_interrupted = physical.recovery_coast_interruption
+                if coast_interrupted is not None:
+                    history = replace(coast_interrupted.execution.inertial_history,
+                                      current_segment=coast)
+                else:
+                    history = InertialContinuation(
+                        physical.active_segment, physical.elapsed_galactic_s,
+                        physical.original_destination_id, coast,
+                        physical.nominal_plan if interrupted is None else None,
+                        physical.nominal_braking_substitution if interrupted is None else None,
+                        (interrupted.execution.authorization if interrupted is not None
+                         else physical.propulsion_authorization),
+                    )
                 staged.ship.physical_transit = replace(
                     physical, active_segment=coast, elapsed_galactic_s=0.0,
                     intent="coast", safety_braking=False, braking_started=True,
                     pending_transition=None, propulsion_authorization=None,
                     nominal_braking_substitution=None, inertial_continuation=history,
+                    nominal_plan=history.nominal_plan,
                     recovery_execution=None,
                 )
             else:
@@ -1009,10 +1038,13 @@ class Engine:
                 for key, system in state.ship.systems.items()}
         engine_boundary = None
         engine_threshold = None
-        if powered or (nominal is not None and physical.intent == "coast" and inertia is None):
+        recovery_coast = recovery is not None and physical.intent == "coast"
+        if (powered or recovery_coast
+                or (nominal is not None and physical.intent == "coast" and inertia is None)):
             engine = state.ship.systems["engines"]
-            engine_threshold = (Balance.SYSTEM_HEALTH_CRITICAL if physical.intent != "brake"
-                                else Balance.ENGINE_EMERGENCY_BRAKE_MIN_HEALTH)
+            engine_threshold = (Balance.ENGINE_EMERGENCY_BRAKE_MIN_HEALTH
+                                if physical.intent == "brake" or recovery_coast
+                                else Balance.SYSTEM_HEALTH_CRITICAL)
             target_wear = engine.health - engine_threshold
             if target_wear == 0 and wear["engines"] > 0:
                 raise RuntimeError(
@@ -1035,7 +1067,8 @@ class Engine:
             thresholds = (Balance.SYSTEM_HEALTH_OFFLINE, Balance.SYSTEM_HEALTH_CRITICAL,
                           Balance.SYSTEM_HEALTH_DAMAGED, Balance.SYSTEM_HEALTH_LIMITED)
             if key == "engines":
-                thresholds = tuple(t for t in thresholds if t != engine_threshold)
+                thresholds = tuple(t for t in thresholds if t != engine_threshold
+                                   and not (recovery_coast and t == Balance.SYSTEM_HEALTH_CRITICAL))
             upper_rate = ordinary_wear_rate(
                 system, min(quality.start, quality.end), False,
                 max(profile.start_rad_per_s, profile.end_rad_per_s)
@@ -1072,8 +1105,8 @@ class Engine:
         staged.clock.t = end.galactic_s
         staged.clock.ship_elapsed_s = end.proper_s
         staged.clock.bio_elapsed_s += biological_time_interval(proper_dt, staged.ship.is_hibernating)
-        pending_transition = ("safety_brake" if physical.intent in {"accelerate", "coast"} else "inertia"
-                              if physical.intent == "brake" else None) if engine_boundary is not None else None
+        pending_transition = ("inertia" if physical.intent == "brake" or recovery_coast
+                              else "safety_brake") if engine_boundary is not None else None
         stopped_safety_brake = substitution is not None and local_end == segment.duration_galactic_s
         if stopped_safety_brake:
             pending_transition = None  # At beta zero there is no inertial continuation to schedule.
@@ -1083,10 +1116,13 @@ class Engine:
             pending_transition = None
         interrupted_recovery = (recovery is not None and physical.intent == "brake"
                                 and pending_transition == "inertia")
+        interrupted_coast = recovery_coast and pending_transition == "inertia"
         spent_recovery = (replace(recovery, invalidated=True)
-                          if interrupted_recovery else recovery)
+                          if interrupted_recovery or interrupted_coast else recovery)
         interruption = (RecoveryInterruption(spent_recovery, local_end, end)
                         if interrupted_recovery else physical.recovery_interruption)
+        coast_interruption = (RecoveryCoastInterruption(spent_recovery, local_end, end)
+                              if interrupted_coast else physical.recovery_coast_interruption)
         staged.ship.physical_transit = replace(
             physical, elapsed_galactic_s=local_end,
             replan_required=physical.replan_required or pending_transition is not None,
@@ -1098,6 +1134,7 @@ class Engine:
             recovery_execution=(replace(recovery, completed=True)
                                 if stopped_recovery else spent_recovery),
             recovery_interruption=interruption,
+            recovery_coast_interruption=coast_interruption,
         )
         fraction = end.distance_m / route_m
         staged.world.current_pos_ly = (
@@ -1129,13 +1166,15 @@ class Engine:
             health_event_count = len(events)
             self._apply_health_state(system, staged, events, cause="degradation")
             if system.state != old_state:
-                if not (substitution is not None and key == "engines"
+                if not (key == "engines"
                         and old_state == SystemState.DAMAGED
                         and system.state == SystemState.CRITICAL
-                        and state.ship.systems["engines"].health == Balance.SYSTEM_HEALTH_CRITICAL
-                        and len(events) == health_event_count + 1):
+                        and len(events) == health_event_count + 1
+                        and (recovery_coast or (substitution is not None
+                             and state.ship.systems["engines"].health
+                             == Balance.SYSTEM_HEALTH_CRITICAL))):
                     raise RuntimeError("Physical segment crossed a system state boundary")
-        if events and not (substitution is not None and len(events) == 1
+        if events and not ((substitution is not None or recovery_coast) and len(events) == 1
                            and events[0].type == EventType.SYSTEM_STATE_CHANGED
                            and events[0].source == SourceRef(kind="ship_system", id="engines")):
             raise RuntimeError("Physical segment produced an unresolved health event")
