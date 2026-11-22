@@ -627,10 +627,10 @@ The next `Engine.tick()` starts unpowered motion at the exact cut and advances
 at constant beta without another charge. The original destination remains a
 reference; the ship may pass it without arrival, node changes, waypoints or
 new links. Save/load retains the bounded history; physical pickles with up to
-14 previous fields load without a second interruption. Further authorization,
-a third maneuver and repair jobs during the second inertia are blocked.
-Repairs and replanning after this second failure, and public navigation and
-arrival remain open.
+14 previous fields load without a second interruption. Further authorization
+and a third maneuver remain blocked; C3A permits one limited productive repair
+job during the second inertia. Replanning after this second failure, and
+public navigation and arrival remain open.
 
 ### Braking capacity loss during the recovery wait (C2B2B2)
 
@@ -656,9 +656,39 @@ executed or charging or refunding antimatter. Save/load retains the history;
 older physical pickles of up to 15 fields keep their meaning.
 
 The ship retains destination and beta, may pass B, and creates no arrival,
-waypoint or new link. A third authorization and jobs during this second
-inertia remain blocked. Engine isolation, electrical loss or another
+waypoint or new link. A third authorization remains blocked; C3A permits one
+engine repair job during this second inertia. Engine isolation, electrical loss or another
 operational change not caused by ordinary wear retains atomic rejection
 until causal coordination exists; it is never recorded as a false integrity
-cut. Later repair and replanning, public admission control and public
-arrival remain open.
+cut. Later replanning, public admission control and public arrival remain open.
+
+### Productive repair during the second inertia (C3A)
+
+After either `RecoveryInterruption` or `RecoveryCoastInterruption`, the C1
+causal scheduler can activate and resolve one `REPAIR_SYSTEM` job for
+`engines` with one valid internal drone. Before advancing it verifies the
+physical history, used intent, and agreement between `QUEUED`/`RUNNING`
+jobs and the active index. It reuses `_begin_job_interval()`, job completion
+boundaries, physical integration, electrical and radiation effects, drone
+maintenance, and applies the productive effect only at completion. A zero
+ETA job may resolve at the current instant without reactivating the
+invalidated `RecoveryExecution`.
+
+Repair can fail under productive risk or improve integrity after earlier
+wear. In either outcome the ship keeps beta, destination, and inertial path.
+No propulsion is charged or authorized; `RecoveryIntent` stays `used`, and
+both interruption types retain the first history and recovery receipt. A
+private transaction rolls the whole tick back if a later electrical,
+radiological, drone, job, or narrative boundary cannot be coordinated.
+Save/load does not repeat the outcome or RNG. Repair after passing B is also
+supported without arrival or node change.
+
+C3B will need to distinguish successive attempts and require a new payment
+without turning spent receipts into authority. One future design is a lineage
+ID, monotonic attempt number, and fixed-size summary of the latest attempts
+in physical state, with cumulative counts and a history digest. The magnitude
+of the last demonstrated brake must be checked with current position, beta,
+destination and capability before another authorization. If every old
+receipt must remain reconstructible, a separate persistent audit log will
+need to retain it. That log must not become another source of position or
+speed. This proposal is not implemented.

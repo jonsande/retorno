@@ -779,10 +779,19 @@ class Engine:
         while remaining > 0:
             physical = staged.ship.physical_transit
             assert physical is not None
-            if ((physical.recovery_interruption is not None
-                    or physical.recovery_coast_interruption is not None)
-                    and self._recovery_jobs_pending(staged)):
-                raise RuntimeError("second inertial continuation cannot process repair jobs")
+            if (physical.recovery_interruption is not None
+                    or physical.recovery_coast_interruption is not None):
+                # The paid recovery is history; only one indexed productive
+                # repair may run, and no old intent may authorize a new leg.
+                physical.__post_init__()
+                if (physical.recovery_intent is not None
+                        and physical.recovery_intent.status != "used"):
+                    raise RuntimeError("second inertia cannot activate an unpaid recovery intent")
+                active_jobs = {job_id for job_id, job in staged.jobs.jobs.items()
+                               if job.status in {JobStatus.QUEUED, JobStatus.RUNNING}}
+                if (len(staged.jobs.active_job_ids) > 1 or len(active_jobs) > 1
+                        or active_jobs != set(staged.jobs.active_job_ids)):
+                    raise RuntimeError("second inertia supports one indexed physical repair job")
             interval, activation_events = self._begin_job_interval(staged)
             if activation_events:
                 raise RuntimeError("physical job activation requires an unsupported causal event")
@@ -809,7 +818,8 @@ class Engine:
                         self._record_event(staged.events, event)
                 events.extend(finished_events)
                 self._settle_recovery_intent(staged, resolved_ids)
-                if staged.ship.physical_transit.recovery_execution is not None:
+                recovery = staged.ship.physical_transit.recovery_execution
+                if recovery is not None and not recovery.invalidated:
                     events.extend(self._tick_recovery(staged, remaining))
                     remaining = 0.0
                     break
@@ -868,7 +878,8 @@ class Engine:
             remaining = max(0.0, remaining - step)
             if interval.job_keys:
                 self._settle_recovery_intent(staged, resolved_ids)
-                if staged.ship.physical_transit.recovery_execution is not None:
+                recovery = staged.ship.physical_transit.recovery_execution
+                if recovery is not None and not recovery.invalidated:
                     if remaining:
                         events.extend(self._tick_recovery(staged, remaining))
                     remaining = 0.0

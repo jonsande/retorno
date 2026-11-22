@@ -666,10 +666,10 @@ y avanza con beta constante sin empuje ni cargo. Se mantiene el destino
 original como referencia; la nave puede sobrepasarlo sin llegada, cambio de
 nodo, waypoint ni enlace nuevo. El historial permanece en guardado/carga;
 los pickles físicos anteriores, de hasta 14 campos, cargan sin segunda
-interrupción. Se bloquean otra autorización, una tercera maniobra y trabajos
-de reparación durante la segunda inercia. Siguen pendientes nuevas
-reparaciones y replanificación tras este segundo fallo, así como la
-navegación y llegada públicas.
+interrupción. Otra autorización y una tercera maniobra permanecen bloqueadas;
+C3A admite una reparación productiva limitada durante la segunda inercia.
+Siguen pendientes replanificación tras este segundo fallo y navegación y
+llegada públicas.
 
 ### Pérdida de capacidad en la espera de recuperación (C2B2B2)
 
@@ -696,9 +696,41 @@ persiste en guardado/carga; los pickles anteriores de hasta 15 campos
 conservan su interpretación.
 
 La nave conserva destino y beta, puede sobrepasar B y no produce llegada,
-waypoint ni enlace nuevo. La tercera autorización y los trabajos durante
-esta segunda inercia siguen bloqueados. Un aislamiento, pérdida eléctrica u
+waypoint ni enlace nuevo. La tercera autorización sigue bloqueada; C3A
+admite un trabajo de reparación de motores durante esta segunda inercia.
+Un aislamiento, pérdida eléctrica u
 otro cambio operativo no causado por el desgaste ordinario conserva el
 rechazo atómico hasta disponer de coordinación causal; no se registra como
-un falso corte de integridad. Quedan pendientes reparación y replanteamiento
-posteriores, control de admisión público y llegada pública.
+un falso corte de integridad. Quedan pendientes replanteamiento posterior,
+control de admisión público y llegada pública.
+
+### Reparación productiva durante la segunda inercia (C3A)
+
+Tras `RecoveryInterruption` o `RecoveryCoastInterruption`, el scheduler causal
+de C1 puede activar y resolver un único `REPAIR_SYSTEM` de `engines` con dron
+interior válido. Antes de avanzar, verifica el historial físico, la intención
+ya utilizada y la coherencia entre trabajos `QUEUED`/`RUNNING` e índice activo.
+Reutiliza `_begin_job_interval()`, los límites de finalización, la integración
+física, electricidad, radiación y mantenimiento del dron, y aplica el efecto
+productivo solo al concluir el trabajo. Un trabajo de ETA cero puede resolverse
+en el instante actual sin reactivar la `RecoveryExecution` invalidada.
+
+La reparación puede fallar conforme al riesgo productivo o mejorar la
+integridad después del desgaste anterior. En ambos casos la nave mantiene
+beta, destino y trayectoria inercial. No se cobra ni autoriza propulsión;
+`RecoveryIntent` permanece `used`, y ambos tipos de interrupción conservan
+la primera historia y el recibo de la recuperación. La simulación privada
+revierte el tick entero si un límite eléctrico, radiológico, de dron, de
+trabajos o narrativo posterior no puede coordinarse. Guardar/cargar no repite
+el resultado ni el RNG. También se admite reparar después de sobrepasar B,
+sin llegada ni cambio de nodo.
+
+Para C3B se necesita distinguir intentos sucesivos y un pago nuevo sin
+convertir recibos gastados en permisos. Una opción futura es mantener en el
+estado físico un identificador de linaje, contador monótono y resumen de
+tamaño fijo de los últimos intentos, con acumulados y huella del historial;
+la magnitud del último frenado demostrado deberá comprobarse junto con
+posición, beta, destino y capacidad actuales antes de autorizar el siguiente.
+Si se exige reconstruir cada recibo antiguo, un registro persistente separado
+de auditoría tendrá que conservarlos. Ese registro no debe ser otra fuente de
+posición ni velocidad. Esta propuesta no está implementada.

@@ -157,7 +157,7 @@ def test_other_unresolved_limits_still_reject_atomically(obstacle):
     assert pickle.dumps(game) == before
 
 
-def test_second_cut_blocks_third_authorization_and_new_repair_slice():
+def test_second_cut_blocks_third_authorization_while_repair_remains_inertial():
     game, cut = recovery_brake_at_risk()
     Engine().tick(game, cut)
     Engine().tick(game, 1)
@@ -168,10 +168,13 @@ def test_second_cut_blocks_third_authorization_and_new_repair_slice():
         Engine().authorize_manual_inertial_recovery(game, max_capsules=10)
     assert pickle.dumps(game) == before
     enqueue_repair(game)
-    before = pickle.dumps(game)
-    with pytest.raises(RuntimeError, match="second inertial continuation"):
-        Engine().tick(game, 1)
-    assert pickle.dumps(game) == before
+    motion = game.ship.physical_transit.motion
+    fuel = game.ship.antimatter_capsules
+    Engine().tick(game, 1)
+    assert game.ship.physical_transit.motion.beta == motion.beta
+    assert game.ship.physical_transit.motion.distance_m > motion.distance_m
+    assert game.ship.physical_transit.recovery_execution is None
+    assert game.ship.antimatter_capsules == fuel
 
 
 def test_interrupted_state_validation_rejects_reactivation_and_lost_history():

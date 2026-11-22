@@ -204,7 +204,7 @@ def test_unsupported_wait_limit_rejects_atomically(obstacle):
     assert pickle.dumps(game) == before
 
 
-def test_coast_interruption_blocks_reuse_and_keeps_history_distinct():
+def test_coast_interruption_blocks_reuse_while_repair_remains_inertial():
     game = paid_coast()
     cut = wear_cut(game, .15)
     assert cut is not None
@@ -225,10 +225,13 @@ def test_coast_interruption_blocks_reuse_and_keeps_history_distinct():
         Engine().authorize_manual_inertial_recovery(game, max_capsules=10)
     assert pickle.dumps(game) == before
     enqueue_repair(game)
-    before = pickle.dumps(game)
-    with pytest.raises(RuntimeError, match="second inertial continuation"):
-        Engine().tick(game, 1)
-    assert pickle.dumps(game) == before
+    motion = game.ship.physical_transit.motion
+    fuel = game.ship.antimatter_capsules
+    Engine().tick(game, 1)
+    assert game.ship.physical_transit.motion.beta == motion.beta
+    assert game.ship.physical_transit.motion.distance_m > motion.distance_m
+    assert game.ship.physical_transit.recovery_execution is None
+    assert game.ship.antimatter_capsules == fuel
 
 
 def test_old_fifteen_field_physical_pickle_retains_brake_history():
