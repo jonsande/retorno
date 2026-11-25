@@ -127,19 +127,17 @@ def test_partial_segment_with_nonzero_absolute_clocks():
     assert game.clock.ship_elapsed_s == pytest.approx(400 + 100 * math.sqrt(.75))
 
 
-def test_rejections_leave_state_untouched():
+def test_docked_drone_and_variable_power_are_not_technical_rejections():
     game, _, _ = physical_game()
     game.ship.drones["probe"] = next(iter(create_initial_state_sandbox(seed=341).ship.drones.values()))
-    before = deepcopy(game)
-    with pytest.raises(RuntimeError, match="drones"):
-        Engine().tick(game, 100)
-    assert game == before
-    game.ship.drones.clear()
+    Engine().tick(game, 100)
+    assert game.clock.t == 100
+    assert game.ship.drones
+    game, _, _ = physical_game()
     game.ship.power.p_gen_base_kw = 0
-    before = deepcopy(game)
-    with pytest.raises(RuntimeError, match="electrical"):
-        Engine().tick(game, 100)
-    assert game == before
+    Engine().tick(game, 100)
+    assert game.clock.t == 100
+    assert game.ship.power.e_batt_kwh < game.ship.power.e_batt_max_kwh
 
 
 @pytest.mark.parametrize("intent", ["accelerate", "brake"])
@@ -161,14 +159,14 @@ def test_jobs_and_narrative_cut_are_rejected_before_mutation():
     game.jobs.jobs["J1"] = Job("J1", JobType.REPAIR_SYSTEM, JobStatus.QUEUED, 10)
     game.jobs.active_job_ids.append("J1")
     before = pickle.dumps(game)
-    with pytest.raises(RuntimeError, match="jobs"):
+    with pytest.raises(RuntimeError, match="causal boundary"):
         Engine().tick(game, 100)
     assert pickle.dumps(game) == before
     game.jobs.jobs.clear()
     game.jobs.active_job_ids.clear()
     game.world.lore_placements.next_non_forced_eval_t = 50
     before = deepcopy(game)
-    with pytest.raises(RuntimeError, match="narrative"):
+    with pytest.raises(RuntimeError, match="causal boundary"):
         Engine().tick(game, 100)
     assert game == before
 
@@ -301,12 +299,12 @@ def test_transaction_failures_preserve_owner_identities_and_values():
     owners = {name: getattr(game, name) for name in
               ("meta", "clock", "world", "ship", "os", "jobs", "events")}
     before = deepcopy(game)
-    game.ship.power.p_gen_base_kw = 0
+    destination = game.world.space.nodes.pop("COAST_DEST")
     invalid = pickle.dumps(game)
-    with pytest.raises(RuntimeError, match="electrical"):
+    with pytest.raises(RuntimeError, match="geometry"):
         engine.tick(game, 100)
     assert pickle.dumps(game) == invalid
-    game.ship.power.p_gen_base_kw = 12
+    game.world.space.nodes["COAST_DEST"] = destination
     assert game == before
     with patch.object(Engine, "_update_alerts", side_effect=RuntimeError("late failure")):
         with pytest.raises(RuntimeError, match="late failure"):

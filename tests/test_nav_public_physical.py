@@ -7,14 +7,14 @@ import pytest
 from retorno.bootstrap import create_initial_state_sandbox
 from retorno.cli import repl
 from retorno.config.balance import Balance
-from retorno.core.actions import EngineSpeed, Repair, RouteSolve, SystemOn, Travel, TravelAbort
+from retorno.core.actions import EngineSpeed, RouteSolve, SystemOn, Travel, TravelAbort
 from retorno.core.engine import Engine
 from retorno.core.nav_physics import LIGHT_SPEED_M_S, LIGHT_YEAR_M
 from retorno.io.save_load import load_single_slot, save_single_slot
 from retorno.model.events import EventType
 from retorno.model.systems import SystemState
 from retorno.model.world import SpaceNode, add_known_link
-from retorno.runtime.loop import GameLoop, NavigationAdvanceBlocked
+from retorno.runtime.loop import GameLoop
 from retorno.ui_textual import presenter
 from tests.test_nav_engine_inertial import nominal_cut
 
@@ -78,8 +78,7 @@ def test_public_route_quote_departure_payment_and_guards(capsys):
     assert engine.apply_action(game, TravelAbort())[0].data["reason"] == "physical_in_transit"
     assert engine.apply_action(game, RouteSolve("NOMINAL_B"))[0].data["reason"] == "physical_in_transit"
     assert engine.apply_action(game, EngineSpeed(.2))[0].data["reason"] == "engine_speed_in_transit"
-    assert engine.apply_action(game, Repair("D1", "engines"))[0].data["reason"] == "physical_jobs_unsupported"
-    assert engine.apply_action(game, SystemOn("comms"))[0].data["reason"] == "physical_radio_unsupported"
+    assert engine.apply_action(game, SystemOn("comms"))[0].data.get("reason") != "physical_radio_unsupported"
     assert game.ship.antimatter_capsules == pytest.approx(reserve - cost)
 
 
@@ -110,23 +109,17 @@ def test_public_rejection_is_spatially_and_economically_atomic(block):
     assert game.meta.rng_seed == old_rng
 
 
-def test_public_preflight_rejects_unsupported_drones_and_power_without_payment():
-    for regime in ("drone", "electricity"):
-        game = public_game(1e6 / LIGHT_YEAR_M)
-        if regime == "drone":
-            donor = create_initial_state_sandbox(seed=341)
-            game.ship.drones = donor.ship.drones
-        else:
-            game.ship.power.p_gen_base_kw = game.ship.power.p_gen_kw = 0.0
-        fuel = game.ship.antimatter_capsules
-        pos = game.world.current_pos_ly
-        rng = game.meta.rng_counter
-        event = Engine().apply_action(game, Travel("NOMINAL_B"))[0]
-        assert event.data["reason"] == "physical_departure_unavailable"
-        assert game.ship.physical_transit is None
-        assert game.ship.antimatter_capsules == fuel
-        assert game.world.current_pos_ly == pos
-        assert game.meta.rng_counter == rng
+def test_public_preflight_accepts_docked_drones_and_variable_power():
+    game = public_game(1e6 / LIGHT_YEAR_M)
+    donor = create_initial_state_sandbox(seed=341)
+    game.ship.drones = donor.ship.drones
+    game.ship.power.p_gen_base_kw = game.ship.power.p_gen_kw = 3.2
+    fuel = game.ship.antimatter_capsules
+    events = Engine().apply_action(game, Travel("NOMINAL_B"))
+    assert [event.type for event in events] == [EventType.TRAVEL_PROFILE_SET, EventType.TRAVEL_STARTED]
+    assert game.ship.physical_transit is not None
+    assert game.ship.drones
+    assert game.ship.antimatter_capsules < fuel
 
 
 @pytest.mark.parametrize("distance_ly, speed, cruise", [(.11, .1, True), (1e6 / LIGHT_YEAR_M, .5, False)])
@@ -191,15 +184,14 @@ def test_physical_status_is_localized_and_inertia_has_no_nominal_eta(capsys):
         header = presenter.build_header(game)
         assert "NOMINAL_B" in header
         assert ("acceleration" if locale == "en" else "aceleración") in header
-    # An unsupported causal boundary is explicit and commits no current tick.
-    pending = game.ship.physical_transit
+    # A normal battery charging boundary no longer blocks physical time.
     game.ship.power.e_batt_kwh = 3.0
     loop = GameLoop(Engine(), game)
-    with pytest.raises(NavigationAdvanceBlocked) as error:
-        loop.advance_interval(pending.nominal_plan.profile.total_galactic_s)
-    assert 0 <= error.value.elapsed_s < pending.nominal_plan.profile.total_galactic_s
-    assert game.clock.t == error.value.elapsed_s
-    assert game.ship.physical_transit is not None
+    duration = game.ship.physical_transit.nominal_plan.profile.total_galactic_s
+    events = loop.advance_interval(duration)
+    assert any(event.type == EventType.ARRIVED for event in events)
+    assert game.clock.t == pytest.approx(duration)
+    assert game.ship.physical_transit is None
 
 
 def test_inertial_status_omits_arrival_eta_and_marks_overshoot():

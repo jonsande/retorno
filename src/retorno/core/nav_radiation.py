@@ -397,6 +397,7 @@ def first_integrated_wear_at(
     start_galactic_s: float, end_galactic_s: float, hull_integrity: float,
     target_health: float, *, in_transit: bool, op_mode: str,
     hibernating: bool, quality_proper_s_at: Callable[[RadiationIntegral], float],
+    brownout_sustained: bool = False,
 ) -> float | None:
     """First representable local galactic instant attaining cumulative wear.
 
@@ -422,6 +423,7 @@ def first_integrated_wear_at(
         return integrated_system_wear(
             system, exposure, quality_proper_s_at(exposure),
             in_transit=in_transit, op_mode=op_mode,
+            brownout_sustained=brownout_sustained,
         )
 
     if system.health - wear_at(end_galactic_s) > target_health:

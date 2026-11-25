@@ -12,8 +12,8 @@ Requirements (gating)
 Operational behavior
 - `until_arrival`: sleeps until current transit completes, stopping at physical rest.
 - `<years>`: sleeps target duration in large chunks and continues ordinary time after arrival if more was requested.
-- Physical phase ends are coordinated without one-second loops. An unresolved causal boundary stops the wait and reports executed time; remaining time is not silently skipped.
-- Wakes on critical events that require operator attention.
+- Physical phase ends and ordinary electrical, health, radiation, job, and narrative boundaries are coordinated without one-second loops. A genuinely unsupported boundary stops the wait and reports executed time; remaining time is not silently skipped.
+- Wakes on critical events that require operator attention and on a physical stop outside the destination.
 - While in transit, hibernation also wakes when ambient radiation crosses the configured threshold (`HIBERNATE_WAKE_ENV_RAD_THRESHOLD_RAD_PER_S`).
 
 Related commands

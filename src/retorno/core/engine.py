@@ -15,6 +15,7 @@ from retorno.core.nav_boundaries import (TemporalLimit, ordinary_wear_rate,
 from retorno.core.nav_coordinator import select_next_boundary
 from retorno.core.nav_electricity import (battery_energy_after, power_quality_components,
                                          capture_power_snapshot, power_limits, integrate_quality,
+                                         resolve_electrical_limit,
                                          invalidation_reasons)
 from retorno.core.nav_physics import (MotionSegment, MotionState, TravelPlan, accelerate_to, append_segment,
                                       brake_to_stop, coast_for, light_years_to_metres,
@@ -29,7 +30,7 @@ from retorno.core.nav_recovery import RecoveryPlan, plan_inertial_recovery
 from retorno.core.nav_radiation import (RadiationProfile, hull_decay_rate, internal_radiation_rate,
                                         integrate_segment_radiation, integrated_system_wear,
                                         first_integrated_wear_at,
-                                        radiation_limits)
+                                        radiation_limits, resolve_radiation_limit)
 
 from retorno.core.actions import (
     Action,
@@ -82,7 +83,7 @@ from retorno.core.lore import (
 )
 from retorno.core.deadnodes import evaluate_dead_nodes
 from retorno.core.exploration_recovery import ensure_exploration_recovery
-from retorno.core.communications import retry_radio_opportunities, radio_block_reason
+from retorno.core.communications import retry_radio_opportunities
 from retorno.core.power_policy import (
     is_action_allowed_in_critical_state,
     is_critical_power_state,
@@ -150,6 +151,8 @@ class Engine:
         "nominal physical next phase lacks propulsion capacity",
         "Physical nominal travel cannot continue after 35% integrity",
         "Physical braking cannot continue after 15% integrity",
+        "Physical propulsion capacity is unavailable",
+        "physical safety braking capacity is unavailable",
         "Physical segment with active jobs needs causal scheduler cuts",
         "Physical segment with drones needs causal drone cuts",
         "Physical segment with radio reception needs spatial cuts",
@@ -166,6 +169,8 @@ class Engine:
         "Physical segment electrical forecast changed during execution",
         "Physical segment crossed a system state boundary",
         "Physical segment produced an unresolved health event",
+        "Physical segment has an unresolved forecast",
+        "Physical causal forecast cannot advance the clock",
         "physical drone would cross its return battery reserve",
         "physical drone would cross an unresolved radiation threshold",
         "physical drone would cross an unresolved integrity threshold",
@@ -696,7 +701,9 @@ class Engine:
             phase_end = segment.start.galactic_s + segment.duration_galactic_s
             step = available if requested_end >= phase_end else min(remaining, available)
             events.extend(self._tick_physical_segment(
-                staged, step, allow_repair_drone=bool(staged.ship.drones)))
+                staged, step, allow_repair_drone=any(
+                    drone.status == DroneStatus.DEPLOYED
+                    for drone in staged.ship.drones.values())))
             remaining = max(0.0, remaining - step)
             active = staged.ship.physical_transit
             assert active is not None and active.recovery_execution is not None
@@ -1110,7 +1117,7 @@ class Engine:
                     inertial_continuation=replace(history, current_segment=coast),
                 )
             events.extend(self._tick_physical_segment(
-                staged, step, allow_repair_drone=bool(staged.ship.drones)))
+                staged, step, allow_repair_drone=bool(interval.job_keys)))
             if interval.job_keys:
                 self._advance_job_timers(staged, interval, step)
                 health_before_repair = staged.ship.systems["engines"].health
@@ -1132,19 +1139,214 @@ class Engine:
         self._commit_physical_state(state, staged)
         return events
 
+    def next_physical_step(self, state: GameState, horizon_s: float) -> float:
+        """Return the next forecast cut for a public physical advance.
+
+        The forecast is read-only. ``tick`` remains the authority that executes
+        every selected interval and can reject a stale forecast atomically.
+        """
+        if not math.isfinite(horizon_s) or horizon_s <= 0:
+            raise ValueError("physical horizon must be positive and finite")
+        physical = state.ship.physical_transit
+        if physical is None:
+            return horizon_s
+        if physical.pending_transition == "safety_brake":
+            staged = deepcopy(state)
+            self._activate_safety_braking(staged)
+            state = staged
+            physical = staged.ship.physical_transit
+            assert physical is not None
+        staged = deepcopy(state)
+        if physical.pending_transition == "inertia" or physical.inertial_continuation is not None:
+            # Inertia builds a coast segment for each request. Forecast the
+            # same segment on a copy so long waits still meet ordinary cuts.
+            physical = staged.ship.physical_transit
+            assert physical is not None
+            coast = coast_for(physical.motion, horizon_s)
+            history = physical.inertial_continuation
+            if history is None:
+                interrupted = physical.recovery_interruption
+                coast_interrupted = physical.recovery_coast_interruption
+                if coast_interrupted is not None:
+                    history = replace(coast_interrupted.execution.inertial_history,
+                                      current_segment=coast)
+                else:
+                    history = InertialContinuation(
+                        physical.active_segment, physical.elapsed_galactic_s,
+                        physical.original_destination_id, coast,
+                        physical.nominal_plan if interrupted is None else None,
+                        physical.nominal_braking_substitution if interrupted is None else None,
+                        (interrupted.execution.authorization if interrupted is not None
+                         else physical.propulsion_authorization),
+                    )
+                staged.ship.physical_transit = replace(
+                    physical, active_segment=coast, elapsed_galactic_s=0.0,
+                    intent="coast", safety_braking=False, braking_started=True,
+                    pending_transition=None, propulsion_authorization=None,
+                    nominal_braking_substitution=None, inertial_continuation=history,
+                    nominal_plan=history.nominal_plan, recovery_execution=None,
+                )
+            else:
+                staged.ship.physical_transit = replace(
+                    physical, active_segment=coast, elapsed_galactic_s=0.0,
+                    inertial_continuation=replace(history, current_segment=coast),
+                )
+        self._begin_physical_job_slice(staged)
+        staged.ship.power.p_gen_kw = self._compute_p_gen(staged)
+        self._integrate_power_interval(staged, 0.0)
+        state = staged
+        physical = state.ship.physical_transit
+        assert physical is not None
+        segment = physical.active_segment
+        remaining = segment.duration_galactic_s - physical.elapsed_galactic_s
+        if remaining <= 0:
+            raise RuntimeError("physical segment has no remaining time")
+        endpoint = segment.start.galactic_s + segment.duration_galactic_s
+        if abs(horizon_s - remaining) <= 16 * math.ulp(max(1.0, endpoint)):
+            horizon_s = remaining
+        horizon_s = min(horizon_s, remaining)
+        selection = self._physical_limit_selection(state, horizon_s)
+        if selection.deferred:
+            raise RuntimeError("Physical segment has an unresolved forecast")
+        if selection.advance_galactic_s <= 0:
+            raise RuntimeError("Physical causal forecast cannot advance the clock")
+        return min(horizon_s, selection.advance_galactic_s)
+
+    def _begin_physical_job_slice(self, state: GameState) -> tuple[_JobInterval, list[Event]]:
+        """Use the productive scheduler to settle due work before motion."""
+        events: list[Event] = []
+        while True:
+            interval, activation = self._begin_job_interval(state)
+            events.extend(activation)
+            if self._next_job_completion_s(state, interval) != 0:
+                return interval, events
+            self._advance_job_timers(state, interval, 0.0)
+            health_before = state.ship.systems["engines"].health
+            finished, resolved = self._resolve_job_interval(state, interval)
+            self._record_recovery_repair_evidence(state, resolved, health_before)
+            events.extend(finished)
+            if not resolved:
+                raise RuntimeError("zero-time physical job did not resolve")
+
+    def _physical_limit_selection(self, state: GameState, horizon_s: float):
+        physical = state.ship.physical_transit
+        assert physical is not None
+        segment = physical.active_segment
+        local_now = physical.elapsed_galactic_s
+        local_end = min(segment.duration_galactic_s, local_now + horizon_s)
+        origin_id = state.ship.transit_from or state.ship.current_node_id
+        destination_id = physical.original_destination_id
+        origin = state.world.space.nodes.get(origin_id)
+        destination = state.world.space.nodes.get(destination_id)
+        route_ly = distance_between_nodes_ly(state.world, origin_id, destination_id)
+        if origin is None or destination is None or route_ly is None or route_ly <= 0:
+            raise RuntimeError("Physical segment requires known route endpoint geometry")
+        profile = RadiationProfile(0.0, light_years_to_metres(route_ly),
+                                   origin.radiation_rad_per_s, destination.radiation_rad_per_s)
+        snapshot = capture_power_snapshot(state, self._compute_p_gen(state), self._compute_load_kw(state))
+        electrical = power_limits(snapshot)
+        resolved_electrical = frozenset(resolve_electrical_limit(snapshot, limit)
+                                        for limit in electrical if limit.time_s == 0)
+        electrical = power_limits(snapshot, resolved=resolved_electrical)
+        radiological = radiation_limits(
+            profile, segment, local_now, state.ship.hull_integrity,
+            hibernating=state.ship.is_hibernating, god_active=state.os.god_active)
+        resolved_radiological = frozenset(resolve_radiation_limit(
+            profile, segment, local_now, state.ship.hull_integrity, limit,
+            hibernating=state.ship.is_hibernating, god_active=state.os.god_active)
+            for limit in radiological if limit.time_s == 0)
+        radiological = radiation_limits(
+            profile, segment, local_now, state.ship.hull_integrity,
+            hibernating=state.ship.is_hibernating, god_active=state.os.god_active,
+            resolved=resolved_radiological)
+        health_limits: list[TemporalLimit] = []
+        engine_threshold = (Balance.ENGINE_EMERGENCY_BRAKE_MIN_HEALTH
+                            if physical.intent == "brake" or physical.recovery_execution is not None
+                            else Balance.SYSTEM_HEALTH_CRITICAL)
+        sustained = (snapshot.brownout and snapshot.brownout_sustained_s
+                     >= Balance.BROWNOUT_SUSTAINED_AFTER_S)
+        for key, system in state.ship.systems.items():
+            if (state.os.god_active or (system.state_locked and key != "engines")
+                    or system.base_decay_per_s <= 0):
+                continue
+            thresholds = (Balance.SYSTEM_HEALTH_OFFLINE, Balance.SYSTEM_HEALTH_CRITICAL,
+                          Balance.SYSTEM_HEALTH_DAMAGED, Balance.SYSTEM_HEALTH_LIMITED)
+            if (key == "engines" and physical.recovery_execution is not None
+                    and physical.intent == "coast"):
+                # A paid recovery may coast through 35%; its next propulsion
+                # decision is the inclusive 15% braking capability limit.
+                thresholds = tuple(value for value in thresholds
+                                   if value != Balance.SYSTEM_HEALTH_CRITICAL)
+            threshold = max((value for value in thresholds if value <= system.health), default=None)
+            if key == "engines" and engine_threshold <= system.health:
+                threshold = max(threshold or 0.0, engine_threshold)
+            if threshold is None:
+                continue
+            if (key == "engines" and physical.intent == "brake"
+                    and system.health == Balance.SYSTEM_HEALTH_CRITICAL
+                    and threshold == Balance.SYSTEM_HEALTH_CRITICAL):
+                # The classifier becomes CRITICAL just below 35%, while paid
+                # emergency braking remains available down to 15%.
+                continue
+            target_health = (math.nextafter(threshold, -math.inf)
+                             if system.health == threshold else threshold)
+            if target_health < 0:
+                continue
+            cut = first_integrated_wear_at(
+                system, profile, segment, local_now, local_end,
+                state.ship.hull_integrity, target_health,
+                in_transit=True, op_mode=state.ship.op_mode,
+                hibernating=state.ship.is_hibernating,
+                quality_proper_s_at=lambda exposure: integrate_quality(
+                    snapshot, exposure.proper_s).quality_proper_s,
+                brownout_sustained=sustained)
+            if cut is not None and cut > local_now:
+                health_limits.append(TemporalLimit(
+                    "engine_integrity_limit" if key == "engines" and threshold == engine_threshold
+                    else "system_health_threshold", "galactic", cut - local_now,
+                    system_id=key, validity="integrated_wear_on_current_regime"))
+        jobs = tuple(TemporalLimit("job_completion", "galactic", max(0.0, job.eta_s), job_id=key)
+                     for key in state.jobs.active_job_ids
+                     if (job := state.jobs.jobs.get(key)) is not None
+                     and job.status == JobStatus.RUNNING
+                     and job.eta_s > 0)
+        if Balance.LORE_SCHEDULER_ENABLED:
+            lore_at = state.world.lore_placements.next_non_forced_eval_t
+            if state.clock.t < lore_at <= state.clock.t + horizon_s:
+                jobs += (TemporalLimit("narrative_evaluation", "galactic", lore_at - state.clock.t),)
+        distribution = state.ship.systems.get("energy_distribution")
+        if (distribution is not None
+                and distribution.state in {SystemState.DAMAGED, SystemState.CRITICAL}
+                and state.clock.t < Balance.BUS_INSTABILITY_AFTER_S <= state.clock.t + horizon_s):
+            jobs += (TemporalLimit("power_bus_alert", "galactic",
+                                   Balance.BUS_INSTABILITY_AFTER_S - state.clock.t),)
+        return select_next_boundary(
+            segment, state.clock.t, horizon_s,
+            proper_limits=tuple(electrical + radiological),
+            job_limits=jobs + tuple(health_limits))
+
     def _tick_physical_segment(self, state: GameState, dt: float, *,
                                allow_repair_drone: bool = False) -> list[Event]:
         """One causal physical interval. Commit only after all staged effects succeed.
 
-        A selected internal cut needs a new forecast and is deliberately rejected
-        until the physical scheduler can resolve that cut. No partial time passes.
+        A public caller selects each causal cut before entering this atomic
+        interval. Direct callers may still request an interval beyond a cut.
         """
-        physical = state.ship.physical_transit
-        assert physical is not None
         if not math.isfinite(dt) or dt < 0:
             raise ValueError("physical tick duration must be finite and nonnegative")
         if dt == 0:
             return []
+        target = state
+        state = deepcopy(target)
+        instant_events: list[Event] = []
+        job_interval = None
+        if not allow_repair_drone:
+            job_interval, instant_events = self._begin_physical_job_slice(state)
+        state.ship.power.p_gen_kw = self._compute_p_gen(state)
+        instant_events.extend(self._integrate_power_interval(state, 0.0))
+        instant_events.extend(retry_radio_opportunities(state))
+        physical = state.ship.physical_transit
+        assert physical is not None
         if physical.pending_transition is not None:
             raise RuntimeError("pending physical transition must be resolved before further motion")
         substitution = physical.nominal_braking_substitution
@@ -1196,25 +1398,8 @@ class Engine:
             raise RuntimeError("Physical coast cannot carry a propulsion authorization")
         if state.ship.in_transit or state.ship.docked_node_id is not None:
             raise RuntimeError("Physical segment requires an undocked, non-legacy transit")
-        if not allow_repair_drone and (state.jobs.active_job_ids or any(
-                j.status in {JobStatus.RUNNING, JobStatus.QUEUED}
-                for j in state.jobs.jobs.values())):
-            raise RuntimeError("Physical segment with active jobs needs causal scheduler cuts")
-        if not allow_repair_drone and state.ship.drones:
-            raise RuntimeError("Physical segment with drones needs causal drone cuts")
         if allow_repair_drone and inertia is None and recovery is None:
             raise RuntimeError("physical repair drones require inertia or recovery")
-        comms = state.ship.systems.get("comms")
-        if (state.world.radio_opportunities or radio_block_reason(state) is None
-                or (comms is not None and not comms.forced_offline
-                    and comms.state != SystemState.OFFLINE)):
-            raise RuntimeError("Physical segment with radio reception needs spatial cuts")
-        if (state.world.lore_placements.next_non_forced_eval_t <= state.clock.t + dt
-                and Balance.LORE_SCHEDULER_ENABLED):
-            raise RuntimeError("Physical segment with a scheduled narrative evaluation needs a causal cut")
-        if any(plan.status in {"active", "stage_consumed", "receipt_pending"}
-               for plan in state.world.recovery_plans.values()):
-            raise RuntimeError("Physical segment with recovery plans needs spatial cuts")
         if (state.os.terminal_lock or state.ship.systems.get("core_os") is None
                 or state.ship.systems.get("life_support") is None
                 or state.ship.systems["core_os"].state == SystemState.OFFLINE
@@ -1229,6 +1414,10 @@ class Engine:
         if state.clock.t != now.galactic_s or state.clock.ship_elapsed_s != now.proper_s:
             raise ValueError("physical and global clocks are misaligned")
         local_end = physical.elapsed_galactic_s + dt
+        if (abs(local_end - segment.duration_galactic_s)
+                <= 16 * math.ulp(max(1.0, segment.duration_galactic_s))):
+            local_end = segment.duration_galactic_s
+            dt = local_end - physical.elapsed_galactic_s
         if local_end > segment.duration_galactic_s or local_end == physical.elapsed_galactic_s:
             raise RuntimeError("Physical segment cannot advance beyond this segment or clock resolution")
         end = sample_segment(segment, local_end)
@@ -1250,10 +1439,6 @@ class Engine:
         load = self._compute_load_kw(state)
         snapshot = capture_power_snapshot(state, generation, load)
         quality = integrate_quality(snapshot, proper_dt)
-        if (state.os.god_active or generation < load or snapshot.brownout
-                or snapshot.brownout_sustained_s or snapshot.low_q_shed_timer_s
-                or quality.start != 1.0 or quality.end != 1.0):
-            raise RuntimeError("Physical segment electrical regime is not yet supported")
         exposure = integrate_segment_radiation(
             profile, segment, physical.elapsed_galactic_s, local_end,
             state.ship.hull_integrity, hibernating=state.ship.is_hibernating,
@@ -1284,14 +1469,13 @@ class Engine:
                     * self._drone_rad_decay_mult(dose_after) * dt
                     <= Balance.DRONE_RECALL_MIN_INTEGRITY):
                 raise RuntimeError("physical drone would cross an unresolved integrity threshold")
-        limits = power_limits(snapshot) + radiation_limits(
-            profile, segment, physical.elapsed_galactic_s, state.ship.hull_integrity,
-            hibernating=state.ship.is_hibernating,
-        )
         # Ordinary wear is integrated over the actual varying radiation field.
         # Reject all health-state transitions before this interval's end.
         wear = {key: integrated_system_wear(system, exposure, quality.quality_proper_s,
-                                           in_transit=True, op_mode=state.ship.op_mode)
+                                           in_transit=True, op_mode=state.ship.op_mode,
+                                           brownout_sustained=(snapshot.brownout and
+                                               snapshot.brownout_sustained_s >= Balance.BROWNOUT_SUSTAINED_AFTER_S),
+                                           god_active=state.os.god_active)
                 for key, system in state.ship.systems.items()}
         engine_boundary = None
         engine_threshold = None
@@ -1317,47 +1501,14 @@ class Engine:
                 )
                 if engine_boundary is not None and engine_boundary < local_end:
                     raise RuntimeError("Physical tick extends beyond the 35% or 15% causal boundary")
-        health_limits = []
-        for key, system in state.ship.systems.items():
-            if system.state_locked and key != "engines":
-                continue
-            thresholds = (Balance.SYSTEM_HEALTH_OFFLINE, Balance.SYSTEM_HEALTH_CRITICAL,
-                          Balance.SYSTEM_HEALTH_DAMAGED, Balance.SYSTEM_HEALTH_LIMITED)
-            if key == "engines":
-                thresholds = tuple(t for t in thresholds if t != engine_threshold
-                                   and not (recovery_coast and t == Balance.SYSTEM_HEALTH_CRITICAL))
-            upper_rate = ordinary_wear_rate(
-                system, min(quality.start, quality.end), False,
-                max(profile.start_rad_per_s, profile.end_rad_per_s)
-                * Balance.HULL_INTERNAL_RAD_MAX_INGRESS,
-                in_transit=True, op_mode=state.ship.op_mode,
-            )
-            for threshold in thresholds:
-                if system.health > threshold and upper_rate > 0:
-                    seconds = (system.health - threshold) / upper_rate
-                    if seconds < proper_dt:
-                        health_limits.append(TemporalLimit(
-                            "system_health_threshold", "proper", seconds, system_id=key,
-                            validity="conservative_fixed_upper_wear_rate"))
-        selected = select_next_boundary(
-            segment, now.galactic_s, dt, proper_limits=tuple(limits + tuple(health_limits)))
+        selected = self._physical_limit_selection(state, dt)
         if selected.deferred or selected.at_galactic_s < end.galactic_s or any(
             cause.at_galactic_s < end.galactic_s and cause.limit.kind != "requested_horizon"
             for cause in selected.causes
         ):
             raise RuntimeError("Physical segment interval has an unresolved causal boundary")
-        if engine_boundary is not None and any(
-            cause.limit.kind not in {"requested_horizon", "segment_end"}
-            for cause in selected.causes
-        ):
-            raise RuntimeError("Engine wear coincides with an unresolved causal boundary")
-        if exposure.hull_end == 0 and state.ship.hull_integrity > 0:
-            raise RuntimeError("Physical segment reaches the hull floor")
-        for key, system in state.ship.systems.items():
-            if wear[key] > system.health and system.health > 0:
-                raise RuntimeError("Physical segment reaches a system health floor")
 
-        staged = deepcopy(state)
+        staged = state
         staged.clock.last_dt = dt
         staged.clock.t = end.galactic_s
         staged.clock.ship_elapsed_s = end.proper_s
@@ -1418,17 +1569,17 @@ class Engine:
             origin.y_ly + fraction * (destination.y_ly - origin.y_ly),
             origin.z_ly + fraction * (destination.z_ly - origin.z_ly),
         )
-        events: list[Event] = []
+        events: list[Event] = list(instant_events)
         run_lore_scheduler_tick(staged)
         staged.ship.power.p_gen_kw = generation
         events.extend(self._integrate_power_interval(staged, proper_dt))
         after = capture_power_snapshot(staged, self._compute_p_gen(staged), self._compute_load_kw(staged))
         unexpected = set(invalidation_reasons(snapshot, after, elapsed_proper_s=proper_dt))
-        if unexpected or events:
+        if unexpected - {"regulation_state_changed", "power_changed", "systems_changed"}:
             raise RuntimeError("Physical segment electrical forecast changed during execution")
         staged.ship.hull_integrity = exposure.hull_end
         staged.ship.radiation_env_rad_per_s = profile.ambient_at(end.distance_m)
-        if allow_repair_drone:
+        if state.ship.drones:
             # Productive drone exposure and maintenance use galactic seconds.
             # The physical radiation integral supplies the whole spatial dose.
             self._apply_radiation(staged, dt, exposure.environmental_galactic_rad / dt)
@@ -1436,24 +1587,26 @@ class Engine:
             events.extend(self._update_drone_radiation_level_alerts(staged))
             events.extend(self._update_drone_battery_alerts(staged))
         for key, system in staged.ship.systems.items():
-            old_state = system.state
-            system.health = (engine_threshold if key == "engines" and engine_boundary is not None
-                             else max(0.0, system.health - wear[key]))
-            health_event_count = len(events)
+            health = (engine_threshold if key == "engines" and engine_boundary is not None
+                      else max(0.0, system.health - wear[key]))
+            if engine_boundary is None or key != "engines":
+                for threshold in (Balance.SYSTEM_HEALTH_OFFLINE,
+                                  Balance.SYSTEM_HEALTH_CRITICAL,
+                                  Balance.SYSTEM_HEALTH_DAMAGED,
+                                  Balance.SYSTEM_HEALTH_LIMITED):
+                    if (system.health > threshold
+                            and abs(health - threshold)
+                            <= 16 * math.ulp(max(1.0, system.health))):
+                        health = threshold
+                        break
+            system.health = health
             self._apply_health_state(system, staged, events, cause="degradation")
-            if system.state != old_state:
-                if not (key == "engines"
-                        and old_state == SystemState.DAMAGED
-                        and system.state == SystemState.CRITICAL
-                        and len(events) == health_event_count + 1
-                        and (recovery_coast or (substitution is not None
-                             and state.ship.systems["engines"].health
-                             == Balance.SYSTEM_HEALTH_CRITICAL))):
-                    raise RuntimeError("Physical segment crossed a system state boundary")
-        if events and not ((substitution is not None or recovery_coast) and len(events) == 1
-                           and events[0].type == EventType.SYSTEM_STATE_CHANGED
-                           and events[0].source == SourceRef(kind="ship_system", id="engines")):
-            raise RuntimeError("Physical segment produced an unresolved health event")
+        if job_interval is not None:
+            self._advance_job_timers(staged, job_interval, dt)
+            health_before = staged.ship.systems["engines"].health
+            finished, resolved = self._resolve_job_interval(staged, job_interval)
+            self._record_recovery_repair_evidence(staged, resolved, health_before)
+            events.extend(finished)
         internal = internal_radiation_rate(staged.ship.radiation_env_rad_per_s,
                                            staged.ship.hull_integrity)
         events.extend(self._update_ship_radiation_level_alerts(
@@ -1467,7 +1620,7 @@ class Engine:
         for event in events:
             self._record_event(staged.events, event)
         self._update_alert_timers(staged.events, dt)
-        self._commit_physical_state(state, staged)
+        self._commit_physical_state(target, staged)
         return events
 
     @staticmethod
@@ -1648,18 +1801,11 @@ class Engine:
             return [event]
 
         physical = state.ship.physical_transit
-        if physical is not None and ((isinstance(action, SystemOn) and action.system_id == "comms")
-                                     or (isinstance(action, Boot) and action.service_name == "radiod")):
-            return [self._power_blocked_event(
-                state, "Radio activation during physical motion needs spatial cuts",
-                "physical_radio_unsupported")]
         if (physical is not None and physical.nominal_plan is not None
                 and not physical.nominal_plan.invalidated
                 and physical.recovery_execution is None
                 and physical.nominal_braking_substitution is None
-                and isinstance(action, (DroneDeploy, DroneMove, DroneRecall, DroneReboot,
-                                        Repair, SelfTestRepair, Install, CargoAudit,
-                                        AuthRecover, RepairAutoMoveDecision))):
+                and isinstance(action, (Install, CargoAudit, AuthRecover))):
             return [self._power_blocked_event(
                 state, "Operation needs physical job coordination not yet available",
                 "physical_jobs_unsupported")]
@@ -1900,7 +2046,8 @@ class Engine:
                 # one-second probe before publishing a prepaid departure.
                 probe = deepcopy(staged)
                 try:
-                    self.tick(probe, min(1.0, nominal.segments[0].duration_galactic_s))
+                    probe_horizon = min(1.0, nominal.segments[0].duration_galactic_s)
+                    self.tick(probe, self.next_physical_step(probe, probe_horizon))
                 except RuntimeError as exc:
                     if str(exc) not in self._EXPECTED_PHYSICAL_LIMIT_REASONS:
                         raise
@@ -5001,7 +5148,11 @@ class Engine:
         for key in interval.job_keys:
             job = state.jobs.jobs[key]
             interval.eta_before[key] = job.eta_s
-            job.eta_s -= dt
+            remaining = job.eta_s - dt
+            if (interval.causal and remaining >= 0
+                    and remaining <= 16 * math.ulp(max(1.0, state.clock.t, job.eta_s))):
+                remaining = 0.0
+            job.eta_s = remaining
         interval.dt_s = dt
 
     def _resolve_job_interval(
@@ -8765,7 +8916,11 @@ class Engine:
                 state.ship.power.low_q_shed_timer_s += dt_ship
             else:
                 state.ship.power.low_q_shed_timer_s = 0.0
-            if state.ship.power.low_q_shed_timer_s >= Balance.POWER_QUALITY_SHED_INTERVAL_S:
+            shed_threshold = Balance.POWER_QUALITY_SHED_INTERVAL_S
+            if (state.ship.power.low_q_shed_timer_s >= shed_threshold
+                    or shed_threshold - state.ship.power.low_q_shed_timer_s
+                    <= 16 * max(math.ulp(max(1.0, shed_threshold)),
+                                math.ulp(max(1.0, state.clock.t)))):
                 events.extend(self._auto_shed_one_noncritical(state))
                 state.ship.power.low_q_shed_timer_s = 0.0
                 p_load = self._compute_load_kw(state)

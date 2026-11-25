@@ -4,6 +4,7 @@ import threading
 import random
 import time
 import math
+from typing import Callable
 from contextlib import contextmanager
 
 from retorno.core.actions import Action
@@ -62,9 +63,11 @@ class GameLoop:
             return self.engine.apply_action(self.state, action)
 
     def step(self, dt: float) -> list[Event]:
+        events = self.advance_interval(dt)
         with self._lock:
-            events = self.engine.tick(self.state, dt)
-            return events
+            if dt > 0:
+                self.state.clock.last_dt = dt
+        return events
 
     def step_many(self, total_s: float, dt: float = 1.0) -> list[Event]:
         events: list[Event] = []
@@ -75,7 +78,8 @@ class GameLoop:
             remaining -= step_dt
         return events
 
-    def advance_interval(self, total_s: float, *, stop_at_arrival: bool = False) -> list[Event]:
+    def advance_interval(self, total_s: float, *, stop_at_arrival: bool = False,
+                         stop_when: Callable[[GameState, list[Event]], bool] | None = None) -> list[Event]:
         """Advance at known physical phase ends; leave direct Engine.tick atomic.
 
         A fixed wait continues with ordinary rest time after a physical stop.
@@ -86,37 +90,50 @@ class GameLoop:
             raise ValueError("advance duration must be nonnegative")
         events: list[Event] = []
         elapsed = 0.0
-        while elapsed < total_s:
+        with self._lock:
+            start_t = self.state.clock.t
+            requested_end = start_t + total_s
+            snapped_to_endpoint = False
+            physical = self.state.ship.physical_transit
+            if physical is not None and physical.nominal_plan is not None:
+                final = physical.nominal_plan.segments[-1]
+                endpoint = final.start.galactic_s + final.duration_galactic_s
+                if abs(requested_end - endpoint) <= 16 * math.ulp(max(1.0, endpoint)):
+                    requested_end = endpoint
+                    snapped_to_endpoint = True
+        while True:
             with self._lock:
                 physical = self.state.ship.physical_transit
-                step = total_s - elapsed
-                if physical is not None and physical.nominal_plan is not None:
-                    nominal = physical.nominal_plan
-                    if not nominal.invalidated and physical.nominal_braking_substitution is None:
-                        segment = nominal.segments[nominal.phase_index]
-                        endpoint = segment.start.galactic_s + segment.duration_galactic_s
-                        to_phase_end = max(0.0, endpoint - self.state.clock.t)
-                        if (nominal.phase_index == len(nominal.segments) - 1
-                                and abs(step - to_phase_end) <= 16 * math.ulp(max(1.0, endpoint))):
-                            step = to_phase_end
-                        else:
-                            step = min(step, to_phase_end)
-                elif stop_at_arrival and self.state.ship.in_transit:
-                    step = min(step, max(0.0, self.state.ship.arrival_t - self.state.clock.t))
+                step = requested_end - self.state.clock.t
+                if not snapped_to_endpoint:
+                    step = min(step, total_s - elapsed)
                 if step <= 0:
-                    raise NavigationAdvanceBlocked("Physical phase cannot advance at clock resolution", elapsed, events)
+                    break
+                clock_resolution = 16 * math.ulp(max(1.0, self.state.clock.t))
+                if step <= clock_resolution:
+                    if elapsed > 0 and abs(requested_end - self.state.clock.t) <= clock_resolution:
+                        break
+                    raise NavigationAdvanceBlocked(
+                        "Physical phase cannot advance at clock resolution", elapsed, events)
+                if physical is None and stop_at_arrival and self.state.ship.in_transit:
+                    step = min(step, max(0.0, self.state.ship.arrival_t - self.state.clock.t))
                 try:
+                    if physical is not None:
+                        step = self.engine.next_physical_step(self.state, step)
+                    if step <= 0:
+                        raise NavigationAdvanceBlocked("Physical phase cannot advance at clock resolution", elapsed, events)
                     batch = self.engine.tick(self.state, step)
                 except RuntimeError as exc:
                     if physical is None or str(exc) not in self.engine._EXPECTED_PHYSICAL_LIMIT_REASONS:
                         raise
                     raise NavigationAdvanceBlocked(str(exc), elapsed, events) from exc
                 events.extend(batch)
-                elapsed += step
+                elapsed = self.state.clock.t - start_t
                 arrived = ((physical is not None and self.state.ship.physical_transit is None)
                            or (stop_at_arrival and not self.state.ship.in_transit
                                and physical is None))
-            if arrived and stop_at_arrival:
+                interrupted = stop_when(self.state, batch) if stop_when is not None else False
+            if interrupted or (arrived and stop_at_arrival):
                 break
         return events
 
@@ -143,13 +160,10 @@ class GameLoop:
     def _run(self) -> None:
         while not self._stop.is_set():
             time.sleep(self.tick_s)
-            with self._lock:
-                try:
-                    events = self.engine.tick(self.state, self.tick_s)
-                except RuntimeError as exc:
-                    if (self.state.ship.physical_transit is None
-                            or str(exc) not in self.engine._EXPECTED_PHYSICAL_LIMIT_REASONS):
-                        raise
+            try:
+                events = self.advance_interval(self.tick_s)
+            except NavigationAdvanceBlocked as exc:
+                with self._lock:
                     seq = self.state.events.next_event_seq
                     self.state.events.next_event_seq += 1
                     warning = Event(
@@ -158,11 +172,15 @@ class GameLoop:
                         source=SourceRef(kind="ship", id=self.state.ship.ship_id),
                         message="Automatic physical time advance stopped",
                         data={"message_key": "boot_blocked",
-                              "reason": "physical_advance_blocked", "detail": str(exc)},
+                              "reason": "physical_advance_blocked", "detail": str(exc),
+                              "elapsed_s": exc.elapsed_s,
+                              "remaining_s": max(0.0, self.tick_s - exc.elapsed_s)},
                     )
                     self.state.events.recent.append(warning)
+                    self._events_auto.extend(exc.events)
                     self._events_auto.append(warning)
                     self._auto_tick_enabled = False
                     self._stop.set()
-                    break
+                break
+            with self._lock:
                 self._events_auto.extend(events)

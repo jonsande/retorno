@@ -8,7 +8,7 @@ from retorno.core.engine import Engine
 from retorno.core.nav_recovery import plan_inertial_recovery
 from retorno.model.events import EventType
 from retorno.model.jobs import JobStatus, JobType
-from retorno.runtime.loop import GameLoop
+from retorno.runtime.loop import GameLoop, NavigationAdvanceBlocked
 from tests.test_nav_engine_recovery_execution import repaired_ship
 from tests.test_nav_engine_repair_inertia import enqueue_repair
 from tests.test_nav_engine_safety_brake import save_and_load
@@ -143,16 +143,20 @@ def test_changed_capacity_and_omitted_external_value_reject_without_payment():
     assert pickle.dumps(game) == before
 
 
-def test_operational_loss_before_recovery_braking_rejects_atomically():
+def test_operational_loss_before_recovery_braking_preserves_direct_atomicity_and_public_elapsed():
     game = repaired_ship()
     plan = plan_inertial_recovery(game)
     Engine().prepare_inertial_recovery(game, plan)
-    # A later operational loss invalidates the planned transition. The whole
-    # crossing tick rolls back, including its simulated coast interval.
+    # The operational loss is already present before the requested advance.
+    # Direct and public paths reject it without recording fictitious time.
     game.ship.systems["engines"].forced_offline = True
     before = pickle.dumps(game)
-    with pytest.raises(RuntimeError, match="capacity|propulsion|system state boundary"):
+    with pytest.raises(RuntimeError, match="braking point"):
+        Engine().tick(game, plan.coast_segment.duration_galactic_s + 1)
+    assert pickle.dumps(game) == before
+    with pytest.raises(NavigationAdvanceBlocked, match="braking point") as blocked:
         GameLoop(Engine(), game).step(plan.coast_segment.duration_galactic_s + 1)
+    assert blocked.value.elapsed_s == 0
     assert pickle.dumps(game) == before
 
 

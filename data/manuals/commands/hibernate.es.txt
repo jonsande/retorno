@@ -12,8 +12,8 @@ Requisitos (gating)
 Comportamiento operativo
 - `until_arrival`: duerme hasta completar el tránsito y se detiene en el reposo físico.
 - `<años>`: duerme la duración solicitada en bloques grandes y continúa con tiempo ordinario tras la llegada si sobra tiempo.
-- Los finales de fase física se coordinan sin bucles de un segundo. Una frontera causal pendiente detiene la espera e informa del tiempo ejecutado; no omite silenciosamente el resto.
-- Despierta ante eventos críticos que requieren intervención.
+- Se coordinan finales de fase y fronteras ordinarias de electricidad, salud, radiación, trabajos y narrativa sin bucles de un segundo. Una frontera realmente no soportada detiene la espera e informa del tiempo ejecutado; no omite silenciosamente el resto.
+- Despierta ante eventos críticos que requieren intervención y ante una detención física fuera del destino.
 - Durante el tránsito, la hibernación también despierta cuando la radiación ambiental cruza el umbral configurado (`HIBERNATE_WAKE_ENV_RAD_THRESHOLD_RAD_PER_S`).
 
 Comandos relacionados

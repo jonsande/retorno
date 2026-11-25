@@ -1,5 +1,43 @@
 # Navigation motion segments (NAV-BRAKE-01B3A)
 
+## Public causal coordination (NAV-BRAKE-01B3H-D2B1)
+
+Public physical navigation admits onboard drones, variable electricity,
+ordinary wear and radiation, compatible jobs, narrative evaluations, radio,
+and existing exploration recovery plans. The internal
+`Engine.next_physical_step()` forecast selects the next cut before each
+productive `Engine.tick()`. `GameLoop.advance_interval()` is shared by
+`step()`, automatic advance, DEBUG wait, and CLI/Textual hibernation. Long
+voyages are not divided into fixed one second ticks.
+
+Candidates include phase ends, full or empty battery, charge and quality
+crossings, electrical regulation and alerts, radiation and hull limits,
+system health thresholds, job completion, and narrative evaluation.
+Electricity and ordinary wear use ship proper time; drones, jobs and
+narrative keep their established clocks. At coincident instants, the prior
+interval is integrated once, electricity, exposure and wear are updated,
+due jobs are resolved, and alerts, exploration recovery and radio run at the
+new physical position. A fresh forecast uses the committed state. A genuine
+subinterval failure leaves its original state untouched; an interrupted
+public request reports how much time was committed.
+
+Engine integrity at 35% starts prepaid preventive braking; 15% ends braking
+capacity and the ship continues by inertia pending a valid intervention.
+Arrival requires zero beta within destination tolerance; stopping elsewhere
+creates a physical waypoint. `hibernate until_arrival` ends at an actual
+arrival. Fixed hibernation continues after ordinary arrival, and wakes for
+an emergency, a physical stop outside the destination, or the configured
+ambient radiation threshold. Radio needs operational `comms` and `radiod`;
+current receiver rules suspend it while the crew hibernates.
+
+Voluntary physical abort, renewed acceleration in transit, destination
+changes, reversal, and new public manual recovery maneuvers remain for D2B2.
+`install`, `cargo audit`, and `auth recover` remain restricted during a
+nominal physical plan because their effects need further coordination.
+Inertial repairs keep their dedicated causal rules. Remaining deployed drone
+and extreme electrical cases are assessed at the specific event; they are
+not departure preconditions for stored drones.
+
 ## Public nominal navigation (NAV-BRAKE-01B3H-D2A)
 
 `nav <node_id>`, `travel <node_id>` and `nav --no-cruise <node_id>` now start
@@ -18,22 +56,21 @@ keeps `ship.in_transit` false so the historical `arrival_t` handler cannot
 teleport the ship. `ship.physical_transit` is the motion authority and the
 shared operational transit predicate guards new travel, route solving,
 docking, speed changes and historical abort. Read-only queries and compatible
-power controls remain available; job-producing actions are blocked during
-nominal motion until physical scheduling supports them, while the established
-inertial repair flow remains available. `status` and Textual
+power controls remain available; D2B1 admits compatible jobs and keeps the
+categories named above restricted. Inertial repair remains available.
+`status` and Textual
 show phase, instantaneous beta, signed remaining distance, both elapsed
 clocks and nominal ETA only while the nominal plan remains valid. Overshoot is
 not clamped; inertia has no promised arrival ETA.
 
-`GameLoop.advance_interval()` advances at nominal phase ends, including
+In D2A, `GameLoop.advance_interval()` advanced at nominal phase ends, including
 acceleration-to-cruise, direct acceleration-to-braking, cruise-to-braking and
 braking-to-rest. `hibernate until_arrival` stops at the physical endpoint;
 a fixed `hibernate <years>` or debug `wait <seconds>` continues ordinary time
 after arrival. Direct `Engine.tick()` still rejects an interval beyond its
-physical horizon. Unsupported electrical, wear, radiation, drone, radio, job
-and narrative cuts stop public advancement with the already committed time
-reported. D2B must resolve these cuts and make long ordinary journeys robust;
-they are not silently skipped. Saving during any nominal phase retains the
+physical horizon. D2B1 extended coordination to the ordinary boundaries
+described above; any unsupported cut stops advancement and reports the time
+already committed. Saving during any nominal phase retains the
 paid plan and its clocks.
 
 ## Physical stop and operational landing (NAV-BRAKE-01B3H-D1)

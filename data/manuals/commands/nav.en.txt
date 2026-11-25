@@ -60,7 +60,8 @@ Propulsion and fuel
 - nav map routes shows reserve and the cruise target once, then a compact Fuel/Speed/ETA line per known direct route. Capsule estimates are approximate (~) to three decimals. Local speeds use km/s and compact durations. Unavailable estimates show a dash; brief notices mark insufficient fuel or blocked departure.
 - Departure confirmation shows the public destination ID, target/peak beta, nominal galactic ETA, ship time, capsule cost and estimated remaining reserve. Displayed estimates use ~ and three decimals; calculations, checks and the eventual debit retain full precision. Local confirmation shows 20 km/s, compact ETA and zero capsules. Cancellation does not start travel or charge capsules; acceptance revalidates current conditions.
 - Accepted interstellar departure charges once; insufficient antimatter leaves navigation unchanged.
-- During nominal physical motion, status and other read-only queries remain available; new job-producing operations await causal scheduling. Existing inertial repair remains available after an incident.
+- During physical motion, compatible drone and repair jobs, onboard drone maintenance, electricity, wear, radiation, narrative checks, and operational radio advance at causal boundaries. `install`, `cargo audit`, and `auth recover` remain restricted during a nominal physical journey. Existing inertial repair remains available after an incident.
+- Hibernation wakes for a critical emergency or a physical stop away from the destination. `hibernate until_arrival` stops only at a real arrival; a fixed duration continues after ordinary arrival.
 - Local travel costs no capsules. Its historical nav abort gives no refund and adds no charge. Physical nav abort is blocked until a later phase.
 - A new voyage carries 12.0 equivalent capsules, including fractional contents. Wear increases cost; repair and engine_efficiency_upgrade_01 improve efficiency. See man engines.
 

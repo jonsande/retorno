@@ -2131,6 +2131,8 @@ def physical_boundary_reason(locale: str, detail: str) -> str:
         return "límite de integridad pendiente de resolver"
     if "causal boundary" in detail:
         return "frontera causal pendiente de resolver"
+    if "braking point" in detail:
+        return "punto de frenado sin capacidad propulsiva"
     if "propulsion" in detail:
         return "capacidad propulsiva insuficiente"
     return "condición física pendiente de resolver"
@@ -6725,6 +6727,8 @@ def _hibernate_interrupt_reason(state, step_events: list[Event], wake_on_low_bat
         return f"terminal:{reason}"
 
     for event in step_events:
+        if event.type == EventType.PHYSICAL_STOPPED:
+            return "physical_stopped"
         if event.type != EventType.SYSTEM_STATE_CHANGED:
             continue
         if event.source.kind != "ship_system":
@@ -6793,7 +6797,7 @@ def _hibernate_transit_env_threshold_dt(state, max_dt_s: float) -> float | None:
 
 
 def _hibernate_reached_env_threshold(state) -> bool:
-    if not _hibernate_env_radiation_wake_enabled() or not state.ship.in_transit:
+    if not _hibernate_env_radiation_wake_enabled() or not state.ship.operational_in_transit:
         return False
     return float(state.ship.radiation_env_rad_per_s) >= _hibernate_env_radiation_threshold()
 
@@ -6856,22 +6860,34 @@ def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False,
             radiation_cross_dt = None
             with loop.with_lock() as locked_state:
                 radiation_cross_dt = _hibernate_transit_env_threshold_dt(locked_state, step)
+                wake_env_from_below = (
+                    locked_state.ship.radiation_env_rad_per_s
+                    < _hibernate_env_radiation_threshold())
             if radiation_cross_dt is not None:
                 step = min(step, max(1.0e-6, radiation_cross_dt))
             try:
-                ev = loop.advance_interval(step, stop_at_arrival=until_arrival)
+                ev = loop.advance_interval(
+                    step, stop_at_arrival=until_arrival,
+                    stop_when=lambda current, batch: bool(
+                        _hibernate_interrupt_reason(current, batch, wake_on_low_battery)
+                        or (wake_env_from_below and _hibernate_reached_env_threshold(current))))
             except NavigationAdvanceBlocked as exc:
                 ev = exc.events
                 step_events.extend([("step", e) for e in ev])
                 woke_early = True
-                wake_reason = f"causal_boundary:{exc}"
+                wake_reason = (f"emergency:{exc}" if str(exc) in {
+                    "Physical propulsion capacity is unavailable",
+                    "physical safety braking capacity is unavailable",
+                    "recovery braking point is no longer operational",
+                    "recovery braking capacity is no longer available",
+                } else f"causal_boundary:{exc}")
                 with loop.with_lock() as locked_state:
                     wake_t = locked_state.clock.t
                 break
             step_events.extend([("step", e) for e in ev])
             with loop.with_lock() as locked_state:
                 reason = _hibernate_interrupt_reason(locked_state, ev, wake_on_low_battery)
-                if not reason and radiation_cross_dt is not None and _hibernate_reached_env_threshold(locked_state):
+                if not reason and wake_env_from_below and _hibernate_reached_env_threshold(locked_state):
                     threshold = _hibernate_env_radiation_threshold()
                     reason = f"env_radiation_threshold:{threshold:.4f}"
                 if reason:
@@ -6912,9 +6928,10 @@ def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False,
     finally:
         with loop.with_lock() as locked_state:
             locked_state.ship.is_hibernating = False
-        loop.set_auto_tick(was_auto and not (woke_early and
-                           (wake_reason or "").startswith("causal_boundary:")))
-    filtered = [pair for pair in step_events if pair[1].severity == Severity.CRITICAL or pair[1].type in {EventType.ARRIVED}]
+        loop.set_auto_tick(was_auto and not woke_early)
+    filtered = [pair for pair in step_events if pair[1].severity == Severity.CRITICAL
+                or pair[1].type in {EventType.ARRIVED, EventType.PHYSICAL_STOPPED,
+                                    EventType.SYSTEM_STATE_CHANGED}]
     events_to_render.extend(filtered)
     recovery_events: list[Event] = []
     with loop.with_lock() as locked_state:
@@ -6969,6 +6986,17 @@ def _render_hibernate_result(loop, result: HibernateRunResult) -> None:
                     msg = {
                         "en": f"Hibernation interrupted: ambient radiation reached threshold ({threshold_txt} rad/s)",
                         "es": f"Hibernación interrumpida: la radiación ambiental alcanzó el umbral ({threshold_txt} rad/s)",
+                    }
+                elif result.wake_reason == "physical_stopped":
+                    msg = {
+                        "en": "Hibernation interrupted: the ship stopped outside the destination",
+                        "es": "Hibernación interrumpida: la nave se detuvo fuera del destino",
+                    }
+                elif result.wake_reason.startswith("emergency:"):
+                    detail = result.wake_reason.split(":", 1)[1]
+                    msg = {
+                        "en": f"Hibernation interrupted by a propulsion emergency: {detail}",
+                        "es": f"Hibernación interrumpida por una emergencia propulsiva: {physical_boundary_reason('es', detail)}",
                     }
                 elif result.wake_reason.startswith("causal_boundary:"):
                     detail = result.wake_reason.split(":", 1)[1]

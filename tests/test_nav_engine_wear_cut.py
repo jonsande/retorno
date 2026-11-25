@@ -329,18 +329,19 @@ def test_earlier_electrical_or_deferred_radiation_limit_rejects_entire_cut():
     assert pickle.dumps(game) == before
 
 
-def test_simultaneous_unresolved_electrical_limit_rejects_engine_cut():
+def test_simultaneous_electrical_limit_and_engine_cut_resolve_once():
     game, physical = _critical_nominal()
     cut = _cut_time(game, .35, physical.active_segment.duration_galactic_s)
     proper = proper_time_in_segment(physical.active_segment, cut)
-    before = pickle.dumps(game)
     with patch("retorno.core.engine.power_limits", return_value=(
         TemporalLimit("battery_full", "proper", proper,
                       validity="fixed_electrical_conditions"),
     )):
-        with pytest.raises(RuntimeError, match="causal boundary"):
-            Engine().tick(game, cut)
-    assert pickle.dumps(game) == before
+        events = Engine().tick(game, cut)
+    assert game.ship.physical_transit.pending_transition == "safety_brake"
+    assert game.ship.systems["engines"].health == .35
+    assert game.clock.t == pytest.approx(cut)
+    assert sum(e.type == EventType.SYSTEM_STATE_CHANGED for e in events) == 0
 
 
 def test_close_but_earlier_electrical_limit_is_not_merged_with_engine_cut():

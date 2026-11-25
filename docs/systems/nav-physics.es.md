@@ -1,5 +1,45 @@
 # Segmentos físicos de navegación (NAV-BRAKE-01B3A)
 
+## Coordinación causal pública (NAV-BRAKE-01B3H-D2B1)
+
+La navegación física pública admite drones a bordo, electricidad variable,
+desgaste y radiación ordinarios, trabajos compatibles, evaluaciones narrativas,
+radio y planes existentes de recuperación de exploración. La predicción interna
+`Engine.next_physical_step()` selecciona el siguiente corte antes de cada
+`Engine.tick()` productivo. `GameLoop.advance_interval()` la comparte con
+`step()`, avance automático, espera DEBUG e hibernación de CLI y Textual. No
+divide viajes largos en segundos fijos.
+
+Los candidatos incluyen fin de fase, batería llena o vacía, cruces de carga y
+calidad, regulación y alertas eléctricas, límites radiológicos y de casco,
+umbrales de salud, finalización de trabajos y evaluación narrativa. La
+electricidad y el desgaste ordinario usan tiempo propio; drones, trabajos y
+narrativa conservan sus relojes vigentes. En un instante coincidente se integra
+una vez el intervalo previo, se actualizan electricidad, exposición y desgaste,
+se resuelven trabajos vencidos y se ejecutan alertas, recuperación de
+exploración y radio sobre la posición física nueva. El siguiente pronóstico
+parte del estado consolidado. Un fallo genuino conserva intacto el estado
+anterior del subintervalo; una petición pública interrumpida informa del
+tiempo ya ejecutado.
+
+El 35 % de integridad de motores activa el frenado preventivo pagado y el
+15 % termina la capacidad de frenado; la nave sigue por inercia hasta una
+intervención válida. La llegada requiere beta cero dentro de tolerancia;
+detenerse fuera crea un waypoint físico. `hibernate until_arrival` termina en
+una llegada real. La hibernación de duración fija continúa tras una llegada
+normal y despierta ante emergencia, detención física fuera del destino o
+cruce radiológico ambiental configurado. La radio requiere `comms` y
+`radiod` operativos; las reglas actuales suspenden recepción al hibernar.
+
+Siguen restringidos el aborto físico voluntario, nueva aceleración durante el
+tránsito, cambio de destino, inversión de rumbo y nuevas maniobras públicas
+de recuperación manual; su interfaz corresponde a D2B2. `install`,
+`cargo audit` y `auth recover` permanecen bloqueados durante el plan físico
+nominal porque sus efectos requieren coordinación adicional. La reparación
+inercial conserva sus reglas causales específicas. Los casos restantes con
+drones desplegados o electricidad extrema se evalúan al producirse el evento;
+no son precondiciones para viajar con drones almacenados.
+
 ## Navegación nominal pública (NAV-BRAKE-01B3H-D2A)
 
 `nav <node_id>`, `travel <node_id>` y `nav --no-cruise <node_id>` inician
@@ -20,22 +60,21 @@ basada en `arrival_t` no teletransporte la nave. `ship.physical_transit` es
 la autoridad del movimiento y el predicado operativo compartido protege otra
 salida, resolución de rutas, acoplamiento, cambio de velocidad y aborto
 histórico. Las consultas y los controles eléctricos compatibles conservan
-sus restricciones; las acciones que generan trabajos se bloquean durante el
-movimiento nominal hasta disponer de coordinación física, mientras sigue
-disponible la reparación inercial ya implantada. `status` y Textual muestran fase, beta instantánea, distancia
+sus restricciones; D2B1 admite trabajos compatibles y mantiene bloqueadas
+las categorías indicadas arriba. La reparación inercial sigue disponible.
+`status` y Textual muestran fase, beta instantánea, distancia
 restante con signo, ambos tiempos transcurridos y ETA nominal solo mientras
 el plan siga vigente. El sobrepaso no se limita; la inercia carece de ETA de
 llegada garantizada.
 
-`GameLoop.advance_interval()` avanza por finales de fase nominal, incluido
+En D2A, `GameLoop.advance_interval()` avanzaba por finales de fase nominal, incluido
 el paso de aceleración a crucero, aceleración directa a frenado, crucero a
 frenado y frenado a reposo. `hibernate until_arrival` se detiene al llegar;
 `hibernate <años>` y `wait <segundos>` en modo DEBUG siguen con tiempo
 ordinario si se solicitó más. `Engine.tick()` conserva el rechazo atómico de
-intervalos que superen el horizonte físico. Los cortes de electricidad,
-desgaste, radiación, drones, radio, trabajos o narrativa aún no resueltos
-detienen el avance público e informan del tiempo ya ejecutado. D2B debe
-resolver estos cortes para que los viajes largos ordinarios sean robustos.
+intervalos que superen el horizonte físico. D2B1 amplió la coordinación a
+los cortes ordinarios descritos arriba; los que sigan sin soporte interrumpen
+el avance con el tiempo ya ejecutado.
 El guardado durante cualquier fase conserva el plan pagado y sus relojes.
 
 ## Detención física y llegada operativa (NAV-BRAKE-01B3H-D1)
