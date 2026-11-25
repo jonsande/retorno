@@ -93,25 +93,23 @@ def test_repair_to_destination_executes_paid_coast_and_brake_with_saves():
     owners = _owners(game)
     loop.step(brake.duration_galactic_s / 2)
     assert _owners(game) == owners
-    final = game.ship.physical_transit
-    assert final.motion.beta == 0
-    assert final.recovery_execution.completed
-    assert final.motion.distance_m == pytest.approx(plan.destination_distance_m, abs=1)
-    assert game.world.current_node_id == old_node
+    assert game.ship.physical_transit is None
+    assert sample_segment(brake, brake.duration_galactic_s).distance_m == pytest.approx(plan.destination_distance_m, abs=1)
+    assert game.world.current_node_id == "NOMINAL_B"
     assert game.world.known_links == old_links
     assert game.ship.antimatter_capsules == pytest.approx(old_fuel - receipt.capsules_paid)
     assert game.meta.rng_counter == old_rng
-    assert not any(e.type == EventType.ARRIVED for e in game.events.recent)
+    assert sum(e.type == EventType.ARRIVED for e in game.events.recent) == 1
     game = save_and_load(game)
     owners = _owners(game)
+    Engine().tick(game, 1)
+    assert sum(e.type == EventType.ARRIVED for e in game.events.recent) == 1
     before = pickle.dumps(game)
-    with pytest.raises(RuntimeError, match="completed"):
-        Engine().tick(game, 1)
     with pytest.raises(RuntimeError, match="interrupted physical brake"):
         Engine().prepare_inertial_recovery(game)
-    with pytest.raises(RuntimeError, match="recovery cannot prepare"):
+    with pytest.raises((RuntimeError, ValueError)):
         Engine().prepare_physical_segment(
-            game, accelerate_to(final.motion, .1, 1e7), "NOMINAL_B",
+            game, accelerate_to(sample_segment(brake, brake.duration_galactic_s), .1, 1e7), "NOMINAL_B",
             "accelerate", pricing_speed=.1)
     assert pickle.dumps(game) == before
     assert _owners(game) == owners
@@ -150,10 +148,10 @@ def test_late_real_repair_recovery_brakes_through_destination_and_stops_beyond()
     assert game.world.current_node_id == node
     game = save_and_load(game)
     GameLoop(Engine(), game).step(brake.duration_galactic_s - crossing_step)
-    assert game.ship.physical_transit.motion.beta == 0
-    assert game.ship.physical_transit.motion.distance_m > plan.destination_distance_m
-    assert game.ship.physical_transit.recovery_execution.completed
-    assert game.world.current_node_id == node
+    assert game.ship.physical_transit is None
+    assert sample_segment(brake, brake.duration_galactic_s).distance_m > plan.destination_distance_m
+    assert game.world.current_node_id == game.world.active_tmp_node_id
+    assert game.world.current_node_id != node
     assert game.ship.antimatter_capsules == pytest.approx(fuel - receipt.capsules_paid)
 
 
@@ -170,9 +168,10 @@ def test_one_tick_crosses_recovery_transition_atomically():
     other = repaired_ship()
     full = plan_inertial_recovery(other)
     Engine().prepare_inertial_recovery(other, full)
-    GameLoop(Engine(), other).step(sum(segment.duration_galactic_s for segment in full.segments))
-    assert other.ship.physical_transit.recovery_execution.completed
-    assert other.ship.physical_transit.motion.beta == 0
+    last = full.segments[-1]
+    GameLoop(Engine(), other).step(last.start.galactic_s + last.duration_galactic_s - other.clock.t)
+    assert other.ship.physical_transit is None
+    assert other.world.current_node_id == "NOMINAL_B"
 
 
 def test_exact_boundary_starts_brake_now_without_an_inertial_leg():
@@ -195,8 +194,8 @@ def test_exact_boundary_starts_brake_now_without_an_inertial_leg():
     assert game.ship.physical_transit.intent == "brake"
     assert len(game.ship.physical_transit.recovery_execution.segments) == 1
     GameLoop(Engine(), game).step(plan.braking_segment.duration_galactic_s)
-    assert game.ship.physical_transit.motion.beta == 0
-    assert game.ship.physical_transit.recovery_execution.completed
+    assert game.ship.physical_transit is None
+    assert game.world.current_node_id == "NOMINAL_B"
 
 
 def test_recovery_preparation_rejects_stale_external_capacity_and_fuel_atomically():

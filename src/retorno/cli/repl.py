@@ -875,6 +875,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "[{sev}] travel_aborted :: Travel aborted",
             "es": "[{sev}] travel_aborted :: Viaje abortado",
         },
+        "physical_stopped": {
+            "en": "[{sev}] physical_stopped :: Stopped outside {to} at {tmp_id}",
+            "es": "[{sev}] physical_stopped :: Detenido fuera de {to} en {tmp_id}",
+        },
         "hibernation_started": {
             "en": "[{sev}] hibernation_started :: Sleeping for {duration}",
             "es": "[{sev}] hibernation_started :: Hibernando durante {duration}",
@@ -1822,13 +1826,14 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             except Exception:
                 print(f"[{origin_tag}] [{sev}] {e.type.value} :: {e.message} (data={e.data})")
             continue
-        if e.type in {EventType.TRAVEL_STARTED, EventType.TRAVEL_ABORTED, EventType.ARRIVED, EventType.HIBERNATION_STARTED, EventType.HIBERNATION_ENDED}:
+        if e.type in {EventType.TRAVEL_STARTED, EventType.TRAVEL_ABORTED, EventType.ARRIVED, EventType.PHYSICAL_STOPPED, EventType.HIBERNATION_STARTED, EventType.HIBERNATION_ENDED}:
             locale = state.os.locale.value
             key = e.type.value
             tmpl = travel_templates.get(key, {}).get(locale)
             payload.update({
                 "to": e.data.get("to", "?"),
                 "from": e.data.get("from", "?"),
+                "tmp_id": e.data.get("tmp_id", "?"),
                 "distance_ly": e.data.get("distance_ly", 0.0),
                 "eta_years": e.data.get("eta_years", 0.0),
                 "speed_ly_per_year": e.data.get("speed_ly_per_year", 0.0),
@@ -2161,8 +2166,8 @@ def render_status(state) -> None:
                 print(msg.get(locale, msg["en"]))
             else:
                 msg = {
-                    "en": "waypoint: stopped (travel aborted)",
-                    "es": "waypoint: detenido (viaje abortado)",
+                    "en": "waypoint: stopped after physical braking",
+                    "es": "waypoint: detenido tras frenado físico",
                 }
                 print(msg.get(locale, msg["en"]))
     print(

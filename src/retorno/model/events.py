@@ -42,6 +42,7 @@ class EventType(str, Enum):
     TRAVEL_PROFILE_SET = "travel_profile_set"
     TRAVEL_ABORTED = "travel_aborted"
     ARRIVED = "arrived"
+    PHYSICAL_STOPPED = "physical_stopped"
     HIBERNATION_STARTED = "hibernation_started"
     HIBERNATION_ENDED = "hibernation_ended"
     SERVICE_ALREADY_RUNNING = "service_already_running"

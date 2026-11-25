@@ -15,7 +15,7 @@ from retorno.core.actions import RouteSolve, Travel
 from retorno.core.engine import Engine
 from retorno.core.nav_boundaries import TemporalLimit
 from retorno.core.nav_physics import (LIGHT_SPEED_M_S, MotionState, coast_for,
-                                       metres_to_light_years)
+                                       metres_to_light_years, sample_segment)
 from retorno.core.nav_state import PhysicalTransitState
 from retorno.io.save_load import load_single_slot, save_single_slot
 from retorno.model.events import EventType
@@ -75,8 +75,8 @@ def test_three_phase_one_tick_reaches_b_and_pays_once():
     owners = {key: getattr(root, key) for key in ("ship", "clock", "world", "events", "meta")}
     total = sum(durations(physical))
     events = loop.step(total)
-    motion = game.ship.physical_transit.motion
-    assert game.ship.physical_transit.nominal_plan.completed
+    motion = sample_segment(nominal.segments[-1], nominal.segments[-1].duration_galactic_s)
+    assert game.ship.physical_transit is None
     assert motion.beta == 0
     assert motion.distance_m == pytest.approx(nominal.profile.distance_m, abs=Engine._nominal_distance_tolerance(nominal.profile.distance_m))
     expected_tau = (2 * LIGHT_SPEED_M_S / 1e7 * math.atanh(nominal.profile.peak_beta)
@@ -91,12 +91,10 @@ def test_three_phase_one_tick_reaches_b_and_pays_once():
     assert game.ship.hull_integrity < 1
     assert game.ship.power.e_batt_kwh > 3
     assert all(getattr(root, key) is value for key, value in owners.items())
-    assert game.world.current_node_id != "NOMINAL_B"
-    assert not any(event.type == EventType.ARRIVED for event in events)
-    before = pickle.dumps(game)
-    with pytest.raises(RuntimeError, match="completed"):
-        Engine().tick(game, 1)
-    assert pickle.dumps(game) == before
+    assert game.world.current_node_id == "NOMINAL_B"
+    assert sum(event.type == EventType.ARRIVED for event in events) == 1
+    Engine().tick(game, 1)
+    assert sum(event.type == EventType.ARRIVED for event in game.events.recent) == 1
 
 
 def test_short_route_has_direct_acceleration_to_braking_transition():
@@ -112,8 +110,8 @@ def test_short_route_has_direct_acceleration_to_braking_transition():
     assert game.ship.physical_transit.motion == nominal.segments[1].start
     assert game.ship.antimatter_capsules == fuel
     Engine().tick(game, second)
-    assert game.ship.physical_transit.nominal_plan.completed
-    assert game.ship.physical_transit.motion.beta == 0
+    assert game.ship.physical_transit is None
+    assert game.world.current_node_id == "NOMINAL_B"
 
 
 def test_whole_and_phase_split_have_same_physical_and_subsystem_state():
@@ -124,8 +122,8 @@ def test_whole_and_phase_split_have_same_physical_and_subsystem_state():
     Engine().tick(whole, sum(phase_times))
     for length in phase_times:
         Engine().tick(split, length)
-    assert split.ship.physical_transit.motion == whole.ship.physical_transit.motion
-    assert split.ship.physical_transit.nominal_plan.completed
+    assert split.ship.physical_transit is whole.ship.physical_transit is None
+    assert split.world.current_pos_ly == whole.world.current_pos_ly
     assert split.clock.t == whole.clock.t
     assert split.clock.ship_elapsed_s == whole.clock.ship_elapsed_s
     assert split.clock.bio_elapsed_s == whole.clock.bio_elapsed_s
@@ -173,7 +171,8 @@ def test_nominal_state_round_trips_through_save_in_every_phase(phase):
                      + restored.ship.physical_transit.nominal_plan.segments[-1].duration_galactic_s
                      - restored.clock.t)
         Engine().tick(restored, remaining)
-        assert restored.ship.physical_transit.nominal_plan.completed
+        assert restored.ship.physical_transit is None
+        assert restored.world.current_node_id == "NOMINAL_B"
 
 
 def test_preparation_rejects_unknown_route_and_insufficient_fuel_atomically():
@@ -284,8 +283,8 @@ def test_one_metre_per_second_squared_accepts_short_route_and_rejects_long_cut()
     physical = prepare(short, acceleration=1.0)
     assert len(physical.nominal_plan.segments) == 2
     Engine().tick(short, sum(durations(physical)))
-    assert short.ship.physical_transit.nominal_plan.completed
-    assert short.ship.physical_transit.motion.beta == 0
+    assert short.ship.physical_transit is None
+    assert short.world.current_node_id == "NOMINAL_B"
     long = nominal_game(distance_m=LIGHT_SPEED_M_S * .5 * 500)
     physical = prepare(long, acceleration=1.0)
     before = pickle.dumps(long)

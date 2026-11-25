@@ -106,9 +106,10 @@ def test_verified_external_deceleration_executes_once(deceleration):
     assert game.ship.antimatter_capsules == pytest.approx(fuel - receipt.capsules_paid)
     assert _same_owners(game, owners)
     game = save_and_load(game)
-    GameLoop(Engine(), game).step(sum(segment.duration_galactic_s for segment in plan.segments))
-    assert game.ship.physical_transit.motion.beta == 0
-    assert game.ship.physical_transit.recovery_execution.completed
+    last = plan.segments[-1]
+    GameLoop(Engine(), game).step(last.start.galactic_s + last.duration_galactic_s - game.clock.t)
+    assert game.ship.physical_transit is None
+    assert game.world.current_node_id in {"NOMINAL_B", game.world.active_tmp_node_id}
     assert game.ship.antimatter_capsules == pytest.approx(fuel - receipt.capsules_paid)
 
 

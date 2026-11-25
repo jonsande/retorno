@@ -1,5 +1,43 @@
 # Segmentos físicos de navegación (NAV-BRAKE-01B3A)
 
+## Detención física y llegada operativa (NAV-BRAKE-01B3H-D1)
+
+`Engine.tick()` cierra el frenado físico terminal en la misma transacción que
+avanza su último intervalo. La muestra de movimiento aporta la única distancia
+y el tiempo coordenado. Solo hay llegada con beta cero y dentro de
+`Engine._nominal_distance_tolerance()` del destino original (como mínimo
+1 metro, ampliado según la resolución binaria). La nave y el mundo pasan
+entonces al nodo de destino, sin acoplar; se limpian `physical_transit` y los
+campos operativos de tránsito, se marca el nodo como visitado, se cierra su
+ventana de lore de entrada en órbita, progresa el prólogo de Harbor cuando
+corresponde, se eliminan el waypoint temporal anterior y el nodo inicial
+desconocido, se ejecuta la recuperación de exploración y se registra un único
+evento `ARRIVED`. Estos efectos sin tiempo añadido no repiten el intervalo físico.
+
+Con beta cero fuera de esa tolerancia, la transacción crea un nodo vacío de
+tránsito `NAV_PT_...` en la posición integrada. Pasa a ser el nodo actual y
+emite `PHYSICAL_STOPPED`, distinto de `TRAVEL_ABORTED` voluntario. No visita el
+destino, no cierra su ventana de lore ni emite `ARRIVED`. El waypoint no ofrece
+por sí mismo recursos, servicios, acoplamiento ni uplink. Solo enlaza con
+origen o destino conocidos y existentes dentro del límite operativo de
+45 años luz. Si ambos quedan fuera de alcance no se inventa un enlace;
+resolver la movilidad allí queda pendiente de diseño. Un waypoint anterior
+permanece durante la trayectoria que sale de él, y `_clear_tmp_node()` limpia
+sus enlaces, índices, pools y trabajos dependientes al terminar. Los
+waypoints físicos dejan `active_tmp_progress` vacío: ese campo sigue
+representando el porcentaje del aborto voluntario histórico, sin limitar
+la distancia física.
+
+Cruzar B con beta positiva conserva el tránsito y el destino original aunque
+la distancia integrada exceda A–B. Un límite de desgaste coincidente con beta
+cero no programa inercia. Los ticks solicitados más allá de la detención se
+rechazan atómicamente; el tiempo ordinario puede avanzar en el tick siguiente.
+El guardado/carga del formato actual conserva movimiento activo, inercia y
+detenciones ya consolidadas sin repetirlas. El comando público `travel` aún
+usa la vía histórica; la salida física y recuperación siguen siendo internas
+hasta una integración posterior. Las secciones previas conservan el alcance
+incremental de su fase; esta sección define la finalización vigente.
+
 Esta es una API matemática pura de `src/retorno/core/nav_physics.py`, probada
 en `tests/test_nav_segments.py`. No activa viajes físicos jugables, modifica
 los relojes ni persiste rutas. El `TravelPlan` anterior desde reposo hasta

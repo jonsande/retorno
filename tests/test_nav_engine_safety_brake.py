@@ -161,18 +161,16 @@ def test_full_sequence_from_nominal_acceleration_to_real_safety_stop():
     assert all(getattr(game, key) is owner for key, owner in zip(
         ("ship", "clock", "world", "events", "meta"), owners))
     rest = physical.active_segment.duration_galactic_s - physical.elapsed_galactic_s
+    stop_distance = sample_segment(physical.active_segment, physical.active_segment.duration_galactic_s).distance_m
     GameLoop(Engine(), game).step(rest)
-    stopped = game.ship.physical_transit
-    assert stopped.motion.beta == 0
-    assert stopped.nominal_braking_substitution.completed
-    assert stopped.motion.distance_m < stopped.nominal_plan.profile.distance_m
+    assert game.ship.physical_transit is None
+    assert stop_distance < active.nominal_plan.profile.distance_m
     assert game.ship.antimatter_capsules == before_fuel
-    assert game.world.current_node_id != "NOMINAL_B"
+    assert game.world.current_node_id == game.world.active_tmp_node_id
     assert not any(event.type == EventType.ARRIVED for event in game.events.recent)
-    saved = pickle.dumps(game)
-    with pytest.raises(RuntimeError, match="already complete"):
-        Engine().tick(game, 1)
-    assert pickle.dumps(game) == saved
+    assert sum(event.type == EventType.PHYSICAL_STOPPED for event in game.events.recent) == 1
+    Engine().tick(game, 1)
+    assert sum(event.type == EventType.PHYSICAL_STOPPED for event in game.events.recent) == 1
 
 
 def test_coast_interruption_and_persistence_across_safety_braking():
@@ -196,8 +194,8 @@ def test_coast_interruption_and_persistence_across_safety_braking():
                  - midway.ship.physical_transit.elapsed_galactic_s)
     Engine().tick(midway, remaining)
     stopped = save_and_load(midway)
-    assert stopped.ship.physical_transit.nominal_braking_substitution.completed
-    assert stopped.ship.physical_transit.motion.beta == 0
+    assert stopped.ship.physical_transit is None
+    assert stopped.world.current_node_id == stopped.world.active_tmp_node_id
     assert stopped.ship.antimatter_capsules == paid
 
 
@@ -266,12 +264,10 @@ def test_exact_nominal_destination_still_has_no_public_arrival():
     assert game.ship.physical_transit.pending_transition == "safety_brake"
     paid = game.ship.antimatter_capsules
     Engine().tick(game, prepared.nominal_plan.segments[-1].duration_galactic_s)
-    physical = game.ship.physical_transit
-    assert physical.nominal_braking_substitution.completed
-    assert physical.motion.beta == 0
-    assert physical.motion.distance_m == pytest.approx(physical.nominal_plan.profile.distance_m, abs=1.0)
+    assert game.ship.physical_transit is None
+    assert game.world.current_node_id == "NOMINAL_B"
     assert game.ship.antimatter_capsules == paid
-    assert not any(event.type == EventType.ARRIVED for event in game.events.recent)
+    assert sum(event.type == EventType.ARRIVED for event in game.events.recent) == 1
 
 
 def test_overshoot_with_shifted_endpoint_preserves_real_motion_and_radiation():
@@ -288,9 +284,8 @@ def test_overshoot_with_shifted_endpoint_preserves_real_motion_and_radiation():
     destination.x_ly = origin.x_ly + metres_to_light_years(target_distance_m)
     paid = game.ship.antimatter_capsules
     Engine().tick(game, brake.duration_galactic_s)
-    physical = game.ship.physical_transit
-    assert physical.nominal_braking_substitution.completed
-    assert physical.motion.distance_m > light_years_to_metres(
+    assert game.ship.physical_transit is None
+    assert sample_segment(brake, brake.duration_galactic_s).distance_m > light_years_to_metres(
         distance_between_nodes_ly(game.world, origin.node_id, destination.node_id))
     assert game.ship.radiation_env_rad_per_s == destination.radiation_rad_per_s
     assert game.world.current_pos_ly[0] > destination.x_ly
@@ -321,7 +316,8 @@ def test_authorization_cannot_be_rebound_or_reused():
             game, accelerate_to(physical.motion, .99, 1e7),
             "NOMINAL_B", "accelerate", pricing_speed=.5)
     Engine().tick(game, physical.active_segment.duration_galactic_s - physical.elapsed_galactic_s)
-    with pytest.raises(RuntimeError, match="safety braking cannot prepare"):
+    assert game.ship.physical_transit is None
+    with pytest.raises((RuntimeError, ValueError)):
         Engine().prepare_physical_segment(
             game, brake_to_stop(MotionState(game.clock.t, physical.motion.distance_m, .1,
                                              game.clock.ship_elapsed_s), 1e7),
@@ -390,5 +386,5 @@ def test_safe_subdivision_matches_whole_brake_and_preserves_nominal_behavior():
         ordinary, "NOMINAL_B", proper_acceleration_m_s2=1e7)
     for segment in physical.nominal_plan.segments:
         Engine().tick(ordinary, segment.duration_galactic_s)
-    assert ordinary.ship.physical_transit.nominal_plan.completed
-    assert ordinary.ship.physical_transit.motion.beta == 0
+    assert ordinary.ship.physical_transit is None
+    assert ordinary.world.current_node_id == "NOMINAL_B"

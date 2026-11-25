@@ -14,7 +14,8 @@ from retorno.config.balance import Balance
 from retorno.core.engine import Engine
 from retorno.core.nav_boundaries import TemporalLimit
 from retorno.core.nav_physics import (LIGHT_SPEED_M_S, MotionState, accelerate_to,
-                                       brake_to_stop, coast_for, metres_to_light_years)
+                                       brake_to_stop, coast_for, metres_to_light_years,
+                                       sample_segment)
 from retorno.core.nav_state import PhysicalTransitState
 from retorno.model.events import EventType
 from retorno.model.systems import SystemState
@@ -97,14 +98,14 @@ def test_acceleration_from_positive_beta_and_partition_are_continuous():
         LIGHT_SPEED_M_S ** 2 / 1e6 * (math.hypot(1, p1) - math.hypot(1, p0)))
 
 
-def test_braking_to_rest_does_not_arrive_or_reverse():
+def test_braking_to_rest_creates_waypoint_without_reversal():
     game, start = ready_game(.5)
     segment = brake_to_stop(start, 1e7)
     prepared(game, segment, "brake")
     fuel = game.ship.antimatter_capsules
     duration = segment.duration_galactic_s
     events = Engine().tick(game, duration)
-    motion = game.ship.physical_transit.motion
+    motion = sample_segment(segment, duration)
     assert motion.beta == 0
     assert motion.distance_m > 0
     p0 = .5 / math.sqrt(1 - .5 ** 2)
@@ -113,11 +114,11 @@ def test_braking_to_rest_does_not_arrive_or_reverse():
     assert motion.distance_m == pytest.approx(expected_x, rel=1e-12)
     assert game.clock.ship_elapsed_s == pytest.approx(expected_tau)
     assert game.ship.antimatter_capsules == fuel
-    assert game.ship.physical_transit.braking_started
+    assert game.ship.physical_transit is None
+    assert game.world.current_node_id == game.world.active_tmp_node_id
     assert game.world.current_node_id != "COAST_DEST"
     assert not any(event.type == EventType.ARRIVED for event in events)
-    with pytest.raises(RuntimeError, match="beyond this segment"):
-        Engine().tick(game, 1)
+    Engine().tick(game, 1)
 
 
 def test_coast_then_brake_uses_exact_endpoint_and_new_paid_leg():
@@ -155,10 +156,11 @@ def test_accelerate_coast_brake_chain_preserves_pose_and_charges_each_powered_le
     assert game.ship.physical_transit.motion == coast_end
     assert game.ship.antimatter_capsules < after_accel_payment < initial_fuel
     Engine().tick(game, brake.duration_galactic_s)
-    assert game.ship.physical_transit.motion.beta == 0
-    with pytest.raises(RuntimeError, match="cannot resume acceleration"):
+    assert game.ship.physical_transit is None
+    assert game.world.current_node_id == game.world.active_tmp_node_id
+    with pytest.raises((RuntimeError, ValueError)):
         Engine().prepare_physical_segment(
-            game, accelerate_to(game.ship.physical_transit.motion, .1, 1e6),
+            game, accelerate_to(sample_segment(brake, brake.duration_galactic_s), .1, 1e6),
             "COAST_DEST", "accelerate", pricing_speed=.5)
 
 

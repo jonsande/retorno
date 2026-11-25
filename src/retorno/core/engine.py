@@ -147,17 +147,28 @@ class Engine:
 
     def tick(self, state: GameState, dt: float) -> list[Event]:
         if state.ship.physical_transit is not None:
-            if state.ship.physical_transit.pending_transition == "safety_brake":
-                return self._tick_safety_braking(state, dt)
-            if (state.ship.physical_transit.pending_transition == "inertia"
-                    or state.ship.physical_transit.inertial_continuation is not None):
-                return self._tick_inertial(state, dt)
-            if state.ship.physical_transit.recovery_execution is not None:
-                return self._tick_recovery(state, dt)
-            if (state.ship.physical_transit.nominal_plan is not None
-                    and state.ship.physical_transit.nominal_braking_substitution is None):
-                return self._tick_nominal_physical_travel(state, dt)
-            return self._tick_physical_segment(state, dt)
+            if dt == 0:
+                return []
+            # The whole physical interval and its zero-time operational landing
+            # share one transaction. A failed world update cannot publish motion.
+            staged = deepcopy(state)
+            physical = staged.ship.physical_transit
+            if physical.pending_transition == "safety_brake":
+                events = self._tick_safety_braking(staged, dt)
+            elif (physical.pending_transition == "inertia"
+                  or physical.inertial_continuation is not None):
+                events = self._tick_inertial(staged, dt)
+            elif physical.recovery_execution is not None:
+                events = self._tick_recovery(staged, dt)
+            elif (physical.nominal_plan is not None
+                  and physical.nominal_braking_substitution is None):
+                events = self._tick_nominal_physical_travel(staged, dt)
+            else:
+                events = self._tick_physical_segment(staged, dt)
+            if dt > 0:
+                events.extend(self._finish_physical_transit(staged))
+            self._commit_physical_state(state, staged)
+            return events
         # Stop at drone decision/completion boundaries. A large wait must not
         # jump from a safe reserve to an exhausted drone before checking recall.
         events: list[Event] = []
@@ -604,7 +615,7 @@ class Engine:
         requested_end = state.clock.t + dt
         final_time = final.start.galactic_s + final.duration_galactic_s
         if (not math.isfinite(requested_end) or requested_end == state.clock.t
-                or requested_end > final_time + math.ulp(final_time)):
+                or requested_end > final_time):
             raise RuntimeError("recovery tick exceeds its physical horizon")
         # A paid wait can begin exactly at the inclusive braking threshold.
         # Positive ordinary wear then makes the first loss a zero-time cut.
@@ -632,10 +643,7 @@ class Engine:
             events = self._tick_inertial(staged, dt)
             self._commit_physical_state(state, staged)
             return events
-        # Summing two positive segment durations can round one ULP beyond the
-        # separately rounded absolute endpoint. It grants no extra motion.
-        remaining = (dt if requested_end <= final_time
-                     else final_time - state.clock.t)
+        remaining = dt
         staged = deepcopy(state)
         events: list[Event] = []
         while remaining > 0:
@@ -657,8 +665,7 @@ class Engine:
             remaining = max(0.0, remaining - step)
             active = staged.ship.physical_transit
             assert active is not None and active.recovery_execution is not None
-            if (active.recovery_execution.completed
-                    and requested_end <= final_time + math.ulp(final_time)):
+            if active.recovery_execution.completed:
                 remaining = 0.0
             if active.pending_transition is not None:
                 if remaining:
@@ -683,6 +690,102 @@ class Engine:
     def _nominal_distance_tolerance(distance_m: float) -> float:
         """Metre-scale arrival tolerance, widened only by binary resolution."""
         return max(1.0, 64 * math.ulp(max(1.0, distance_m)))
+
+    def _finish_physical_transit(self, state: GameState) -> list[Event]:
+        """Turn a completed physical brake into an orbit or an empty waypoint."""
+        physical = state.ship.physical_transit
+        if physical is None or physical.motion.beta != 0 or physical.intent != "brake":
+            return []
+        if (physical.elapsed_galactic_s != physical.active_segment.duration_galactic_s
+                or physical.pending_transition is not None):
+            return []
+        if (physical.recovery_execution is not None and not physical.recovery_execution.completed
+                or physical.nominal_braking_substitution is not None
+                and not physical.nominal_braking_substitution.completed
+                or physical.nominal_plan is not None
+                and physical.nominal_braking_substitution is None
+                and not physical.nominal_plan.completed):
+            return []
+        world, ship = state.world, state.ship
+        origin_id = ship.transit_from or ship.current_node_id
+        destination_id = physical.original_destination_id
+        origin = world.space.nodes.get(origin_id)
+        destination = world.space.nodes.get(destination_id)
+        route_ly = distance_between_nodes_ly(world, origin_id, destination_id)
+        if origin is None or destination is None or route_ly is None or route_ly <= 0:
+            raise RuntimeError("physical stop lost its endpoint geometry")
+        route_m = light_years_to_metres(route_ly)
+        position = world.current_pos_ly  # Written by the physical integrator.
+        arrived = abs(physical.motion.distance_m - route_m) <= self._nominal_distance_tolerance(route_m)
+        ship.physical_transit = None
+        ship.in_transit = False
+        ship.docked_node_id = None
+        ship.arrival_t = 0.0
+        ship.transit_start_t = 0.0
+        ship.transit_speed_ly_per_year = 0.0
+        ship.transit_from = ""
+        ship.transit_to = ""
+        if ship.transit_prev_op_mode:
+            ship.op_mode = ship.transit_prev_op_mode
+            ship.op_mode_source = ship.transit_prev_op_mode_source or "manual"
+        ship.transit_prev_op_mode = ""
+        ship.transit_prev_op_mode_source = ""
+        events = self._clear_tmp_node(state)
+        if arrived:
+            ship.current_node_id = destination_id
+            world.current_node_id = destination_id
+            world.current_pos_ly = (destination.x_ly, destination.y_ly, destination.z_ly)
+            if destination.kind != "transit":
+                world.visited_nodes.add(destination_id)
+                close_window_on_orbit_entry(state, destination_id)
+                if destination_id == "HARBOR_12" and not state.meta.prologue_complete:
+                    state.meta.prologue_complete = True
+            self._drop_initial_unknown_node(state)
+            events.append(self._make_event(
+                state, EventType.ARRIVED, Severity.INFO,
+                SourceRef(kind="ship", id=ship.ship_id),
+                f"Arrived at {destination_id}",
+                data={"from": origin_id, "to": destination_id,
+                      "distance_ly": route_ly},
+            ))
+            events.extend(ensure_exploration_recovery(state, "arrival"))
+        else:
+            # The sequence is persistent and does not consume universe RNG.
+            seq = world.next_tmp_seq
+            tmp_id = f"NAV_PT_{seq:04X}"
+            while tmp_id in world.space.nodes:
+                seq += 1
+                tmp_id = f"NAV_PT_{seq:04X}"
+            world.next_tmp_seq = seq + 1
+            node = SpaceNode(
+                node_id=tmp_id, name="Nav Point", kind="transit",
+                radiation_rad_per_s=max(Balance.PROCEDURAL_RAD_MIN,
+                                        ship.radiation_env_rad_per_s),
+                x_ly=position[0], y_ly=position[1], z_ly=position[2],
+            )
+            world.space.nodes[tmp_id] = node
+            world.current_node_id = tmp_id
+            ship.current_node_id = tmp_id
+            world.current_pos_ly = position
+            world.active_tmp_node_id = tmp_id
+            world.active_tmp_from = origin_id if origin_id in world.space.nodes else None
+            world.active_tmp_to = destination_id if destination_id in world.space.nodes else None
+            world.active_tmp_progress = None  # Physical stops are not voluntary aborts.
+            known = world.known_nodes | set(world.known_intel) | world.known_contacts
+            for endpoint in (origin_id, destination_id):
+                if endpoint in world.space.nodes and endpoint in known:
+                    add_known_link(world, tmp_id, endpoint, bidirectional=True)
+            events.append(self._make_event(
+                state, EventType.PHYSICAL_STOPPED, Severity.WARN,
+                SourceRef(kind="ship", id=ship.ship_id),
+                "Physical braking stopped outside the destination",
+                data={"from": origin_id, "to": destination_id, "tmp_id": tmp_id,
+                      "distance_ly": physical.motion.distance_m / light_years_to_metres(1.0)},
+            ))
+        for event in events:
+            if not any(event is previous for previous in state.events.recent):
+                self._record_event(state.events, event)
+        return events
 
     def prepare_nominal_physical_travel(
         self, state: GameState, destination_id: str, *,
@@ -1224,6 +1327,8 @@ class Engine:
         staged.clock.bio_elapsed_s += biological_time_interval(proper_dt, staged.ship.is_hibernating)
         pending_transition = ("inertia" if physical.intent == "brake" or recovery_coast
                               else "safety_brake") if engine_boundary is not None else None
+        if physical.intent == "brake" and local_end == segment.duration_galactic_s and end.beta == 0:
+            pending_transition = None  # A wear cut at rest cannot start inertia.
         stopped_safety_brake = substitution is not None and local_end == segment.duration_galactic_s
         if stopped_safety_brake:
             pending_transition = None  # At beta zero there is no inertial continuation to schedule.

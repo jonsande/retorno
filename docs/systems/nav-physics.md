@@ -1,5 +1,42 @@
 # Navigation motion segments (NAV-BRAKE-01B3A)
 
+## Physical stop and operational landing (NAV-BRAKE-01B3H-D1)
+
+`Engine.tick()` closes a terminal physical braking segment in the same
+transaction that advances its last interval. The motion sampler supplies the
+only distance and coordinate time. Arrival occurs only at beta zero and within
+`Engine._nominal_distance_tolerance()` of the original destination (at least
+1 metre, widened for binary resolution). The ship and world then enter the
+destination node, remain undocked, clear `physical_transit` and the operational
+transit fields, mark the node visited, close its orbit-entry lore window,
+advance the Harbor prologue where applicable, remove the previous temporary
+waypoint and initial unknown node, run exploration recovery, and record one
+`ARRIVED` event. These zero-time effects do not rerun the physical interval.
+
+At beta zero outside that tolerance, the same transaction creates an empty
+`NAV_PT_...` transit node at the integrated position. It becomes the current
+node and emits `PHYSICAL_STOPPED`, distinct from voluntary `TRAVEL_ABORTED`.
+It does not visit the destination, close its lore window or emit `ARRIVED`.
+The waypoint offers no salvage, services, docking or uplink by itself. It
+links only to known, still existing origin/destination nodes within the
+operational 45 ly hop cap. No link is invented when both are unreachable;
+recovering mobility there remains a game-design task. A prior waypoint stays
+alive through its outbound physical journey and `_clear_tmp_node()` removes
+its links, indexes, pools and dependent jobs on terminalization. Physical
+waypoints leave `active_tmp_progress` unset; that field continues to describe
+the historical voluntary abort percentage, never a physical distance clamp.
+
+Crossing B with beta positive leaves the transit and original destination
+unchanged, even when the integrated distance exceeds A–B. A final wear cut
+coincident with beta zero cannot schedule inertia. Requested ticks beyond a
+physical stop reject atomically; ordinary time can advance in a subsequent
+tick. Save/load of the current format preserves active motion, inertia and
+completed operational landings without replaying them. Public `travel` still
+uses the historical path; physical departure and recovery remain internal
+until a later public-navigation integration. Older phase descriptions below
+record their original incremental scope; this section specifies the current
+terminal behavior.
+
 This is a pure mathematical API in `src/retorno/core/nav_physics.py`, tested in
 `tests/test_nav_segments.py`. It does not activate physical playable travel,
 change the clocks, or persist a route. The earlier rest-to-rest `TravelPlan`

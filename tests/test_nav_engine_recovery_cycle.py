@@ -90,19 +90,19 @@ def test_five_successive_manual_payments_with_coast_and_brake_cuts_then_stop():
 
         if number == 5:
             game.ship.systems["engines"].base_decay_per_s = 0
+            terminal = plan.braking_segment
             for segment in plan.segments:
                 due = (segment.start.galactic_s
                        + segment.duration_galactic_s - game.clock.t)
                 GameLoop(engine, game).step(due)
-            physical = game.ship.physical_transit
-            assert physical.motion.beta == 0
-            assert physical.recovery_execution.completed
-            assert physical.recovery_lineage.recent[-1].outcome == "completed"
+            assert game.ship.physical_transit is None
+            assert terminal.end_beta == 0
             assert game.ship.antimatter_capsules == pytest.approx(before_fuel - price)
             game = save_and_load(game)
-            assert game.ship.physical_transit.motion.beta == 0
-            assert game.world.current_node_id == original_node
-            assert set(game.world.space.nodes) == original_nodes
+            assert game.ship.physical_transit is None
+            assert game.world.current_node_id == game.world.active_tmp_node_id
+            assert game.world.current_node_id != original_node
+            assert set(game.world.space.nodes) == original_nodes | {game.world.current_node_id}
             assert not any(event.type == EventType.ARRIVED for event in game.events.recent)
             break
 
@@ -169,9 +169,7 @@ def test_five_successive_manual_payments_with_coast_and_brake_cuts_then_stop():
         previous_clock = game.clock.t
         previous_distance = game.ship.physical_transit.motion.distance_m
 
-    assert game.ship.physical_transit.recovery_lineage.attempt_count == 6
-    assert game.ship.physical_transit.recovery_lineage.interruption_count == 5
-    assert len(game.ship.physical_transit.recovery_lineage.recent) == 2
+    assert sum(event.type == EventType.PHYSICAL_STOPPED for event in game.events.recent) == 1
 
 
 @pytest.mark.parametrize("origin", ["brake", "coast"])
