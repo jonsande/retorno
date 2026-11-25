@@ -666,10 +666,10 @@ y avanza con beta constante sin empuje ni cargo. Se mantiene el destino
 original como referencia; la nave puede sobrepasarlo sin llegada, cambio de
 nodo, waypoint ni enlace nuevo. El historial permanece en guardado/carga;
 los pickles físicos anteriores, de hasta 14 campos, cargan sin segunda
-interrupción. Otra autorización y una tercera maniobra permanecen bloqueadas;
-C3A admite una reparación productiva limitada durante la segunda inercia.
-Siguen pendientes replanificación tras este segundo fallo y navegación y
-llegada públicas.
+interrupción. En C2B2B1, otra autorización y una tercera maniobra estaban
+bloqueadas; C3A añadió una reparación productiva limitada y C3B1 permite la
+maniobra manual descrita abajo. Siguen pendientes navegación y llegada
+públicas.
 
 ### Pérdida de capacidad en la espera de recuperación (C2B2B2)
 
@@ -696,8 +696,8 @@ persiste en guardado/carga; los pickles anteriores de hasta 15 campos
 conservan su interpretación.
 
 La nave conserva destino y beta, puede sobrepasar B y no produce llegada,
-waypoint ni enlace nuevo. La tercera autorización sigue bloqueada; C3A
-admite un trabajo de reparación de motores durante esta segunda inercia.
+waypoint ni enlace nuevo. En C2B2B2, la tercera autorización estaba bloqueada;
+C3A añadió un trabajo de reparación y C3B1 permite la autorización manual.
 Un aislamiento, pérdida eléctrica u
 otro cambio operativo no causado por el desgaste ordinario conserva el
 rechazo atómico hasta disponer de coordinación causal; no se registra como
@@ -725,12 +725,72 @@ trabajos o narrativo posterior no puede coordinarse. Guardar/cargar no repite
 el resultado ni el RNG. También se admite reparar después de sobrepasar B,
 sin llegada ni cambio de nodo.
 
-Para C3B se necesita distinguir intentos sucesivos y un pago nuevo sin
-convertir recibos gastados en permisos. Una opción futura es mantener en el
-estado físico un identificador de linaje, contador monótono y resumen de
-tamaño fijo de los últimos intentos, con acumulados y huella del historial;
-la magnitud del último frenado demostrado deberá comprobarse junto con
-posición, beta, destino y capacidad actuales antes de autorizar el siguiente.
-Si se exige reconstruir cada recibo antiguo, un registro persistente separado
-de auditoría tendrá que conservarlos. Ese registro no debe ser otra fuente de
-posición ni velocidad. Esta propuesta no está implementada.
+C3B1 implementa el linaje acotado y un tercer pago manual descritos a
+continuación. Las partidas C3A conservan su significado hasta preparar la
+nueva maniobra.
+
+### Tercera recuperación autorizada manualmente (C3B1, C3B1-R1)
+
+Tras la segunda interrupción, una reparación de motores terminada y aplicada
+por el scheduler productivo **después del corte**, junto con la capacidad
+actual de frenado, permite una nueva `RecoveryIntent` manual.
+Tiene un identificador monótono nuevo y un límite de gasto positivo y finito.
+Armarla no descuenta combustible. `prepare_inertial_recovery()` verifica
+`RecoveryPlan`, relojes, ruta, electricidad, trabajos, desaceleración
+conservadora y combustible actuales, y descuenta una sola vez la tarifa
+existente de `engine_fuel_cost()`. La nueva `PropulsionAuthorization` queda
+ligada a un segmento de frenado y al destino original. Una desaceleración
+manual puede ser inferior a la demostrada históricamente, nunca superior.
+Un frenado planificado y abandonado durante la espera no demuestra capacidad;
+el frenado anterior ejecutado sigue siendo el límite. La capacidad se vuelve
+a comprobar antes de iniciar la fase propulsiva.
+
+`RecoveryLineage`, en `src/retorno/core/nav_state.py`, conserva origen y
+destino originales, cantidades de recuperaciones pagadas e interrumpidas,
+antimateria acumulada gastada en recuperaciones, identificador máximo ya
+gastado y una ventana fija de **dos** `RecoveryAttemptRecord` detallados.
+Cada registro contiene recibo gastado de segmento, identificador, resultado,
+tipo de interrupción y estado físico del corte cuando corresponde. Los
+registros antiguos se resumen en acumulados y una huella SHA-256
+determinista. La huella no equivale a un registro de auditoría reconstruible;
+conservar todos los recibos exigiría un libro persistente separado. El linaje
+nunca determina posición, beta ni relojes actuales: eso corresponde al
+segmento físico activo. No pueden reutilizarse identificadores hasta
+`spent_through_authorization_id`.
+
+Siguen cargándose los formatos físicos anteriores de 8–17 campos y las
+intenciones de 7 o 9 campos. El linaje se crea solo al preparar el nuevo
+pago: incorpora el recibo y corte validados de la segunda interrupción sin
+mover la nave, modificar relojes, reembolsar combustible ni activar una
+intención antigua. C3B1 infería la segunda reparación a partir de dos trabajos
+de motores terminados y distintos. Ambos podían preceder al segundo corte,
+por lo que su cantidad no acredita causalidad. C3B1-R1 registra una
+`SecondRepairEvidence` inmutable solo cuando `_tick_inertial()` resuelve un
+trabajo `REPAIR_SYSTEM` de `engines` satisfactorio y mejora realmente la
+integridad. La evidencia vincula ID interno, secuencia terminal, instante
+galáctico de terminación, integridad anterior y posterior, tipo de
+interrupción, estado físico del corte y recibo de recuperación ya gastado.
+Al autorizar se comprueban de nuevo el trabajo terminado y la capacidad
+actual de frenado; la evidencia por sí sola no autoriza propulsión ni cobra
+combustible. No puede asociarse a otra interrupción. Los trabajos fallidos,
+cancelados, pendientes, en curso o de otros sistemas no sirven de prueba.
+
+Las partidas C3A sin esta evidencia siguen cargando con estado físico,
+trabajos, recursos y recibos gastados intactos. Sus trabajos históricos no
+tienen una fecha de terminación fiable respecto al corte, así que se exige
+otra reparación de motores acreditada antes de la autorización manual. El
+rechazo conserva combustible, movimiento, relojes, trabajos, drones, eventos
+y RNG. La evidencia nueva sobrevive al guardado y a la tercera recuperación
+pagada.
+
+La vía existente de `Engine.tick()` ejecuta frenado inmediato, espera seguida
+de frenado y sobrepaso inevitable. Puede cruzar el límite espera/frenado en
+una sola transacción privada. Al detenerse, marca como terminado el último
+registro acotado. Una tercera pérdida de integridad durante espera o frenado
+aún no se representa: se rechaza atómicamente el tick completo y el
+combustible ya pagado permanece gastado. También se rechazan trabajos
+incompatibles y otros límites causales irresueltos antes de confirmar. No se
+habilitan llegada pública, waypoint, recuperación automática sucesiva,
+aceleración nueva ni navegación física pública. Las interrupciones posteriores
+necesitan una transición acotada y soporte causal del scheduler antes de
+integrarse en la navegación pública.

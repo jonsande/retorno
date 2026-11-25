@@ -6,6 +6,7 @@ proper time. No playable action creates this state in NAV-BRAKE-01B3C.
 from __future__ import annotations
 
 from dataclasses import dataclass, fields
+import hashlib
 import math
 from typing import Literal
 
@@ -263,6 +264,7 @@ class RecoveryIntent:
     outcome: str | None = None
     attempt_id: int = 1
     previous_cancelled: tuple[int, str | None, str] | None = None
+    paid_predecessor_id: int | None = None
 
     def __post_init__(self) -> None:
         prior = self.previous_cancelled
@@ -276,6 +278,10 @@ class RecoveryIntent:
                 or (self.status == "pending") != (self.outcome is None)
                 or isinstance(self.attempt_id, bool) or not isinstance(self.attempt_id, int)
                 or self.attempt_id < 1
+                or (self.paid_predecessor_id is not None and (
+                    isinstance(self.paid_predecessor_id, bool)
+                    or not isinstance(self.paid_predecessor_id, int)
+                    or not 1 <= self.paid_predecessor_id < self.attempt_id))
                 or (self.attempt_id == 1) != (prior is None)
                 or (prior is not None and (
                     not isinstance(prior, tuple) or len(prior) != 3
@@ -291,14 +297,169 @@ class RecoveryIntent:
     def __setstate__(self, values: list[object]) -> None:
         """Accept C2B2A's seven-field intent without renewing its authority."""
         specs = fields(self)
-        if not isinstance(values, (list, tuple)) or len(values) not in (7, len(specs)):
+        if not isinstance(values, (list, tuple)) or len(values) not in (7, 9, len(specs)):
             raise ValueError("unsupported recovery intent pickle payload")
         for spec, value in zip(specs, values):
             object.__setattr__(self, spec.name, value)
         if len(values) == 7:
             object.__setattr__(self, "attempt_id", 1)
             object.__setattr__(self, "previous_cancelled", None)
+        if len(values) < 10:
+            object.__setattr__(self, "paid_predecessor_id", None)
         self.__post_init__()
+
+
+@dataclass(frozen=True, slots=True)
+class RecoveryAttemptRecord:
+    """One detailed, spent recovery receipt; never an active permission."""
+
+    attempt_id: int
+    authorization_id: int
+    authorization: PropulsionAuthorization
+    outcome: Literal["active", "completed", "interrupted_brake", "interrupted_coast"]
+    cut_motion: MotionState | None = None
+    demonstrated_deceleration_m_s2: float | None = None
+
+    def __post_init__(self) -> None:
+        self.authorization.__post_init__()
+        if (isinstance(self.attempt_id, bool) or not isinstance(self.attempt_id, int)
+                or self.attempt_id < 1 or self.outcome not in {
+                    "active", "completed", "interrupted_brake", "interrupted_coast"}
+                or isinstance(self.authorization_id, bool)
+                or not isinstance(self.authorization_id, int)
+                or self.authorization_id < self.attempt_id
+                or (self.cut_motion is None) != (self.outcome in {"active", "completed"})
+                or (self.demonstrated_deceleration_m_s2 is not None and (
+                    not math.isfinite(self.demonstrated_deceleration_m_s2)
+                    or self.demonstrated_deceleration_m_s2 <= 0))):
+            raise ValueError("invalid bounded recovery attempt")
+
+
+def _attempt_digest(previous: str, record: RecoveryAttemptRecord) -> str:
+    """Deterministic commitment to summaries, not a reconstructible audit log."""
+    return hashlib.sha256((previous + "|" + repr(record)).encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class RecoveryLineage:
+    """Fixed two-record window plus monotonic spent IDs and cumulative totals."""
+
+    origin_id: str
+    destination_id: str
+    attempt_count: int
+    interruption_count: int
+    capsules_spent: float
+    recent: tuple[RecoveryAttemptRecord, ...]
+    digest: str
+    prefix_digest: str = "0" * 64
+    spent_through_authorization_id: int = 0
+
+    def __post_init__(self) -> None:
+        if (not self.origin_id or not self.destination_id
+                or self.origin_id == self.destination_id
+                or isinstance(self.attempt_count, bool)
+                or not isinstance(self.attempt_count, int) or self.attempt_count < 1
+                or isinstance(self.interruption_count, bool)
+                or not isinstance(self.interruption_count, int)
+                or not 0 <= self.interruption_count <= self.attempt_count
+                or not math.isfinite(self.capsules_spent) or self.capsules_spent <= 0
+                or not 1 <= len(self.recent) <= 2
+                or self.recent[-1].attempt_id != self.attempt_count
+                or self.spent_through_authorization_id != self.recent[-1].authorization_id
+                or any(a.attempt_id + 1 != b.attempt_id
+                       for a, b in zip(self.recent, self.recent[1:]))
+                or any(a.authorization_id >= b.authorization_id
+                       for a, b in zip(self.recent, self.recent[1:]))
+                or any(r.outcome == "active" for r in self.recent[:-1])
+                or any(r.authorization.destination_id != self.destination_id
+                       for r in self.recent)
+                or len(self.digest) != 64 or len(self.prefix_digest) != 64
+                or any(c not in "0123456789abcdef" for c in self.digest + self.prefix_digest)):
+            raise ValueError("invalid bounded recovery lineage")
+        for record in self.recent:
+            record.__post_init__()
+        digest = self.prefix_digest
+        for record in self.recent:
+            digest = _attempt_digest(digest, record)
+        if (self.digest != digest
+                or self.interruption_count < sum(
+                    r.outcome.startswith("interrupted") for r in self.recent)
+                or self.capsules_spent < sum(
+                    r.authorization.capsules_paid for r in self.recent)
+                or (self.attempt_count == len(self.recent) and (
+                    self.prefix_digest != "0" * 64
+                    or self.interruption_count != sum(
+                        r.outcome.startswith("interrupted") for r in self.recent)
+                    or not math.isclose(self.capsules_spent, sum(
+                        r.authorization.capsules_paid for r in self.recent), rel_tol=1e-12)))):
+            raise ValueError("recovery lineage totals disagree with detailed records")
+
+    @classmethod
+    def first(cls, origin_id: str, destination_id: str,
+              record: RecoveryAttemptRecord) -> RecoveryLineage:
+        return cls(origin_id, destination_id, 1,
+                   int(record.outcome.startswith("interrupted")),
+                   record.authorization.capsules_paid, (record,),
+                   _attempt_digest("0" * 64, record),
+                   spent_through_authorization_id=record.authorization_id)
+
+    def append(self, record: RecoveryAttemptRecord) -> RecoveryLineage:
+        if (record.attempt_id != self.attempt_count + 1
+                or record.authorization_id <= self.spent_through_authorization_id
+                or self.recent[-1].outcome == "active"):
+            raise ValueError("recovery attempt IDs must increase monotonically")
+        prefix = (self.prefix_digest if len(self.recent) < 2 else
+                  _attempt_digest(self.prefix_digest, self.recent[0]))
+        recent = (*self.recent, record)[-2:]
+        digest = prefix
+        for item in recent:
+            digest = _attempt_digest(digest, item)
+        return RecoveryLineage(
+            self.origin_id, self.destination_id, record.attempt_id,
+            self.interruption_count + int(record.outcome.startswith("interrupted")),
+            self.capsules_spent + record.authorization.capsules_paid,
+            recent, digest, prefix, record.authorization_id)
+
+    def replace_last(self, record: RecoveryAttemptRecord) -> RecoveryLineage:
+        if record.attempt_id != self.attempt_count or self.recent[-1].outcome != "active":
+            raise ValueError("only the active latest recovery may change outcome")
+        records = (*self.recent[:-1], record)
+        digest = self.prefix_digest
+        for item in records:
+            digest = _attempt_digest(digest, item)
+        return RecoveryLineage(
+            self.origin_id, self.destination_id, self.attempt_count,
+            self.interruption_count + int(record.outcome.startswith("interrupted")),
+            self.capsules_spent, records, digest, self.prefix_digest,
+            self.spent_through_authorization_id)
+
+
+@dataclass(frozen=True, slots=True)
+class SecondRepairEvidence:
+    """One productive completion witnessed after a particular recovery cut."""
+
+    interruption_kind: Literal["brake", "coast"]
+    cut_motion: MotionState
+    spent_receipt: PropulsionAuthorization
+    job_internal_id: str
+    terminal_seq: int
+    completed_galactic_s: float
+    engine_health_before: float
+    engine_health_after: float
+
+    def __post_init__(self) -> None:
+        self.spent_receipt.__post_init__()
+        if (self.interruption_kind not in {"brake", "coast"}
+                or not self.job_internal_id
+                or isinstance(self.terminal_seq, bool)
+                or not isinstance(self.terminal_seq, int)
+                or self.terminal_seq < 1
+                or not math.isfinite(self.completed_galactic_s)
+                or self.completed_galactic_s < self.cut_motion.galactic_s
+                or not math.isfinite(self.engine_health_before)
+                or not math.isfinite(self.engine_health_after)
+                or not 0 <= self.engine_health_before < self.engine_health_after <= 1):
+            raise ValueError("second repair evidence requires an applied post-cut repair")
 
 
 @dataclass(frozen=True, slots=True)
@@ -326,6 +487,8 @@ class PhysicalTransitState:
     recovery_intent: RecoveryIntent | None = None
     recovery_interruption: RecoveryInterruption | None = None
     recovery_coast_interruption: RecoveryCoastInterruption | None = None
+    recovery_lineage: RecoveryLineage | None = None
+    second_repair_evidence: SecondRepairEvidence | None = None
 
     def __post_init__(self) -> None:
         if (not math.isfinite(self.elapsed_galactic_s)
@@ -369,6 +532,35 @@ class PhysicalTransitState:
         armed = self.recovery_intent
         interrupted = self.recovery_interruption
         coast_interrupted = self.recovery_coast_interruption
+        lineage = self.recovery_lineage
+        evidence = self.second_repair_evidence
+        if evidence is not None:
+            evidence.__post_init__()
+            if interrupted is not None or coast_interrupted is not None:
+                source = interrupted if interrupted is not None else coast_interrupted
+                kind = "brake" if interrupted is not None else "coast"
+                if (evidence.interruption_kind != kind
+                        or evidence.cut_motion != source.cut_motion
+                        or evidence.spent_receipt != source.execution.authorization):
+                    raise ValueError("second repair evidence belongs to another interruption")
+            elif lineage is not None:
+                first = lineage.recent[0]
+                if (evidence.interruption_kind != first.outcome.removeprefix("interrupted_")
+                        or evidence.cut_motion != first.cut_motion
+                        or evidence.spent_receipt != first.authorization):
+                    raise ValueError("second repair evidence disagrees with the paid lineage")
+            else:
+                raise ValueError("second repair evidence requires its interrupted recovery")
+        if lineage is not None:
+            lineage.__post_init__()
+            if (lineage.destination_id != self.original_destination_id
+                    or (recovery is not None and (
+                        lineage.recent[-1].outcome != (
+                            "completed" if recovery.completed else "active")
+                        or lineage.recent[-1].authorization != recovery.authorization))
+                    or (recovery is None and lineage.recent[-1].outcome == "active")
+                    or interrupted is not None or coast_interrupted is not None):
+                raise ValueError("bounded lineage must match the active recovery")
         if interrupted is not None and coast_interrupted is not None:
             raise ValueError("a recovery cannot fail in both phases")
         if coast_interrupted is not None:
@@ -415,7 +607,9 @@ class PhysicalTransitState:
                     or (recovery is None and armed.status == "used"
                         and interrupted is None and coast_interrupted is None)
                     or ((interrupted is not None or coast_interrupted is not None)
-                        and armed.status != "used")):
+                        and armed.status != "used"
+                        and not (recovery is None and armed.job_id is None
+                                 and armed.status in {"pending", "cancelled"}))):
                 raise ValueError("recovery intent must match its physical history")
         if recovery is not None:
             recovery.__post_init__()
@@ -486,7 +680,7 @@ class PhysicalTransitState:
     def __setstate__(self, values: list[object]) -> None:
         """Load physical payloads since 01B3H-A, defaulting newer fields."""
         specs = fields(self)
-        if not isinstance(values, (list, tuple)) or len(values) not in (8, 9, 10, 11, 12, 13, 14, 15, len(specs)):
+        if not isinstance(values, (list, tuple)) or len(values) not in (8, 9, 10, 11, 12, 13, 14, 15, 16, 17, len(specs)):
             raise ValueError("unsupported physical transit pickle payload")
         for spec, value in zip(specs, values):
             object.__setattr__(self, spec.name, value)
@@ -504,6 +698,10 @@ class PhysicalTransitState:
             object.__setattr__(self, "recovery_interruption", None)
         if len(values) < 16:
             object.__setattr__(self, "recovery_coast_interruption", None)
+        if len(values) < 17:
+            object.__setattr__(self, "recovery_lineage", None)
+        if len(values) < 18:
+            object.__setattr__(self, "second_repair_evidence", None)
         if len(values) < 11:
             object.__setattr__(self, "nominal_braking_substitution", None)
         self.__post_init__()

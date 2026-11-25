@@ -22,7 +22,9 @@ from retorno.core.nav_physics import (MotionSegment, MotionState, accelerate_to,
 from retorno.core.nav_state import (PhysicalTransitState, PropulsionAuthorization,
                                     NominalTravelState, NominalBrakingSubstitution,
                                     InertialContinuation, RecoveryExecution, RecoveryIntent,
-                                    RecoveryInterruption, RecoveryCoastInterruption)
+                                    RecoveryInterruption, RecoveryCoastInterruption,
+                                    RecoveryAttemptRecord, RecoveryLineage,
+                                    SecondRepairEvidence)
 from retorno.core.nav_recovery import RecoveryPlan, plan_inertial_recovery
 from retorno.core.nav_radiation import (RadiationProfile, hull_decay_rate, internal_radiation_rate,
                                         integrate_segment_radiation, integrated_system_wear,
@@ -309,9 +311,16 @@ class Engine:
         physical = state.ship.physical_transit
         if physical is None or physical.inertial_continuation is None:
             raise RuntimeError("recovery requires an interrupted physical brake")
-        if (physical.recovery_interruption is not None
-                or physical.recovery_coast_interruption is not None):
-            raise RuntimeError("a second interrupted recovery cannot authorize another maneuver")
+        second_failure = (physical.recovery_interruption
+                          or physical.recovery_coast_interruption)
+        if physical.recovery_lineage is not None:
+            raise RuntimeError("further interrupted recovery is not supported")
+        if second_failure is not None:
+            armed_third = physical.recovery_intent
+            if (armed_third is None or armed_third.status != "pending"
+                    or armed_third.job_id is not None or armed_third.attempt_id < 2
+                    or not self._second_repair_completed(state, physical)):
+                raise RuntimeError("a second interrupted recovery requires a new manual authorization and repair")
         armed = physical.recovery_intent
         if armed is not None:
             if (armed.status != "pending"
@@ -321,7 +330,7 @@ class Engine:
                 job = state.jobs.jobs.get(armed.job_id)
                 if job is None or job.status != JobStatus.COMPLETED:
                     raise RuntimeError("recovery intent lacks its completed engine repair")
-            if proper_deceleration_m_s2 is not None:
+            if proper_deceleration_m_s2 is not None and armed.job_id is not None:
                 raise RuntimeError("armed recovery requires its historical deceleration")
         if self._recovery_jobs_pending(state):
             raise RuntimeError("recovery requires completed physical repair jobs")
@@ -372,6 +381,21 @@ class Engine:
             raise RuntimeError("recovery exceeds its authorized spending limit")
         receipt = PropulsionAuthorization(braking, plan.destination_id, pricing_speed, price)
         recovery = RecoveryExecution(physical.inertial_continuation, plan.segments, receipt)
+        lineage = None
+        if second_failure is not None:
+            previous = second_failure.execution
+            previous_record = RecoveryAttemptRecord(
+                1, armed.paid_predecessor_id or 1, previous.authorization,
+                "interrupted_brake" if physical.recovery_interruption is not None
+                else "interrupted_coast", second_failure.cut_motion,
+                abs(previous.segments[-1].proper_acceleration_m_s2)
+                if physical.recovery_interruption is not None else None)
+            first = RecoveryLineage.first(
+                state.ship.transit_from or state.ship.current_node_id,
+                physical.original_destination_id, previous_record)
+            lineage = first.append(RecoveryAttemptRecord(
+                2, armed.attempt_id, receipt, "active", None,
+                abs(braking.proper_acceleration_m_s2)))
         staged = deepcopy(state)
         staged.ship.antimatter_capsules -= price
         staged.ship.physical_transit = PhysicalTransitState(
@@ -380,6 +404,8 @@ class Engine:
             braking_started=True, recovery_execution=recovery,
             recovery_intent=(replace(armed, status="used", outcome="prepared")
                              if armed is not None else None),
+            recovery_lineage=lineage,
+            second_repair_evidence=physical.second_repair_evidence,
         )
         self._commit_physical_state(state, staged)
         assert state.ship.physical_transit is not None
@@ -439,11 +465,15 @@ class Engine:
         physical = state.ship.physical_transit
         if (physical is None or physical.inertial_continuation is None
                 or physical.recovery_execution is not None
-                or physical.recovery_interruption is not None
-                or physical.recovery_coast_interruption is not None
+                or physical.recovery_lineage is not None
                 or (physical.recovery_intent is not None
-                    and physical.recovery_intent.status != "cancelled")):
+                    and physical.recovery_intent.status not in {"cancelled", "used"})):
             raise RuntimeError("manual authorization requires uncommitted physical inertia")
+        if ((physical.recovery_interruption is not None
+             or physical.recovery_coast_interruption is not None)
+                and (not self._second_repair_completed(state, physical)
+                     or not self._physical_propulsion_available(state, "brake"))):
+            raise RuntimeError("third recovery requires a completed second engine repair")
         physical.__post_init__()
         if (physical.motion.beta <= 0 or state.clock.t != physical.motion.galactic_s
                 or state.clock.ship_elapsed_s != physical.motion.proper_s
@@ -457,12 +487,74 @@ class Engine:
         previous = physical.recovery_intent
         intent = RecoveryIntent(
             None, destination_id, True, max_capsules,
-            attempt_id=previous.attempt_id + 1 if previous is not None else 1,
+            attempt_id=previous.attempt_id + 1 if previous is not None else (
+                2 if physical.recovery_interruption is not None
+                or physical.recovery_coast_interruption is not None else 1),
             previous_cancelled=(previous.attempt_id, previous.job_id, previous.outcome)
-            if previous is not None else None,
+            if previous is not None else ((1, None, "legacy_paid_recovery")
+                if physical.recovery_interruption is not None
+                or physical.recovery_coast_interruption is not None else None),
+            paid_predecessor_id=(
+                previous.paid_predecessor_id or previous.attempt_id
+                if previous is not None else 1)
+            if physical.recovery_interruption is not None
+            or physical.recovery_coast_interruption is not None else None,
         )
         state.ship.physical_transit = replace(physical, recovery_intent=intent)
         return intent
+
+    @staticmethod
+    def _second_repair_completed(state: GameState,
+                                 physical: PhysicalTransitState) -> bool:
+        """Require a productive completion witnessed by the post-cut scheduler."""
+        evidence = physical.second_repair_evidence
+        if evidence is None:
+            return False
+        physical.__post_init__()
+        job = state.jobs.jobs.get(evidence.job_internal_id)
+        first_job = physical.recovery_intent.job_id if physical.recovery_intent else None
+        return bool(
+            job is not None and job.internal_id == evidence.job_internal_id
+            and job.status == JobStatus.COMPLETED
+            and job.terminal_seq == evidence.terminal_seq
+            and job.job_type == JobType.REPAIR_SYSTEM
+            and job.target is not None and job.target.kind == "ship_system"
+            and job.target.id == "engines"
+            and evidence.job_internal_id not in state.jobs.active_job_ids
+            and evidence.job_internal_id != first_job
+            and state.clock.t >= evidence.completed_galactic_s)
+
+    @staticmethod
+    def _record_second_repair_evidence(
+        state: GameState, resolved_job_ids: tuple[str, ...],
+        engine_health_before: float,
+    ) -> None:
+        """Bind an applied repair to the exact second cut on the staged state."""
+        physical = state.ship.physical_transit
+        assert physical is not None
+        interrupted = physical.recovery_interruption
+        coast_interrupted = physical.recovery_coast_interruption
+        source = interrupted if interrupted is not None else coast_interrupted
+        if source is None:
+            return
+        for job_id in resolved_job_ids:
+            job = state.jobs.jobs[job_id]
+            if (job.status != JobStatus.COMPLETED
+                    or job.job_type != JobType.REPAIR_SYSTEM
+                    or job.target is None or job.target.kind != "ship_system"
+                    or job.target.id != "engines" or job.terminal_seq is None):
+                continue
+            health_after = state.ship.systems["engines"].health
+            if health_after <= engine_health_before:
+                continue
+            evidence = SecondRepairEvidence(
+                "brake" if interrupted is not None else "coast",
+                source.cut_motion, source.execution.authorization,
+                job_id, job.terminal_seq, state.clock.t,
+                engine_health_before, health_after)
+            state.ship.physical_transit = replace(
+                physical, second_repair_evidence=evidence)
+            return
 
     def cancel_manual_inertial_recovery(self, state: GameState) -> RecoveryIntent:
         """End an unused manual authorization so a new one may be issued."""
@@ -525,6 +617,8 @@ class Engine:
         if (physical.intent == "coast"
                 and engine.health == Balance.ENGINE_EMERGENCY_BRAKE_MIN_HEALTH
                 and engine.base_decay_per_s > 0):
+            if physical.recovery_lineage is not None:
+                raise RuntimeError("third recovery coast loss is not yet representable")
             if not self._recovery_braking_capable(state, recovery):
                 raise RuntimeError("recovery braking capacity is no longer operational")
             staged = deepcopy(state)
@@ -563,6 +657,9 @@ class Engine:
             remaining = max(0.0, remaining - step)
             active = staged.ship.physical_transit
             assert active is not None and active.recovery_execution is not None
+            if (active.recovery_execution.completed
+                    and requested_end <= final_time + math.ulp(final_time)):
+                remaining = 0.0
             if active.pending_transition is not None:
                 if remaining:
                     raise RuntimeError("recovery braking lost a causal propulsion boundary")
@@ -785,7 +882,9 @@ class Engine:
                 # repair may run, and no old intent may authorize a new leg.
                 physical.__post_init__()
                 if (physical.recovery_intent is not None
-                        and physical.recovery_intent.status != "used"):
+                        and physical.recovery_intent.status != "used"
+                        and not (physical.recovery_intent.job_id is None
+                                 and physical.recovery_intent.status in {"pending", "cancelled"})):
                     raise RuntimeError("second inertia cannot activate an unpaid recovery intent")
                 active_jobs = {job_id for job_id, job in staged.jobs.jobs.items()
                                if job.status in {JobStatus.QUEUED, JobStatus.RUNNING}}
@@ -808,7 +907,10 @@ class Engine:
             due = self._next_job_completion_s(staged, interval)
             if due == 0:
                 self._advance_job_timers(staged, interval, 0.0)
+                health_before_repair = staged.ship.systems["engines"].health
                 finished_events, resolved_ids = self._resolve_job_interval(staged, interval)
+                self._record_second_repair_evidence(
+                    staged, resolved_ids, health_before_repair)
                 if any(staged.jobs.jobs[key].status == JobStatus.RUNNING
                        and staged.jobs.jobs[key].eta_s <= 0
                        for key in interval.job_keys):
@@ -870,7 +972,10 @@ class Engine:
                 staged, step, allow_repair_drone=bool(staged.ship.drones)))
             if interval.job_keys:
                 self._advance_job_timers(staged, interval, step)
+                health_before_repair = staged.ship.systems["engines"].health
                 finished_events, resolved_ids = self._resolve_job_interval(staged, interval)
+                self._record_second_repair_evidence(
+                    staged, resolved_ids, health_before_repair)
                 for event in finished_events:
                     if not any(event is prior for prior in staged.events.recent):
                         self._record_event(staged.events, event)
@@ -1071,6 +1176,8 @@ class Engine:
                 )
                 if engine_boundary is not None and engine_boundary < local_end:
                     raise RuntimeError("Physical tick extends beyond the 35% or 15% causal boundary")
+            if recovery is not None and physical.recovery_lineage is not None and engine_boundary is not None:
+                raise RuntimeError("third recovery integrity cut is not yet representable")
         health_limits = []
         for key, system in state.ship.systems.items():
             if system.state_locked and key != "engines":
@@ -1125,6 +1232,9 @@ class Engine:
                             and local_end == segment.duration_galactic_s and end.beta == 0)
         if stopped_recovery:
             pending_transition = None
+        lineage = physical.recovery_lineage
+        if stopped_recovery and lineage is not None:
+            lineage = lineage.replace_last(replace(lineage.recent[-1], outcome="completed"))
         interrupted_recovery = (recovery is not None and physical.intent == "brake"
                                 and pending_transition == "inertia")
         interrupted_coast = recovery_coast and pending_transition == "inertia"
@@ -1146,6 +1256,7 @@ class Engine:
                                 if stopped_recovery else spent_recovery),
             recovery_interruption=interruption,
             recovery_coast_interruption=coast_interruption,
+            recovery_lineage=lineage,
         )
         fraction = end.distance_m / route_m
         staged.world.current_pos_ly = (

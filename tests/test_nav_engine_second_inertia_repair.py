@@ -103,16 +103,16 @@ def test_real_second_repair_moves_and_keeps_both_histories(origin):
     assert saved.ship.physical_transit.motion.distance_m > repaired.motion.distance_m
     assert saved.ship.antimatter_capsules == fuel
     assert len([e for e in saved.events.recent if e.type == EventType.JOB_COMPLETED]) == 2
-    prior = pickle.dumps(saved)
-    with pytest.raises(RuntimeError, match="second interrupted recovery"):
+    with pytest.raises(RuntimeError, match="new manual authorization"):
         Engine().prepare_inertial_recovery(saved)
-    with pytest.raises(RuntimeError):
-        Engine().authorize_manual_inertial_recovery(saved, max_capsules=10)
+    third_intent = Engine().authorize_manual_inertial_recovery(saved, max_capsules=10)
+    assert third_intent.attempt_id > original_intent.attempt_id
+    assert saved.ship.antimatter_capsules == fuel
     with pytest.raises(RuntimeError, match="inertial motion cannot prepare"):
         Engine().prepare_physical_segment(
             saved, brake_to_stop(saved.ship.physical_transit.motion, 1e7),
             saved.ship.physical_transit.original_destination_id, "brake", pricing_speed=.5)
-    assert pickle.dumps(saved) == prior
+    assert saved.ship.physical_transit.recovery_intent == third_intent
 
 
 @pytest.mark.parametrize("origin", ["brake", "coast"])

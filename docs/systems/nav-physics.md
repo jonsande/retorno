@@ -628,9 +628,9 @@ at constant beta without another charge. The original destination remains a
 reference; the ship may pass it without arrival, node changes, waypoints or
 new links. Save/load retains the bounded history; physical pickles with up to
 14 previous fields load without a second interruption. Further authorization
-and a third maneuver remain blocked; C3A permits one limited productive repair
-job during the second inertia. Replanning after this second failure, and
-public navigation and arrival remain open.
+and a third maneuver were blocked at C2B2B1; C3A added one limited productive
+repair job during the second inertia, and C3B1 permits the manual maneuver
+below. Public navigation and arrival remain open.
 
 ### Braking capacity loss during the recovery wait (C2B2B2)
 
@@ -656,8 +656,9 @@ executed or charging or refunding antimatter. Save/load retains the history;
 older physical pickles of up to 15 fields keep their meaning.
 
 The ship retains destination and beta, may pass B, and creates no arrival,
-waypoint or new link. A third authorization remains blocked; C3A permits one
-engine repair job during this second inertia. Engine isolation, electrical loss or another
+waypoint or new link. A third authorization was blocked at C2B2B2; C3A added
+one engine repair job, and C3B1 permits manual authorization below. Engine
+isolation, electrical loss or another
 operational change not caused by ordinary wear retains atomic rejection
 until causal coordination exists; it is never recorded as a false integrity
 cut. Later replanning, public admission control and public arrival remain open.
@@ -683,12 +684,65 @@ radiological, drone, job, or narrative boundary cannot be coordinated.
 Save/load does not repeat the outcome or RNG. Repair after passing B is also
 supported without arrival or node change.
 
-C3B will need to distinguish successive attempts and require a new payment
-without turning spent receipts into authority. One future design is a lineage
-ID, monotonic attempt number, and fixed-size summary of the latest attempts
-in physical state, with cumulative counts and a history digest. The magnitude
-of the last demonstrated brake must be checked with current position, beta,
-destination and capability before another authorization. If every old
-receipt must remain reconstructible, a separate persistent audit log will
-need to retain it. That log must not become another source of position or
-speed. This proposal is not implemented.
+C3B1 implements a bounded lineage and a third manual payment as described
+below. C3A saves retain their original meaning until the new preparation.
+
+### Third, manually authorized recovery (C3B1, C3B1-R1)
+
+After a second recovery interruption, an engine repair completed and applied
+by the productive scheduler **after that cut**, together with current braking
+capability, permits one new manual `RecoveryIntent`.
+It has a fresh monotonic authorization ID and a finite positive spending
+ceiling. Arming does not debit fuel. `prepare_inertial_recovery()` checks the
+current `RecoveryPlan`, clocks, route, power, jobs, conservative deceleration
+and fuel, then debits the existing `engine_fuel_cost()` tariff once. The new
+`PropulsionAuthorization` binds one braking segment to the original
+destination. A manual deceleration may be below the historically demonstrated
+brake, never above it. A planned brake abandoned during coast is not proof of
+its capacity; the earlier executed brake remains the cap. Capacity is checked
+again before the powered phase.
+
+`RecoveryLineage` in `src/retorno/core/nav_state.py` stores the original
+origin and destination, counts of paid and interrupted recoveries, total
+recovery antimatter spent, the highest spent authorization ID, and a fixed
+window of **two** detailed `RecoveryAttemptRecord`s. A record holds a spent
+segment receipt, authorization ID, outcome, interruption type and cut motion
+when applicable. Older records roll into cumulative totals and a deterministic
+SHA-256 commitment. The digest is not a reconstructible audit log; complete
+historical receipts would require a separate persistent ledger. The lineage
+never supplies current position, beta or clocks: the active physical segment
+does. IDs through `spent_through_authorization_id` cannot be reused.
+
+Physical pickle payloads of 8–17 fields and recovery intents of 7 or 9
+fields still load. The lineage is created only when a new paid maneuver is
+prepared. It migrates the second interruption's validated receipt and cut
+without moving the ship, changing clocks, refunding fuel or activating an
+old intent. C3B1 originally inferred a second repair from two distinct
+completed engine jobs. Both could predate the second cut, so their count does
+not establish causality. C3B1-R1 instead records immutable
+`SecondRepairEvidence` only when `_tick_inertial()` resolves a successful
+`REPAIR_SYSTEM` job for `engines` and actually improves engine health. The
+evidence binds its internal job ID, terminal sequence, completion galactic
+time, health before and after application, interruption type, cut motion and
+spent recovery receipt. Authorization rechecks the completed job and current
+braking capability; evidence alone never authorizes propulsion or debits fuel.
+It cannot be attached to a different interruption. Failed, cancelled,
+queued, running or unrelated jobs provide no evidence.
+
+Older C3A saves without this evidence still load with physical state, jobs,
+resources and spent receipts intact. Their historical jobs have no reliable
+completion time relative to the cut, so a new witnessed engine repair is
+required before manual authorization. The rejection leaves fuel, motion,
+clocks, jobs, drones, events and RNG untouched. Save/load preserves new
+evidence, including across the third paid recovery.
+
+The existing `Engine.tick()` recovery path executes immediate braking,
+coast then braking, and emergency overshoot. It can cross the coast/brake
+boundary in one private transaction. Completion marks the last bounded
+record completed. A third integrity loss during coast or brake is not yet
+representable; the entire tick is rejected atomically while the fuel paid
+at preparation remains spent. Incompatible jobs and other unresolved causal
+boundaries are rejected before commit. No public arrival, waypoint,
+automatic successive recovery, new acceleration or public physical travel
+is enabled. Further interruptions need a bounded transition and causal
+scheduler support before this path can back public navigation.
