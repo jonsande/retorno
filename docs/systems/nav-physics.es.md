@@ -725,9 +725,7 @@ trabajos o narrativo posterior no puede coordinarse. Guardar/cargar no repite
 el resultado ni el RNG. También se admite reparar después de sobrepasar B,
 sin llegada ni cambio de nodo.
 
-C3B1 implementa el linaje acotado y un tercer pago manual descritos a
-continuación. Las partidas C3A conservan su significado hasta preparar la
-nueva maniobra.
+C3B1 introdujo el linaje acotado y el pago manual descritos a continuación.
 
 ### Tercera recuperación autorizada manualmente (C3B1, C3B1-R1)
 
@@ -775,22 +773,70 @@ actual de frenado; la evidencia por sí sola no autoriza propulsión ni cobra
 combustible. No puede asociarse a otra interrupción. Los trabajos fallidos,
 cancelados, pendientes, en curso o de otros sistemas no sirven de prueba.
 
-Las partidas C3A sin esta evidencia siguen cargando con estado físico,
-trabajos, recursos y recibos gastados intactos. Sus trabajos históricos no
-tienen una fecha de terminación fiable respecto al corte, así que se exige
-otra reparación de motores acreditada antes de la autorización manual. El
-rechazo conserva combustible, movimiento, relojes, trabajos, drones, eventos
-y RNG. La evidencia nueva sobrevive al guardado y a la tercera recuperación
-pagada.
+Un estado inercial sin evidencia vigente de reparación no puede recibir una
+nueva autorización manual ni pagar una recuperación. El rechazo conserva
+combustible, movimiento, relojes, trabajos, drones, eventos y RNG.
 
 La vía existente de `Engine.tick()` ejecuta frenado inmediato, espera seguida
 de frenado y sobrepaso inevitable. Puede cruzar el límite espera/frenado en
 una sola transacción privada. Al detenerse, marca como terminado el último
-registro acotado. Una tercera pérdida de integridad durante espera o frenado
-aún no se representa: se rechaza atómicamente el tick completo y el
-combustible ya pagado permanece gastado. También se rechazan trabajos
-incompatibles y otros límites causales irresueltos antes de confirmar. No se
-habilitan llegada pública, waypoint, recuperación automática sucesiva,
-aceleración nueva ni navegación física pública. Las interrupciones posteriores
-necesitan una transición acotada y soporte causal del scheduler antes de
-integrarse en la navegación pública.
+registro acotado. C3B2 extiende esta vía a cortes sucesivos.
+
+### Ciclo de recuperaciones manuales sucesivas (C3B2)
+
+Toda recuperación pagada puede perder la capacidad de frenado en el límite
+de desgaste del 15 %, durante el frenado o durante una espera ya pagada. La
+ejecución interrumpida y su recibo permanecen gastados. Un corte con velocidad
+residual actualiza el último registro de `RecoveryLineage` a
+`interrupted_brake` o `interrupted_coast`, conserva el `MotionState` exacto,
+invalida la ejecución actual y comienza la continuación inercial sin salto de
+posición, beta ni relojes. Un frenado que alcanza beta cero se marca terminado,
+sin interrupción ficticia. Una espera pagada que empieza justo al 15 % puede
+cortarse en tiempo cero. El corte no declara llegada ni crea waypoint, aunque
+se haya sobrepasado el destino.
+
+La `RecoveryInterruption` o `RecoveryCoastInterruption` actual es la única
+interrupción detallada fuera de la ventana de dos registros del linaje. El
+nombre existente `SecondRepairEvidence` pasa a designar la prueba del **corte
+actual**: el scheduler productivo registra una reparación satisfactoria de
+motores con mejora real de integridad, secuencia terminal e instante de
+terminación al procesar el estado inercial posterior al corte. Una reparación
+de ETA cero puede compartir el instante galáctico del corte porque el
+scheduler la resuelve después de este. La preparación consume la evidencia,
+añade un registro pagado y elimina la interrupción y la evidencia vigentes.
+Por ello, el corte siguiente no puede reutilizar una reparación anterior.
+Cancelar una autorización manual pendiente conserva la evidencia y aumenta
+el próximo ID de autorización. Los ID pagados siguen gastados cuando sus
+registros detallados salen de la ventana.
+
+`InertialContinuation.interrupted_segment` conserva el último frenado
+**ejecutado**. Un corte durante una espera pagada traslada ese frenado previo;
+un frenado planificado pero no ejecutado nunca eleva el límite de
+desaceleración demostrada. `plan_inertial_recovery()` y la preparación usan
+ese segmento como valor predeterminado y máximo físico, respectivamente,
+también tras expulsar del linaje el registro detallado original.
+`RecoveryLineage` conserva acumulados de antimateria pagada, intentos e
+interrupciones, ID máximo gastado y una huella encadenada con un máximo de dos
+registros detallados. No determina el movimiento ni los relojes actuales.
+
+El planificador, integrador físico, scheduler de trabajos y tarifa única de
+combustible existentes ejecutan cada ciclo. Autorizar no cobra; preparar con
+éxito cobra una sola vez. Los ticks trabajan sobre un estado privado y solo
+confirman al resolver todos los límites admitidos; un límite eléctrico,
+radiológico, de dron, trabajo o narrativo posterior revierte conjuntamente
+movimiento, evidencia de reparación, combustible, eventos y RNG. Guardar y
+cargar la versión actual conserva fases pendientes, interrumpidas, reparadas,
+autorizadas, pagadas y terminadas, incluido el avance de la ventana. Durante
+el desarrollo experimental no se promete migración ni compatibilidad con
+esquemas de guardado anteriores; las cargas incompatibles deben fallar con
+claridad. El código de compatibilidad existente fuera de este ciclo no es
+una restricción de diseño para formatos futuros.
+
+Siguen vigentes los límites operativos: capacidad real de frenado,
+electricidad, geometría, relojes, trabajos, vigencia del plan, desaceleración
+demostrada, antimateria disponible y techo de gasto autorizado. Los límites
+causales no soportados y trabajos incompatibles aún se rechazan atómicamente.
+Quedan fuera de esta fase llegada pública, waypoints de detención, destinos
+nuevos, aceleración durante el tránsito y recuperación automática sucesiva.
+El siguiente bloque de navegación tratará llegada física, sobrepaso y
+waypoint de detención.

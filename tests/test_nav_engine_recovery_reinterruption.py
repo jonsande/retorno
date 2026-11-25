@@ -162,7 +162,7 @@ def test_second_cut_blocks_third_authorization_while_repair_remains_inertial():
     Engine().tick(game, cut)
     Engine().tick(game, 1)
     before = pickle.dumps(game)
-    with pytest.raises(RuntimeError, match="second interrupted recovery"):
+    with pytest.raises(RuntimeError, match="new manual authorization and repair"):
         Engine().prepare_inertial_recovery(game)
     with pytest.raises(RuntimeError):
         Engine().authorize_manual_inertial_recovery(game, max_capsules=10)

@@ -684,8 +684,7 @@ radiological, drone, job, or narrative boundary cannot be coordinated.
 Save/load does not repeat the outcome or RNG. Repair after passing B is also
 supported without arrival or node change.
 
-C3B1 implements a bounded lineage and a third manual payment as described
-below. C3A saves retain their original meaning until the new preparation.
+C3B1 introduced the bounded lineage and manual payment described below.
 
 ### Third, manually authorized recovery (C3B1, C3B1-R1)
 
@@ -729,20 +728,66 @@ braking capability; evidence alone never authorizes propulsion or debits fuel.
 It cannot be attached to a different interruption. Failed, cancelled,
 queued, running or unrelated jobs provide no evidence.
 
-Older C3A saves without this evidence still load with physical state, jobs,
-resources and spent receipts intact. Their historical jobs have no reliable
-completion time relative to the cut, so a new witnessed engine repair is
-required before manual authorization. The rejection leaves fuel, motion,
-clocks, jobs, drones, events and RNG untouched. Save/load preserves new
-evidence, including across the third paid recovery.
+An inertial state without current repair evidence cannot issue a new manual
+authorization or pay for a recovery. Rejection leaves fuel, motion, clocks,
+jobs, drones, events and RNG untouched.
 
 The existing `Engine.tick()` recovery path executes immediate braking,
 coast then braking, and emergency overshoot. It can cross the coast/brake
 boundary in one private transaction. Completion marks the last bounded
-record completed. A third integrity loss during coast or brake is not yet
-representable; the entire tick is rejected atomically while the fuel paid
-at preparation remains spent. Incompatible jobs and other unresolved causal
-boundaries are rejected before commit. No public arrival, waypoint,
-automatic successive recovery, new acceleration or public physical travel
-is enabled. Further interruptions need a bounded transition and causal
-scheduler support before this path can back public navigation.
+record completed. C3B2 extends this path to successive cuts below.
+
+### Successive manual recovery cycle (C3B2)
+
+Every paid recovery can now lose braking capacity at the 15% wear boundary,
+either during its brake or during a prepaid coast. The interrupted execution
+and its receipt remain spent. A residual-speed cut updates the latest
+`RecoveryLineage` record to `interrupted_brake` or `interrupted_coast`, records
+the exact `MotionState`, invalidates the current execution, and starts
+unpowered continuation without a jump in position, beta or clocks. A brake
+that actually reaches beta zero is completed, not interrupted. A prepaid
+coast beginning at exactly 15% can cut at zero elapsed time. No cut declares
+arrival or creates a waypoint, even after passing the destination.
+
+The current `RecoveryInterruption` or `RecoveryCoastInterruption` is the only
+detailed interruption outside the two-record lineage window. The existing
+`SecondRepairEvidence` name now denotes evidence for **that current cut**:
+the productive scheduler records a successful engine repair with actual
+health gain, terminal sequence and completion time while processing the
+post-cut inertial state. Zero-ETA completion may share the cut's galactic
+instant because it occurs after the cut in scheduler order. Preparation
+consumes the evidence, appends one paid record, and clears the current
+interruption and evidence. The next cut therefore cannot reuse an earlier
+repair. Cancellation of a pending manual intent leaves current evidence
+intact and increments the next authorization ID. Past paid IDs stay spent
+even when their detailed records leave the window.
+
+`InertialContinuation.interrupted_segment` retains the last **executed**
+brake. A cut during prepaid coast carries this earlier executed brake
+forward; an unexecuted planned brake never raises the demonstrated
+deceleration ceiling. `plan_inertial_recovery()` and preparation use that
+segment as the default and maximum physical deceleration, respectively,
+including after the lineage has evicted its original detailed record.
+`RecoveryLineage` keeps cumulative paid capsules, attempt and interruption
+counts, highest spent authorization ID and a chained digest with at most
+two detailed records. It does not supply live motion or clocks.
+
+The existing planner, physical integrator, job scheduler and one-use fuel
+tariff execute each cycle. Authorization alone is free; successful preparation
+debits exactly once. Ticks run on private staged state and commit only after
+all supported boundaries resolve; a later unsupported electrical, radiation,
+drone, job or narrative boundary rolls back motion, repair evidence, fuel,
+events and RNG together. Current-version save/load preserves pending,
+interrupted, repaired, authorized, paid and completed phases, including
+lineage rollover. During experimental development no migration or backward
+compatibility is promised for older save schemas; incompatible payloads must
+fail clearly. Existing compatibility code outside this cycle is not a design
+constraint for future formats.
+
+Operational limits still apply: actual braking capability, electrical power,
+geometry, clocks, jobs, plan freshness, demonstrated deceleration, available
+antimatter and the authorized spending ceiling. Unsupported causal boundaries
+and incompatible jobs still reject atomically. Public arrival, stopping
+waypoints, new destinations, acceleration during transit and automatic
+successive recovery remain outside this phase. The next navigation block
+will handle physical arrival, overshoot and the stopping waypoint.

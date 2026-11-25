@@ -436,7 +436,7 @@ class RecoveryLineage:
 
 @dataclass(frozen=True, slots=True)
 class SecondRepairEvidence:
-    """One productive completion witnessed after a particular recovery cut."""
+    """A productive repair witnessed after the currently interrupted recovery."""
 
     interruption_kind: Literal["brake", "coast"]
     cut_motion: MotionState
@@ -459,7 +459,7 @@ class SecondRepairEvidence:
                 or not math.isfinite(self.engine_health_before)
                 or not math.isfinite(self.engine_health_after)
                 or not 0 <= self.engine_health_before < self.engine_health_after <= 1):
-            raise ValueError("second repair evidence requires an applied post-cut repair")
+            raise ValueError("recovery repair evidence requires an applied post-cut repair")
 
 
 @dataclass(frozen=True, slots=True)
@@ -536,30 +536,38 @@ class PhysicalTransitState:
         evidence = self.second_repair_evidence
         if evidence is not None:
             evidence.__post_init__()
-            if interrupted is not None or coast_interrupted is not None:
-                source = interrupted if interrupted is not None else coast_interrupted
-                kind = "brake" if interrupted is not None else "coast"
-                if (evidence.interruption_kind != kind
-                        or evidence.cut_motion != source.cut_motion
-                        or evidence.spent_receipt != source.execution.authorization):
-                    raise ValueError("second repair evidence belongs to another interruption")
-            elif lineage is not None:
-                first = lineage.recent[0]
-                if (evidence.interruption_kind != first.outcome.removeprefix("interrupted_")
-                        or evidence.cut_motion != first.cut_motion
-                        or evidence.spent_receipt != first.authorization):
-                    raise ValueError("second repair evidence disagrees with the paid lineage")
-            else:
-                raise ValueError("second repair evidence requires its interrupted recovery")
+            source = interrupted if interrupted is not None else coast_interrupted
+            kind = "brake" if interrupted is not None else "coast"
+            if (source is None or evidence.interruption_kind != kind
+                    or evidence.cut_motion != source.cut_motion
+                    or evidence.spent_receipt != source.execution.authorization):
+                raise ValueError("recovery repair evidence belongs to another interruption")
         if lineage is not None:
             lineage.__post_init__()
             if (lineage.destination_id != self.original_destination_id
                     or (recovery is not None and (
                         lineage.recent[-1].outcome != (
+                            "interrupted_brake" if interrupted is not None else
+                            "interrupted_coast" if coast_interrupted is not None else
                             "completed" if recovery.completed else "active")
                         or lineage.recent[-1].authorization != recovery.authorization))
-                    or (recovery is None and lineage.recent[-1].outcome == "active")
-                    or interrupted is not None or coast_interrupted is not None):
+                    or (recovery is None and (
+                        lineage.recent[-1].outcome not in {
+                            "interrupted_brake", "interrupted_coast"}
+                        or (interrupted is None and coast_interrupted is None)))
+                    or ((interrupted is not None or coast_interrupted is not None) and (
+                        lineage.recent[-1].outcome != (
+                            "interrupted_brake" if interrupted is not None else "interrupted_coast")
+                        or lineage.recent[-1].cut_motion != (
+                            interrupted.cut_motion if interrupted is not None
+                            else coast_interrupted.cut_motion)
+                        or lineage.recent[-1].authorization != (
+                            interrupted.execution.authorization if interrupted is not None
+                            else coast_interrupted.execution.authorization)))
+                    or (armed is not None and (
+                        armed.attempt_id != lineage.spent_through_authorization_id
+                        if armed.status == "used" else
+                        armed.paid_predecessor_id != lineage.spent_through_authorization_id))):
                 raise ValueError("bounded lineage must match the active recovery")
         if interrupted is not None and coast_interrupted is not None:
             raise ValueError("a recovery cannot fail in both phases")

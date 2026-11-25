@@ -8,7 +8,6 @@ import pytest
 
 from retorno.config.balance import Balance
 from retorno.core.engine import Engine
-from retorno.core.nav_state import PhysicalTransitState
 from retorno.model.jobs import JobStatus, TargetRef, allocate_job_ids, finalize_job
 from retorno.runtime.loop import GameLoop
 from tests.test_nav_engine_repair_inertia import enqueue_repair
@@ -46,7 +45,7 @@ def test_two_old_engine_repairs_cannot_authorize_after_second_cut():
     assert physical.recovery_interruption is not None
     assert physical.inertial_continuation is not None
     before = pickle.dumps(game)
-    with pytest.raises(RuntimeError, match="second engine repair"):
+    with pytest.raises(RuntimeError, match="repair after its current cut"):
         Engine().authorize_manual_inertial_recovery(game, max_capsules=100)
     assert pickle.dumps(game) == before
     with pytest.raises(RuntimeError, match="manual authorization"):
@@ -56,7 +55,7 @@ def test_two_old_engine_repairs_cannot_authorize_after_second_cut():
 
 def _assert_no_third_payment(game):
     before = pickle.dumps(game)
-    with pytest.raises(RuntimeError, match="second engine repair"):
+    with pytest.raises(RuntimeError, match="repair after its current cut"):
         Engine().authorize_manual_inertial_recovery(game, max_capsules=100)
     with pytest.raises(RuntimeError, match="manual authorization and repair"):
         Engine().prepare_inertial_recovery(game)
@@ -93,7 +92,7 @@ def test_productive_completion_after_cut_persists_and_enables_manual_recovery(or
     intent = Engine().authorize_manual_inertial_recovery(game, max_capsules=100)
     assert intent.status == "pending" and game.ship.antimatter_capsules == fuel
     state = Engine().prepare_inertial_recovery(game)
-    assert state.second_repair_evidence == evidence
+    assert state.second_repair_evidence is None
     assert state.recovery_lineage is not None
     assert len(state.recovery_lineage.recent) == 2
     assert game.ship.antimatter_capsules < fuel
@@ -134,31 +133,6 @@ def test_nonqualifying_job_outcomes_do_not_create_evidence(outcome):
             assert game.jobs.jobs[job.internal_id].status == JobStatus.RUNNING
     assert game.ship.physical_transit.second_repair_evidence is None
     _assert_no_third_payment(save_and_load(game))
-
-
-@pytest.mark.parametrize("origin", ["brake", "coast"])
-def test_legacy_c3a_repair_without_timestamp_needs_new_witnessed_repair(origin):
-    game = second_inertia(origin)
-    first = enqueue_repair(game)
-    Engine().tick(game, first.eta_s)
-    assert game.ship.physical_transit.second_repair_evidence is not None
-    old_payload = game.ship.physical_transit.__getstate__()[:-1]
-    restored = object.__new__(PhysicalTransitState)
-    restored.__setstate__(old_payload)
-    game.ship.physical_transit = restored
-    game = save_and_load(game)
-    assert game.ship.physical_transit.second_repair_evidence is None
-    _assert_no_third_payment(game)
-    before = game.ship.physical_transit.motion
-    fuel = game.ship.antimatter_capsules
-    with patch.object(Balance, "REPAIR_JOB_FAIL_P_BASE", 0.0):
-        second = enqueue_repair(game)
-        Engine().tick(game, second.eta_s)
-    assert game.ship.physical_transit.second_repair_evidence.job_internal_id == second.internal_id
-    assert game.ship.physical_transit.motion.beta == before.beta
-    assert game.ship.physical_transit.motion.distance_m > before.distance_m
-    assert game.ship.antimatter_capsules == fuel
-    assert Engine().authorize_manual_inertial_recovery(game, max_capsules=100).status == "pending"
 
 
 def test_repair_evidence_cannot_be_attached_to_another_interruption():

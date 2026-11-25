@@ -148,7 +148,7 @@ def test_third_rejection_is_atomic_and_permission_is_one_use(origin):
 
 
 @pytest.mark.parametrize("origin", ["brake", "coast"])
-def test_third_integrity_boundary_rejects_whole_interval(origin):
+def test_third_integrity_boundary_creates_current_interruption(origin):
     game = repaired_second(origin)
     engine = Engine()
     engine.authorize_manual_inertial_recovery(game, max_capsules=100)
@@ -157,19 +157,33 @@ def test_third_integrity_boundary_rejects_whole_interval(origin):
     if origin == "coast":
         game.ship.systems["engines"].health = .15
         game.ship.systems["engines"].base_decay_per_s = .001
-        before = pickle.dumps(game)
-        with pytest.raises(RuntimeError, match="not yet representable"):
-            engine.tick(game, 1)
-        assert pickle.dumps(game) == before
+        before = game.ship.physical_transit.motion
+        fuel = game.ship.antimatter_capsules
+        engine.tick(game, 1)
+        physical = game.ship.physical_transit
+        assert physical.recovery_coast_interruption is not None
+        assert physical.recovery_coast_interruption.cut_motion == before
+        assert physical.inertial_continuation is not None
     else:
         game.ship.systems["engines"].health = .15001
         game.ship.systems["engines"].base_decay_per_s = .001
         cut = wear_cut(game, .15)
         assert cut is not None
-        before = pickle.dumps(game)
-        with pytest.raises(RuntimeError, match="not yet representable"):
-            engine.tick(game, cut)
-        assert pickle.dumps(game) == before
+        fuel = game.ship.antimatter_capsules
+        engine.tick(game, cut)
+        physical = game.ship.physical_transit
+        assert physical.recovery_interruption is not None
+        assert physical.recovery_interruption.cut_motion == physical.motion
+        engine.tick(game, 1)
+        physical = game.ship.physical_transit
+        assert physical.inertial_continuation is not None
+    assert physical.second_repair_evidence is None
+    assert physical.recovery_lineage.attempt_count == 2
+    assert physical.recovery_lineage.interruption_count == 2
+    assert physical.recovery_lineage.recent[-1].outcome == (
+        "interrupted_brake" if origin == "brake" else "interrupted_coast")
+    assert physical.motion.beta > 0
+    assert game.ship.antimatter_capsules == fuel
 
 
 def test_lineage_has_bounded_recent_window_and_digest():

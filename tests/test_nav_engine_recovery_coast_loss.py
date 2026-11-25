@@ -219,7 +219,7 @@ def test_coast_interruption_blocks_reuse_while_repair_remains_inertial():
     with pytest.raises(ValueError):
         replace(coast, recovery_coast_interruption=None)
     before = pickle.dumps(game)
-    with pytest.raises(RuntimeError, match="second interrupted recovery"):
+    with pytest.raises(RuntimeError, match="new manual authorization and repair"):
         Engine().prepare_inertial_recovery(game)
     with pytest.raises(RuntimeError):
         Engine().authorize_manual_inertial_recovery(game, max_capsules=10)
