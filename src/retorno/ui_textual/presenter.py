@@ -30,7 +30,11 @@ def build_header(state) -> str:
     if ship.op_mode == "CRUISE":
         source = ship.op_mode_source or "manual"
         mode = f"{ship.op_mode} ({source})"
-    if ship.in_transit:
+    if ship.physical_transit is not None:
+        physical = ship.physical_transit
+        phase = repl.physical_transit_lines(state)[1]
+        loc = f"{physical.original_destination_id} | {phase}"
+    elif ship.in_transit:
         remaining_s = max(0.0, ship.arrival_t - state.clock.t)
         eta = repl._format_eta_short(remaining_s, state.os.locale.value)
         loc = f"en route to {ship.transit_to} (ETA {eta})"

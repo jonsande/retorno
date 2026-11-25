@@ -324,7 +324,7 @@ class RetornoTextualApp(App):
         self.query_one("#jobs", RichLog).auto_scroll = False
         # Status should never auto-scroll; user controls position.
         self.query_one("#status", RichLog).auto_scroll = False
-        self.set_interval(0.25, self.refresh_panels)
+        self._panel_refresh_timer = self.set_interval(0.25, self.refresh_panels)
         self.refresh_panels()
         self._apply_panel_layout()
         if self._play_startup_sequence and Balance.STARTUP_SEQUENCE_ENABLED:
@@ -443,7 +443,8 @@ class RetornoTextualApp(App):
         for widget_id in widget_ids:
             self.query_one(f"#{widget_id}", RichLog).clear()
 
-    async def _run_hibernate_start_sequence(self, years: float, wake_on_low_battery: bool) -> None:
+    async def _run_hibernate_start_sequence(self, years: float, wake_on_low_battery: bool,
+                                            until_arrival: bool = False) -> None:
         if self._hibernate_sequence_running:
             return
         self._hibernate_sequence_running = True
@@ -532,6 +533,7 @@ class RetornoTextualApp(App):
                 self.loop,
                 years,
                 wake_on_low_battery=wake_on_low_battery,
+                until_arrival=until_arrival,
             )
             self._hibernate_panel_blackout = True
             self._render_panel_blackout()
@@ -583,6 +585,8 @@ class RetornoTextualApp(App):
         return
 
     def on_shutdown(self) -> None:
+        if hasattr(self, "_panel_refresh_timer"):
+            self._panel_refresh_timer.stop()
         self._persist_game_on_exit()
 
     def startup_console_messages(self) -> list[str]:
@@ -1308,11 +1312,12 @@ class RetornoTextualApp(App):
                 if warn_msg:
                     self._log_line(warn_msg)
                 if parsed.mode == "until_arrival":
-                    if not state.ship.in_transit:
-                        self._log_line("hibernate: not in transit")
+                    remaining_s = repl._remaining_arrival_s(state)
+                    if remaining_s is None:
+                        self._log_line("hibernate: no reliable arrival horizon" if state.os.locale.value == "en" else
+                                       "hibernate: no hay un horizonte fiable de llegada")
                         self._pending_hibernate_parsed = None
                         return
-                    remaining_s = max(0.0, state.ship.arrival_t - state.clock.t)
                     years = remaining_s / repl.Balance.YEAR_S if repl.Balance.YEAR_S else 0.0
                     if state.ship.op_mode != "CRUISE":
                         self._pending_years = years
@@ -1322,7 +1327,8 @@ class RetornoTextualApp(App):
                         return
                 else:
                     years = parsed.years
-            asyncio.create_task(self._run_hibernate_start_sequence(years, wake_on_low_battery))
+            asyncio.create_task(self._run_hibernate_start_sequence(
+                years, wake_on_low_battery, parsed.mode == "until_arrival"))
         except Exception as e:
             self._log_line(f"[ERROR] hibernate failed: {e}")
         self._pending_hibernate_parsed = None
@@ -1385,6 +1391,9 @@ class RetornoTextualApp(App):
         input_widget.styles.color = palette.foreground
 
     def refresh_panels(self) -> None:
+        # A queued timer callback can run after Textual removed the screen.
+        if not list(self.query("#header")):
+            return
         with self.loop.with_lock() as state:
             theme_preset = normalize_theme_preset(getattr(state.os, "theme_preset", "linux"))
         if theme_preset != self._theme_preset:
@@ -1594,6 +1603,7 @@ class RetornoTextualApp(App):
                         self._run_hibernate_start_sequence(
                             self._pending_years,
                             self._pending_wake_on_low_battery,
+                            True,
                         )
                     )
                     self._pending_hibernate_parsed = None
@@ -1871,7 +1881,13 @@ class RetornoTextualApp(App):
             return
         if parsed.__class__.__name__ == "TravelAbort":
             with self.loop.with_lock() as state:
-                self._confirm_travel_abort_needed(state)
+                physical = state.ship.physical_transit is not None
+                if not physical:
+                    self._confirm_travel_abort_needed(state)
+            if physical:
+                ev = self.loop.apply_action(parsed)
+                with self.loop.with_lock() as state:
+                    self._log_lines(presenter.format_event_lines(state, [("cmd", e) for e in ev]))
             return
         if parsed == "ALERTS":
             with self.loop.with_lock() as state:
@@ -2214,7 +2230,13 @@ class RetornoTextualApp(App):
                 if not state.os.debug_enabled:
                     self._log_line("wait is available only in DEBUG mode. Use: debug on")
                     return
-            step_events = self.loop.step_many(seconds, dt=1.0)
+            try:
+                step_events = self.loop.advance_interval(seconds)
+            except repl.NavigationAdvanceBlocked as exc:
+                step_events = exc.events
+                with self.loop.with_lock() as state:
+                    self._log_line((f"Advance stopped after {exc.elapsed_s:g}s: {exc}" if state.os.locale.value == "en" else
+                                    f"Avance detenido tras {exc.elapsed_s:g}s: {repl.physical_boundary_reason('es', str(exc))}"))
             step_pairs = [("step", e) for e in step_events]
             audio_enabled = False
             with self.loop.with_lock() as state:

@@ -1,5 +1,43 @@
 # Segmentos físicos de navegación (NAV-BRAKE-01B3A)
 
+## Navegación nominal pública (NAV-BRAKE-01B3H-D2A)
+
+`nav <node_id>`, `travel <node_id>` y `nav --no-cruise <node_id>` inician
+ahora la misma trayectoria física prepaga entre reposos para saltos directos
+interestelares conocidos. `engines speed max|<beta>` selecciona la beta
+objetivo; un trayecto corto puede alcanzar una beta máxima inferior. La
+aceleración propia provisional es **1,0 m/s²**, el valor predeterminado de
+`Engine.prepare_nominal_physical_travel()`, expuesto en
+`Engine.NOMINAL_PROPER_ACCELERATION_M_S2` para su balance futuro. No hay
+selector público de aceleración. `nav map routes` y la confirmación utilizan
+`plan_travel()` para estimar tiempo galáctico y propio y conservan la tarifa
+actual. La ETA es nominal y depende de que no haya incidencias propulsivas.
+
+Los saltos locales (mismo sector y como máximo `LOCAL_TRAVEL_RADIUS_LY`)
+conservan la vía histórica a 20 km/s y coste cero, incluido `nav abort`.
+El viaje físico deja `ship.in_transit` en falso para que la llegada histórica
+basada en `arrival_t` no teletransporte la nave. `ship.physical_transit` es
+la autoridad del movimiento y el predicado operativo compartido protege otra
+salida, resolución de rutas, acoplamiento, cambio de velocidad y aborto
+histórico. Las consultas y los controles eléctricos compatibles conservan
+sus restricciones; las acciones que generan trabajos se bloquean durante el
+movimiento nominal hasta disponer de coordinación física, mientras sigue
+disponible la reparación inercial ya implantada. `status` y Textual muestran fase, beta instantánea, distancia
+restante con signo, ambos tiempos transcurridos y ETA nominal solo mientras
+el plan siga vigente. El sobrepaso no se limita; la inercia carece de ETA de
+llegada garantizada.
+
+`GameLoop.advance_interval()` avanza por finales de fase nominal, incluido
+el paso de aceleración a crucero, aceleración directa a frenado, crucero a
+frenado y frenado a reposo. `hibernate until_arrival` se detiene al llegar;
+`hibernate <años>` y `wait <segundos>` en modo DEBUG siguen con tiempo
+ordinario si se solicitó más. `Engine.tick()` conserva el rechazo atómico de
+intervalos que superen el horizonte físico. Los cortes de electricidad,
+desgaste, radiación, drones, radio, trabajos o narrativa aún no resueltos
+detienen el avance público e informan del tiempo ya ejecutado. D2B debe
+resolver estos cortes para que los viajes largos ordinarios sean robustos.
+El guardado durante cualquier fase conserva el plan pagado y sus relojes.
+
 ## Detención física y llegada operativa (NAV-BRAKE-01B3H-D1)
 
 `Engine.tick()` cierra el frenado físico terminal en la misma transacción que
@@ -33,9 +71,9 @@ la distancia integrada exceda A–B. Un límite de desgaste coincidente con beta
 cero no programa inercia. Los ticks solicitados más allá de la detención se
 rechazan atómicamente; el tiempo ordinario puede avanzar en el tick siguiente.
 El guardado/carga del formato actual conserva movimiento activo, inercia y
-detenciones ya consolidadas sin repetirlas. El comando público `travel` aún
-usa la vía histórica; la salida física y recuperación siguen siendo internas
-hasta una integración posterior. Las secciones previas conservan el alcance
+detenciones ya consolidadas sin repetirlas. El comando público `travel`
+interestelar utiliza ahora la salida física; la recuperación manual sigue
+siendo interna. Las secciones previas conservan el alcance
 incremental de su fase; esta sección define la finalización vigente.
 
 Esta es una API matemática pura de `src/retorno/core/nav_physics.py`, probada
@@ -237,7 +275,7 @@ y velocidad objetivo discreta admitida sin superar el máximo actual. Convierte
 la distancia geométrica conocida mediante `light_years_to_metres()`, llama a
 `plan_travel()` y construye una cadena continua con `accelerate_to()`,
 `coast_for()` opcional, `brake_to_stop()` y `append_segment()`. No crea ni
-descubre rutas. `Travel` público conserva su vía histórica.
+descubre rutas. Desde D2A, `Travel` público interestelar llama a esta API.
 
 `NominalTravelState` guarda origen y destino, `TravelPlan` inmutable, dos o
 tres segmentos inmutables, velocidad y coste de tarifa, índice acotado de

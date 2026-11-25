@@ -5,13 +5,14 @@ Purpose
 - Advance long-duration transit time with reduced output noise.
 
 Requirements (gating)
-- Ship must be in transit.
+- `until_arrival` requires active local transit or a valid nominal physical arrival horizon.
 - Blocked when `life_support` is degraded enough to forbid hibernation.
 - Blocked in critical power quality / brownout conditions.
 
 Operational behavior
-- `until_arrival`: sleeps until current transit completes.
-- `<years>`: sleeps target duration in large chunks.
+- `until_arrival`: sleeps until current transit completes, stopping at physical rest.
+- `<years>`: sleeps target duration in large chunks and continues ordinary time after arrival if more was requested.
+- Physical phase ends are coordinated without one-second loops. An unresolved causal boundary stops the wait and reports executed time; remaining time is not silently skipped.
 - Wakes on critical events that require operator attention.
 - While in transit, hibernation also wakes when ambient radiation crosses the configured threshold (`HIBERNATE_WAKE_ENV_RAD_THRESHOLD_RAD_PER_S`).
 

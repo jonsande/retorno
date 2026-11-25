@@ -1,5 +1,41 @@
 # Navigation motion segments (NAV-BRAKE-01B3A)
 
+## Public nominal navigation (NAV-BRAKE-01B3H-D2A)
+
+`nav <node_id>`, `travel <node_id>` and `nav --no-cruise <node_id>` now start
+the same prepaid physical rest-to-rest plan for known interstellar direct hops.
+`engines speed max|<beta>` selects its target beta; a short route can peak below
+that target. The provisional proper acceleration is **1.0 m/s²**, the default
+of `Engine.prepare_nominal_physical_travel()`, exposed in
+`Engine.NOMINAL_PROPER_ACCELERATION_M_S2` for later balancing. No public
+acceleration selector exists. `nav map routes` and departure confirmation use
+`plan_travel()` for galactic and ship proper estimates and the existing fuel
+tariff. Their ETA is nominal, contingent on uninterrupted propulsion.
+
+Local hops (same sector and at most `LOCAL_TRAVEL_RADIUS_LY`) retain the
+historical 20 km/s, zero-capsule path, including `nav abort`. Physical travel
+keeps `ship.in_transit` false so the historical `arrival_t` handler cannot
+teleport the ship. `ship.physical_transit` is the motion authority and the
+shared operational transit predicate guards new travel, route solving,
+docking, speed changes and historical abort. Read-only queries and compatible
+power controls remain available; job-producing actions are blocked during
+nominal motion until physical scheduling supports them, while the established
+inertial repair flow remains available. `status` and Textual
+show phase, instantaneous beta, signed remaining distance, both elapsed
+clocks and nominal ETA only while the nominal plan remains valid. Overshoot is
+not clamped; inertia has no promised arrival ETA.
+
+`GameLoop.advance_interval()` advances at nominal phase ends, including
+acceleration-to-cruise, direct acceleration-to-braking, cruise-to-braking and
+braking-to-rest. `hibernate until_arrival` stops at the physical endpoint;
+a fixed `hibernate <years>` or debug `wait <seconds>` continues ordinary time
+after arrival. Direct `Engine.tick()` still rejects an interval beyond its
+physical horizon. Unsupported electrical, wear, radiation, drone, radio, job
+and narrative cuts stop public advancement with the already committed time
+reported. D2B must resolve these cuts and make long ordinary journeys robust;
+they are not silently skipped. Saving during any nominal phase retains the
+paid plan and its clocks.
+
 ## Physical stop and operational landing (NAV-BRAKE-01B3H-D1)
 
 `Engine.tick()` closes a terminal physical braking segment in the same
@@ -31,9 +67,9 @@ unchanged, even when the integrated distance exceeds A–B. A final wear cut
 coincident with beta zero cannot schedule inertia. Requested ticks beyond a
 physical stop reject atomically; ordinary time can advance in a subsequent
 tick. Save/load of the current format preserves active motion, inertia and
-completed operational landings without replaying them. Public `travel` still
-uses the historical path; physical departure and recovery remain internal
-until a later public-navigation integration. Older phase descriptions below
+completed operational landings without replaying them. Public interstellar
+`travel` now uses the physical departure; manual recovery remains internal.
+Older phase descriptions below
 record their original incremental scope; this section specifies the current
 terminal behavior.
 
@@ -228,7 +264,7 @@ supported discrete target speed no greater than the ship's current maximum.
 It converts the known geometric distance with `light_years_to_metres()`, calls
 `plan_travel()`, and builds an exact continuous chain using `accelerate_to()`,
 optional `coast_for()`, `brake_to_stop()`, and `append_segment()`. No route is
-created or discovered. Public `Travel` remains on its historical path.
+created or discovered. Since D2A, public interstellar `Travel` calls this API.
 
 `NominalTravelState` stores origin and destination IDs, the immutable
 `TravelPlan`, two or three immutable segments, the tariff speed and amount

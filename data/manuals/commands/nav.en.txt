@@ -21,9 +21,9 @@ Description
 - `nav map routes`: list operational direct routes from current node.
 - `nav map contacts`: list known contacts with sector, region, and route status relative to current node.
 - `nav map contacts sector`: group known contacts by sector and order sectors by proximity.
-- `nav <node_id>`: start transit to destination.
+- `nav <node_id>`: start physical nominal interstellar transit, or the existing local maneuver.
 - `nav --no-cruise <node_id>`: start transit without forcing CRUISE profile.
-- `nav abort`: stop active travel at the exact current position, creating a temporary waypoint. It does not return the ship to its origin.
+- `nav abort`: stop a local historical trip at its current position, creating a temporary waypoint. Physical transit cannot yet be voluntarily aborted.
 - At a stopped waypoint you can remain, use ship systems, save/load and `scan` with normal requirements.
 - Use `route solve <node_id>` and then `nav <node_id>` to reach a valid third destination within sensor range and 45 ly; returning to the origin is optional.
 - Routes back to the origin or onward to the previous destination still require real travel.
@@ -54,13 +54,14 @@ Dependencies and gating
 
 Propulsion and fuel
 - engines speed selects an interstellar target: max follows the current ceiling; explicit 0.1c steps remain fixed. Default ceilings are 0.5c/0.4c/0.3c for nominal/LIMITED/DAMAGED, or 0.8c/0.6c/0.4c with engine_speed_upgrade_01. The selected speed multiplies fuel cost; see man engine_speed.
-- Interstellar speed and ETA are fixed on departure, including the speed used by onboard clocks. Subsequent wear, repair or module changes affect future departures. Local travel remains at 20 km/s.
-- status and diag engines show available and actual transit speed. Route listings and confirmation show estimated galactic duration.
+- Interstellar speed selection is a target beta, not the instantaneous departure speed. The ship accelerates, possibly cruises, then brakes to rest. Short routes can peak below the target. Local travel remains at 20 km/s.
+- status shows physical phase, instantaneous beta, distance and both elapsed clocks. Route listings and confirmation show nominal galactic and ship proper durations and attainable peak beta; incidents can invalidate the ETA.
 - Requires powered engines at DAMAGED or better. CRUISE preserves their electrical auxiliaries.
 - nav map routes shows reserve and the cruise target once, then a compact Fuel/Speed/ETA line per known direct route. Capsule estimates are approximate (~) to three decimals. Local speeds use km/s and compact durations. Unavailable estimates show a dash; brief notices mark insufficient fuel or blocked departure.
-- Departure confirmation shows the public destination ID, target/effective cruise, galactic ETA, capsule cost and estimated remaining reserve. Displayed estimates use ~ and three decimals; calculations, checks and the eventual debit retain full precision. Local confirmation shows 20 km/s, compact ETA and zero capsules. The ordinary question is neutral; drone-abandonment warnings remain. Cancellation does not start travel or charge capsules; acceptance revalidates current conditions.
+- Departure confirmation shows the public destination ID, target/peak beta, nominal galactic ETA, ship time, capsule cost and estimated remaining reserve. Displayed estimates use ~ and three decimals; calculations, checks and the eventual debit retain full precision. Local confirmation shows 20 km/s, compact ETA and zero capsules. Cancellation does not start travel or charge capsules; acceptance revalidates current conditions.
 - Accepted interstellar departure charges once; insufficient antimatter leaves navigation unchanged.
-- Local travel costs no capsules. nav abort gives no refund and adds no charge.
+- During nominal physical motion, status and other read-only queries remain available; new job-producing operations await causal scheduling. Existing inertial repair remains available after an incident.
+- Local travel costs no capsules. Its historical nav abort gives no refund and adds no charge. Physical nav abort is blocked until a later phase.
 - A new voyage carries 12.0 equivalent capsules, including fractional contents. Wear increases cost; repair and engine_efficiency_upgrade_01 improve efficiency. See man engines.
 
 - Speed may be queried during transit but configured only afterward. Fixed targets invalidated by damage/removal block the next interstellar departure; local travel ignores the target. Target speed is independent of the CRUISE electrical profile.

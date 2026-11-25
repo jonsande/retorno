@@ -5,13 +5,14 @@ Propósito
 - Avanzar tiempo de tránsito de larga duración con menor ruido de salida.
 
 Requisitos (gating)
-- La nave debe estar en tránsito.
+- `until_arrival` requiere tránsito local activo o un horizonte de llegada física nominal vigente.
 - Bloqueado si `life_support` está lo bastante degradado como para impedir hibernación.
 - Bloqueado con calidad crítica de energía / brownout.
 
 Comportamiento operativo
-- `until_arrival`: duerme hasta completar el tránsito actual.
-- `<años>`: duerme la duración objetivo en bloques grandes.
+- `until_arrival`: duerme hasta completar el tránsito y se detiene en el reposo físico.
+- `<años>`: duerme la duración solicitada en bloques grandes y continúa con tiempo ordinario tras la llegada si sobra tiempo.
+- Los finales de fase física se coordinan sin bucles de un segundo. Una frontera causal pendiente detiene la espera e informa del tiempo ejecutado; no omite silenciosamente el resto.
 - Despierta ante eventos críticos que requieren intervención.
 - Durante el tránsito, la hibernación también despierta cuando la radiación ambiental cruza el umbral configurado (`HIBERNATE_WAKE_ENV_RAD_THRESHOLD_RAD_PER_S`).
 

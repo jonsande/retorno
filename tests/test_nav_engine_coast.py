@@ -316,13 +316,13 @@ def test_transaction_failures_preserve_owner_identities_and_values():
         assert getattr(game, name) is reference
 
 
-def test_historical_travel_still_starts_without_physical_transit():
+def test_local_historical_travel_still_starts_without_physical_transit():
     game = create_initial_state_sandbox(seed=342)
     game.ship.docked_node_id = None
     origin = game.world.space.nodes[game.world.current_node_id]
     game.world.space.nodes["HIST_DEST"] = SpaceNode(
         "HIST_DEST", "Historical destination", "station",
-        x_ly=origin.x_ly + 3, y_ly=origin.y_ly, z_ly=origin.z_ly)
+        x_ly=origin.x_ly + .001, y_ly=origin.y_ly, z_ly=origin.z_ly)
     from retorno.model.world import add_known_link
     game.world.known_nodes.add("HIST_DEST")
     add_known_link(game.world, origin.node_id, "HIST_DEST")

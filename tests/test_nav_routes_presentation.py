@@ -62,6 +62,8 @@ class NavRoutesPresentationTests(unittest.TestCase):
     def test_header_and_one_approximate_estimate_en_es_without_rounding_quotes(self):
         target = self.route(20.155)
         exact_cost = self.engine.estimate_travel_fuel(self.state, target)
+        profile = self.engine.estimate_travel_profile(self.state, target)
+        self.assertIsNotNone(profile)
         for locale in (Locale.EN, Locale.ES):
             with self.subTest(locale=locale):
                 self.state.os.locale = locale
@@ -71,7 +73,10 @@ class NavRoutesPresentationTests(unittest.TestCase):
                 self.assertIn('MAX (0.5c)', text)
                 self.assertIn('engines speed <value>', text)
                 line = self.summary(text)
-                self.assertRegex(line, r'~\d+\.\d{3} (capsules|cápsulas) \| (Speed|Velocidad): 0.5c \| ETA: 40.31[ya]$')
+                self.assertRegex(line, r'~\d+\.\d{3} (capsules|cápsulas) \| (Speed|Velocidad): 0.5c \| ETA: ')
+                self.assertIn('ETA: ' + repl._format_eta_short(profile.total_galactic_s, locale.value), line)
+                self.assertIn(repl._format_eta_short(profile.total_proper_s, locale.value), line)
+                self.assertIn('0.5c', line)
                 self.assertNotIn(str(exact_cost), line)
                 self.assertEqual(self.engine.estimate_travel_fuel(self.state, target), exact_cost)
                 self.assertNotIn('sufficient', line)

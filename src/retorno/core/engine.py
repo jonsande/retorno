@@ -16,7 +16,7 @@ from retorno.core.nav_coordinator import select_next_boundary
 from retorno.core.nav_electricity import (battery_energy_after, power_quality_components,
                                          capture_power_snapshot, power_limits, integrate_quality,
                                          invalidation_reasons)
-from retorno.core.nav_physics import (MotionSegment, MotionState, accelerate_to, append_segment,
+from retorno.core.nav_physics import (MotionSegment, MotionState, TravelPlan, accelerate_to, append_segment,
                                       brake_to_stop, coast_for, light_years_to_metres,
                                       plan_travel, proper_time_in_segment, sample_segment)
 from retorno.core.nav_state import (PhysicalTransitState, PropulsionAuthorization,
@@ -144,6 +144,41 @@ class _JobInterval:
 
 class Engine:
     _MAX_RECENT_EVENTS = 50
+    _EXPECTED_PHYSICAL_LIMIT_REASONS = frozenset({
+        "physical tick exceeds the nominal journey endpoint",
+        "physical transition after engine wear is not yet supported",
+        "nominal physical next phase lacks propulsion capacity",
+        "Physical nominal travel cannot continue after 35% integrity",
+        "Physical braking cannot continue after 15% integrity",
+        "Physical segment with active jobs needs causal scheduler cuts",
+        "Physical segment with drones needs causal drone cuts",
+        "Physical segment with radio reception needs spatial cuts",
+        "Physical segment with a scheduled narrative evaluation needs a causal cut",
+        "Physical segment with recovery plans needs spatial cuts",
+        "Physical segment with critical survival transitions needs causal cuts",
+        "Physical segment crosses an unresolved power-bus alert time",
+        "Physical segment electrical regime is not yet supported",
+        "Physical tick extends beyond the 35% or 15% causal boundary",
+        "Physical segment interval has an unresolved causal boundary",
+        "Engine wear coincides with an unresolved causal boundary",
+        "Physical segment reaches the hull floor",
+        "Physical segment reaches a system health floor",
+        "Physical segment electrical forecast changed during execution",
+        "Physical segment crossed a system state boundary",
+        "Physical segment produced an unresolved health event",
+        "physical drone would cross its return battery reserve",
+        "physical drone would cross an unresolved radiation threshold",
+        "physical drone would cross an unresolved integrity threshold",
+        "physical job activation requires an unsupported causal event",
+        "physical jobs require one eligible repair interval",
+        "physical job is outside the supported engine repair slice",
+        "recovery tick exceeds its physical horizon",
+        "recovery braking capacity is no longer operational",
+        "recovery braking capacity is no longer available",
+        "recovery braking point is no longer operational",
+    })
+    # The existing productive nominal API uses this default; balancing belongs to D2B.
+    NOMINAL_PROPER_ACCELERATION_M_S2 = 1.0
 
     def tick(self, state: GameState, dt: float) -> list[Event]:
         if state.ship.physical_transit is not None:
@@ -789,13 +824,15 @@ class Engine:
 
     def prepare_nominal_physical_travel(
         self, state: GameState, destination_id: str, *,
-        target_beta: float | None = None, proper_acceleration_m_s2: float = 1.0,
+        target_beta: float | None = None, proper_acceleration_m_s2: float | None = None,
     ) -> PhysicalTransitState:
         """Prepare a known rest-to-rest route and pay its existing tariff once.
 
         This internal API never invokes public Travel or changes acquired links.
         It reuses segment preparation on a private copy for the sole debit.
         """
+        if proper_acceleration_m_s2 is None:
+            proper_acceleration_m_s2 = self.NOMINAL_PROPER_ACCELERATION_M_S2
         ship, world = state.ship, state.world
         origin_id = ship.current_node_id
         if (ship.physical_transit is not None or ship.in_transit
@@ -1600,7 +1637,7 @@ class Engine:
         if isinstance(action, Diag):
             return []
 
-        if state.ship.physical_transit is not None and isinstance(action, (Travel, RouteSolve, Dock, Scan)):
+        if state.ship.physical_transit is not None and isinstance(action, (Travel, RouteSolve, Dock, Scan, TravelAbort)):
             event = self._make_event(
                 state, EventType.BOOT_BLOCKED, Severity.WARN,
                 SourceRef(kind="ship", id=state.ship.ship_id),
@@ -1610,6 +1647,23 @@ class Engine:
             self._record_event(state.events, event)
             return [event]
 
+        physical = state.ship.physical_transit
+        if physical is not None and ((isinstance(action, SystemOn) and action.system_id == "comms")
+                                     or (isinstance(action, Boot) and action.service_name == "radiod")):
+            return [self._power_blocked_event(
+                state, "Radio activation during physical motion needs spatial cuts",
+                "physical_radio_unsupported")]
+        if (physical is not None and physical.nominal_plan is not None
+                and not physical.nominal_plan.invalidated
+                and physical.recovery_execution is None
+                and physical.nominal_braking_substitution is None
+                and isinstance(action, (DroneDeploy, DroneMove, DroneRecall, DroneReboot,
+                                        Repair, SelfTestRepair, Install, CargoAudit,
+                                        AuthRecover, RepairAutoMoveDecision))):
+            return [self._power_blocked_event(
+                state, "Operation needs physical job coordination not yet available",
+                "physical_jobs_unsupported")]
+
         blocked = self._check_power_action_block(state, action)
         if blocked:
             return [blocked]
@@ -1617,7 +1671,7 @@ class Engine:
         if isinstance(action, EngineSpeed):
             maximum = state.ship.maximum_cruise_speed()
             data = {"target": action.target, "maximum": maximum}
-            if state.ship.in_transit:
+            if state.ship.in_transit or state.ship.physical_transit is not None:
                 reason = "engine_speed_in_transit"
             elif action.target is not None and action.target not in Balance.ENGINE_SPEED_FUEL_MULTIPLIERS:
                 reason = "engine_speed_invalid"
@@ -1777,6 +1831,84 @@ class Engine:
                 )
                 self._record_event(state.events, event)
                 return [event]
+            if not is_local:
+                # The nominal preparator owns both the trajectory and its one debit.
+                # Stage the public metadata and profile with it as a single action.
+                staged = deepcopy(state)
+                try:
+                    physical = self.prepare_nominal_physical_travel(staged, action.node_id)
+                except (ValueError, RuntimeError) as exc:
+                    reason = ("engines_unavailable" if "propulsion" in str(exc) or "acceleration capacity" in str(exc)
+                              else "physical_departure_unavailable")
+                    return [self._power_blocked_event(state, "Physical departure blocked", reason,
+                                                      {"detail": str(exc)})]
+                nominal = physical.nominal_plan
+                assert nominal is not None
+                staged.ship.transit_to = action.node_id
+                staged.ship.transit_start_t = staged.clock.t
+                staged.ship.last_travel_distance_ly = distance_ly
+                staged.ship.last_travel_distance_km = 0.0
+                staged.ship.last_travel_is_local = False
+                staged.ship.transit_prev_op_mode = staged.ship.op_mode
+                staged.ship.transit_prev_op_mode_source = staged.ship.op_mode_source
+                events: list[Event] = []
+                if not action.no_cruise:
+                    staged.ship.op_mode = "CRUISE"
+                    staged.ship.op_mode_source = "auto"
+                    for sid in ("sensors", "data_core", "drone_bay"):
+                        system = staged.ship.systems.get(sid)
+                        if system is None:
+                            continue
+                        old_state = system.state
+                        system.forced_offline = True
+                        if old_state != SystemState.OFFLINE:
+                            system.state = SystemState.OFFLINE
+                            if system.service:
+                                system.service.is_running = False
+                            self._record_event(staged.events, self._make_event(
+                                staged, EventType.SYSTEM_STATE_CHANGED, Severity.WARN,
+                                SourceRef(kind="ship_system", id=system.system_id),
+                                f"Power plan cruise: {sid} -> OFFLINE",
+                                data={"from": old_state.value, "to": system.state.value,
+                                      "cause": "manual_shed"}))
+                    message_key = "travel_profile_auto"
+                else:
+                    message_key = "travel_profile_manual"
+                profile_event = self._make_event(
+                    staged, EventType.TRAVEL_PROFILE_SET,
+                    Severity.INFO if not action.no_cruise else Severity.WARN,
+                    SourceRef(kind="ship", id=staged.ship.ship_id),
+                    "Travel profile selected", data={"message_key": message_key})
+                self._record_event(staged.events, profile_event)
+                events.append(profile_event)
+                travel_event = self._make_event(
+                    staged, EventType.TRAVEL_STARTED, Severity.INFO,
+                    SourceRef(kind="ship", id=staged.ship.ship_id),
+                    f"Physical travel started to {action.node_id}",
+                    data={"from": current_id, "to": action.node_id,
+                          "distance_ly": distance_ly, "physical": True, "local": False,
+                          "target_beta": nominal.profile.target_beta,
+                          "peak_beta": nominal.profile.peak_beta,
+                          "eta_s": nominal.profile.total_galactic_s,
+                          "proper_s": nominal.profile.total_proper_s,
+                          "eta_years": nominal.profile.total_galactic_s / Balance.YEAR_S,
+                          "fuel_cost": nominal.capsules_paid,
+                          "fuel_remaining": staged.ship.antimatter_capsules})
+                self._record_event(staged.events, travel_event)
+                events.append(travel_event)
+                # Check the current electrical/spatial regime on an isolated
+                # one-second probe before publishing a prepaid departure.
+                probe = deepcopy(staged)
+                try:
+                    self.tick(probe, min(1.0, nominal.segments[0].duration_galactic_s))
+                except RuntimeError as exc:
+                    if str(exc) not in self._EXPECTED_PHYSICAL_LIMIT_REASONS:
+                        raise
+                    return [self._power_blocked_event(
+                        state, "Physical departure blocked by an unsupported causal regime",
+                        "physical_departure_unavailable", {"detail": str(exc)})]
+                self._commit_physical_state(state, staged)
+                return events
             fine_km = state.world.fine_ranges_km.get(action.node_id)
             same_sector = False
             from_node = state.world.space.nodes.get(current_id)
@@ -2046,7 +2178,7 @@ class Engine:
             JobCancel,
             RepairAutoMoveDecision,
         )
-        if state.ship.in_transit and not isinstance(action, allowed_in_transit):
+        if state.ship.operational_in_transit and not isinstance(action, allowed_in_transit):
             event = self._make_event(
                 state,
                 EventType.BOOT_BLOCKED,
@@ -2117,7 +2249,7 @@ class Engine:
             return events
 
         if isinstance(action, Undock):
-            if state.ship.in_transit:
+            if state.ship.operational_in_transit:
                 event = self._make_event(
                     state,
                     EventType.BOOT_BLOCKED,
@@ -5127,7 +5259,7 @@ class Engine:
 
         if job.job_type == JobType.DOCK:
             node_id = job.params.get("node_id", job.target.id if job.target else "")
-            if state.ship.in_transit:
+            if state.ship.operational_in_transit:
                 event = self._make_job_outcome_event(
                     state,
                     job,
@@ -5163,7 +5295,7 @@ class Engine:
 
         if job.job_type == JobType.UNDOCK:
             node_id = job.params.get("node_id", job.target.id if job.target else "")
-            if state.ship.in_transit:
+            if state.ship.operational_in_transit:
                 event = self._make_job_outcome_event(
                     state,
                     job,
@@ -5632,7 +5764,7 @@ class Engine:
                 sector.topology_hub_node_id = None
             if sector.playable_hub_node_id == tmp_id:
                 sector.playable_hub_node_id = None
-        if not state.ship.in_transit:
+        if not state.ship.operational_in_transit:
             if state.ship.transit_from == tmp_id:
                 state.ship.transit_from = ""
             if state.ship.transit_to == tmp_id:
@@ -6688,8 +6820,23 @@ class Engine:
             if fine is None:
                 fine = self._compute_fine_range_km(state, origin, destination_id)
             return fine / max(0.1, Balance.LOCAL_TRAVEL_SPEED_KM_S)
+        profile = self.estimate_travel_profile(state, destination_id)
+        return profile.total_galactic_s if profile is not None else None
+
+    def estimate_travel_profile(self, state: GameState, destination_id: str) -> TravelPlan | None:
+        """Read-only interstellar profile using the productive nominal acceleration."""
+        distance = self._known_hop_distance(state, destination_id)
+        if distance is None or self._is_local_hop(state, state.world.current_node_id,
+                                                  destination_id, distance):
+            return None
         speed = state.ship.effective_cruise_speed()
-        return distance / speed * Balance.YEAR_S if speed > 0.0 else None
+        if speed <= 0 or state.ship.engine_operating_state() in {SystemState.OFFLINE, SystemState.CRITICAL}:
+            return None
+        try:
+            return plan_travel(light_years_to_metres(distance), speed,
+                               self.NOMINAL_PROPER_ACCELERATION_M_S2)
+        except ValueError:
+            return None
 
     def _known_hop_distance(self, state: GameState, destination_id: str) -> float | None:
         """Acquired route boundary shared by public fuel and duration queries."""

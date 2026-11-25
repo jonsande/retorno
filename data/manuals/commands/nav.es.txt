@@ -21,9 +21,9 @@ Descripción
 - `nav map routes`: lista rutas directas operativas desde el nodo actual.
 - `nav map contacts`: lista contactos conocidos con sector, región y estado de ruta relativo al nodo actual.
 - `nav map contacts sector`: agrupa los contactos conocidos por sector y ordena los sectores por cercanía.
-- `nav <node_id>`: inicia tránsito al destino.
+- `nav <node_id>`: inicia tránsito interestelar físico nominal o la maniobra local vigente.
 - `nav --no-cruise <node_id>`: inicia tránsito sin forzar perfil CRUISE.
-- `nav abort`: detiene el viaje en la posición exacta actual y crea un waypoint temporal. No devuelve la nave al origen.
+- `nav abort`: detiene un viaje local histórico en su posición actual y crea un waypoint temporal. Todavía no permite abortar voluntariamente el tránsito físico.
 - En un waypoint detenido puedes permanecer, usar sistemas, guardar/cargar y ejecutar `scan` con sus requisitos normales.
 - Usa `route solve <node_id>` y después `nav <node_id>` para llegar a un tercer destino válido dentro de sensores y 45 ly; regresar al origen es opcional.
 - Volver al origen o continuar al destino anterior sigue exigiendo un viaje real.
@@ -54,13 +54,14 @@ Dependencias y gating
 
 Propulsión y combustible
 - engines speed selecciona objetivo interestelar: max sigue el techo actual; un escalón explícito de 0.1c permanece fijo. Techos predeterminados 0.5c/0.4c/0.3c para nominal/LIMITED/DAMAGED, o 0.8c/0.6c/0.4c con engine_speed_upgrade_01. La velocidad elegida multiplica el coste; consulta man engine_speed.
-- Velocidad interestelar y ETA se fijan al salir, incluida la velocidad usada por los relojes de a bordo. El desgaste, las reparaciones o los cambios de módulos posteriores afectan a futuras salidas. El viaje local sigue a 20 km/s.
-- status y diag engines muestran velocidad disponible y real en tránsito. Rutas y confirmación muestran duración galáctica estimada.
+- La velocidad interestelar seleccionada es una beta objetivo, no la velocidad instantánea de salida. La nave acelera, puede mantener crucero y frena hasta reposo. Los trayectos cortos pueden alcanzar una beta menor. El viaje local sigue a 20 km/s.
+- status muestra fase física, beta instantánea, distancia y ambos tiempos transcurridos. Rutas y confirmación muestran duración galáctica y propia nominales y beta máxima alcanzable; una incidencia puede invalidar la ETA.
 - Requiere engines alimentado en DAMAGED o superior. CRUISE preserva sus auxiliares eléctricos.
 - nav map routes muestra una vez reserva y objetivo de crucero, y una línea compacta Combustible/Velocidad/ETA por ruta directa conocida. Las cápsulas son aproximadas (~) con tres decimales. Las velocidades locales usan km/s y duraciones compactas. Una estimación no disponible muestra un guion; los avisos breves indican combustible insuficiente o salida bloqueada.
-- La confirmación de salida muestra ID público del destino, crucero objetivo/efectivo, ETA galáctica, coste de cápsulas y reserva restante estimada. Las estimaciones usan ~ y tres decimales; cálculos, comprobaciones y descuento posterior conservan precisión completa. La confirmación local muestra 20 km/s, ETA compacta y cero cápsulas. La pregunta ordinaria es neutra; se conservan los avisos de abandono de drones. Cancelar no inicia el viaje ni cobra cápsulas; aceptar vuelve a validar las condiciones actuales.
+- La confirmación de salida muestra ID público del destino, beta objetivo/máxima, ETA galáctica nominal, tiempo propio, coste de cápsulas y reserva restante estimada. Las estimaciones usan ~ y tres decimales; cálculos, comprobaciones y descuento posterior conservan precisión completa. La confirmación local muestra 20 km/s, ETA compacta y cero cápsulas. Cancelar no inicia el viaje ni cobra cápsulas; aceptar vuelve a validar las condiciones actuales.
 - La salida interestelar aceptada cobra una vez; con antimateria insuficiente la navegación no cambia.
-- Los viajes locales no cuestan cápsulas. nav abort no devuelve combustible ni añade cobro.
+- Durante el movimiento físico nominal siguen disponibles status y las consultas; las operaciones que crean trabajos esperan coordinación causal. La reparación inercial ya implantada permanece disponible tras una incidencia.
+- Los viajes locales no cuestan cápsulas. Su nav abort histórico no devuelve combustible ni añade cobro. El aborto físico queda bloqueado hasta una fase posterior.
 - Un viaje nuevo lleva 12.0 cápsulas equivalentes, incluido contenido fraccionario. El desgaste aumenta el coste; reparar y engine_efficiency_upgrade_01 mejoran eficiencia. Consulta man engines.
 
 - En tránsito puede consultarse la velocidad, pero solo se configura después. Un objetivo invalidado por daño/retirada bloquea la siguiente salida interestelar; el viaje local lo ignora. El objetivo es independiente del perfil eléctrico CRUISE.

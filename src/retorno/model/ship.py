@@ -69,8 +69,13 @@ class ShipState:
     transit_prev_op_mode: str = ""
     transit_prev_op_mode_source: str = ""
     docked_node_id: str | None = None
-    # Internal-only physical navigation state; legacy travel never creates it.
+    # Physical navigation is the public interstellar path; keep in_transit for
+    # the local historical clock so its arrival handler cannot run in parallel.
     physical_transit: PhysicalTransitState | None = None
+
+    @property
+    def operational_in_transit(self) -> bool:
+        return self.in_transit or self.physical_transit is not None
 
     location: ShipLocation = field(default_factory=ShipLocation)
     hull_integrity: float = 1.0

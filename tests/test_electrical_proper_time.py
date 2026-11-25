@@ -55,8 +55,20 @@ class ElectricalProperTimeTests(unittest.TestCase):
             self.engine._apply_health_state(s.ship.systems['engines'], s, [], cause='module_install')
         else:
             self.assertEqual(beta, .5)
-        events = self.engine.apply_action(s, Travel(node_id=self.target, no_cruise=True))
-        self.assertTrue(any(e.type == EventType.TRAVEL_STARTED for e in events), events)
+        # Historical fixed-speed transit is retained only as a fixture for
+        # legacy electrical interval regressions. Public interstellar Travel
+        # now uses the separate causal physical integrator.
+        origin = s.world.current_node_id
+        distance = self.engine._distance_between_nodes(s, origin, self.target)
+        s.ship.antimatter_capsules -= self.engine.engine_fuel_cost(s, distance, beta)
+        s.ship.in_transit = True
+        s.ship.transit_from = origin
+        s.ship.transit_to = self.target
+        s.ship.transit_start_t = s.clock.t
+        s.ship.arrival_t = s.clock.t + distance / beta * Balance.YEAR_S
+        s.ship.transit_speed_ly_per_year = beta
+        s.ship.last_travel_distance_ly = distance
+        s.ship.last_travel_is_local = False
         self.assertEqual(s.ship.transit_speed_ly_per_year, beta)
         return s
 

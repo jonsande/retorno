@@ -24,6 +24,7 @@ from retorno.bootstrap import (
 from retorno.audio.config import AudioConfigError, load_audio_config
 from retorno.audio.manager import AudioManager
 from retorno.core.engine import Engine
+from retorno.core.nav_physics import metres_to_light_years
 from retorno.core.lore import (
     build_lore_context,
     list_lore_piece_entries,
@@ -34,7 +35,7 @@ from retorno.core.lore import (
 from retorno.core.deadnodes import evaluate_dead_nodes
 from retorno.core.exploration_recovery import ensure_exploration_recovery, uplink_blocked_reason
 from retorno.core.actions import Action, AuthRecover, Hibernate, Repair, RepairAutoMoveDecision, RouteSolve, Status
-from retorno.runtime.loop import GameLoop
+from retorno.runtime.loop import GameLoop, NavigationAdvanceBlocked
 from retorno.runtime.operator_config import (
     apply_config_value,
     audio_flags,
@@ -1210,6 +1211,22 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Navigation blocked: ship already moving.",
             "es": "Navegación bloqueada: la nave ya está en movimiento.",
         },
+        "physical_departure_unavailable": {
+            "en": "Physical departure blocked by current ship conditions: {detail}",
+            "es": "Salida física bloqueada por las condiciones actuales de la nave: {detail}",
+        },
+        "physical_advance_blocked": {
+            "en": "Automatic physical advance stopped at an unresolved boundary: {detail}",
+            "es": "Avance físico automático detenido en una frontera pendiente: {detail}",
+        },
+        "physical_jobs_unsupported": {
+            "en": "This operation needs physical job coordination that is not available during nominal travel.",
+            "es": "Esta operación requiere coordinación física de trabajos que aún no está disponible durante el viaje nominal.",
+        },
+        "physical_radio_unsupported": {
+            "en": "Radio activation during physical motion needs spatial cuts that are not yet available.",
+            "es": "Activar la radio durante el movimiento físico requiere cortes espaciales todavía no disponibles.",
+        },
         "power_quality_low": {
             "en": "Action blocked: power quality too low (Q={q:.2f}, requires >= {required:.2f})",
             "es": "Acción bloqueada: calidad de energía demasiado baja (Q={q:.2f}, requiere >= {required:.2f})",
@@ -1684,6 +1701,8 @@ def render_events(state, events, origin_override: str | None = None) -> None:
         if e.type == EventType.BOOT_BLOCKED:
             locale = state.os.locale.value
             reason = e.data.get("reason", "")
+            if reason in {"physical_departure_unavailable", "physical_advance_blocked"}:
+                payload["detail"] = physical_boundary_reason(locale, str(e.data.get("detail", "")))
             unknown_contact_message = _public_unknown_contact_message(state, e)
             if unknown_contact_message:
                 message = unknown_contact_message
@@ -1841,6 +1860,14 @@ def render_events(state, events, origin_override: str | None = None) -> None:
                 "years": e.data.get("years", 0.0),
                 "duration": _format_eta_short((e.data.get("years", 0.0) or 0.0) * Balance.YEAR_S, locale),
             })
+            if e.type == EventType.TRAVEL_STARTED and e.data.get("physical"):
+                eta = _format_eta_short(float(e.data["eta_s"]), locale)
+                peak = float(e.data["peak_beta"])
+                target = float(e.data["target_beta"])
+                print(f"[{origin_tag}] [INFO] travel_started :: " +
+                      (f"A {e.data['to']} | beta objetivo={target:g}c | máxima={peak:.4g}c | ETA nominal={eta}" if locale == "es" else
+                       f"To {e.data['to']} | target beta={target:g}c | peak={peak:.4g}c | nominal ETA={eta}"))
+                continue
             if e.type == EventType.TRAVEL_STARTED and e.data.get("local"):
                 km = e.data.get("distance_km") or 0.0
                 eta_s = e.data.get("eta_s") or 0.0
@@ -2085,6 +2112,82 @@ def clock_readouts(state, *, compact: bool = False) -> list[str]:
     return lines
 
 
+def physical_boundary_reason(locale: str, detail: str) -> str:
+    if locale != "es":
+        return detail
+    if "drones" in detail:
+        return "drones presentes sin coordinación causal"
+    if "radio reception" in detail:
+        return "recepción de radio sin cortes espaciales"
+    if "active jobs" in detail or "physical jobs" in detail:
+        return "trabajos activos sin coordinación causal"
+    if "narrative" in detail:
+        return "evaluación narrativa programada"
+    if "electrical" in detail or "power-bus" in detail:
+        return "cambio eléctrico pendiente de resolver"
+    if "35%" in detail or "15%" in detail or "Engine wear" in detail:
+        return "límite de integridad de motores pendiente de resolver"
+    if "health" in detail or "hull" in detail:
+        return "límite de integridad pendiente de resolver"
+    if "causal boundary" in detail:
+        return "frontera causal pendiente de resolver"
+    if "propulsion" in detail:
+        return "capacidad propulsiva insuficiente"
+    return "condición física pendiente de resolver"
+
+
+def physical_transit_lines(state) -> list[str]:
+    """Shared CLI/Textual readout from the physical integrator's current state."""
+    physical = state.ship.physical_transit
+    if physical is None:
+        return []
+    es = state.os.locale.value == "es"
+    origin = state.ship.transit_from or state.ship.current_node_id
+    destination = physical.original_destination_id
+    route_ly = Engine()._distance_between_nodes(state, origin, destination)
+    travelled_ly = metres_to_light_years(physical.motion.distance_m)
+    remaining_ly = route_ly - travelled_ly
+    if physical.pending_transition == "inertia" or physical.inertial_continuation is not None:
+        phase = "continuación inercial" if es else "inertial continuation"
+    elif physical.recovery_execution is not None and physical.intent == "coast":
+        phase = "espera previa al frenado de recuperación" if es else "waiting for recovery braking"
+    else:
+        phase = {"accelerate": "aceleración" if es else "acceleration",
+                 "coast": "crucero" if es else "cruise",
+                 "brake": "frenado" if es else "braking"}.get(physical.intent, physical.intent)
+    elapsed_g = state.clock.t - state.ship.transit_start_t
+    first_proper = (physical.nominal_plan.segments[0].start.proper_s
+                    if physical.nominal_plan is not None else physical.active_segment.start.proper_s)
+    elapsed_p = state.clock.ship_elapsed_s - first_proper
+    labels = (
+        f"location: en route to {destination} (from {origin})" if not es
+        else f"ubicación: rumbo a {destination} (desde {origin})",
+        (f"transit: phase={phase}  beta={physical.motion.beta:.6g}c  "
+         f"travelled={travelled_ly:.6g}ly  remaining={remaining_ly:.6g}ly" if not es else
+         f"tránsito: fase={phase}  beta={physical.motion.beta:.6g}c  "
+         f"recorrida={travelled_ly:.6g}al  restante={remaining_ly:.6g}al"),
+        (f"elapsed: galactic={_format_eta_short(elapsed_g, 'en')}  "
+         f"ship={_format_eta_short(elapsed_p, 'en')}" if not es else
+         f"transcurrido: galáctico={_format_eta_short(elapsed_g, 'es')}  "
+         f"propio={_format_eta_short(elapsed_p, 'es')}"),
+    )
+    lines = list(labels)
+    if remaining_ly < 0:
+        lines.append("destino sobrepasado" if es else "destination overshot")
+    nominal = physical.nominal_plan
+    if (nominal is not None and not nominal.invalidated
+            and physical.nominal_braking_substitution is None
+            and physical.pending_transition is None
+            and physical.inertial_continuation is None
+            and physical.recovery_execution is None):
+        endpoint = nominal.segments[-1]
+        remaining_s = endpoint.start.galactic_s + endpoint.duration_galactic_s - state.clock.t
+        if remaining_s >= 0:
+            lines.append(("ETA nominal: " if es else "nominal ETA: ")
+                         + _format_eta_short(remaining_s, state.os.locale.value))
+    return lines
+
+
 @public_output
 def render_status(state) -> None:
     ship = state.ship
@@ -2106,7 +2209,10 @@ def render_status(state) -> None:
     current_loc = state.world.current_node_id
     node = state.world.space.nodes.get(current_loc)
     node_name = node.name if node else current_loc
-    if ship.in_transit:
+    if ship.physical_transit is not None:
+        for line in physical_transit_lines(state):
+            print(line)
+    elif ship.in_transit:
         remaining_s = max(0.0, ship.arrival_t - state.clock.t)
         total_s = max(0.0, ship.arrival_t - ship.transit_start_t)
         if getattr(ship, "last_travel_is_local", False):
@@ -2607,6 +2713,8 @@ def speed_readout(state, destination_id: str | None = None) -> str:
         actual = (f"{Balance.LOCAL_TRAVEL_SPEED_KM_S:g} km/s" if ship.last_travel_is_local
                   else f"{ship.transit_speed_ly_per_year}c")
         text += f"; {'velocidad en tránsito' if es else 'transit speed'}={actual}"
+    elif ship.physical_transit is not None:
+        text += f"; {'beta instantánea' if es else 'instantaneous beta'}={ship.physical_transit.motion.beta:.6g}c"
     if destination_id is not None:
         duration = Engine().estimate_travel_duration(state, destination_id)
         if duration is None:
@@ -2634,7 +2742,13 @@ def render_engines_speed(state) -> None:
         print(f"Objetivo: {target} | SALIDA BLOQUEADA" if es else f"Target: {target} | DEPARTURE BLOCKED")
     else:
         print(f"Motores: {operating} | Objetivo: {target}" if es else f"Engines: {operating} | Target: {target}")
-    if ship.in_transit:
+    if ship.operational_in_transit:
+        if ship.physical_transit is not None:
+            print(f"En tránsito: beta={ship.physical_transit.motion.beta:.6g}c" if es else
+                  f"In transit: beta={ship.physical_transit.motion.beta:.6g}c")
+            print("Cambio de velocidad no disponible durante el viaje." if es else
+                  "Speed change unavailable during travel.")
+            return
         actual = (f"{Balance.LOCAL_TRAVEL_SPEED_KM_S:g} km/s" if ship.last_travel_is_local else
                   f"{ship.transit_speed_ly_per_year:g}c")
         print(f"En tránsito: {actual} (fija)" if es else f"In transit: {actual} (fixed)")
@@ -5562,6 +5676,9 @@ def render_nav_routes(state) -> None:
     elif ship.target_cruise_speed is None:
         target += f" ({speed:g}c)"
     print("\n=== RUTAS NAV ===" if es else "\n=== NAV ROUTES ===")
+    if ship.physical_transit is not None:
+        for line in physical_transit_lines(state):
+            print(line)
     print(f"Antimateria: {ship.antimatter_capsules:.3f} cápsulas" if es else
           f"Antimatter: {ship.antimatter_capsules:.3f} capsules")
     operating_state = ship.engine_operating_state().value.upper()
@@ -5624,6 +5741,10 @@ def render_nav_routes(state) -> None:
                     eta = _format_eta_short(duration, state.os.locale.value)
                 estimate = (f"  Combustible: {fuel} | Velocidad: {route_speed} | ETA: {eta}" if es else
                             f"  Fuel: {fuel} | Speed: {route_speed} | ETA: {eta}")
+                profile = engine.estimate_travel_profile(state, nid)
+                if profile is not None:
+                    estimate += (f" | Beta máx.: {profile.peak_beta:.4g}c | Tiempo propio: {_format_eta_short(profile.total_proper_s, 'es')}" if es else
+                                 f" | Peak beta: {profile.peak_beta:.4g}c | Ship time: {_format_eta_short(profile.total_proper_s, 'en')}")
                 if cost is not None and cost > ship.antimatter_capsules:
                     estimate += " | Combustible insuficiente" if es else " | Insufficient fuel"
                 if cost is None or duration is None or departure_blocked:
@@ -6270,7 +6391,11 @@ def nav_confirmation(state, action) -> tuple[list[str], str | None]:
                       "Antimateria: 0 cápsulas" if es else "Antimatter: 0 capsules"]
         else:
             target = _cruise_target_text(state.ship)
-            lines += [f"Crucero: {target} | ETA galáctica: {eta}" if es else f"Cruise: {target} | Galactic ETA: {eta}",
+            profile = engine.estimate_travel_profile(state, dest)
+            peak = profile.peak_beta if profile is not None else 0.0
+            proper = _format_eta_short(profile.total_proper_s, locale) if profile is not None else "—"
+            lines += [f"Beta objetivo: {target} | Beta máxima: {peak:.4g}c | ETA galáctica nominal: {eta} | Tiempo propio: {proper}" if es else
+                      f"Target beta: {target} | Peak beta: {peak:.4g}c | Nominal galactic ETA: {eta} | Ship time: {proper}",
                       f"Antimateria: ~{cost:.3f} cáps. | Reserva: {reserve:.3f} → ~{reserve - cost:.3f}" if es else
                       f"Antimatter: ~{cost:.3f} caps. | Reserve: {reserve:.3f} → ~{reserve - cost:.3f}"]
         if cost > reserve:
@@ -6673,7 +6798,24 @@ def _hibernate_reached_env_threshold(state) -> bool:
     return float(state.ship.radiation_env_rad_per_s) >= _hibernate_env_radiation_threshold()
 
 
-def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False) -> HibernateRunResult:
+def _remaining_arrival_s(state) -> float | None:
+    physical = state.ship.physical_transit
+    if physical is not None:
+        nominal = physical.nominal_plan
+        if (nominal is None or nominal.invalidated or physical.pending_transition is not None
+                or physical.inertial_continuation is not None
+                or physical.nominal_braking_substitution is not None
+                or physical.recovery_execution is not None):
+            return None
+        final = nominal.segments[-1]
+        return max(0.0, final.start.galactic_s + final.duration_galactic_s - state.clock.t)
+    if state.ship.in_transit:
+        return max(0.0, state.ship.arrival_t - state.clock.t)
+    return None
+
+
+def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False,
+                       *, until_arrival: bool = False) -> HibernateRunResult:
     total_s = max(0.0, years * Balance.YEAR_S)
     if total_s <= 0:
         raise ValueError("hibernate: nothing to do (duration <= 0)")
@@ -6683,8 +6825,6 @@ def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False) ->
     wake_t: float | None = None
     wake_reason: str | None = None
     with loop.with_lock() as locked_state:
-        prev_mode = locked_state.ship.op_mode
-        prev_source = locked_state.ship.op_mode_source
         start_t = locked_state.clock.t
         start_soc = locked_state.ship.power.e_batt_kwh / locked_state.ship.power.e_batt_max_kwh if locked_state.ship.power.e_batt_max_kwh else 0.0
         start_health = {sid: sys.health for sid, sys in locked_state.ship.systems.items() if "critical" in sys.tags}
@@ -6718,7 +6858,16 @@ def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False) ->
                 radiation_cross_dt = _hibernate_transit_env_threshold_dt(locked_state, step)
             if radiation_cross_dt is not None:
                 step = min(step, max(1.0e-6, radiation_cross_dt))
-            ev = loop.step(step)
+            try:
+                ev = loop.advance_interval(step, stop_at_arrival=until_arrival)
+            except NavigationAdvanceBlocked as exc:
+                ev = exc.events
+                step_events.extend([("step", e) for e in ev])
+                woke_early = True
+                wake_reason = f"causal_boundary:{exc}"
+                with loop.with_lock() as locked_state:
+                    wake_t = locked_state.clock.t
+                break
             step_events.extend([("step", e) for e in ev])
             with loop.with_lock() as locked_state:
                 reason = _hibernate_interrupt_reason(locked_state, ev, wake_on_low_battery)
@@ -6729,11 +6878,15 @@ def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False) ->
                     woke_early = True
                     wake_t = locked_state.clock.t
                     wake_reason = reason
-            remaining -= step
+                advanced = locked_state.clock.t - start_t - (total_s - remaining)
+                arrived = until_arrival and not locked_state.ship.operational_in_transit
+            remaining -= advanced
+            if arrived:
+                break
             if woke_early:
                 break
         with loop.with_lock() as locked_state:
-            if woke_early:
+            if woke_early or until_arrival:
                 if wake_t is not None:
                     elapsed_s = max(0.0, wake_t - start_t)
                 else:
@@ -6755,13 +6908,12 @@ def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False) ->
                 else 0.0
             )
             end_health = {sid: sys.health for sid, sys in locked_state.ship.systems.items() if "critical" in sys.tags}
-            # Do not change ship_mode; restore previous values.
-            locked_state.ship.op_mode = prev_mode
-            locked_state.ship.op_mode_source = prev_source
+            # Hibernation does not select a mode. Physical arrival restores it.
     finally:
         with loop.with_lock() as locked_state:
             locked_state.ship.is_hibernating = False
-        loop.set_auto_tick(was_auto)
+        loop.set_auto_tick(was_auto and not (woke_early and
+                           (wake_reason or "").startswith("causal_boundary:")))
     filtered = [pair for pair in step_events if pair[1].severity == Severity.CRITICAL or pair[1].type in {EventType.ARRIVED}]
     events_to_render.extend(filtered)
     recovery_events: list[Event] = []
@@ -6817,6 +6969,12 @@ def _render_hibernate_result(loop, result: HibernateRunResult) -> None:
                     msg = {
                         "en": f"Hibernation interrupted: ambient radiation reached threshold ({threshold_txt} rad/s)",
                         "es": f"Hibernación interrumpida: la radiación ambiental alcanzó el umbral ({threshold_txt} rad/s)",
+                    }
+                elif result.wake_reason.startswith("causal_boundary:"):
+                    detail = result.wake_reason.split(":", 1)[1]
+                    msg = {
+                        "en": f"Hibernation stopped at unresolved physical boundary: {detail}",
+                        "es": f"Hibernación detenida en una frontera física pendiente: {physical_boundary_reason('es', detail)}",
                     }
             if not msg:
                 msg = {
@@ -8238,7 +8396,8 @@ def main() -> None:
         if parsed.__class__.__name__ == "TravelAbort":
             _drain_auto_events()
             with loop.with_lock() as locked_state:
-                if not _confirm_travel_abort(locked_state):
+                physical = locked_state.ship.physical_transit is not None
+                if not physical and not _confirm_travel_abort(locked_state):
                     continue
             ev = loop.apply_action(parsed)
             with loop.with_lock() as locked_state:
@@ -8312,7 +8471,13 @@ def main() -> None:
                 if not locked_state.os.debug_enabled:
                     print("wait is available only in DEBUG mode. Use: debug on")
                     continue
-            step_events = loop.step_many(seconds, dt=1.0)
+            try:
+                step_events = loop.advance_interval(seconds)
+            except NavigationAdvanceBlocked as exc:
+                step_events = exc.events
+                with loop.with_lock() as locked_state:
+                    print((f"Advance stopped after {exc.elapsed_s:g}s: {exc}" if locked_state.os.locale.value == "en" else
+                           f"Avance detenido tras {exc.elapsed_s:g}s: {physical_boundary_reason('es', str(exc))}"))
             cmd_events = [("step", e) for e in step_events]
             audio_enabled = False
             with loop.with_lock() as locked_state:
@@ -8348,20 +8513,22 @@ def main() -> None:
                     continue
             if parsed.mode == "until_arrival":
                 with loop.with_lock() as locked_state:
-                    if not locked_state.ship.in_transit:
-                        print("hibernate: not in transit")
+                    remaining_s = _remaining_arrival_s(locked_state)
+                    if remaining_s is None:
+                        print("hibernate: no reliable arrival horizon" if locked_state.os.locale.value == "en" else
+                              "hibernate: no hay un horizonte fiable de llegada")
                         continue
                     if locked_state.ship.op_mode != "CRUISE":
                         if not _confirm_hibernate_non_cruise(locked_state):
                             continue
-                    remaining_s = max(0.0, locked_state.ship.arrival_t - locked_state.clock.t)
                     years = remaining_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
             else:
                 years = parsed.years
             with loop.with_lock() as locked_state:
                 locale = locked_state.os.locale.value
             _play_hibernate_start_sequence(locale)
-            result = _execute_hibernate(loop, years, wake_on_low_battery=wake_on_low)
+            result = _execute_hibernate(loop, years, wake_on_low_battery=wake_on_low,
+                                        until_arrival=parsed.mode == "until_arrival")
             blackout_s = _hibernate_wake_panel_blackout_s()
             if blackout_s > 0.0:
                 time.sleep(blackout_s)

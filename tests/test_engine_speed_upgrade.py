@@ -1,4 +1,9 @@
-"""T-04A: engine state, independent modules and inertial transit via public flows."""
+"""T-04A engine speed and module regressions.
+
+Historical fixed-speed interval tests use a fixture engine after D2A moved
+public interstellar Travel to the physical integrator. Public physical travel
+is exercised in test_nav_public_physical.py.
+"""
 from contextlib import redirect_stdout
 from copy import deepcopy
 import asyncio
@@ -23,7 +28,7 @@ from retorno.cli import repl
 from retorno.cli.parser import ParseError, format_parse_error, parse_command
 from retorno.config.balance import Balance
 from retorno.core.actions import EngineSpeed, PowerPlan, PowerShed, Repair, SystemOn, Travel, TravelAbort
-from retorno.core.engine import Engine
+from tests.legacy_transit_fixture import LegacyTransitEngine as Engine
 from retorno.core.temporal import proper_time_interval
 from retorno.io.save_load import SaveLoadError, load_single_slot, save_single_slot
 from retorno.model.drones import DroneLocation, DroneStatus
@@ -620,7 +625,7 @@ class EngineSpeedUpgradeTests(unittest.TestCase):
                     self.assertEqual(lines[0], ('Destino: ' if locale == Locale.ES else 'Destination: ') + alias)
                     self.assertNotIn(target, '\n'.join(lines))
                     self.assertIn('MAX (0.5c)' if selection is None else '0.3c', lines[1])
-                    self.assertIn('ETA galáctica' if locale == Locale.ES else 'Galactic ETA', lines[1])
+                    self.assertIn('ETA galáctica nominal' if locale == Locale.ES else 'Nominal galactic ETA', lines[1])
                     cost = self.engine.estimate_travel_fuel(s, target)
                     self.assertIn(f'~{cost:.3f}', lines[2])
                     self.assertIn(f'12.000 → ~{12-cost:.3f}', lines[2])
@@ -729,7 +734,9 @@ class EngineSpeedUpgradeTests(unittest.TestCase):
                     palette = get_theme_palette(preset)
                     for line in [*confirmation, *query]:
                         rich = render_rich_line(line, preset)
-                        self.assertEqual(rich.get_style_at_offset(console, 0), Style.parse(palette.foreground))
+                        first_style = (f'bold {palette.accent}' if line.startswith(('Target beta:', 'Beta objetivo:'))
+                                       else palette.foreground)
+                        self.assertEqual(rich.get_style_at_offset(console, 0), Style.parse(first_style))
                         if target in line:
                             self.assertEqual(rich.get_style_at_offset(console, line.index(target)), Style.parse(f'bold {palette.accent}'))
                         if 'NOMINAL' in line:
@@ -803,6 +810,7 @@ class EngineSpeedUpgradeTests(unittest.TestCase):
             s.os.locale = locale
             s.os.audio.enabled = s.os.audio.ambient_enabled = False
             app.loop.state = s
+            app.loop.engine = self.engine
             app.loop.set_auto_tick(False)
             app._play_startup_sequence = app._startup_panel_blackout = False
             async with app.run_test() as pilot:
