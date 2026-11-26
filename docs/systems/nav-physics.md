@@ -405,6 +405,18 @@ operational cut and are rejected until B2 resolves it. B2 must invalidate
 stale nominal plans, resolve same-instant cuts and failures, authorize any new
 powered maneuver separately, and replan from actual position and beta.
 
+## Startup with critical systems offline (PT001-06A)
+
+A physical tick with `core_os` or `life_support` offline remains atomically
+rejected: causal survival transitions are unavailable. The opening CLI and
+Textual tick keeps the loaded save accessible, reports the boundary, and
+pauses automatic advance. It does not credit elapsed time or reactivate a
+system. Public commands cannot turn off these critical systems during physical
+transit, preventing new states whose advance is unsupported. Existing terminal
+policy prevents turning `core_os` on from a terminal without control; the
+affected real save remains unable to advance. Resolving that transition needs
+a separate intervention and is outside 06A.
+
 ## First causal engine-wear cut (NAV-BRAKE-01B3H-B2A)
 
 Within the restricted electrical and radiological regime of 01B3H-A,

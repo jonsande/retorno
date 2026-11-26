@@ -29,14 +29,15 @@ especificación vigente. Los documentos técnicos propietarios están en
 | ID | Estado | Incidencia o resultado aprobado; trabajo técnico pendiente |
 | --- | --- | --- |
 | PT001-01/09 | Observaciones abiertas | Lag residual y regularidad de relojes durante tránsito físico. Medir en el perfil real actual antes de elegir solución; los viajes completados no cierran esta incidencia. |
-| PT001-06 | Defecto abierto | Crash y partida inaccesible al apagar `core_os` durante tránsito físico. Reproducir en copia y definir recuperación sin dañar el original. |
+| PT001-06 | 06A: carga protegida; transición causal pendiente | La partida real carga en CLI y Textual; el avance se pausa y se informa cuando `core_os` ya está apagado durante tránsito físico. Se impide apagar `core_os` o `life_support` mediante comandos públicos mientras hay tránsito físico. El terminal apagado conserva sus restricciones: la partida afectada no puede reanudar el viaje sin una futura transición causal de supervivencia, fuera de 06A. |
 | PT001-07 | Resultado aprobado; implementación pendiente | Permitir recargar drones con net eléctrico negativo si hay SoC suficiente y se cumplen las demás condiciones operativas; contabilizar energía real. Umbral y contabilidad causal requieren diseño acotado. |
 | PT001-08 | Dirección de presentación aprobada; implementación pendiente | Mostrar progreso interno de simulación de hibernación solo en debug. La interfaz normal sigue siendo diegética. Concretar la superficie de debug. |
 | PT001-10 | Dirección de presentación aprobada; implementación pendiente | Explicar motivos específicos que impiden iniciar viaje, incluido engines apagado. Localizar EN/ES sin divulgar estado interno; concretar mensajes. |
-| PT001-11 | Dirección aprobada; definición técnica pendiente | Estado operativo de espera de motores durante crucero y reactivación anticipada para frenar. Definir electricidad, temporización, fallos y persistencia primero. |
+| PT001-11 | Diseño aprobado; implementación pendiente | `ACTIVE` durante aceleración y frenado; `STANDBY` durante crucero con reactivación anticipada; `OFFLINE` automático tras detenerse efectivamente en destino. Separar estado operativo, salud del sistema y causa de desconexión. La reactivación para una nueva partida, los consumos, el desgaste y los tiempos de arranque requieren concreción en NAV-BRAKE-01C. |
 
 La tabla distingue defectos observados de comportamiento futuro aprobado. No
-afirma que PT001-06 a PT001-11 estén implementadas. Siguen vigentes los
+afirma que PT001-07 a PT001-11 estén implementadas; PT001-06 solo tiene la
+protección de carga y prevención de 06A. Siguen vigentes los
 contratos causales, económicos, transaccionales y de conocimiento.
 
 ## Hitos pendientes

@@ -317,8 +317,8 @@ class RetornoTextualApp(App):
             self._audio_manager.start(audio_enabled, ambient_enabled, self.loop.state.os.audio.music_volume)
             self._audio_manager.play_startup(audio_enabled, self._startup_audio_context)
             self._audio_manager.consume_notice()
-        self.loop.step(1.0)
-        if not self.loop.state.os.debug_enabled:
+        initial_advance_ok = self.loop.step_initial()
+        if not self.loop.state.os.debug_enabled and initial_advance_ok:
             self.loop.set_auto_tick(True)
             self.loop.start()
         else:

@@ -3535,6 +3535,19 @@ class Engine:
             system = state.ship.systems.get(action.system_id)
             if not system:
                 return []
+            if (state.ship.physical_transit is not None
+                    and action.system_id in {"core_os", "life_support"}
+                    and system.state != SystemState.OFFLINE):
+                event = self._make_event(
+                    state, EventType.BOOT_BLOCKED, Severity.WARN,
+                    SourceRef(kind="ship_system", id=system.system_id),
+                    f"Critical system shutdown blocked during physical transit: {system.system_id}",
+                    data={"message_key": "boot_blocked",
+                          "reason": "physical_critical_shutdown_blocked",
+                          "system_id": system.system_id},
+                )
+                self._record_event(state.events, event)
+                return [event]
             if system.service:
                 system.service.is_running = False
             if system.forced_offline:

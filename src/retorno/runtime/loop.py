@@ -70,6 +70,16 @@ class GameLoop:
                 self.state.clock.last_dt = dt
         return events
 
+    def step_initial(self) -> bool:
+        """Attempt the opening tick; keep a loadable session at a known causal limit."""
+        try:
+            self.step(self.tick_s)
+        except NavigationAdvanceBlocked as exc:
+            self._pause_auto_after_error(
+                "physical_advance_blocked", str(exc), exc.events, exc.elapsed_s)
+            return False
+        return True
+
     def step_many(self, total_s: float, dt: float = 1.0) -> list[Event]:
         events: list[Event] = []
         remaining = total_s

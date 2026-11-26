@@ -28,14 +28,15 @@ not a current implementation specification. Technical owners are indexed in
 | ID | Status | Issue or approved outcome; technical work remaining |
 | --- | --- | --- |
 | PT001-01/09 | Open observations | Residual lag and clock regularity during physical transit. Measure on the current real profile before choosing a remedy; completed journeys do not close this issue. |
-| PT001-06 | Open defect | Crash and inaccessible save when `core_os` is turned off during physical transit. Reproduce safely on a copy and define recovery without damaging the original. |
+| PT001-06 | 06A: safe load; causal transition pending | The real save loads in CLI and Textual; time advance pauses with a visible explanation when `core_os` is already offline during physical transit. Public commands cannot turn off `core_os` or `life_support` during physical transit. Offline terminal restrictions remain: the affected save cannot resume travel without a future causal survival transition, outside 06A. |
 | PT001-07 | Approved outcome; implementation pending | Allow drone charging with negative net power when SoC is sufficient and other operational conditions hold; debit actual energy. Threshold and causal accounting need a focused design. |
 | PT001-08 | Approved presentation direction; implementation pending | Show internal hibernation simulation progress only in debug mode. Keep ordinary presentation diegetic. Specify the debug surface. |
 | PT001-10 | Approved presentation direction; implementation pending | Give specific reasons why a journey cannot start, including engines being off. Localize EN/ES and avoid internal leaks; specify message mapping. |
-| PT001-11 | Approved direction; technical definition pending | Give engines an operational standby state during cruise and reactivate them early enough for braking. Define power, timing, failure and persistence rules first. |
+| PT001-11 | Approved design; implementation pending | `ACTIVE` during acceleration and braking; `STANDBY` during cruise with early reactivation; automatic `OFFLINE` after the ship actually stops at its destination. Separate operational state, system health, and disconnection cause. Reactivation for a new departure, power use, wear, and startup times need definition in NAV-BRAKE-01C. |
 
 These rows distinguish observed defects from approved future behavior. None
-claims PT001-06 through PT001-11 is implemented. Causal, economic,
+claims PT001-07 through PT001-11 is implemented; PT001-06 only has the 06A
+load and prevention safeguards. Causal, economic,
 transactional and knowledge contracts remain in force.
 
 ## Pending milestones

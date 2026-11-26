@@ -423,6 +423,18 @@ y se rechazan hasta que B2 lo resuelva. B2 deberá invalidar planes nominales
 obsoletos, resolver cortes simultáneos y averías, autorizar aparte cualquier
 maniobra propulsiva nueva y replantear desde posición y beta reales.
 
+## Arranque ante sistemas críticos apagados (PT001-06A)
+
+Un tick físico con `core_os` o `life_support` apagado sigue rechazándose
+atómicamente: faltan transiciones causales de supervivencia. El tick inicial
+de CLI y Textual conserva la partida cargada, informa del bloqueo y deja el
+avance automático pausado. No atribuye tiempo transcurrido ni reactiva ningún
+sistema. Los comandos públicos no pueden apagar estos sistemas críticos
+durante un tránsito físico, para evitar nuevos estados sin avance soportado.
+La política existente de terminal impide encender `core_os` desde un terminal
+sin control; la partida real afectada permanece bloqueada para avanzar. Resolver
+esa transición exige una intervención separada y no forma parte de 06A.
+
 ## Primer corte causal por desgaste de motores (NAV-BRAKE-01B3H-B2A)
 
 Dentro del régimen eléctrico y radiológico restringido de 01B3H-A,

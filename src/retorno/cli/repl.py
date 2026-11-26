@@ -1219,6 +1219,10 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             "en": "Automatic physical advance stopped at an unresolved boundary: {detail}",
             "es": "Avance físico automático detenido en una frontera pendiente: {detail}",
         },
+        "physical_critical_shutdown_blocked": {
+            "en": "Cannot turn off {system_id} while the ship is moving.",
+            "es": "No se puede apagar {system_id} mientras la nave está en movimiento.",
+        },
         "physical_jobs_unsupported": {
             "en": "This operation needs physical job coordination that is not available during nominal travel.",
             "es": "Esta operación requiere coordinación física de trabajos que aún no está disponible durante el viaje nominal.",
@@ -2113,6 +2117,10 @@ def clock_readouts(state, *, compact: bool = False) -> list[str]:
 
 
 def physical_boundary_reason(locale: str, detail: str) -> str:
+    if "critical survival transitions" in detail:
+        return ("Critical ship systems are offline during physical transit; time advance is paused."
+                if locale != "es" else
+                "Hay sistemas críticos apagados durante el tránsito físico; el avance temporal está pausado.")
     if locale != "es":
         return detail
     if "drones" in detail:
@@ -4361,7 +4369,7 @@ def _core_os_damaged_blocks(parsed) -> bool:
 
 
 def _terminal_state_allows(parsed) -> bool:
-    if parsed in {"HELP", "HELP_VERBOSE", "HELP_NO_VERBOSE", "EXIT", "CLEAR"}:
+    if isinstance(parsed, str) and parsed in {"HELP", "HELP_VERBOSE", "HELP_NO_VERBOSE", "EXIT", "CLEAR"}:
         return True
     if isinstance(parsed, Status):
         return True
@@ -7541,7 +7549,7 @@ def main() -> None:
         audio_warning = audio_manager.notice or ""
 
     loop = GameLoop(engine, state, tick_s=1.0)
-    loop.step(1.0)
+    initial_advance_ok = loop.step_initial()
     audio_enabled, ambient_enabled = audio_flags(state.os)
     music_volume = state.os.audio.music_volume
     if audio_manager is not None:
@@ -7556,7 +7564,7 @@ def main() -> None:
         audio_manager.play_startup(audio_enabled, startup_audio_context)
     if play_startup_sequence:
         _maybe_run_startup_sequence(state.os.locale.value)
-    if not state.os.debug_enabled:
+    if not state.os.debug_enabled and initial_advance_ok:
         loop.set_auto_tick(True)
         loop.start()
     else:
@@ -8050,6 +8058,9 @@ def main() -> None:
 
     # print("RETORNO (prologue)")
     # print("\nTip: cat /mail/inbox/0000.notice.txt")
+    initial_events = loop.drain_events()
+    if initial_events:
+        render_events(state, initial_events)
     with loop.with_lock() as locked_state:
         render_status(locked_state)
         render_alerts(locked_state)
