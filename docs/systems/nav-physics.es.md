@@ -1,5 +1,25 @@
 # Segmentos físicos de navegación (NAV-BRAKE-01B3A)
 
+## Corrección del playtest (NAV-BRAKE-01B3H-D2B1-R1)
+
+La validación de intervalos físicos considera el mismo instante galáctico a
+dos extremos separados por hasta cuatro ULP, conforme a la regla existente
+del coordinador para coincidencias. El integrador sigue siendo la autoridad y
+los límites causales anteriores siguen deteniendo el intervalo. Un tick físico
+público prepara una sola copia del estado completo; el tramo nominal trabaja
+sobre esa misma transacción provisional, con rollback e identidad estable de
+los componentes principales. La predicción conserva una copia independiente
+de solo lectura.
+
+El avance automático de un segundo utiliza plazos monotónicos. El coste del
+procesamiento deja de sumarse a cada período nominal; se omiten los plazos
+perdidos sin reproducir ticks ni cambiar el tiempo de juego por tick. Tras un
+despertar normal o anticipado legítimo, la hibernación restablece la política
+previa de avance automático si la partida no está en estado terminal. Una
+frontera técnica aún no resuelta mantiene el tiempo automático pausado y
+emite un aviso; el guardado puede recargarse después de corregir el defecto.
+Los subsistemas ordinarios de la nave siguen activos.
+
 ## Coordinación causal pública (NAV-BRAKE-01B3H-D2B1)
 
 La navegación física pública admite drones a bordo, electricidad variable,

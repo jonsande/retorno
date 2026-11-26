@@ -158,8 +158,10 @@ class GameLoop:
             self._lock.release()
 
     def _run(self) -> None:
+        deadline = time.monotonic() + self.tick_s
         while not self._stop.is_set():
-            time.sleep(self.tick_s)
+            if self._stop.wait(max(0.0, deadline - time.monotonic())):
+                break
             try:
                 events = self.advance_interval(self.tick_s)
             except NavigationAdvanceBlocked as exc:
@@ -184,3 +186,9 @@ class GameLoop:
                 break
             with self._lock:
                 self._events_auto.extend(events)
+            deadline += self.tick_s
+            now = time.monotonic()
+            if deadline <= now:
+                # Missed deadlines are skipped, never replayed as a burst.
+                # Each successful iteration still advances one game tick.
+                deadline += (math.floor((now - deadline) / self.tick_s) + 1) * self.tick_s

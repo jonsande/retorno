@@ -1,5 +1,23 @@
 # Navigation motion segments (NAV-BRAKE-01B3A)
 
+## Playtest correction (NAV-BRAKE-01B3H-D2B1-R1)
+
+Physical interval validation treats galactic endpoints within four floating
+point ULPs as the same clock instant, matching the coordinator's existing
+tie rule. The integrator remains authoritative and earlier causal limits
+still stop the interval. A public physical tick stages the full state once;
+its nominal segment work uses that same provisional transaction, preserving
+rollback and stable top-level state owners. Forecasting retains a separate
+read-only state copy.
+
+Automatic one-second advance uses monotonic deadlines. Processing time no
+longer extends every nominal period; missed deadlines are skipped without
+replaying ticks or changing the amount of game time per tick. Hibernation
+restores the previous automatic-time setting after normal or legitimate early
+wake, provided the game is not terminal. A still unresolved technical boundary
+leaves automatic time paused and reports a warning; the current save can be
+reloaded after a correction. The full ordinary ship subsystems remain active.
+
 ## Public causal coordination (NAV-BRAKE-01B3H-D2B1)
 
 Public physical navigation admits onboard drones, variable electricity,

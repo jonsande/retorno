@@ -6928,7 +6928,14 @@ def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False,
     finally:
         with loop.with_lock() as locked_state:
             locked_state.ship.is_hibernating = False
-        loop.set_auto_tick(was_auto and not woke_early)
+            terminal = (locked_state.os.terminal_lock
+                        or locked_state.ship.systems["core_os"].state == SystemState.OFFLINE
+                        or locked_state.ship.systems["life_support"].state == SystemState.OFFLINE)
+        # An ordinary wake restores the player's prior time policy. An
+        # unresolved technical cut must stay paused so the automatic loop
+        # cannot immediately repeat it; a deliberate pause stays paused too.
+        unresolved = bool(wake_reason and wake_reason.startswith("causal_boundary:"))
+        loop.set_auto_tick(was_auto and not terminal and not unresolved)
     filtered = [pair for pair in step_events if pair[1].severity == Severity.CRITICAL
                 or pair[1].type in {EventType.ARRIVED, EventType.PHYSICAL_STOPPED,
                                     EventType.SYSTEM_STATE_CHANGED}]
@@ -7001,8 +7008,8 @@ def _render_hibernate_result(loop, result: HibernateRunResult) -> None:
                 elif result.wake_reason.startswith("causal_boundary:"):
                     detail = result.wake_reason.split(":", 1)[1]
                     msg = {
-                        "en": f"Hibernation stopped at unresolved physical boundary: {detail}",
-                        "es": f"Hibernación detenida en una frontera física pendiente: {physical_boundary_reason('es', detail)}",
+                        "en": f"Hibernation stopped at unresolved physical boundary: {detail}. Automatic time is paused; save and reload after the fault is corrected.",
+                        "es": f"Hibernación detenida en una frontera física pendiente: {physical_boundary_reason('es', detail)}. El tiempo automático está pausado; guarda y recarga tras corregir el fallo.",
                     }
             if not msg:
                 msg = {

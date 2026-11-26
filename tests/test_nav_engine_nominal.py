@@ -238,10 +238,10 @@ def test_second_phase_failure_rejects_whole_tick_without_events_or_rng_changes()
     first, _, _ = durations(physical)
     before = pickle.dumps(game)
     original = Engine._tick_physical_segment
-    def fail_on_coast(self, staged, dt):
+    def fail_on_coast(self, staged, dt, **kwargs):
         if staged.ship.physical_transit.nominal_plan.phase_index == 1:
             raise RuntimeError("second phase failed")
-        return original(self, staged, dt)
+        return original(self, staged, dt, **kwargs)
     with patch.object(Engine, "_tick_physical_segment", new=fail_on_coast):
         with pytest.raises(RuntimeError, match="second phase failed"):
             Engine().tick(game, first + 1)

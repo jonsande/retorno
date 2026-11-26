@@ -202,9 +202,9 @@ class Engine:
                 events = self._tick_recovery(staged, dt)
             elif (physical.nominal_plan is not None
                   and physical.nominal_braking_substitution is None):
-                events = self._tick_nominal_physical_travel(staged, dt)
+                events = self._tick_nominal_physical_travel(staged, dt, _staged=True)
             else:
-                events = self._tick_physical_segment(staged, dt)
+                events = self._tick_physical_segment(staged, dt, _staged=True)
             if dt > 0:
                 events.extend(self._finish_physical_transit(staged))
             self._commit_physical_state(state, staged)
@@ -896,8 +896,9 @@ class Engine:
         assert state.ship.physical_transit is not None
         return state.ship.physical_transit
 
-    def _tick_nominal_physical_travel(self, state: GameState, dt: float) -> list[Event]:
-        """Resolve phase ends on a private state; publish only the complete tick."""
+    def _tick_nominal_physical_travel(self, state: GameState, dt: float, *,
+                                      _staged: bool = False) -> list[Event]:
+        """Resolve phase ends within the caller's transaction or a private copy."""
         if not math.isfinite(dt) or dt < 0:
             raise ValueError("physical tick duration must be finite and nonnegative")
         if dt == 0:
@@ -922,7 +923,7 @@ class Engine:
             raise RuntimeError("nominal physical tick is below clock resolution")
         if requested_end > final_time:
             raise RuntimeError("physical tick exceeds the nominal journey endpoint")
-        staged = deepcopy(state)
+        staged = state if _staged else deepcopy(state)
         events: list[Event] = []
         remaining = dt
         while remaining > 0:
@@ -933,7 +934,7 @@ class Engine:
             if available <= 0:
                 raise RuntimeError("nominal physical phase cannot advance")
             step = min(remaining, available)
-            events.extend(self._tick_physical_segment(staged, step))
+            events.extend(self._tick_physical_segment(staged, step, _staged=True))
             remaining = max(0.0, requested_end - staged.clock.t)
             active = staged.ship.physical_transit
             assert active is not None and active.nominal_plan is not None
@@ -966,7 +967,8 @@ class Engine:
                     staged.ship.physical_transit = replace(
                         active, nominal_plan=replace(nominal, completed=True))
         staged.clock.last_dt = dt
-        self._commit_physical_state(state, staged)
+        if not _staged:
+            self._commit_physical_state(state, staged)
         return events
 
     def _tick_safety_braking(self, state: GameState, dt: float) -> list[Event]:
@@ -1326,18 +1328,20 @@ class Engine:
             job_limits=jobs + tuple(health_limits))
 
     def _tick_physical_segment(self, state: GameState, dt: float, *,
-                               allow_repair_drone: bool = False) -> list[Event]:
-        """One causal physical interval. Commit only after all staged effects succeed.
+                               allow_repair_drone: bool = False,
+                               _staged: bool = False) -> list[Event]:
+        """One causal interval; ``_staged`` requires a caller-owned transaction.
 
         A public caller selects each causal cut before entering this atomic
-        interval. Direct callers may still request an interval beyond a cut.
+        interval. Direct callers retain a private copy and may still request
+        an interval beyond a cut.
         """
         if not math.isfinite(dt) or dt < 0:
             raise ValueError("physical tick duration must be finite and nonnegative")
         if dt == 0:
             return []
         target = state
-        state = deepcopy(target)
+        state = target if _staged else deepcopy(target)
         instant_events: list[Event] = []
         job_interval = None
         if not allow_repair_drone:
@@ -1502,8 +1506,15 @@ class Engine:
                 if engine_boundary is not None and engine_boundary < local_end:
                     raise RuntimeError("Physical tick extends beyond the 35% or 15% causal boundary")
         selected = self._physical_limit_selection(state, dt)
-        if selected.deferred or selected.at_galactic_s < end.galactic_s or any(
-            cause.at_galactic_s < end.galactic_s and cause.limit.kind != "requested_horizon"
+        # The coordinator adds the horizon to the absolute clock; the physical
+        # integrator adds local elapsed time to the segment's start. Those
+        # equivalent sums can differ by a few representable clock instants.
+        # Use the coordinator's four-ULP tie rule; earlier real causes remain
+        # rejected and are still executed at the selected endpoint.
+        boundary_tolerance = 4 * math.ulp(max(1.0, abs(end.galactic_s)))
+        if selected.deferred or selected.at_galactic_s < end.galactic_s - boundary_tolerance or any(
+            cause.at_galactic_s < end.galactic_s - boundary_tolerance
+            and cause.limit.kind != "requested_horizon"
             for cause in selected.causes
         ):
             raise RuntimeError("Physical segment interval has an unresolved causal boundary")
@@ -1620,7 +1631,8 @@ class Engine:
         for event in events:
             self._record_event(staged.events, event)
         self._update_alert_timers(staged.events, dt)
-        self._commit_physical_state(target, staged)
+        if not _staged:
+            self._commit_physical_state(target, staged)
         return events
 
     @staticmethod
