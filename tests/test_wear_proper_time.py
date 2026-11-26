@@ -206,11 +206,12 @@ class WearProperTimeTests(unittest.TestCase):
              patch.object(self.engine, '_update_drone_maintenance', wraps=self.engine._update_drone_maintenance) as maintenance, \
              patch.object(self.engine, '_apply_critical_system_consequences', wraps=self.engine._apply_critical_system_consequences) as life_support:
             self.engine.tick(s, 100)
-        for consumer in (jobs, radiation, maintenance, life_support):
-            self.assertEqual(consumer.call_count, 1)
+        for name, consumer in (("jobs", jobs), ("radiation", radiation),
+                               ("maintenance", maintenance), ("life_support", life_support)):
+            self.assertEqual(consumer.call_count, 1, name)
             self.assertEqual(consumer.call_args.args[1], 100)
-        for consumer in (lore, recovery, radio):
-            self.assertEqual(consumer.call_count, 1)
+        for name, consumer in (("lore", lore), ("recovery", recovery), ("radio", radio)):
+            self.assertEqual(consumer.call_count, 1, name)
         self.assertAlmostEqual(drone.dose_rad, .002*.5*100)
         self.assertAlmostEqual(drone.battery, 1-Balance.DRONE_BATTERY_IDLE_DRAIN_DEPLOYED_PER_S*100)
 

@@ -69,6 +69,7 @@ def test_hibernation_labels_propulsion_loss_as_emergency():
     game.ship.power.p_gen_base_kw = 2.0
     game.ship.power.e_batt_kwh = 1.0
     result = repl._execute_hibernate(loop, .001)
+    loop.stop()
     assert result.woke_early
     assert result.wake_reason == "emergency:Physical propulsion capacity is unavailable"
     assert 0 < result.actual_years < .001
@@ -166,6 +167,7 @@ def test_hibernation_wakes_on_real_critical_health_transition():
     support.state = SystemState.DAMAGED
     support.base_decay_per_s = .00001
     result = repl._execute_hibernate(loop, .001)
+    loop.stop()
     assert result.woke_early
     assert result.wake_reason == "critical_system:life_support:critical"
     assert 0 < result.actual_years < .001
@@ -176,6 +178,7 @@ def test_hibernation_wakes_at_physical_radiation_crossing():
     game, loop = departed()
     game.world.space.nodes["NOMINAL_B"].radiation_rad_per_s = .004
     result = repl._execute_hibernate(loop, 10.0)
+    loop.stop()
     assert result.woke_early
     assert result.wake_reason == "env_radiation_threshold:0.0030"
     assert 0 < result.actual_years < 10

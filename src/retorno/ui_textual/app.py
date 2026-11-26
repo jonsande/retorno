@@ -6,6 +6,7 @@ import os
 import random
 import sys
 import time
+from queue import Empty, SimpleQueue
 
 from textual.app import App, ComposeResult
 from textual import events
@@ -271,7 +272,10 @@ class RetornoTextualApp(App):
         self._startup_sequence_skip = False
         self._startup_panel_blackout = bool(self._play_startup_sequence and Balance.STARTUP_SEQUENCE_ENABLED)
         self._hibernate_sequence_running = False
+        self._hibernate_worker: asyncio.Task | None = None
+        self._hibernate_closing = False
         self._hibernate_panel_blackout = False
+        self._hibernate_progress: SimpleQueue[str] = SimpleQueue()
         try:
             self._audio_manager = AudioManager(load_audio_config())
         except AudioConfigError as exc:
@@ -529,12 +533,34 @@ class RetornoTextualApp(App):
                     await asyncio.sleep(1.0)
 
             self._clear_log_widget(clear_buffer=True)
-            result = repl._execute_hibernate(
-                self.loop,
-                years,
+            progress_last = [0.0]
+
+            def report_progress(elapsed_s: float, total_s: float) -> None:
+                if self._hibernate_closing:
+                    return
+                now = time.monotonic()
+                if now - progress_last[0] < 0.5 and elapsed_s < total_s:
+                    return
+                progress_last[0] = now
+                elapsed_years = elapsed_s / Balance.YEAR_S
+                total_years = total_s / Balance.YEAR_S
+                message = (f"[INFO] Simulating: {elapsed_years:.2f}/{total_years:.2f} y"
+                           if locale == "en" else
+                           f"[INFO] Simulando: {elapsed_years:.2f}/{total_years:.2f} años")
+                self._hibernate_progress.put(message)
+
+            self._log_line("[INFO] Simulating journey…" if locale == "en" else
+                           "[INFO] Simulando el viaje…")
+            self._hibernate_worker = asyncio.create_task(asyncio.to_thread(
+                repl._execute_hibernate, self.loop, years,
                 wake_on_low_battery=wake_on_low_battery,
-                until_arrival=until_arrival,
-            )
+                until_arrival=until_arrival, on_progress=report_progress,
+            ))
+            result = await asyncio.shield(self._hibernate_worker)
+            self._hibernate_worker = None
+            if self._hibernate_closing:
+                return
+            self._drain_hibernate_progress()
             self._hibernate_panel_blackout = True
             self._render_panel_blackout()
             if wake_blackout_s > 0.0:
@@ -561,12 +587,13 @@ class RetornoTextualApp(App):
         except Exception as e:
             self._log_line(f"[ERROR] hibernate failed: {e}")
         finally:
-            self._hibernate_panel_blackout = False
-            input_widget.disabled = False
             self._hibernate_sequence_running = False
-            self.refresh_panels()
-            self.call_later(input_widget.focus)
-            self.call_later(self._rearm_deferred_repair_prompts)
+            if not self._hibernate_closing:
+                self._hibernate_panel_blackout = False
+                input_widget.disabled = False
+                self.refresh_panels()
+                self.call_later(input_widget.focus)
+                self.call_later(self._rearm_deferred_repair_prompts)
 
     def action_startup_skip(self) -> None:
         if not self._startup_sequence_running:
@@ -584,9 +611,15 @@ class RetornoTextualApp(App):
             event.stop()
         return
 
-    def on_shutdown(self) -> None:
+    async def on_unmount(self) -> None:
         if hasattr(self, "_panel_refresh_timer"):
             self._panel_refresh_timer.stop()
+        self._hibernate_closing = True
+        if self._hibernate_worker is not None:
+            try:
+                await self._hibernate_worker
+            except Exception:
+                pass  # The sequence reports the technical error if still mounted.
         self._persist_game_on_exit()
 
     def startup_console_messages(self) -> list[str]:
@@ -1390,11 +1423,24 @@ class RetornoTextualApp(App):
         input_widget.styles.background = palette.panel_background
         input_widget.styles.color = palette.foreground
 
+    def _drain_hibernate_progress(self) -> None:
+        if self._hibernate_closing:
+            return
+        while True:
+            try:
+                message = self._hibernate_progress.get_nowait()
+            except Empty:
+                return
+            self._log_line(message)
+
     def refresh_panels(self) -> None:
         # A queued timer callback can run after Textual removed the screen.
         if not list(self.query("#header")):
             return
-        with self.loop.with_lock() as state:
+        self._drain_hibernate_progress()
+        with self.loop.with_lock_if_available() as state:
+            if state is None:
+                return
             theme_preset = normalize_theme_preset(getattr(state.os, "theme_preset", "linux"))
         if theme_preset != self._theme_preset:
             self._apply_theme(theme_preset)
@@ -1404,12 +1450,22 @@ class RetornoTextualApp(App):
         if self._hibernate_panel_blackout:
             self._render_panel_blackout()
             return
-        with self.loop.with_lock() as state:
+        auto_events = []
+        event_lines = []
+        audio_enabled = False
+        with self.loop.with_lock_if_available() as state:
+            if state is None:
+                return
             header = presenter.build_header(state)
             status_lines = presenter.build_status_lines(state)
             alerts_lines = presenter.build_alerts_lines(state)
             jobs_lines = presenter.build_jobs_lines(state)
             power_lines = presenter.build_power_lines(state)
+            if not (self._startup_sequence_running or self._hibernate_sequence_running):
+                auto_events = self.loop._drain_events_locked()
+                if auto_events:
+                    event_lines = presenter.format_event_lines(state, auto_events)
+                    audio_enabled = state.os.audio.enabled
         self.query_one("#header", Static).update(render_rich_line(header, self._theme_preset))
         status_widget = self.query_one("#status", RichLog)
         if status_widget.display:
@@ -1438,13 +1494,8 @@ class RetornoTextualApp(App):
         self.query_one("#power", Static).update(render_rich_block(power_lines, self._theme_preset))
         if self._startup_sequence_running or self._hibernate_sequence_running:
             return
-        auto_events = self.loop.drain_events()
         if auto_events:
-            audio_enabled = False
-            with self.loop.with_lock() as state:
-                lines = presenter.format_event_lines(state, auto_events)
-                audio_enabled = state.os.audio.enabled
-            self._log_lines(lines)
+            self._log_lines(event_lines)
             if self._audio_manager is not None:
                 self._audio_manager.handle_event_batch(audio_enabled, auto_events)
                 notice = self._audio_manager.consume_notice()

@@ -174,9 +174,12 @@ def test_large_absolute_time_and_unrepresentable_positive_steps():
     with pytest.raises(TemporalResolutionError):
         select_next_boundary(segment, at, 10,
                              job_limits=(TemporalLimit("propulsion_job", "galactic", 0.1),))
-    with pytest.raises(TemporalResolutionError):
-        select_next_boundary(segment, at, 10,
-                             health_limit=TemporalLimit("engine_health_threshold", "proper", 1e-20))
+    resolved = select_next_boundary(
+        segment, at, 10,
+        health_limit=TemporalLimit("engine_health_threshold", "proper", 1e-20))
+    assert resolved.at_galactic_s == math.nextafter(at, math.inf)
+    assert resolved.advance_galactic_s == math.ulp(at)
+    assert kinds(resolved) == ["engine_health_threshold"]
     large_proper_clock = coast_for(origin(0.5, proper=1e16), 100)
     with pytest.raises(TemporalResolutionError, match="proper-clock"):
         select_next_boundary(large_proper_clock, 0, 0.1)

@@ -62,6 +62,7 @@ def select_next_boundary(
     job_limits: tuple[TemporalLimit, ...] = (),
     invalidation_reasons: tuple[str, ...] = (),
     seen_zero_selections: tuple[BoundarySelection, ...] = (),
+    elapsed_segment_s: float | None = None,
 ) -> BoundarySelection:
     """Select the earliest cut of a nominal plan or the active physical segment.
 
@@ -115,21 +116,41 @@ def select_next_boundary(
         end_kind = "profile_end"
     elif isinstance(plan, MotionSegment):
         start = plan.start.galactic_s
-        profile_end = start + plan.duration_galactic_s
-        if not math.isfinite(elapsed_galactic_s) or not start <= elapsed_galactic_s <= profile_end:
+        absolute_end = start + plan.duration_galactic_s
+        if not math.isfinite(elapsed_galactic_s) or not start <= elapsed_galactic_s <= absolute_end:
             raise ValueError("elapsed_galactic_s must lie within the active segment")
-        local_now = (plan.duration_galactic_s if elapsed_galactic_s == profile_end
+        local_now = (elapsed_segment_s if elapsed_segment_s is not None else
+                     plan.duration_galactic_s if elapsed_galactic_s == absolute_end
                      else elapsed_galactic_s - start)
+        if not math.isfinite(local_now) or not 0 <= local_now <= plan.duration_galactic_s:
+            raise ValueError("elapsed_segment_s must lie within the active segment")
+        # The saved local coordinate is authoritative. Reconstructing it by
+        # subtracting two decade-scale absolute clocks can move a boundary by
+        # one or more local ULPs.
+        remaining_local = plan.duration_galactic_s - local_now
+        profile_end = elapsed_galactic_s + remaining_local
+        if remaining_local > 0 and profile_end == elapsed_galactic_s:
+            profile_end = math.nextafter(elapsed_galactic_s, math.inf)
         current_proper = proper_time_in_segment(plan, local_now)
         current_accumulated_proper = sample_segment(plan, local_now).proper_s
         total_local_proper = proper_time_in_segment(plan, plan.duration_galactic_s)
 
         def proper_at(at: float) -> float:
-            local = plan.duration_galactic_s if at == profile_end else at - start
+            local = (plan.duration_galactic_s if at == profile_end else
+                     min(plan.duration_galactic_s, local_now + (at - elapsed_galactic_s)))
             return sample_segment(plan, local).proper_s
 
         def galactic_at_proper(target: float) -> float:
-            return start + galactic_time_at_segment_proper(plan, target)
+            local_target = galactic_time_at_segment_proper(plan, target)
+            delta = local_target - local_now
+            if delta <= 0 and target > current_proper:
+                # The local inverse itself rounded to this representable
+                # instant. The real crossing lies in the next clock quantum.
+                delta = math.ulp(elapsed_galactic_s)
+            at = elapsed_galactic_s + delta
+            if target > current_proper and at == elapsed_galactic_s:
+                at = math.nextafter(elapsed_galactic_s, math.inf)
+            return at
 
         phases = ()
         end_kind = "segment_end"
@@ -161,10 +182,13 @@ def select_next_boundary(
             target_proper = current_proper + proper_limit.time_s
             if not math.isfinite(target_proper):
                 raise ValueError("proper-time limit exceeds floating-point range")
-            if proper_limit.time_s > 0 and target_proper == current_proper:
+            if (isinstance(plan, TravelPlan) and proper_limit.time_s > 0
+                    and target_proper == current_proper):
                 raise TemporalResolutionError("positive proper limit is below clock resolution")
             if target_proper <= total_local_proper:
                 at = (elapsed_galactic_s if proper_limit.time_s == 0
+                      else math.nextafter(elapsed_galactic_s, math.inf)
+                      if isinstance(plan, MotionSegment) and target_proper == current_proper
                       else galactic_at_proper(target_proper))
                 if at < elapsed_galactic_s or (proper_limit.time_s > 0 and at == elapsed_galactic_s):
                     raise TemporalResolutionError("proper limit cannot advance the galactic clock")
@@ -184,13 +208,58 @@ def select_next_boundary(
     # The horizon can lie beyond the active profile, but its end supplies a cut.
     earliest = min(cause.at_galactic_s for cause in candidates)
     tolerance = 4 * math.ulp(max(1.0, abs(earliest)))
+    if isinstance(plan, MotionSegment):
+        # A large absolute clock ULP can span whole seconds. Causes are
+        # simultaneous only if they also coincide at the query's local scale.
+        tolerance = min(tolerance, 4 * math.ulp(max(1.0, abs(horizon_galactic_s))))
     causes = tuple(cause for cause in candidates
                    if cause.at_galactic_s - earliest <= tolerance)
-    accumulated_at = proper_at(earliest)
+    advance = earliest - elapsed_galactic_s
+    if isinstance(plan, MotionSegment):
+        # Absolute addition can contract a local duration by an ULP. Keep the
+        # local cut itself as the executable duration, and resolve all causes
+        # that map to the same representable absolute instant together.
+        local_advances = []
+        for cause in causes:
+            limit = cause.limit
+            if limit.kind == "segment_end":
+                duration = plan.duration_galactic_s - local_now
+            elif limit.domain == "proper" and limit.time_s is not None:
+                target = current_proper + limit.time_s
+                duration = (galactic_time_at_segment_proper(plan, target) - local_now
+                            if limit.time_s > 0 else 0.0)
+                if limit.time_s > 0 and duration <= 0:
+                    duration = math.ulp(elapsed_galactic_s)
+            else:
+                duration = limit.time_s or 0.0
+            if duration > 0:
+                duration = max(duration, math.ulp(elapsed_galactic_s))
+            local_advances.append(duration)
+        advance = max(local_advances)
+        local_at = min(plan.duration_galactic_s, local_now + advance)
+        accumulated_at = sample_segment(plan, local_at).proper_s
+        if advance > 0:
+            for _ in range(256):
+                sampled = sample_segment(plan, local_at)
+                if (sampled.galactic_s > elapsed_galactic_s
+                        and sampled.proper_s > current_accumulated_proper):
+                    accumulated_at = sampled.proper_s
+                    advance = local_at - local_now
+                    break
+                next_local = math.nextafter(local_at, math.inf)
+                if next_local > plan.duration_galactic_s:
+                    raise TemporalResolutionError(
+                        "positive interval is below cumulative proper-clock resolution")
+                local_at = next_local
+            else:
+                raise TemporalResolutionError(
+                    "positive interval is below cumulative proper-clock resolution")
+    else:
+        accumulated_at = proper_at(earliest)
     if earliest > elapsed_galactic_s and accumulated_at == current_accumulated_proper:
         raise TemporalResolutionError("positive interval is below cumulative proper-clock resolution")
     selection = BoundarySelection(
-        earliest, earliest - elapsed_galactic_s, accumulated_at, causes, deferred,
+        earliest, advance, accumulated_at, causes, deferred,
         any(cause.limit.kind != "requested_horizon" for cause in causes),
     )
     signature = _zero_signature(selection)

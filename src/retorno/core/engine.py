@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import random
 import hashlib
+import pickle
 from copy import deepcopy
 from dataclasses import fields, replace
 from typing import Iterable
@@ -19,7 +20,8 @@ from retorno.core.nav_electricity import (battery_energy_after, power_quality_co
                                          invalidation_reasons)
 from retorno.core.nav_physics import (MotionSegment, MotionState, TravelPlan, accelerate_to, append_segment,
                                       brake_to_stop, coast_for, light_years_to_metres,
-                                      plan_travel, proper_time_in_segment, sample_segment)
+                                      plan_travel, proper_time_in_segment,
+                                      proper_time_between_segment, sample_segment)
 from retorno.core.nav_state import (PhysicalTransitState, PropulsionAuthorization,
                                     NominalTravelState, NominalBrakingSubstitution,
                                     InertialContinuation, RecoveryExecution, RecoveryIntent,
@@ -122,7 +124,7 @@ from retorno.runtime.data_loader import load_locations, load_modules
 from retorno.model.os import AccessLevel, FSNode, FSNodeType, normalize_path, mount_files
 from retorno.model.systems import Dependency, ShipSystem, SystemState
 from retorno.config.balance import Balance
-from retorno.worldgen.generator import ensure_sector_generated
+from retorno.worldgen.generator import ensure_sector_generated, universe_rules_transaction
 
 
 @dataclass(slots=True)
@@ -191,24 +193,29 @@ class Engine:
                 return []
             # The whole physical interval and its zero-time operational landing
             # share one transaction. A failed world update cannot publish motion.
-            staged = deepcopy(state)
-            physical = staged.ship.physical_transit
-            if physical.pending_transition == "safety_brake":
-                events = self._tick_safety_braking(staged, dt)
-            elif (physical.pending_transition == "inertia"
-                  or physical.inertial_continuation is not None):
-                events = self._tick_inertial(staged, dt)
-            elif physical.recovery_execution is not None:
-                events = self._tick_recovery(staged, dt)
-            elif (physical.nominal_plan is not None
-                  and physical.nominal_braking_substitution is None):
-                events = self._tick_nominal_physical_travel(staged, dt, _staged=True)
-            else:
-                events = self._tick_physical_segment(staged, dt, _staged=True)
-            if dt > 0:
-                events.extend(self._finish_physical_transit(staged))
-            self._commit_physical_state(state, staged)
-            return events
+            # Pickle round-trip fully isolates the transaction, including
+            # mutable universe records, at lower cost than Python deepcopy
+            # for the large slotted playtest state. Save/load already relies
+            # on this exact in-memory schema.
+            with universe_rules_transaction():
+                staged = pickle.loads(pickle.dumps(state, protocol=pickle.HIGHEST_PROTOCOL))
+                physical = staged.ship.physical_transit
+                if physical.pending_transition == "safety_brake":
+                    events = self._tick_safety_braking(staged, dt)
+                elif (physical.pending_transition == "inertia"
+                      or physical.inertial_continuation is not None):
+                    events = self._tick_inertial(staged, dt)
+                elif physical.recovery_execution is not None:
+                    events = self._tick_recovery(staged, dt)
+                elif (physical.nominal_plan is not None
+                      and physical.nominal_braking_substitution is None):
+                    events = self._tick_nominal_physical_travel(staged, dt, _staged=True)
+                else:
+                    events = self._tick_physical_segment(staged, dt, _staged=True)
+                if dt > 0:
+                    events.extend(self._finish_physical_transit(staged))
+                self._commit_physical_state(state, staged)
+                return events
         # Stop at drone decision/completion boundaries. A large wait must not
         # jump from a safe reserve to an exhausted drone before checking recall.
         events: list[Event] = []
@@ -936,6 +943,8 @@ class Engine:
             step = min(remaining, available)
             events.extend(self._tick_physical_segment(staged, step, _staged=True))
             remaining = max(0.0, requested_end - staged.clock.t)
+            if remaining <= 4 * math.ulp(max(1.0, requested_end)):
+                remaining = 0.0
             active = staged.ship.physical_transit
             assert active is not None and active.nominal_plan is not None
             nominal = active.nominal_plan
@@ -1152,6 +1161,27 @@ class Engine:
         physical = state.ship.physical_transit
         if physical is None:
             return horizon_s
+        if (physical.pending_transition is None
+                and physical.inertial_continuation is None
+                and not state.jobs.active_job_ids):
+            # With no zero-time work or electrical regulation, the productive
+            # scheduler's prelude cannot alter the forecast. Read the state
+            # directly instead of cloning the whole discovered universe.
+            snapshot = capture_power_snapshot(
+                state, self._compute_p_gen(state), self._compute_load_kw(state))
+            if not any(limit.time_s == 0 for limit in power_limits(snapshot)):
+                remaining = (physical.active_segment.duration_galactic_s
+                             - physical.elapsed_galactic_s)
+                endpoint = physical.active_segment.start.galactic_s + physical.active_segment.duration_galactic_s
+                if abs(horizon_s - remaining) <= 16 * math.ulp(max(1.0, endpoint)):
+                    horizon_s = remaining
+                horizon_s = min(horizon_s, remaining)
+                selection = self._physical_limit_selection(state, horizon_s)
+                if selection.deferred:
+                    raise RuntimeError("Physical segment has an unresolved forecast")
+                if selection.advance_galactic_s <= 0:
+                    raise RuntimeError("Physical causal forecast cannot advance the clock")
+                return min(horizon_s, selection.advance_galactic_s)
         if physical.pending_transition == "safety_brake":
             staged = deepcopy(state)
             self._activate_safety_braking(staged)
@@ -1325,7 +1355,8 @@ class Engine:
         return select_next_boundary(
             segment, state.clock.t, horizon_s,
             proper_limits=tuple(electrical + radiological),
-            job_limits=jobs + tuple(health_limits))
+            job_limits=jobs + tuple(health_limits),
+            elapsed_segment_s=local_now)
 
     def _tick_physical_segment(self, state: GameState, dt: float, *,
                                allow_repair_drone: bool = False,
@@ -1425,8 +1456,8 @@ class Engine:
         if local_end > segment.duration_galactic_s or local_end == physical.elapsed_galactic_s:
             raise RuntimeError("Physical segment cannot advance beyond this segment or clock resolution")
         end = sample_segment(segment, local_end)
-        proper_dt = (proper_time_in_segment(segment, local_end)
-                     - proper_time_in_segment(segment, physical.elapsed_galactic_s))
+        proper_dt = proper_time_between_segment(
+            segment, physical.elapsed_galactic_s, local_end)
         if proper_dt <= 0 or end.galactic_s == now.galactic_s or end.proper_s == now.proper_s:
             raise RuntimeError("Physical segment is below clock resolution")
 
@@ -1600,11 +1631,28 @@ class Engine:
         for key, system in staged.ship.systems.items():
             health = (engine_threshold if key == "engines" and engine_boundary is not None
                       else max(0.0, system.health - wear[key]))
+            if (wear[key] > 0 and health == system.health
+                    and system.health in {
+                        Balance.SYSTEM_HEALTH_OFFLINE, Balance.SYSTEM_HEALTH_CRITICAL,
+                        Balance.SYSTEM_HEALTH_DAMAGED, Balance.SYSTEM_HEALTH_LIMITED,
+                    }
+                    and any(cause.limit.system_id == key
+                            and cause.limit.kind == "system_health_threshold"
+                            and abs(cause.at_galactic_s - end.galactic_s)
+                            <= boundary_tolerance for cause in selected.causes)):
+                # The causal wear crossing has occurred, but subtracting less
+                # than one health ULP can leave a strict classifier pinned on
+                # the old side forever. Resolve that exact selected crossing
+                # to the next representable health value once.
+                health = math.nextafter(system.health, -math.inf)
             if engine_boundary is None or key != "engines":
-                for threshold in (Balance.SYSTEM_HEALTH_OFFLINE,
-                                  Balance.SYSTEM_HEALTH_CRITICAL,
-                                  Balance.SYSTEM_HEALTH_DAMAGED,
-                                  Balance.SYSTEM_HEALTH_LIMITED):
+                thresholds = (Balance.SYSTEM_HEALTH_OFFLINE,
+                              Balance.SYSTEM_HEALTH_CRITICAL,
+                              Balance.SYSTEM_HEALTH_DAMAGED,
+                              Balance.SYSTEM_HEALTH_LIMITED)
+                if key == "engines":
+                    thresholds += (Balance.ENGINE_EMERGENCY_BRAKE_MIN_HEALTH,)
+                for threshold in thresholds:
                     if (system.health > threshold
                             and abs(health - threshold)
                             <= 16 * math.ulp(max(1.0, system.health))):

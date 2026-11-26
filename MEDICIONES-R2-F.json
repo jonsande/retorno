@@ -1,0 +1,24 @@
+[
+  {
+    "save": "PT001-04-clock-resolution.dat",
+    "processing_s": 12.000804465000328,
+    "arrived": true,
+    "woke_early": false,
+    "wake_reason": null,
+    "clock_t": 836389555.0282785,
+    "actual_years": 12.521576182435263,
+    "fuel_before": 10.40581506308498,
+    "fuel_after": 10.40581506308498
+  },
+  {
+    "save": "PT001-05-proper-limit.dat",
+    "processing_s": 13.810436478000156,
+    "arrived": true,
+    "woke_early": false,
+    "wake_reason": null,
+    "clock_t": 2426848953.7272334,
+    "actual_years": 23.639517446900538,
+    "fuel_before": 7.639609187995884,
+    "fuel_after": 7.639609187995884
+  }
+]

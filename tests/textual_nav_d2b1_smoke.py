@@ -75,4 +75,12 @@ async def run() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(run())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(run())
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        if loop._default_executor is not None:
+            loop._default_executor.shutdown(wait=True)
+    finally:
+        loop.close()

@@ -1,0 +1,28 @@
+{
+  "phase": "R2 baseline before code changes",
+  "head": "cc5e58412c3606554c9dc19bd638c232e231ee43",
+  "source": "tests/nav_r1_benchmark.py and /tmp/nav_r2_hibernate.py on read-only original saves",
+  "pt001_04": {
+    "save": "PT001-04-clock-resolution.dat",
+    "samples": 5,
+    "rest_tick_s": [0.019183276999683585, 0.017614366006455384, 0.016171310002391692, 0.015915867996227462, 0.016465284999867436],
+    "physical_forecast_s": [0.09257947299920488, 0.050255539994395804, 0.057187048994819634, 0.05224793999514077, 0.05004922700027237],
+    "physical_tick_s": [0.20788359500147635, 0.11329067000042414, 0.10621532599907368, 0.1082197619980434, 0.1247529320025933],
+    "physical_advance_s": [0.17352523399313213, 0.17594080600247253, 0.1567622799993842, 0.152780882002844, 0.24956756699975813],
+    "physical_lock_held_s": [0.17349737999757053, 0.17591008000454167, 0.15674758700333769, 0.15275430899782805, 0.2495515369955683],
+    "deepcopy_count_per_advance": [2, 2, 2, 2, 2],
+    "deepcopy_total_s": [0.11345776500093052, 0.09827878900978249, 0.09015662300225813, 0.08901552300085314, 0.156928385993524],
+    "hibernate_processing_s": 88.17377407499589,
+    "hibernate_outer_blocks": 653,
+    "hibernate_result": "arrival at 836389555.0282785 s; fuel 10.40581506308498"
+  },
+  "pt001_05": {
+    "save": "PT001-05-proper-limit.dat",
+    "first_forecast": "TemporalResolutionError: proper limit cannot advance the galactic clock",
+    "hibernate_processing_s_before_error": 0.09079389300313778,
+    "hibernate_outer_blocks_before_error": 1,
+    "clock_t_before_and_after": 1681353131.521778,
+    "fuel_before_and_after": 7.639609187995884
+  },
+  "note": "Elapsed load/save validation is excluded from hibernation processing timing. The five short samples were gathered while two baseline probes overlapped briefly; the 88.17-second full run was separate."
+}

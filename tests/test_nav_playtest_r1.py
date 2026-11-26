@@ -73,7 +73,7 @@ def test_rounding_tolerance_does_not_cross_a_real_job_boundary():
     assert game.jobs.jobs[job.internal_id].status == JobStatus.COMPLETED
 
 
-def test_nominal_public_tick_uses_one_forecast_and_one_transaction(monkeypatch):
+def test_nominal_public_tick_avoids_redundant_deep_copies(monkeypatch):
     import retorno.core.engine as engine_module
     game, loop = fractional_departure()
     original = engine_module.deepcopy
@@ -85,7 +85,7 @@ def test_nominal_public_tick_uses_one_forecast_and_one_transaction(monkeypatch):
 
     monkeypatch.setattr(engine_module, "deepcopy", counted)
     loop.advance_interval(1)
-    assert len(copies) == 2
+    assert copies == []
 
 
 def test_hibernation_legitimate_wake_restores_prior_auto_policy_and_job_progress(monkeypatch):

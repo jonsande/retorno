@@ -12,7 +12,8 @@ from typing import Callable
 from retorno.config.balance import Balance
 from retorno.core.nav_boundaries import TemporalLimit, ordinary_wear_rate
 from retorno.core.nav_physics import (
-    LIGHT_SPEED_M_S, MotionSegment, proper_time_in_segment, sample_segment,
+    LIGHT_SPEED_M_S, MotionSegment, proper_time_in_segment,
+    proper_time_between_segment, sample_segment,
 )
 from retorno.model.systems import ShipSystem
 
@@ -101,9 +102,7 @@ def _proper_moments(
     The caller cuts at spatial endpoint and hull-radiation saturation branches.
     Stable hyperbolic series avoid cancellation near zero acceleration/time.
     """
-    dtau = proper_time_in_segment(segment, right) - proper_time_in_segment(segment, left)
-    if dtau < 0 or (right > left and dtau == 0):
-        raise ValueError("proper duration is below floating-point resolution")
+    dtau = proper_time_between_segment(segment, left, right)
     start = sample_segment(segment, left)
     middle = sample_segment(segment, left + (right - left) / 2.0)
     slope = (profile.slope_rad_per_s_m
@@ -269,8 +268,7 @@ def integrate_segment_radiation(
         raise ValueError("subinterval must lie within the segment")
     if hull_integrity > 1 or abs_tol == 0 or rel_tol == 0:
         raise ValueError("hull integrity and tolerances are out of range")
-    total_proper = (proper_time_in_segment(segment, end_galactic_s)
-                    - proper_time_in_segment(segment, start_galactic_s))
+    total_proper = proper_time_between_segment(segment, start_galactic_s, end_galactic_s)
     if start_galactic_s == end_galactic_s:
         return RadiationIntegral(0, 0, 0, 0, 0, 0, hull_integrity, hull_integrity, 0, 0)
     cuts = _spatial_cuts(profile, segment, start_galactic_s, end_galactic_s)
@@ -525,8 +523,7 @@ def environmental_limits(
         if not now.distance_m < position < end.distance_m:
             continue
         at = _position_cut(segment, position, current_galactic_s, segment.duration_galactic_s)
-        proper = (proper_time_in_segment(segment, at)
-                  - proper_time_in_segment(segment, current_galactic_s))
+        proper = proper_time_between_segment(segment, current_galactic_s, at)
         if proper <= 0:
             raise ValueError("radiation crossing is below proper-time resolution")
         limits.append(_radiation_limit(kind, proper, "fixed_segment_and_radiation_profile"))
@@ -713,8 +710,7 @@ def radiation_limits(
                 lo = mid
             else:
                 hi = mid
-        proper = (proper_time_in_segment(segment, hi)
-                  - proper_time_in_segment(segment, current_galactic_s))
+        proper = proper_time_between_segment(segment, current_galactic_s, hi)
         if proper > 0:
             floor_at = hi
             limits.append(_radiation_limit("hull_integrity_zero", proper,
@@ -743,8 +739,7 @@ def radiation_limits(
             continue
         if at is None:
             continue
-        proper = (proper_time_in_segment(segment, at)
-                  - proper_time_in_segment(segment, current_galactic_s))
+        proper = proper_time_between_segment(segment, current_galactic_s, at)
         if at > current_galactic_s and proper <= 0:
             limits.append(TemporalLimit(
                 kind, "proper", None, validity="proper_time_resolution_exhausted",

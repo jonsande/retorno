@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import random
+from contextlib import contextmanager
 
 from retorno.config.balance import Balance
 from retorno.core.gamestate import GameState
@@ -10,6 +11,12 @@ from retorno.runtime.data_loader import load_modules, load_worldgen_archetypes, 
 
 _PLAYABLE_HUB_KINDS = {"relay", "station", "waystation"}
 _EARLY_PROGRESS_ARCHETYPES = {"relay_corridor", "isolated_station"}
+@contextmanager
+def universe_rules_transaction():
+    """Reuse one configuration validation inside an atomic engine transaction."""
+    from retorno.worldgen.manifest import physical_rules_scope
+    with physical_rules_scope():
+        yield
 
 
 def _hash64(seed: int, text: str) -> int:

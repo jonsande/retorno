@@ -329,6 +329,17 @@ def proper_time_in_segment(segment: MotionSegment, elapsed_galactic_s: float) ->
                          elapsed_galactic_s)[2]
 
 
+def proper_time_between_segment(segment: MotionSegment, left: float, right: float) -> float:
+    """Proper duration from a local galactic interval without clock cancellation."""
+    if (not math.isfinite(left) or not math.isfinite(right)
+            or not 0 <= left <= right <= segment.duration_galactic_s):
+        raise ValueError("proper interval must lie within the segment")
+    if left == right:
+        return 0.0
+    at_left = sample_segment(segment, left)
+    return _motion_delta(at_left.beta, segment.proper_acceleration_m_s2, right - left)[2]
+
+
 def galactic_time_at_segment_proper(segment: MotionSegment, elapsed_proper_s: float) -> float:
     """Invert proper seconds since this segment's start to galactic seconds.
 

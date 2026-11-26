@@ -14,6 +14,8 @@ import math
 import random
 import inspect
 import sys
+from contextlib import contextmanager
+from contextvars import ContextVar
 from types import SimpleNamespace
 
 from retorno.config.balance import Balance
@@ -28,6 +30,18 @@ from retorno.worldgen.generator import (
 
 PROTOTYPE_VERSION = "prototype-4d3e1b-v1"
 ALGORITHM_VERSION = "historical-world-v1"
+_RULES_KEY_SCOPE: ContextVar[dict[str, str] | None] = ContextVar(
+    "physical_rules_key_scope", default=None)
+
+
+@contextmanager
+def physical_rules_scope():
+    """Validate static configuration once per atomic engine transaction."""
+    token = _RULES_KEY_SCOPE.set({})
+    try:
+        yield
+    finally:
+        _RULES_KEY_SCOPE.reset(token)
 PROLOGUE_VERSION = "historical-prologue-chain-v1"
 MAX_SECTOR_INDEX = 2**48 - 32
 
@@ -168,6 +182,9 @@ def _scope(seed, version, configuration, authored, cap, rules_key="", narrative_
 
 def physical_rules_key():
     """Reject reinterpretation after configuration/kernel changes, including loot."""
+    scope = _RULES_KEY_SCOPE.get()
+    if scope is not None and "key" in scope:
+        return scope["key"]
     from retorno.runtime.data_loader import load_modules
     if (sys.implementation.name != "cpython" or sys.version_info[:2] != (3, 12)
         or sys.float_info.radix != 2 or sys.float_info.mant_dig != 53 or sys.float_info.rounds != 1):
@@ -181,7 +198,10 @@ def physical_rules_key():
     payload = (_configuration_key(load_worldgen_templates(), load_worldgen_archetypes()),
                list(load_modules().items()), balance, authored,
                inspect.getsource(random.Random.gauss), "cpython-3.12-binary64")
-    return hashlib.sha256(json.dumps(payload, sort_keys=True, allow_nan=False).encode()).hexdigest()
+    key = hashlib.sha256(json.dumps(payload, sort_keys=True, allow_nan=False).encode()).hexdigest()
+    if scope is not None:
+        scope["key"] = key
+    return key
 
 
 def define_manifest(

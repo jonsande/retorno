@@ -1,5 +1,45 @@
 # Navigation motion segments (NAV-BRAKE-01B3A)
 
+## Precision and long advances (NAV-BRAKE-01B3H-D2B1-R2)
+
+The coordinator retains elapsed local segment time as its calculation
+coordinate. It computes proper-time and radiation limits from local
+differences instead of subtracting large absolute clocks. If a real positive
+cut is shorter than one galactic-clock ULP, it chooses the next representable
+instant and advances both clocks. Strict health threshold selection uses
+`nextafter` to choose the correct side. Residuals of at most four ULP at a
+requested endpoint are representational coincidences. No arbitrary minimum
+duration or causal-limit omission is introduced.
+Grouping causes requires coincidence at both the absolute clock's scale and
+the requested local duration's scale, so four ULP on a huge galactic clock
+cannot merge events seconds apart. The engine-specific 15% threshold is also
+snapped exactly within the numerical tolerance already used for other health
+thresholds.
+
+The nominal forecast reads state without cloning it when no job or pending
+transition requires a copy. A physical tick retains a complete transactional
+clone through local serialization, preserving rollback and owner identity.
+The universe rules key is cached only inside the tick's atomic transaction.
+Stable hibernation in cruise may request 26-week blocks only when
+`physical.intent == "coast"`; acceleration and braking retain weekly blocks
+even when the other conditions are stable. Causal boundaries still cut each
+block, and the next request starts from consolidated state.
+Jobs, variable batteries, recovery, pending narrative work, or drone
+maintenance keep the seven-day horizon. Radio reception retains its existing
+hibernation rules.
+When a positive remainder at the end of a request rounds to the current clock
+after real progress, hibernation ends without repeating or counting that
+remainder. A pending causal transition or a request unable to advance from its
+start is reported as blocked, without declaring arrival.
+
+Textual runs hibernation simulation outside its UI loop. The worker puts
+real elapsed time in a queue, which the panel timer drains on the Textual
+thread. Input remains disabled until wakeup, and shutdown waits for simulation
+before saving. Panels and automatic events share a snapshot under a
+nonblocking lock; refresh skips a frame if the engine is busy. An
+unexpected automatic-advance error pauses the loop and emits a visible
+warning without inventing game-time progress.
+
 ## Playtest correction (NAV-BRAKE-01B3H-D2B1-R1)
 
 Physical interval validation treats galactic endpoints within four floating

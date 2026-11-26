@@ -15,6 +15,7 @@ Operational behavior
 - Physical phase ends and ordinary electrical, health, radiation, job, and narrative boundaries are coordinated without one-second loops. A genuinely unsupported boundary stops the wait and reports executed time; remaining time is not silently skipped.
 - Wakes on critical events that require operator attention and on a physical stop outside the destination.
 - While in transit, hibernation also wakes when ambient radiation crosses the configured threshold (`HIBERNATE_WAKE_ENV_RAD_THRESHOLD_RAD_PER_S`).
+- In Textual, the simulation displays elapsed game time while it runs. Commands become available again after wakeup.
 
 Related commands
 - `nav <node_id>`, `nav abort`, `status`, `alerts`

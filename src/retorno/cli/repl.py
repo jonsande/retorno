@@ -6818,8 +6818,45 @@ def _remaining_arrival_s(state) -> float | None:
     return None
 
 
+def _hibernate_extended_chunk_safe(state, engine: Engine) -> bool:
+    """Only stable nominal cruise may omit the historical weekly checkpoints."""
+    physical = state.ship.physical_transit
+    if (physical is None or physical.intent != "coast"
+            or physical.nominal_plan is None
+            or physical.nominal_plan.invalidated or physical.pending_transition is not None
+            or physical.inertial_continuation is not None
+            or physical.nominal_braking_substitution is not None
+            or physical.recovery_execution is not None
+            or state.jobs.active_job_ids
+            or any(plan.status in {"active", "receipt_pending", "stage_consumed"}
+                   for plan in state.world.recovery_plans.values())):
+        return False
+    power = state.ship.power
+    if (power.e_batt_kwh != power.e_batt_max_kwh
+            or engine._compute_p_gen(state) < engine._compute_load_kw(state)):
+        return False
+    from retorno.core.lore import _iter_all_pieces
+    placed = state.world.lore_placements.piece_to_node
+    if any(piece.get("force") and piece["piece_key"] not in placed
+           for piece in _iter_all_pieces(state)):
+        return False
+    support = engine._drone_bay_support_snapshot(state)
+    for drone in state.ship.drones.values():
+        if drone.status != DroneStatus.DOCKED:
+            return False
+        profile = engine._drone_profile(state, drone)
+        if ((support["charge_rate"] > 0 and drone.battery < profile.battery_max_effective)
+                or (support["decon_rate"] > 0 and drone.dose_rad > 0)
+                or (support["repair_rate_mult"] > 0
+                    and drone.integrity < profile.integrity_max_effective
+                    and state.ship.cargo_scrap >= support["repair_scrap_cost"])):
+            return False
+    return True
+
+
 def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False,
-                       *, until_arrival: bool = False) -> HibernateRunResult:
+                       *, until_arrival: bool = False,
+                       on_progress=None) -> HibernateRunResult:
     total_s = max(0.0, years * Balance.YEAR_S)
     if total_s <= 0:
         raise ValueError("hibernate: nothing to do (duration <= 0)")
@@ -6854,7 +6891,22 @@ def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False,
             locked_state.ship.is_hibernating = True
         loop.set_auto_tick(False)
         while remaining > 0:
+            # The requested absolute endpoint already rounds to the current
+            # clock. A positive remainder after real progress is only the
+            # unrepresentable tail of this request, unless a transition is
+            # still waiting at the current physical boundary.
+            with loop.with_lock() as locked_state:
+                physical = locked_state.ship.physical_transit
+                if (locked_state.clock.t > start_t
+                        and start_t + total_s == locked_state.clock.t
+                        and (physical is None or physical.pending_transition is None)):
+                    break
             step = Balance.HIBERNATE_CHUNK_S if remaining >= Balance.HIBERNATE_CHUNK_S else remaining
+            with loop.with_lock() as locked_state:
+                extended = (not wake_on_low_battery
+                            and _hibernate_extended_chunk_safe(locked_state, loop.engine))
+            if extended:
+                step = min(remaining, 26 * Balance.HIBERNATE_CHUNK_S)
             if wake_on_low_battery:
                 step = min(step, Balance.HIBERNATE_WAKE_CHECK_S)
             radiation_cross_dt = None
@@ -6865,9 +6917,12 @@ def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False,
                     < _hibernate_env_radiation_threshold())
             if radiation_cross_dt is not None:
                 step = min(step, max(1.0e-6, radiation_cross_dt))
+            with loop.with_lock() as locked_state:
+                before_t = locked_state.clock.t
             try:
                 ev = loop.advance_interval(
                     step, stop_at_arrival=until_arrival,
+                    single_causal_step=extended,
                     stop_when=lambda current, batch: bool(
                         _hibernate_interrupt_reason(current, batch, wake_on_low_battery)
                         or (wake_env_from_below and _hibernate_reached_env_threshold(current))))
@@ -6894,20 +6949,22 @@ def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False,
                     woke_early = True
                     wake_t = locked_state.clock.t
                     wake_reason = reason
-                advanced = locked_state.clock.t - start_t - (total_s - remaining)
+                advanced = locked_state.clock.t - before_t
+                progress_elapsed = locked_state.clock.t - start_t
                 arrived = until_arrival and not locked_state.ship.operational_in_transit
+                if advanced <= 0 and not arrived and not woke_early:
+                    woke_early = True
+                    wake_t = locked_state.clock.t
+                    wake_reason = "causal_boundary:Physical phase cannot advance at clock resolution"
             remaining -= advanced
+            if on_progress is not None:
+                on_progress(progress_elapsed, total_s)
             if arrived:
                 break
             if woke_early:
                 break
         with loop.with_lock() as locked_state:
-            if woke_early or until_arrival:
-                if wake_t is not None:
-                    elapsed_s = max(0.0, wake_t - start_t)
-                else:
-                    elapsed_s = total_s - remaining
-                actual_years = elapsed_s / Balance.YEAR_S if Balance.YEAR_S else 0.0
+            actual_years = max(0.0, locked_state.clock.t - start_t) / Balance.YEAR_S
             _emit_runtime_event(
                 locked_state,
                 events_to_render,

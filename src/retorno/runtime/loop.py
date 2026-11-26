@@ -34,6 +34,7 @@ class GameLoop:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._auto_tick_enabled = True
+        self.last_auto_error: str | None = None
 
     def start(self) -> None:
         if not self._auto_tick_enabled:
@@ -79,7 +80,8 @@ class GameLoop:
         return events
 
     def advance_interval(self, total_s: float, *, stop_at_arrival: bool = False,
-                         stop_when: Callable[[GameState, list[Event]], bool] | None = None) -> list[Event]:
+                         stop_when: Callable[[GameState, list[Event]], bool] | None = None,
+                         single_causal_step: bool = False) -> list[Event]:
         """Advance at known physical phase ends; leave direct Engine.tick atomic.
 
         A fixed wait continues with ordinary rest time after a physical stop.
@@ -93,6 +95,9 @@ class GameLoop:
         with self._lock:
             start_t = self.state.clock.t
             requested_end = start_t + total_s
+            if total_s > 0 and requested_end == start_t:
+                raise NavigationAdvanceBlocked(
+                    "Physical phase cannot advance at clock resolution", 0.0, [])
             snapped_to_endpoint = False
             physical = self.state.ship.physical_transit
             if physical is not None and physical.nominal_plan is not None:
@@ -107,12 +112,12 @@ class GameLoop:
                 step = requested_end - self.state.clock.t
                 if not snapped_to_endpoint:
                     step = min(step, total_s - elapsed)
+                if (elapsed > 0 and step > 0
+                        and step <= 4 * math.ulp(max(1.0, requested_end))):
+                    break
                 if step <= 0:
                     break
-                clock_resolution = 16 * math.ulp(max(1.0, self.state.clock.t))
-                if step <= clock_resolution:
-                    if elapsed > 0 and abs(requested_end - self.state.clock.t) <= clock_resolution:
-                        break
+                if self.state.clock.t + step == self.state.clock.t:
                     raise NavigationAdvanceBlocked(
                         "Physical phase cannot advance at clock resolution", elapsed, events)
                 if physical is None and stop_at_arrival and self.state.ship.in_transit:
@@ -133,15 +138,19 @@ class GameLoop:
                            or (stop_at_arrival and not self.state.ship.in_transit
                                and physical is None))
                 interrupted = stop_when(self.state, batch) if stop_when is not None else False
-            if interrupted or (arrived and stop_at_arrival):
+            if interrupted or (arrived and stop_at_arrival) or single_causal_step:
                 break
         return events
 
     def drain_events(self) -> list[tuple[str, Event]]:
         with self._lock:
-            events = [("auto", e) for e in self._events_auto]
-            self._events_auto.clear()
-            return events
+            return self._drain_events_locked()
+
+    def _drain_events_locked(self) -> list[tuple[str, Event]]:
+        """Drain automatic events while the caller owns the state lock."""
+        events = [("auto", e) for e in self._events_auto]
+        self._events_auto.clear()
+        return events
 
     def get_state_snapshot(self) -> GameState:
         return self.state
@@ -157,6 +166,38 @@ class GameLoop:
         finally:
             self._lock.release()
 
+    @contextmanager
+    def with_lock_if_available(self):
+        """Permit presentation to skip a busy engine frame without blocking UI."""
+        if not self._lock.acquire(blocking=False):
+            yield None
+            return
+        try:
+            yield self.state
+        finally:
+            self._lock.release()
+
+    def _pause_auto_after_error(self, reason: str, detail: str,
+                                events: list[Event], elapsed_s: float) -> None:
+        with self._lock:
+            seq = self.state.events.next_event_seq
+            self.state.events.next_event_seq += 1
+            warning = Event(
+                event_id=f"E{seq:05d}", t=int(self.state.clock.t),
+                type=EventType.BOOT_BLOCKED, severity=Severity.WARN,
+                source=SourceRef(kind="ship", id=self.state.ship.ship_id),
+                message="Automatic physical time advance stopped",
+                data={"message_key": "boot_blocked", "reason": reason,
+                      "detail": detail, "elapsed_s": elapsed_s,
+                      "remaining_s": max(0.0, self.tick_s - elapsed_s)},
+            )
+            self.state.events.recent.append(warning)
+            self._events_auto.extend(events)
+            self._events_auto.append(warning)
+            self.last_auto_error = detail
+            self._auto_tick_enabled = False
+            self._stop.set()
+
     def _run(self) -> None:
         deadline = time.monotonic() + self.tick_s
         while not self._stop.is_set():
@@ -165,24 +206,12 @@ class GameLoop:
             try:
                 events = self.advance_interval(self.tick_s)
             except NavigationAdvanceBlocked as exc:
-                with self._lock:
-                    seq = self.state.events.next_event_seq
-                    self.state.events.next_event_seq += 1
-                    warning = Event(
-                        event_id=f"E{seq:05d}", t=int(self.state.clock.t),
-                        type=EventType.BOOT_BLOCKED, severity=Severity.WARN,
-                        source=SourceRef(kind="ship", id=self.state.ship.ship_id),
-                        message="Automatic physical time advance stopped",
-                        data={"message_key": "boot_blocked",
-                              "reason": "physical_advance_blocked", "detail": str(exc),
-                              "elapsed_s": exc.elapsed_s,
-                              "remaining_s": max(0.0, self.tick_s - exc.elapsed_s)},
-                    )
-                    self.state.events.recent.append(warning)
-                    self._events_auto.extend(exc.events)
-                    self._events_auto.append(warning)
-                    self._auto_tick_enabled = False
-                    self._stop.set()
+                self._pause_auto_after_error(
+                    "physical_advance_blocked", str(exc), exc.events, exc.elapsed_s)
+                break
+            except Exception as exc:
+                self._pause_auto_after_error(
+                    "automatic_internal_error", f"{type(exc).__name__}: {exc}", [], 0.0)
                 break
             with self._lock:
                 self._events_auto.extend(events)

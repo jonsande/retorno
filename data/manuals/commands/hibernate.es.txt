@@ -15,6 +15,7 @@ Comportamiento operativo
 - Se coordinan finales de fase y fronteras ordinarias de electricidad, salud, radiación, trabajos y narrativa sin bucles de un segundo. Una frontera realmente no soportada detiene la espera e informa del tiempo ejecutado; no omite silenciosamente el resto.
 - Despierta ante eventos críticos que requieren intervención y ante una detención física fuera del destino.
 - Durante el tránsito, la hibernación también despierta cuando la radiación ambiental cruza el umbral configurado (`HIBERNATE_WAKE_ENV_RAD_THRESHOLD_RAD_PER_S`).
+- En Textual, la simulación muestra el tiempo de juego transcurrido mientras avanza. Los comandos vuelven a estar disponibles tras despertar.
 
 Comandos relacionados
 - `nav <node_id>`, `nav abort`, `status`, `alerts`

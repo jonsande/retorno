@@ -222,6 +222,7 @@ def test_public_hibernate_until_arrival_and_fixed_wait_after_stop():
     remaining = repl._remaining_arrival_s(game)
     result = repl._execute_hibernate(loop, remaining / Balance.YEAR_S,
                                      until_arrival=True)
+    loop.stop()
     assert not result.woke_early
     assert game.world.current_node_id == "NOMINAL_B"
     assert game.ship.physical_transit is None

@@ -1,5 +1,46 @@
 # Segmentos físicos de navegación (NAV-BRAKE-01B3A)
 
+## Precisión y avance prolongado (NAV-BRAKE-01B3H-D2B1-R2)
+
+El coordinador conserva el tiempo local transcurrido dentro del segmento como
+coordenada de cálculo. Calcula los límites propios y radiológicos con diferencias
+locales, sin restar dos relojes absolutos grandes. Si un corte físico positivo
+es menor que una ULP del reloj galáctico, lo sitúa en el siguiente instante
+representable y avanza ambos relojes. La elección de umbrales estrictos de
+salud se ajusta al lado correcto con `nextafter`; los residuos de hasta cuatro
+ULP al final de una solicitud se tratan como coincidencias representacionales.
+No se añade una duración mínima arbitraria ni se omite una frontera causal.
+La agrupación de causas exige coincidencia tanto a escala del reloj absoluto
+como a escala de la duración local solicitada; así, cuatro ULP de un reloj
+galáctico enorme no agrupan eventos separados por segundos. El umbral
+específico del 15 % de motores también se fija exactamente dentro de la
+tolerancia numérica ya aplicada a los demás umbrales de salud.
+
+La predicción nominal sin trabajos ni transición pendiente consulta el estado
+sin copiarlo. El tick mantiene una copia transaccional completa mediante
+serialización local, para preservar rollback e identidad de propietarios. La
+clave de reglas del universo se memoriza solo dentro de la transacción atómica
+del tick. Una hibernación estable en crucero puede pedir bloques de 26 semanas;
+esto exige explícitamente `physical.intent == "coast"`, por lo que acelerar o
+frenar mantiene los bloques semanales aunque las demás condiciones sean estables.
+Las fronteras causales siguen cortando cada bloque, y el siguiente se decide
+desde el estado consolidado. Con trabajos, batería variable, recuperación,
+narrativa pendiente o mantenimiento de drones se conserva el horizonte de
+siete días. La radio sigue sus restricciones de recepción durante hibernación.
+Si al final de la petición queda un residuo positivo que redondea al instante
+actual tras un avance real, la hibernación termina sin repetirlo ni contarlo como
+tiempo transcurrido. Una transición causal pendiente o una petición que no puede
+avanzar desde el inicio se comunican como bloqueo, sin declarar llegada.
+
+Textual ejecuta la simulación de hibernación fuera de su bucle de interfaz. El
+worker entrega tiempos reales por una cola, que el temporizador de paneles
+consume en el hilo de Textual. La entrada permanece deshabilitada hasta el
+despertar; el cierre espera a la simulación antes de guardar. Paneles y eventos
+automáticos comparten una instantánea bajo lock no bloqueante; se omite un
+refresco si el motor está ocupado. Un error inesperado en
+el avance automático pausa el bucle y genera un aviso observable; no avanza
+el tiempo de juego por un resultado ficticio.
+
 ## Corrección del playtest (NAV-BRAKE-01B3H-D2B1-R1)
 
 La validación de intervalos físicos considera el mismo instante galáctico a
