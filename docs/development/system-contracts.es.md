@@ -13,6 +13,20 @@ comportamiento actual; **aprobado** vincula el diseño aunque falte código;
   [tiempo eléctrico](../systems/electrical-proper-time.es.md),
   [desgaste](../systems/wear-proper-time.es.md),
   [radiación](../systems/nav-radiation.es.md).
+- **Implementado:** la recarga de drones consume potencia variable y energía
+  contabilizada en segundos propios, con reserva condicionada por SoC.
+  Propietario: [recarga de drones](../systems/drone-charging.es.md).
+- **Invariante temporal aprobado; implementación parcial:** los procesos
+  físicos internos de la nave usan tiempo propio. Los procesos externos usan
+  la base temporal físicamente correspondiente. El tiempo biológico deriva
+  del propio, modulado por el estado fisiológico. Los relojes de la nave, la
+  recarga eléctrica y las rutas de desgaste físico documentadas ya usan tiempo
+  propio; la integración del reloj biológico deriva de él. **TEMP-01** auditará
+  y corregirá progresivamente los demás subsistemas, sin dar por conforme su
+  comportamiento temporal actual. Propietarios:
+  [tiempo eléctrico](../systems/electrical-proper-time.es.md),
+  [desgaste](../systems/wear-proper-time.es.md) y
+  [estado actual](current-status.es.md).
 - **Implementado/exigido:** la propulsión gasta combustible autorizado;
   interrupción y recuperación no obtienen combustible gratis ni gastan
   cápsulas inexistentes. Llegar requiere detención física real en destino.

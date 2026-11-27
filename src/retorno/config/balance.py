@@ -331,7 +331,10 @@ class Balance:
     DRONE_BAY_CRITICAL_REPAIR_FAIL_HIT = 0.01
     # Power draw for charging a drone (kW).
     DRONE_CHARGE_KW = 0.2
-    # Minimum net power required to allow drone charging.
+    # One battery unit corresponds to nominal power divided by nominal rate.
+    DRONE_BATTERY_KWH_PER_UNIT = DRONE_CHARGE_KW / (DRONE_BATTERY_CHARGE_PER_S * 3600.0)
+    DRONE_CHARGE_RESERVE_SOC = 0.25
+    # Legacy diagnostic only; no longer gates charging.
     DRONE_CHARGE_NET_MIN_KW = -0.2
     DRONE_BATTERY_IDLE_DRAIN_DEPLOYED_PER_S = 0.00002 # Velocidad a la que descarga sin hacer nada
     DRONE_CARGO_CAPACITY_BASE = 10.0

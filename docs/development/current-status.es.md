@@ -23,6 +23,12 @@ especificación vigente. Los documentos técnicos propietarios están en
   inalterado. R2-E había medido 3,44 s y 7,12 s. R2-F restringió los bloques
   largos al crucero nominal estable; no se intentó otra optimización. Véase el
   [registro de mediciones R2-F](../../MEDICIONES-R2-F.json).
+- **Implementado en PT001-07B y corregido en 07B-F:** recarga de drones con
+  carga variable, reserva por encima del 25 % y cortes causales tras la
+  regulación efectiva. La propuesta 07A, antes conservada
+  solo en una conversación, está registrada en la
+  [especificación de recarga](../systems/drone-charging.es.md). Véase la
+  [validación dirigida](../testing/pt001-07b-review.es.md).
 
 ## Incidencias abiertas y direcciones de diseño
 
@@ -30,13 +36,14 @@ especificación vigente. Los documentos técnicos propietarios están en
 | --- | --- | --- |
 | PT001-01/09 | Observaciones abiertas | Lag residual y regularidad de relojes durante tránsito físico. Medir en el perfil real actual antes de elegir solución; los viajes completados no cierran esta incidencia. |
 | PT001-06 | 06A: carga protegida; transición causal pendiente | La partida real carga en CLI y Textual; el avance se pausa y se informa cuando `core_os` ya está apagado durante tránsito físico. Se impide apagar `core_os` o `life_support` mediante comandos públicos mientras hay tránsito físico. El terminal apagado conserva sus restricciones: la partida afectada no puede reanudar el viaje sin una futura transición causal de supervivencia, fuera de 06A. |
-| PT001-07 | Resultado aprobado; implementación pendiente | Permitir recargar drones con net eléctrico negativo si hay SoC suficiente y se cumplen las demás condiciones operativas; contabilizar energía real. Umbral y contabilidad causal requieren diseño acotado. |
+| PT001-07 | 07B-F implementado; revisión pendiente | Recarga variable y reserva con umbral del 25 %, contabilidad energética y cortes causales tras la regulación eléctrica efectiva. |
+| TEMP-01 | Invariante aprobado; auditoría pendiente | Auditar y corregir progresivamente las bases temporales de todos los subsistemas. La física interna de la nave usa tiempo propio; los procesos externos, el físicamente correspondiente; el tiempo biológico deriva del propio y del estado fisiológico. 07B-F no implementa TEMP-01. |
 | PT001-08 | Dirección de presentación aprobada; implementación pendiente | Mostrar progreso interno de simulación de hibernación solo en debug. La interfaz normal sigue siendo diegética. Concretar la superficie de debug. |
 | PT001-10 | Dirección de presentación aprobada; implementación pendiente | Explicar motivos específicos que impiden iniciar viaje, incluido engines apagado. Localizar EN/ES sin divulgar estado interno; concretar mensajes. |
 | PT001-11 | Diseño aprobado; implementación pendiente | `ACTIVE` durante aceleración y frenado; `STANDBY` durante crucero con reactivación anticipada; `OFFLINE` automático tras detenerse efectivamente en destino. Separar estado operativo, salud del sistema y causa de desconexión. La reactivación para una nueva partida, los consumos, el desgaste y los tiempos de arranque requieren concreción en NAV-BRAKE-01C. |
 
 La tabla distingue defectos observados de comportamiento futuro aprobado. No
-afirma que PT001-07 a PT001-11 estén implementadas; PT001-06 solo tiene la
+afirma que PT001-08 a PT001-11 estén implementadas; PT001-06 solo tiene la
 protección de carga y prevención de 06A. Siguen vigentes los
 contratos causales, económicos, transaccionales y de conocimiento.
 

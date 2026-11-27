@@ -269,6 +269,12 @@ caso inercial interno restringido.
 
 ## 01B3E: electricidad condicional y desgaste integrado
 
+Actualización PT001-07B: `power_limits()` también corta al llenarse un dron
+que recibe energía o al cruzar el SoC del 25 % mientras la recarga está activa.
+La fotografía incluye la asignación compartida de potencia variable; al
+cambiar elegibilidad o asignación se invalida la previsión. Véase
+[recarga de drones](drone-charging.es.md).
+
 `nav_electricity.py` captura un `PowerSnapshot` inmutable con generación y
 carga efectivas, límites y eficiencias de batería, calidad y déficit muestreados,
 temporizadores de brownout y deslastre, modo operativo, identificadores de

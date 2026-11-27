@@ -13,6 +13,18 @@ unimplemented, and **proposal** needs a technical decision.
   [electrical time](../systems/electrical-proper-time.md),
   [wear](../systems/wear-proper-time.md),
   [radiation](../systems/nav-radiation.md).
+- **Implemented:** drone charging draws variable power and accounted energy
+  in proper seconds, with reserve use gated by SoC. Owner:
+  [drone charging](../systems/drone-charging.md).
+- **Approved temporal invariant; partially implemented:** internal physical
+  processes of the ship use proper time. External processes use their
+  physically appropriate time base. Biological time derives from proper time
+  and is modulated by physiological state. Ship clocks, electrical charging,
+  and the documented physical wear paths already use proper time; biological
+  clock integration derives from it. **TEMP-01** will audit and progressively
+  correct the remaining subsystems, without treating their current timing as
+  already compliant. Owners: [electrical time](../systems/electrical-proper-time.md),
+  [wear](../systems/wear-proper-time.md), and [current status](current-status.md).
 - **Implemented/required:** propulsion spends authorized fuel; interruption
   and recovery may neither obtain free fuel nor spend absent capsules. Arrival
   requires a real physical stop at the destination. Owners:

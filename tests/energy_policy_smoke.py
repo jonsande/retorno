@@ -373,7 +373,7 @@ def main() -> None:
     _prepare_docked_drone(state)
     state.ship.power.p_gen_kw = 5.0
     state.ship.power.p_load_kw = 0.0
-    engine._update_drone_maintenance(state, 10.0)  # noqa: SLF001 - intentional policy smoke
+    engine._integrate_power_interval(state, 10.0)  # noqa: SLF001 - charging is electrical
     assert abs(state.ship.drones["D1"].battery - (Balance.DRONE_BATTERY_CHARGE_PER_S * 0.5 * 10.0)) < 1e-6
 
     # Passive docked repair profile by bay state.
@@ -472,7 +472,7 @@ def main() -> None:
     _prepare_docked_drone(state)
     state.ship.power.p_gen_kw = 5.0
     state.ship.power.p_load_kw = 0.0
-    engine._update_drone_maintenance(state, 10.0)  # noqa: SLF001 - intentional policy smoke
+    engine._integrate_power_interval(state, 10.0)  # noqa: SLF001 - charging is electrical
     assert abs(state.ship.drones["D1"].battery - (Balance.DRONE_BATTERY_CHARGE_PER_S * 0.25 * 10.0)) < 1e-6
 
     # DAMAGED integrity risk on deploy when configured deterministic.
@@ -663,7 +663,7 @@ def main() -> None:
     _prepare_docked_drone(state)
     state.ship.power.p_gen_kw = 5.0
     state.ship.power.p_load_kw = 0.0
-    engine._update_drone_maintenance(state, 10.0)  # noqa: SLF001 - intentional policy smoke
+    engine._integrate_power_interval(state, 10.0)  # noqa: SLF001 - charging is electrical
     assert state.ship.drones["D1"].battery == 0.0
 
     # Drone bay maintenance alert: active only when a docked drone needs battery/integrity and support is blocked.

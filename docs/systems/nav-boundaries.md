@@ -242,6 +242,11 @@ restricted internal inertial case.
 
 ## 01B3E conditional electricity and integrated wear
 
+PT001-07B update: `power_limits()` also cuts when an actively charging drone
+fills or ship SoC crosses 25% while charging is active. The snapshot includes
+the shared variable-power allocation; changes in eligibility or allocation
+invalidate the forecast. See [drone charging](drone-charging.md).
+
 `nav_electricity.py` captures a frozen `PowerSnapshot` from effective generation,
 effective load, battery limits and efficiencies, sampled quality/deficit,
 brownout and shedding timers, operating mode, installed module IDs, and

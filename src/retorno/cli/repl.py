@@ -7302,8 +7302,8 @@ def render_alert_explain(state, alert_key: str) -> None:
                 "es": "energy_distribution está OFFLINE",
             },
             "insufficient_net_power": {
-                "en": "insufficient net power for charging thresholds",
-                "es": "potencia neta insuficiente para los umbrales de carga",
+                "en": "no usable surplus or reserve capacity for charging",
+                "es": "sin excedente ni capacidad de reserva utilizable para recarga",
             },
         }
         repair_reason_labels = {
@@ -7352,10 +7352,14 @@ def render_alert_explain(state, alert_key: str) -> None:
         print("- Drone must be docked in DRN-BAY and battery below its effective maximum")
         print("- drone_bay must not be OFFLINE")
         print("- energy_distribution must not be OFFLINE")
-        print(
-            f"- Power gate: net >= {Balance.DRONE_CHARGE_KW:.2f}kW (normal charge), or "
-            f"SoC > 0 with net >= {Balance.DRONE_CHARGE_NET_MIN_KW:.2f}kW (slow charge)"
-        )
+        print({
+            "en": (f"- Normal charge: {Balance.DRONE_CHARGE_KW:.2f}kW real surplus per drone; "
+                   f"slow charge can use reserve above {Balance.DRONE_CHARGE_RESERVE_SOC:.0%} SoC "
+                   "within discharge capacity. At or below the threshold, only real surplus is used."),
+            "es": (f"- Recarga normal: {Balance.DRONE_CHARGE_KW:.2f}kW de excedente real por dron; "
+                   f"la lenta puede usar reserva por encima del {Balance.DRONE_CHARGE_RESERVE_SOC:.0%} de SoC "
+                   "dentro de la capacidad de descarga. En el umbral o por debajo, solo se usa excedente real."),
+        }[locale])
         print("Integrity passive-repair conditions:")
         print("- Drone must be docked in DRN-BAY and integrity below its effective maximum")
         print("- drone_bay and energy_distribution must be available (not OFFLINE)")

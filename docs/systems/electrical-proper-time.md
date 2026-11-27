@@ -73,3 +73,11 @@ CLI/Textual power readings keep their commands and units. The bilingual power
 manuals explain onboard kW/kWh and timers; no help command syntax or event text
 changes are needed. Tests and results:
 [verification](../testing/electrical-proper-time-review.md).
+
+## PT001-07B update
+
+The account above preserves T-04B1's historical scope. Since 07B, drone
+charging adds variable kW load and is integrated in proper seconds alongside
+electricity. Other drone maintenance still uses galactic seconds. The
+[charging specification](drone-charging.md) defines calibration, the 25%
+reserve threshold, allocation, and causal cuts.

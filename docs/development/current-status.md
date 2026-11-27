@@ -22,6 +22,12 @@ not a current implementation specification. Technical owners are indexed in
   fuel. R2-E had measured 3.44 s and 7.12 s. R2-F restricted extended blocks
   to stable nominal coast; no further optimization was attempted. See the
   [R2-F measurement record](../../MEDICIONES-R2-F.json).
+- **Implemented in PT001-07B and corrected in 07B-F:** variable-load drone
+  charging, reserve above 25% SoC, and causal cuts after effective regulation.
+  The 07A proposal, previously held only in a
+  conversation, is now recorded in the
+  [charging specification](../systems/drone-charging.md). See the
+  [targeted verification](../testing/pt001-07b-review.md).
 
 ## Open playtest issues and design directions
 
@@ -29,13 +35,14 @@ not a current implementation specification. Technical owners are indexed in
 | --- | --- | --- |
 | PT001-01/09 | Open observations | Residual lag and clock regularity during physical transit. Measure on the current real profile before choosing a remedy; completed journeys do not close this issue. |
 | PT001-06 | 06A: safe load; causal transition pending | The real save loads in CLI and Textual; time advance pauses with a visible explanation when `core_os` is already offline during physical transit. Public commands cannot turn off `core_os` or `life_support` during physical transit. Offline terminal restrictions remain: the affected save cannot resume travel without a future causal survival transition, outside 06A. |
-| PT001-07 | Approved outcome; implementation pending | Allow drone charging with negative net power when SoC is sufficient and other operational conditions hold; debit actual energy. Threshold and causal accounting need a focused design. |
+| PT001-07 | 07B-F implemented; review pending | Variable charging load and reserve with a 25% SoC threshold, energy accounting, and causal cuts after effective electrical regulation. |
+| TEMP-01 | Approved invariant; audit pending | Audit and progressively correct the time bases of all subsystems. Internal ship physics uses proper time; external processes use the physically appropriate time; biological time derives from proper time and physiological state. No TEMP-01 implementation is included in 07B-F. |
 | PT001-08 | Approved presentation direction; implementation pending | Show internal hibernation simulation progress only in debug mode. Keep ordinary presentation diegetic. Specify the debug surface. |
 | PT001-10 | Approved presentation direction; implementation pending | Give specific reasons why a journey cannot start, including engines being off. Localize EN/ES and avoid internal leaks; specify message mapping. |
 | PT001-11 | Approved design; implementation pending | `ACTIVE` during acceleration and braking; `STANDBY` during cruise with early reactivation; automatic `OFFLINE` after the ship actually stops at its destination. Separate operational state, system health, and disconnection cause. Reactivation for a new departure, power use, wear, and startup times need definition in NAV-BRAKE-01C. |
 
 These rows distinguish observed defects from approved future behavior. None
-claims PT001-07 through PT001-11 is implemented; PT001-06 only has the 06A
+claims PT001-08 through PT001-11 is implemented; PT001-06 only has the 06A
 load and prevention safeguards. Causal, economic,
 transactional and knowledge contracts remain in force.
 

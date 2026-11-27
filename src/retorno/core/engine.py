@@ -18,6 +18,7 @@ from retorno.core.nav_electricity import (battery_energy_after, power_quality_co
                                          capture_power_snapshot, power_limits, integrate_quality,
                                          resolve_electrical_limit,
                                          invalidation_reasons)
+from retorno.core.drone_charging import decide_drone_charging
 from retorno.core.nav_physics import (MotionSegment, MotionState, TravelPlan, accelerate_to, append_segment,
                                       brake_to_stop, coast_for, light_years_to_metres,
                                       plan_travel, proper_time_in_segment,
@@ -1616,8 +1617,15 @@ class Engine:
         staged.ship.power.p_gen_kw = generation
         events.extend(self._integrate_power_interval(staged, proper_dt))
         after = capture_power_snapshot(staged, self._compute_p_gen(staged), self._compute_load_kw(staged))
+        for allocation in snapshot.charging.allocations:
+            expected_drone = allocation.start_battery + min(
+                allocation.remaining, allocation.rate_per_s * proper_dt)
+            if not math.isclose(staged.ship.drones[allocation.drone_id].battery,
+                                expected_drone, rel_tol=1e-12, abs_tol=1e-12):
+                raise RuntimeError("Physical segment electrical forecast changed during execution")
         unexpected = set(invalidation_reasons(snapshot, after, elapsed_proper_s=proper_dt))
-        if unexpected - {"regulation_state_changed", "power_changed", "systems_changed"}:
+        if unexpected - {"regulation_state_changed", "power_changed", "systems_changed",
+                          "charging_changed"}:
             raise RuntimeError("Physical segment electrical forecast changed during execution")
         staged.ship.hull_integrity = exposure.hull_end
         staged.ship.radiation_env_rad_per_s = profile.ambient_at(end.distance_m)
@@ -7188,7 +7196,6 @@ class Engine:
                     drone.integrity - Balance.DRONE_BASE_DECAY_PER_S * decay_mult * dt,
                 )
         support = self._drone_bay_support_snapshot(state)
-        charge_rate = float(support["charge_rate"])
         decon_rate = float(support["decon_rate"])
         repair_rate_mult = float(support["repair_rate_mult"])
         repair_scrap_cost = int(support["repair_scrap_cost"])
@@ -7197,9 +7204,6 @@ class Engine:
         for drone in state.ship.drones.values():
             if drone.status == DroneStatus.DOCKED:
                 profile = self._drone_profile(state, drone)
-                # charge battery
-                if charge_rate > 0.0:
-                    drone.battery = min(profile.battery_max_effective, drone.battery + charge_rate * dt)
                 if decon_rate > 0.0:
                     drone.dose_rad = max(0.0, drone.dose_rad - decon_rate * dt)
                 # passive bay repair profile depends on drone_bay state
@@ -8246,7 +8250,8 @@ class Engine:
             else 0.0
         )
         bay_mult = self._drone_bay_charge_rate_mult(state)
-        charge_rate = 0.0
+        charging = decide_drone_charging(state, self._compute_p_gen(state), self._compute_load_kw(state))
+        charge_rate = charging.allocations[0].rate_per_s if charging.allocations else 0.0
         decon_rate = 0.0
         repair_rate_mult = 0.0
         repair_scrap_mult = 0.0
@@ -8254,11 +8259,6 @@ class Engine:
         repair_fail_hit = 0.0
 
         if bay_state != SystemState.OFFLINE and not distribution_offline:
-            if net_kw >= Balance.DRONE_CHARGE_KW:
-                charge_rate = Balance.DRONE_BATTERY_CHARGE_PER_S
-            elif soc > 0.0 and net_kw >= Balance.DRONE_CHARGE_NET_MIN_KW:
-                charge_rate = Balance.DRONE_BATTERY_CHARGE_PER_S * Balance.DRONE_BATTERY_CHARGE_LOW_MULT
-            charge_rate *= bay_mult
             decon_rate = Balance.DRONE_DECON_RAD_PER_S * bay_mult
             repair_rate_mult, repair_scrap_mult, repair_fail_p, repair_fail_hit = self._drone_bay_repair_profile(state)
 
@@ -8342,8 +8342,8 @@ class Engine:
             "soc": float(support["soc"]),
             "scrap_available": int(state.ship.cargo_scrap),
             "scrap_required_per_tick": repair_scrap_cost,
-            "charge_kw_required": Balance.DRONE_CHARGE_KW,
-            "charge_net_min_kw": Balance.DRONE_CHARGE_NET_MIN_KW,
+            "charge_kw_nominal": Balance.DRONE_CHARGE_KW,
+            "charge_reserve_soc": Balance.DRONE_CHARGE_RESERVE_SOC,
         }
 
     def _is_drone_bay_support_required(self, action: Action) -> bool:
@@ -8959,13 +8959,38 @@ class Engine:
         """Integrate ordinary ship electricity and regulation in onboard seconds.
 
         Generation has been sampled by the caller for this electrical segment.
-        This does not advance clocks, jobs, wear, drones or narrative schedulers.
+        This advances only drone charging, not clocks, jobs, other maintenance,
+        wear, or narrative schedulers.
         """
+        if not math.isfinite(dt_ship) or dt_ship < 0.0:
+            raise ValueError("electrical interval must be finite and nonnegative")
+        if dt_ship == 0.0:
+            events, _, _ = self._integrate_power_slice(state, 0.0)
+            return events
         events: list[Event] = []
-        p_load = self._compute_load_kw(state)
+        remaining = dt_ship
+        timed_shed_used = False
+        while remaining > 0.0:
+            slice_events, step, timed_shed = self._integrate_power_slice(
+                state, remaining, timed_shed_used=timed_shed_used)
+            if step <= 0.0 or remaining - step == remaining:
+                raise RuntimeError("electrical charging cut cannot advance")
+            events.extend(slice_events)
+            timed_shed_used |= timed_shed
+            remaining = max(0.0, remaining - step)
+        return events
+
+    def _integrate_power_slice(
+        self, state: GameState, dt_ship: float, *, timed_shed_used: bool = False,
+    ) -> tuple[list[Event], float, bool]:
+        """Regulate once, then cut and integrate the resulting allocation."""
+        events: list[Event] = []
+        base_load = self._compute_load_kw(state)
         if state.os.god_active:
             state.ship.power.p_gen_kw = self._compute_p_gen(state)
         p_gen = state.ship.power.p_gen_kw
+        charging = decide_drone_charging(state, p_gen, base_load)
+        p_load = base_load + charging.power_kw
         p_discharge_max = state.ship.power.p_discharge_max_kw
         soc = self._soc(state)
         available_discharge_kw = p_discharge_max if soc > 0.0 else 0.0
@@ -8973,47 +8998,101 @@ class Engine:
 
         if p_load > p_capacity:
             events.extend(self._auto_load_shed(state, p_capacity, p_load))
-            p_load = self._compute_load_kw(state)
+            base_load = self._compute_load_kw(state)
+            charging = decide_drone_charging(state, p_gen, base_load)
+            p_load = base_load + charging.power_kw
 
         if 0.0 < soc < 0.10 and p_load > p_gen:
             events.extend(self._auto_load_shed(state, p_gen, p_load))
-            p_load = self._compute_load_kw(state)
+            base_load = self._compute_load_kw(state)
+            charging = decide_drone_charging(state, p_gen, base_load)
+            p_load = base_load + charging.power_kw
 
         power_quality_pre = self._compute_power_quality(state, p_gen, p_load)
         if power_quality_pre < Balance.POWER_QUALITY_COLLAPSE_THRESHOLD:
             events.extend(self._shed_all_noncritical(state))
-            p_load = self._compute_load_kw(state)
+            base_load = self._compute_load_kw(state)
+            charging = decide_drone_charging(state, p_gen, base_load)
+            p_load = base_load + charging.power_kw
             power_quality_pre = self._compute_power_quality(state, p_gen, p_load)
-        if power_quality_pre < Balance.POWER_QUALITY_CRITICAL_THRESHOLD:
-            if p_load > p_gen or p_load > p_capacity:
-                state.ship.power.low_q_shed_timer_s += dt_ship
-            else:
-                state.ship.power.low_q_shed_timer_s = 0.0
-            shed_threshold = Balance.POWER_QUALITY_SHED_INTERVAL_S
-            if (state.ship.power.low_q_shed_timer_s >= shed_threshold
-                    or shed_threshold - state.ship.power.low_q_shed_timer_s
-                    <= 16 * max(math.ulp(max(1.0, shed_threshold)),
-                                math.ulp(max(1.0, state.clock.t)))):
-                events.extend(self._auto_shed_one_noncritical(state))
-                state.ship.power.low_q_shed_timer_s = 0.0
-                p_load = self._compute_load_kw(state)
-        else:
-            state.ship.power.low_q_shed_timer_s = 0.0
+        power = state.ship.power
+        shedding_timer_active = (not timed_shed_used
+                                 and power_quality_pre < Balance.POWER_QUALITY_CRITICAL_THRESHOLD
+                                 and (p_load > p_gen or p_load > p_capacity))
+        if not shedding_timer_active:
+            power.low_q_shed_timer_s = 0.0
+        shed_threshold = Balance.POWER_QUALITY_SHED_INTERVAL_S
+        timer_tolerance = 16 * max(math.ulp(max(1.0, shed_threshold)),
+                                   math.ulp(max(1.0, state.clock.t)))
+        immediate_timed_shed = False
+        if shedding_timer_active and shed_threshold - power.low_q_shed_timer_s <= timer_tolerance:
+            events.extend(self._auto_shed_one_noncritical(state))
+            power.low_q_shed_timer_s = 0.0
+            immediate_timed_shed = True
+            base_load = self._compute_load_kw(state)
+            charging = decide_drone_charging(state, p_gen, base_load)
+            p_load = base_load + charging.power_kw
+            shedding_timer_active = False
 
+        step = dt_ship
+        reaches_floor = False
+        for allocation in charging.allocations:
+            until_full = allocation.remaining / allocation.rate_per_s
+            if 0.0 < until_full < step:
+                step = until_full
+        if charging.allocations and not state.os.god_active:
+            net = p_gen - p_load
+            if net >= 0:
+                rate = min(net, power.p_charge_max_kw) * power.eta_charge / 3600.0
+            else:
+                rate = -min(-net, power.p_discharge_max_kw) / max(power.eta_discharge, 1e-6) / 3600.0
+            floor = Balance.DRONE_CHARGE_RESERVE_SOC * power.e_batt_max_kwh
+            if rate < 0.0 and power.e_batt_kwh > floor:
+                until_floor = (power.e_batt_kwh - floor) / -rate
+                if 0.0 < until_floor <= step:
+                    step, reaches_floor = until_floor, True
+            elif rate > 0.0 and power.e_batt_kwh < floor:
+                until_floor = (floor - power.e_batt_kwh) / rate
+                if 0.0 < until_floor <= step:
+                    step, reaches_floor = until_floor, True
+        timed_shed = False
+        if shedding_timer_active and dt_ship > 0.0:
+            until_shed = shed_threshold - power.low_q_shed_timer_s
+            if 0.0 < until_shed <= step:
+                step, timed_shed = until_shed, True
         state.ship.power.p_load_kw = p_load
 
-        self._update_battery(state, dt_ship, p_gen, p_load)
+        self._update_battery(state, step, p_gen, p_load)
+        if reaches_floor and not timed_shed:
+            # This snap only removes roundoff after the *regulated* net reached
+            # the floor. A stale forecast must never change stored energy.
+            floor_tolerance = 16 * math.ulp(max(1.0, abs(floor)))
+            if abs(power.e_batt_kwh - floor) <= floor_tolerance:
+                power.e_batt_kwh = floor
+        for allocation in charging.allocations:
+            drone = state.ship.drones[allocation.drone_id]
+            drone.battery = min(drone.battery + allocation.rate_per_s * step,
+                                drone.battery + allocation.remaining)
+        if shedding_timer_active:
+            power.low_q_shed_timer_s += step
+        if timed_shed:
+            events.extend(self._auto_shed_one_noncritical(state))
+            power.low_q_shed_timer_s = 0.0
+            base_load = self._compute_load_kw(state)
+            charging = decide_drone_charging(state, p_gen, base_load)
+            p_load = base_load + charging.power_kw
+            power.p_load_kw = p_load
         power_quality = self._compute_power_quality(state, p_gen, p_load)
         state.ship.power.power_quality = power_quality
         soc = self._soc(state)
         available_discharge_kw = p_discharge_max if soc > 0.0 else 0.0
         state.ship.power.brownout = not state.os.god_active and p_load > (p_gen + available_discharge_kw)
         if state.ship.power.brownout:
-            state.ship.power.brownout_sustained_s += dt_ship
+            state.ship.power.brownout_sustained_s += step
         else:
             state.ship.power.brownout_sustained_s = 0.0
 
-        return events
+        return events, step, timed_shed or immediate_timed_shed
 
     def _update_battery(self, state: GameState, dt_ship: float, p_gen: float, p_load: float) -> None:
         if state.os.god_active:

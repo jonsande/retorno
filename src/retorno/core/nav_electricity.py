@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import math
 
 from retorno.config.balance import Balance
+from retorno.core.drone_charging import ChargingDecision, decide_drone_charging
 from retorno.core.nav_boundaries import TemporalLimit, ordinary_wear_rate
 from retorno.model.systems import ShipSystem, SystemState
 
@@ -82,6 +83,7 @@ class PowerSnapshot:
     installed_modules: tuple[str, ...]
     system_signature: tuple[tuple[str, float, SystemState, bool, float], ...]
     job_signature: tuple[tuple[str, str, float], ...]
+    charging: ChargingDecision = ChargingDecision()
 
     def __post_init__(self) -> None:
         nonnegative = (
@@ -103,8 +105,9 @@ def capture_power_snapshot(state, generation_kw: float, load_kw: float) -> Power
     """Read productive powers and the small set of assumptions they rely on."""
     power = state.ship.power
     distribution = state.ship.systems.get("energy_distribution")
+    charging = decide_drone_charging(state, generation_kw, load_kw)
     return PowerSnapshot(
-        generation_kw, load_kw, power.e_batt_kwh, power.e_batt_max_kwh,
+        generation_kw, load_kw + charging.power_kw, power.e_batt_kwh, power.e_batt_max_kwh,
         power.p_charge_max_kw, power.p_discharge_max_kw,
         power.eta_charge, power.eta_discharge, power.power_quality,
         power.deficit_ratio, power.brownout, power.brownout_sustained_s,
@@ -114,7 +117,7 @@ def capture_power_snapshot(state, generation_kw: float, load_kw: float) -> Power
         tuple((key, system.health, system.state, system.forced_offline, system.p_nom_kw)
               for key, system in sorted(state.ship.systems.items())),
         tuple((key, job.status.value, job.power_draw_kw)
-              for key, job in sorted(state.jobs.jobs.items())),
+              for key, job in sorted(state.jobs.jobs.items())), charging,
     )
 
 
@@ -135,6 +138,8 @@ def invalidation_reasons(
     ):
         if any(getattr(before, name) != getattr(after, name) for name in fields):
             reasons.append(label)
+    if before.charging != after.charging:
+        reasons.append("charging_changed")
     if elapsed_proper_s is not None:
         expected = energy_at(before, elapsed_proper_s)
         if not math.isclose(after.energy_kwh, expected, rel_tol=1e-12, abs_tol=1e-12):
@@ -223,7 +228,7 @@ class ResolvedElectricalLimit:
 
 _MATHEMATICAL_LIMITS = frozenset({
     "battery_empty", "soc_10_percent", "soc_50_percent", "battery_full",
-    "quality_025", "quality_040", "quality_055",
+    "quality_025", "quality_040", "quality_055", "drone_charge_soc_floor",
 })
 
 
@@ -302,6 +307,13 @@ def power_limits(
         add(name, _time_to_energy(snapshot, fraction * snapshot.capacity_kwh),
             validity="mathematical_crossing",
             reason="battery_state_or_quality_branch_changes")
+    if snapshot.charging.candidate:
+        add("drone_charge_soc_floor", _time_to_energy(
+            snapshot, Balance.DRONE_CHARGE_RESERVE_SOC * snapshot.capacity_kwh),
+            validity="mathematical_crossing", reason="reserve_charging_changes")
+        for allocation in snapshot.charging.allocations:
+            add("drone_battery_full", allocation.remaining / allocation.rate_per_s,
+                validity="mathematical_crossing", reason="charging_allocation_changes")
     for threshold, name in ((Balance.POWER_QUALITY_COLLAPSE_THRESHOLD, "quality_025"),
                             (Balance.POWER_QUALITY_CRITICAL_THRESHOLD, "quality_040"),
                             (Balance.POWER_QUALITY_BLOCK_THRESHOLD, "quality_055")):

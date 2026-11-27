@@ -74,3 +74,11 @@ Las lecturas eléctricas CLI/Textual conservan comandos y unidades. Los manuales
 bilingües explican kW/kWh y temporizadores a bordo; no hacen falta cambios de
 sintaxis de help ni de textos de eventos. Pruebas y resultados:
 [validación](../testing/electrical-proper-time-review.es.md).
+
+## Actualización PT001-07B
+
+La descripción anterior conserva el alcance histórico de T-04B1. Desde 07B,
+la recarga de drones añade carga variable en kW y se integra en segundos
+propios junto a la electricidad. El resto del mantenimiento de drones sigue
+en segundos galácticos. La [especificación de recarga](drone-charging.es.md)
+define calibración, reserva del 25 %, reparto y cortes causales.

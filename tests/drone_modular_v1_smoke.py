@@ -233,6 +233,7 @@ def main() -> None:
     maint_state.ship.power.p_load_kw = 0.0
     maint_state.ship.power.e_batt_kwh = 2.0
     maint_state.ship.power.e_batt_max_kwh = 2.0
+    engine._integrate_power_interval(maint_state, 120.0)
     engine._update_drone_maintenance(maint_state, 120.0)
     mprofile = compute_drone_effective_profile(mdrone, modules)
     assert mdrone.battery <= mprofile.battery_max_effective + 1e-6
