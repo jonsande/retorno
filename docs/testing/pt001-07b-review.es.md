@@ -61,3 +61,7 @@ No se ejecutaron la suite general ni benchmarks extensos. La política y
 calibración de recarga aprobadas siguen intactas. **TEMP-01** queda registrado
 como trabajo futuro; no se ha auditado aquí la base temporal de otros
 subsistemas.
+
+Posteriormente, el desarrollador comunicó la validación general definitiva de
+PT001-07: **677 pruebas y 169 subpruebas superadas en 362,72 s**. No se repitió
+durante PT001-08.

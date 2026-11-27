@@ -275,6 +275,7 @@ class RetornoTextualApp(App):
         self._hibernate_worker: asyncio.Task | None = None
         self._hibernate_closing = False
         self._hibernate_panel_blackout = False
+        self._hibernate_show_progress = False
         self._hibernate_progress: SimpleQueue[str] = SimpleQueue()
         try:
             self._audio_manager = AudioManager(load_audio_config())
@@ -454,9 +455,12 @@ class RetornoTextualApp(App):
         self._hibernate_sequence_running = True
         input_widget = self.query_one("#input", Input)
         input_widget.disabled = True
+        hibernate_start_t: float | None = None
         try:
             with self.loop.with_lock() as state:
                 locale = state.os.locale.value
+                debug_progress = state.os.debug_enabled
+            self._hibernate_show_progress = debug_progress
             start_lines = load_hibernate_start_sequence_lines(locale)
             start_typewriter = Balance.HIBERNATE_SEQUENCE_TYPEWRITER
             start_cps = max(1, int(Balance.HIBERNATE_SEQUENCE_TYPEWRITER_CPS))
@@ -532,6 +536,8 @@ class RetornoTextualApp(App):
                 if remaining > 0:
                     await asyncio.sleep(1.0)
 
+            with self.loop.with_lock() as state:
+                hibernate_start_t = state.clock.t
             self._clear_log_widget(clear_buffer=True)
             progress_last = [0.0]
 
@@ -542,42 +548,49 @@ class RetornoTextualApp(App):
                 if now - progress_last[0] < 0.5 and elapsed_s < total_s:
                     return
                 progress_last[0] = now
-                elapsed_years = elapsed_s / Balance.YEAR_S
-                total_years = total_s / Balance.YEAR_S
-                message = (f"[INFO] Simulating: {elapsed_years:.2f}/{total_years:.2f} y"
-                           if locale == "en" else
-                           f"[INFO] Simulando: {elapsed_years:.2f}/{total_years:.2f} años")
-                self._hibernate_progress.put(message)
+                self._hibernate_progress.put(repl._hibernate_progress_line(locale, elapsed_s, total_s))
 
-            self._log_line("[INFO] Simulating journey…" if locale == "en" else
-                           "[INFO] Simulando el viaje…")
+            if debug_progress:
+                self._log_line("[DEBUG] Simulating journey…" if locale == "en" else
+                               "[DEBUG] Simulando el viaje…")
+            else:
+                self._hibernate_panel_blackout = True
+                input_widget.display = False
+                self._render_panel_blackout()
             self._hibernate_worker = asyncio.create_task(asyncio.to_thread(
                 repl._execute_hibernate, self.loop, years,
                 wake_on_low_battery=wake_on_low_battery,
-                until_arrival=until_arrival, on_progress=report_progress,
+                until_arrival=until_arrival,
+                on_progress=report_progress if debug_progress else None,
             ))
             result = await asyncio.shield(self._hibernate_worker)
             self._hibernate_worker = None
             if self._hibernate_closing:
                 return
             self._drain_hibernate_progress()
-            self._hibernate_panel_blackout = True
-            self._render_panel_blackout()
-            if wake_blackout_s > 0.0:
-                await asyncio.sleep(wake_blackout_s)
+            outcome = repl._hibernate_outcome(result)
+            if outcome == "technical":
+                self.loop.set_auto_tick(False)
+            else:
+                self._hibernate_panel_blackout = True
+                self._render_panel_blackout()
+                if wake_blackout_s > 0.0:
+                    await asyncio.sleep(wake_blackout_s)
             self._hibernate_panel_blackout = False
+            input_widget.display = True
             self.refresh_panels()
-            wake_lines = load_hibernate_wake_sequence_lines(
-                locale,
-                emergency=repl._hibernate_wake_is_emergency(result),
-            )
-            await _play_log_sequence(
-                wake_lines,
-                typewriter=wake_typewriter,
-                cps=wake_cps,
-                line_delay_s=wake_line_delay_s,
-                persist_to_buffer=True,
-            )
+            if outcome != "technical":
+                wake_lines = load_hibernate_wake_sequence_lines(
+                    locale,
+                    emergency=repl._hibernate_wake_is_emergency(result),
+                )
+                await _play_log_sequence(
+                    wake_lines,
+                    typewriter=wake_typewriter,
+                    cps=wake_cps,
+                    line_delay_s=wake_line_delay_s,
+                    persist_to_buffer=True,
+                )
             lines = presenter.build_command_output(
                 repl._render_hibernate_result,
                 self.loop,
@@ -585,11 +598,26 @@ class RetornoTextualApp(App):
             )
             self._log_lines(lines)
         except Exception as e:
-            self._log_line(f"[ERROR] hibernate failed: {e}")
+            self.loop.set_auto_tick(False)
+            error_locale = self.loop.state.os.locale.value
+            with self.loop.with_lock() as state:
+                elapsed_s = state.clock.t - hibernate_start_t if hibernate_start_t is not None else 0.0
+            failure_lines = repl._hibernate_failure_lines(error_locale, e, elapsed_s)
+            if self._hibernate_closing:
+                sys.stderr.write("\n".join(failure_lines) + "\n")
+            else:
+                self._hibernate_panel_blackout = False
+                input_widget.display = True
+                self.refresh_panels()
+                self._log_lines(failure_lines)
         finally:
+            self._hibernate_show_progress = False
+            if self._hibernate_worker is not None and self._hibernate_worker.done():
+                self._hibernate_worker = None
             self._hibernate_sequence_running = False
             if not self._hibernate_closing:
                 self._hibernate_panel_blackout = False
+                input_widget.display = True
                 input_widget.disabled = False
                 self.refresh_panels()
                 self.call_later(input_widget.focus)
@@ -1431,7 +1459,8 @@ class RetornoTextualApp(App):
                 message = self._hibernate_progress.get_nowait()
             except Empty:
                 return
-            self._log_line(message)
+            if self._hibernate_show_progress:
+                self._log_line(message)
 
     def refresh_panels(self) -> None:
         # A queued timer callback can run after Textual removed the screen.

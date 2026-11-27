@@ -296,6 +296,14 @@ def _hibernate_countdown_line(locale: str, remaining: int) -> str:
     return template.format(remaining=max(0, remaining))
 
 
+def _hibernate_progress_line(locale: str, elapsed_s: float, total_s: float) -> str:
+    elapsed_years = elapsed_s / Balance.YEAR_S
+    total_years = total_s / Balance.YEAR_S
+    if locale == "es":
+        return f"[DEBUG] Simulando: {elapsed_years:.2f}/{total_years:.2f} años"
+    return f"[DEBUG] Simulating: {elapsed_years:.2f}/{total_years:.2f} y"
+
+
 def _play_hibernate_start_sequence(locale: str) -> None:
     lines = load_hibernate_start_sequence_lines(locale)
     if lines:
@@ -336,7 +344,27 @@ def _hibernate_wake_sequence_line_delay_s() -> float:
 
 
 def _hibernate_wake_is_emergency(result: HibernateRunResult) -> bool:
-    return bool(result.woke_early)
+    return _hibernate_outcome(result) == "emergency"
+
+
+def _hibernate_outcome(result: HibernateRunResult) -> str:
+    if result.wake_reason and result.wake_reason.startswith("causal_boundary:"):
+        return "technical"
+    return "emergency" if result.woke_early else "ordinary"
+
+
+def _hibernate_failure_lines(locale: str, error: Exception, elapsed_s: float) -> list[str]:
+    years = max(0.0, elapsed_s) / Balance.YEAR_S
+    days = max(0.0, elapsed_s) / Balance.DAY_S
+    if locale == "es":
+        return [
+            f"[ERROR] Fallo técnico de hibernación: {error}. El tiempo automático está pausado.",
+            f"Tiempo avanzado realmente: {years:.2f} años ({days:.1f} días).",
+        ]
+    return [
+        f"[ERROR] Technical hibernation failure: {error}. Automatic time is paused.",
+        f"Time actually advanced: {years:.2f} years ({days:.1f} days).",
+    ]
 
 
 def _play_hibernate_wake_sequence(locale: str, result: HibernateRunResult) -> None:
@@ -793,6 +821,13 @@ def _public_unknown_contact_message(state, event) -> str | None:
         "es": "Acción bloqueada: contacto desconocido. Usa 'scan' o consigue inteligencia de navegación.",
     }
     return messages.get(state.os.locale.value, messages["en"])
+
+
+def _technical_hibernation_end_message(locale: str, event: Event) -> str:
+    duration = _format_eta_short((event.data.get("years", 0.0) or 0.0) * Balance.YEAR_S, locale)
+    if locale == "es":
+        return f"Hibernación detenida tras {duration} por un fallo técnico"
+    return f"Hibernation stopped after {duration} by a technical fault"
 
 
 @public_output
@@ -1851,6 +1886,11 @@ def render_events(state, events, origin_override: str | None = None) -> None:
             continue
         if e.type in {EventType.TRAVEL_STARTED, EventType.TRAVEL_ABORTED, EventType.ARRIVED, EventType.PHYSICAL_STOPPED, EventType.HIBERNATION_STARTED, EventType.HIBERNATION_ENDED}:
             locale = state.os.locale.value
+            if (e.type == EventType.HIBERNATION_ENDED
+                    and e.data.get("end_reason") == "causal_boundary"):
+                print(f"[{origin_tag}] [{sev}] hibernation_ended :: "
+                      + _technical_hibernation_end_message(locale, e))
+                continue
             key = e.type.value
             tmpl = travel_templates.get(key, {}).get(locale)
             payload.update({
@@ -2508,6 +2548,9 @@ def render_logs(state, limit: int = 15) -> None:
         if t_label.startswith("T+"):
             t_label = t_label[2:]
         message = _public_unknown_contact_message(state, e) or e.message
+        if (e.type == EventType.HIBERNATION_ENDED
+                and e.data.get("end_reason") == "causal_boundary"):
+            message = _technical_hibernation_end_message(state.os.locale.value, e)
         speed_message = _ENGINE_SPEED_MESSAGES.get(
             e.type.value if e.type == EventType.ENGINE_SPEED_SET else e.data.get("reason"))
         if speed_message:
@@ -6973,6 +7016,7 @@ def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False,
                 break
         with loop.with_lock() as locked_state:
             actual_years = max(0.0, locked_state.clock.t - start_t) / Balance.YEAR_S
+            technical_block = bool(wake_reason and wake_reason.startswith("causal_boundary:"))
             _emit_runtime_event(
                 locked_state,
                 events_to_render,
@@ -6980,8 +7024,9 @@ def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False,
                 EventType.HIBERNATION_ENDED,
                 Severity.INFO,
                 SourceRef(kind="ship", id=locked_state.ship.ship_id),
-                f"Hibernation ended after {actual_years:.2f} years",
-                data={"years": actual_years},
+                (f"Hibernation stopped after {actual_years:.2f} years" if technical_block
+                 else f"Hibernation ended after {actual_years:.2f} years"),
+                data={"years": actual_years, **({"end_reason": "causal_boundary"} if technical_block else {})},
             )
             end_soc = (
                 locked_state.ship.power.e_batt_kwh / locked_state.ship.power.e_batt_max_kwh
@@ -7026,7 +7071,7 @@ def _render_hibernate_result(loop, result: HibernateRunResult) -> None:
         if result.events_to_render:
             render_events(locked_state, result.events_to_render)
         _render_and_store_events(locked_state, result.recovery_events)
-        if result.woke_early:
+        if _hibernate_outcome(result) != "ordinary":
             locale = locked_state.os.locale.value
             msg = None
             if result.wake_reason:
@@ -7081,7 +7126,8 @@ def _render_hibernate_result(loop, result: HibernateRunResult) -> None:
                     "en": f"Hibernation interrupted: {result.wake_reason or 'unknown reason'}",
                     "es": f"Hibernación interrumpida: {result.wake_reason or 'motivo desconocido'}",
                 }
-            print(f"[WARN] {msg.get(locale, msg['en'])}")
+            level = "ERROR" if _hibernate_outcome(result) == "technical" else "WARN"
+            print(f"[{level}] {msg.get(locale, msg['en'])}")
     days = result.actual_years * (Balance.YEAR_S / Balance.DAY_S)
     print(f"Advanced time by {result.actual_years:.2f} years ({days:.1f} days).")
     if result.start_health:
@@ -8633,13 +8679,38 @@ def main() -> None:
                 years = parsed.years
             with loop.with_lock() as locked_state:
                 locale = locked_state.os.locale.value
+                debug_progress = locked_state.os.debug_enabled
             _play_hibernate_start_sequence(locale)
-            result = _execute_hibernate(loop, years, wake_on_low_battery=wake_on_low,
-                                        until_arrival=parsed.mode == "until_arrival")
-            blackout_s = _hibernate_wake_panel_blackout_s()
-            if blackout_s > 0.0:
-                time.sleep(blackout_s)
-            _play_hibernate_wake_sequence(locale, result)
+            progress_last = [0.0]
+
+            def report_debug_progress(elapsed_s: float, total_s: float) -> None:
+                now = time.monotonic()
+                if now - progress_last[0] < 0.5 and elapsed_s < total_s:
+                    return
+                progress_last[0] = now
+                print(_hibernate_progress_line(locale, elapsed_s, total_s), flush=True)
+
+            with loop.with_lock() as locked_state:
+                hibernate_start_t = locked_state.clock.t
+            try:
+                result = _execute_hibernate(loop, years, wake_on_low_battery=wake_on_low,
+                                            until_arrival=parsed.mode == "until_arrival",
+                                            on_progress=report_debug_progress if debug_progress else None)
+            except Exception as exc:
+                loop.set_auto_tick(False)
+                with loop.with_lock() as locked_state:
+                    elapsed_s = locked_state.clock.t - hibernate_start_t
+                for line in _hibernate_failure_lines(locale, exc, elapsed_s):
+                    print(line)
+                _rearm_pending_repair_auto_move_prompts()
+                continue
+            if _hibernate_outcome(result) == "technical":
+                loop.set_auto_tick(False)
+            else:
+                blackout_s = _hibernate_wake_panel_blackout_s()
+                if blackout_s > 0.0:
+                    time.sleep(blackout_s)
+                _play_hibernate_wake_sequence(locale, result)
             _render_hibernate_result(loop, result)
             _rearm_pending_repair_auto_move_prompts()
             continue

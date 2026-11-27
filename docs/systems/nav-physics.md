@@ -32,9 +32,28 @@ after real progress, hibernation ends without repeating or counting that
 remainder. A pending causal transition or a request unable to advance from its
 start is reported as blocked, without declaring arrival.
 
-Textual runs hibernation simulation outside its UI loop. The worker puts
+Textual runs hibernation simulation outside its UI loop. The worker can put
 real elapsed time in a queue, which the panel timer drains on the Textual
-thread. Input remains disabled until wakeup, and shutdown waits for simulation
+thread in debug mode. PT001-08 keeps the normal interface dark from the end
+of the entry countdown through simulation and the existing wake blackout:
+telemetry, clocks, and intermediate events are not displayed. The existing
+entry and wake narration and audio remain; selected recorded events and the
+hibernation digest appear after the wake sequence. The ordinary CLI clears its
+screen and remains silent during processing; its existing debug mode prints
+real elapsed progress through the same simulation callback. A technical
+worker error removes the blackout and shows an error without a wake sequence.
+PT001-08-F classifies completed runs as ordinary, legitimate emergency, or
+technical causal block in shared presentation logic. A returned
+`causal_boundary:` result, like a worker exception, restores the interface,
+keeps automatic time paused, reports the fault and actual elapsed time, and
+does not play wake narration. CLI catches worker exceptions and remains in its
+ordinary command and save flow. Legitimate emergency wakes retain their
+existing narration; no physical or survival rule changes in 08-F.
+PT001-08-F2 keeps the effective `HIBERNATION_ENDED` record on a technical
+causal block and stores its termination reason with the event. Its immediate
+presentation and later event-log view report a technical stop instead of a
+wake, in both locales. Ordinary and legitimate emergency wake wording remains.
+Input remains disabled until wakeup or error, and shutdown waits for simulation
 before saving. Panels and automatic events share a snapshot under a
 nonblocking lock; refresh skips a frame if the engine is busy. An
 unexpected automatic-advance error pauses the loop and emits a visible

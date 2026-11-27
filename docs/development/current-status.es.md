@@ -29,6 +29,16 @@ especificación vigente. Los documentos técnicos propietarios están en
   solo en una conversación, está registrada en la
   [especificación de recarga](../systems/drone-charging.es.md). Véase la
   [validación dirigida](../testing/pt001-07b-review.es.md).
+- **PT001-07 aprobado tras la validación general definitiva comunicada por el desarrollador:**
+  `677 passed, 169 subtests passed in 362.72s`. Es el resultado completado
+  de PT001-07, no una ejecución de la suite en PT001-08.
+- **Implementado y revisado en PT001-08, 08-F y 08-F2:** la hibernación normal oculta el progreso de
+  simulación, relojes y paneles intermedios hasta el despertar; debug conserva
+  el progreso real mediante el mecanismo existente. Los bloqueos técnicos
+  restauran la interfaz, pausan el tiempo automático y muestran el avance real
+  sin narración de despertar. El evento final registrado también presenta una
+  detención técnica al consultarlo después. Véase el
+  [registro de presentación](../testing/pt001-08-review.es.md).
 
 ## Incidencias abiertas y direcciones de diseño
 
@@ -36,14 +46,14 @@ especificación vigente. Los documentos técnicos propietarios están en
 | --- | --- | --- |
 | PT001-01/09 | Observaciones abiertas | Lag residual y regularidad de relojes durante tránsito físico. Medir en el perfil real actual antes de elegir solución; los viajes completados no cierran esta incidencia. |
 | PT001-06 | 06A: carga protegida; transición causal pendiente | La partida real carga en CLI y Textual; el avance se pausa y se informa cuando `core_os` ya está apagado durante tránsito físico. Se impide apagar `core_os` o `life_support` mediante comandos públicos mientras hay tránsito físico. El terminal apagado conserva sus restricciones: la partida afectada no puede reanudar el viaje sin una futura transición causal de supervivencia, fuera de 06A. |
-| PT001-07 | 07B-F implementado; revisión pendiente | Recarga variable y reserva con umbral del 25 %, contabilidad energética y cortes causales tras la regulación eléctrica efectiva. |
+| PT001-07 | Aprobado; validación general definitiva completada | Recarga variable y reserva con umbral del 25 %, contabilidad energética y cortes causales tras la regulación eléctrica efectiva. Superadas 677 pruebas y 169 subpruebas. |
 | TEMP-01 | Invariante aprobado; auditoría pendiente | Auditar y corregir progresivamente las bases temporales de todos los subsistemas. La física interna de la nave usa tiempo propio; los procesos externos, el físicamente correspondiente; el tiempo biológico deriva del propio y del estado fisiológico. 07B-F no implementa TEMP-01. |
-| PT001-08 | Dirección de presentación aprobada; implementación pendiente | Mostrar progreso interno de simulación de hibernación solo en debug. La interfaz normal sigue siendo diegética. Concretar la superficie de debug. |
+| PT001-08 | 08-F2 implementado; validación dirigida completada | La hibernación normal de Textual permanece oscura durante el procesamiento; CLI guarda silencio tras limpiar la pantalla. El debug existente muestra progreso real. Los despertares ordinarios y las emergencias legítimas conservan su secuencia. Las excepciones y los bloqueos causales devueltos pausan el tiempo automático, muestran el avance real y omiten la narración de despertar; el evento final registrado comunica una detención técnica al consultarlo después. CLI puede guardar al salir. |
 | PT001-10 | Dirección de presentación aprobada; implementación pendiente | Explicar motivos específicos que impiden iniciar viaje, incluido engines apagado. Localizar EN/ES sin divulgar estado interno; concretar mensajes. |
 | PT001-11 | Diseño aprobado; implementación pendiente | `ACTIVE` durante aceleración y frenado; `STANDBY` durante crucero con reactivación anticipada; `OFFLINE` automático tras detenerse efectivamente en destino. Separar estado operativo, salud del sistema y causa de desconexión. La reactivación para una nueva partida, los consumos, el desgaste y los tiempos de arranque requieren concreción en NAV-BRAKE-01C. |
 
 La tabla distingue defectos observados de comportamiento futuro aprobado. No
-afirma que PT001-08 a PT001-11 estén implementadas; PT001-06 solo tiene la
+afirma que PT001-10 ni PT001-11 estén implementadas; PT001-06 solo tiene la
 protección de carga y prevención de 06A. Siguen vigentes los
 contratos causales, económicos, transaccionales y de conocimiento.
 

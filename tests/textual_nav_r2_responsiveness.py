@@ -35,6 +35,7 @@ async def run() -> dict:
             app._startup_panel_blackout = False
             marks: dict[str, float] = {}
             refreshes: list[float] = []
+            blackout_refreshes: list[float] = []
             gaps: list[float] = []
             original_refresh = app.refresh_panels
             original_execute = repl._execute_hibernate
@@ -43,6 +44,8 @@ async def run() -> dict:
 
             def refresh() -> None:
                 refreshes.append(time.perf_counter())
+                if app._hibernate_panel_blackout:
+                    blackout_refreshes.append(time.perf_counter())
                 original_refresh()
 
             def execute(*args, **kwargs):
@@ -86,8 +89,9 @@ async def run() -> dict:
                     await task
                     marks["sequence_end"] = time.perf_counter()
                     assert app.loop.state.ship.physical_transit is None
-                    assert any("simulating" in line.lower() or "simulando" in line.lower()
-                               for line in app._log_buffer)
+                    assert not any("simulating" in line.lower() or "simulando" in line.lower()
+                                   for line in app._log_buffer)
+                    assert blackout_refreshes
                     assert not any("hibernate failed" in line for line in app._log_buffer)
                     wake_clock_t = app.loop.state.clock.t
                     await pilot.pause(1.5)
@@ -112,6 +116,7 @@ async def run() -> dict:
                 "event_loop_gap_max_s": max(gaps),
                 "event_loop_gap_p95_s": sorted(gaps)[int(.95 * (len(gaps) - 1))],
                 "panel_refresh_calls": len(refreshes),
+                "blackout_refresh_calls": len(blackout_refreshes),
                 "progress_messages": sum("simulating:" in line.lower() or "simulando:" in line.lower()
                                          for line in app._log_buffer),
                 "arrived": app.loop.state.ship.physical_transit is None,

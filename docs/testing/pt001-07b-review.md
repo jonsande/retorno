@@ -58,3 +58,7 @@ Validation with `/home/jon/prog/retorno_case/retorno_venv/bin/python`:
 The general suite and extensive benchmarks were not run. The approved charging
 policy and calibration remain unchanged. **TEMP-01** is recorded as future work;
 no time-base audit of other subsystems was implemented here.
+
+The developer subsequently reported definitive PT001-07 general validation:
+**677 tests and 169 subtests passed in 362.72 s**. This result was not
+rerun during PT001-08.

@@ -28,6 +28,15 @@ not a current implementation specification. Technical owners are indexed in
   conversation, is now recorded in the
   [charging specification](../systems/drone-charging.md). See the
   [targeted verification](../testing/pt001-07b-review.md).
+- **PT001-07 approved after definitive general validation reported by the developer:**
+  `677 passed, 169 subtests passed in 362.72s`. This is the completed
+  PT001-07 validation result, not a suite run in PT001-08.
+- **Implemented and reviewed in PT001-08, 08-F, and 08-F2:** normal hibernation hides simulation progress,
+  clocks, and intermediate panels until wake; debug mode retains real progress
+  through the existing mechanism. Technical blocks return to the interface
+  with automatic time paused and actual progress shown, without wake narration.
+  The recorded end event also presents a technical stop when consulted later. See the
+  [presentation record](../testing/pt001-08-review.md).
 
 ## Open playtest issues and design directions
 
@@ -35,14 +44,14 @@ not a current implementation specification. Technical owners are indexed in
 | --- | --- | --- |
 | PT001-01/09 | Open observations | Residual lag and clock regularity during physical transit. Measure on the current real profile before choosing a remedy; completed journeys do not close this issue. |
 | PT001-06 | 06A: safe load; causal transition pending | The real save loads in CLI and Textual; time advance pauses with a visible explanation when `core_os` is already offline during physical transit. Public commands cannot turn off `core_os` or `life_support` during physical transit. Offline terminal restrictions remain: the affected save cannot resume travel without a future causal survival transition, outside 06A. |
-| PT001-07 | 07B-F implemented; review pending | Variable charging load and reserve with a 25% SoC threshold, energy accounting, and causal cuts after effective electrical regulation. |
+| PT001-07 | Approved; definitive general validation complete | Variable charging load and reserve with a 25% SoC threshold, energy accounting, and causal cuts after effective electrical regulation. 677 tests and 169 subtests passed. |
 | TEMP-01 | Approved invariant; audit pending | Audit and progressively correct the time bases of all subsystems. Internal ship physics uses proper time; external processes use the physically appropriate time; biological time derives from proper time and physiological state. No TEMP-01 implementation is included in 07B-F. |
-| PT001-08 | Approved presentation direction; implementation pending | Show internal hibernation simulation progress only in debug mode. Keep ordinary presentation diegetic. Specify the debug surface. |
+| PT001-08 | 08-F2 implemented; focused validation complete | Normal Textual hibernation stays dark during processing; CLI remains silent after its cleared screen. Existing debug mode shows real progress. Ordinary and legitimate emergency wakes retain their sequence. Exceptions and returned causal blocks pause automatic time, show actual progress, and omit wake narration; the recorded end event reports a technical stop on later consultation. CLI can still save on exit. |
 | PT001-10 | Approved presentation direction; implementation pending | Give specific reasons why a journey cannot start, including engines being off. Localize EN/ES and avoid internal leaks; specify message mapping. |
 | PT001-11 | Approved design; implementation pending | `ACTIVE` during acceleration and braking; `STANDBY` during cruise with early reactivation; automatic `OFFLINE` after the ship actually stops at its destination. Separate operational state, system health, and disconnection cause. Reactivation for a new departure, power use, wear, and startup times need definition in NAV-BRAKE-01C. |
 
 These rows distinguish observed defects from approved future behavior. None
-claims PT001-08 through PT001-11 is implemented; PT001-06 only has the 06A
+claims PT001-10 or PT001-11 is implemented; PT001-06 only has the 06A
 load and prevention safeguards. Causal, economic,
 transactional and knowledge contracts remain in force.
 

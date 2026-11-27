@@ -33,10 +33,32 @@ tiempo transcurrido. Una transición causal pendiente o una petición que no pue
 avanzar desde el inicio se comunican como bloqueo, sin declarar llegada.
 
 Textual ejecuta la simulación de hibernación fuera de su bucle de interfaz. El
-worker entrega tiempos reales por una cola, que el temporizador de paneles
-consume en el hilo de Textual. La entrada permanece deshabilitada hasta el
-despertar; el cierre espera a la simulación antes de guardar. Paneles y eventos
-automáticos comparten una instantánea bajo lock no bloqueante; se omite un
+worker puede entregar tiempos reales por una cola, que el temporizador de
+paneles consume en el hilo de Textual en modo debug. PT001-08 mantiene oscura
+la interfaz normal desde el final de la cuenta atrás de entrada durante la
+simulación y el oscurecimiento previo al despertar: no se muestran telemetría,
+relojes ni sucesos intermedios. Se conservan la narración y el audio existentes
+de entrada y salida; los acontecimientos registrados seleccionados y el resumen
+de hibernación aparecen tras la secuencia de despertar. CLI normal limpia la
+pantalla y permanece en silencio durante el procesamiento; el debug existente
+imprime progreso real mediante el mismo callback de simulación. Un error
+técnico del worker retira el oscurecimiento y muestra el fallo sin secuencia de
+despertar. PT001-08-F clasifica los resultados como finalización ordinaria,
+emergencia legítima o bloqueo causal técnico mediante lógica de presentación
+compartida. Un resultado `causal_boundary:`, igual que una excepción del worker,
+restaura la interfaz, mantiene pausado el tiempo automático, informa del fallo
+y del tiempo realmente avanzado y omite la narración de despertar. CLI captura
+las excepciones del worker y conserva su flujo ordinario de comandos y guardado.
+Los despertares de emergencia legítimos mantienen la narración existente; 08-F
+no cambia reglas físicas ni de supervivencia.
+PT001-08-F2 conserva el registro efectivo `HIBERNATION_ENDED` ante un bloqueo
+causal técnico y guarda la causa de terminación con el evento. Su presentación
+inmediata y la consulta posterior del registro comunican una detención técnica,
+sin despertar ficticio, en ambos idiomas. Se mantiene el texto de despertar
+ordinario y de emergencia legítima.
+La entrada permanece deshabilitada hasta el despertar o el error; el cierre
+espera a la simulación antes de guardar. Paneles y eventos automáticos
+comparten una instantánea bajo lock no bloqueante; se omite un
 refresco si el motor está ocupado. Un error inesperado en
 el avance automático pausa el bucle y genera un aviso observable; no avanza
 el tiempo de juego por un resultado ficticio.
