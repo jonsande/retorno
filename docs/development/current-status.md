@@ -31,6 +31,10 @@ not a current implementation specification. Technical owners are indexed in
 - **PT001-07 approved after definitive general validation reported by the developer:**
   `677 passed, 169 subtests passed in 362.72s`. This is the completed
   PT001-07 validation result, not a suite run in PT001-08.
+- **PT001-01/09-B definitively validated as reported by the developer:**
+  `727 passed, 169 subtests passed in 461.08s`. TEMP-01A did not rerun that
+  suite. The [scheduler diagnosis](../testing/pt001-01-09-diagnosis.md)
+  retains its focused measurements and remaining real-terminal limitation.
 - **Implemented and reviewed in PT001-08, 08-F, and 08-F2:** normal hibernation hides simulation progress,
   clocks, and intermediate panels until wake; debug mode retains real progress
   through the existing mechanism. Technical blocks return to the interface
@@ -46,10 +50,10 @@ not a current implementation specification. Technical owners are indexed in
 
 | ID | Status | Issue or approved outcome; technical work remaining |
 | --- | --- | --- |
-| PT001-01/09 | B implemented; focused validation | Automatic time now retains active-time debt after missed deadlines and recovers it in bounded, yielding steps. Pauses, manual advance, hibernation, errors and close discard debt; permitted restarts begin fresh epochs. Sustained overload and real-terminal perception remain open; see the [diagnosis and B results](../testing/pt001-01-09-diagnosis.md). |
+| PT001-01/09 | B implemented; definitive general validation complete | Automatic time retains active-time debt after missed deadlines and recovers it in bounded, yielding steps. Pauses, manual advance, hibernation, errors and close discard debt; permitted restarts begin fresh epochs. 727 tests and 169 subtests passed. Sustained overload and real-terminal perception remain open; see the [diagnosis](../testing/pt001-01-09-diagnosis.md). |
 | PT001-06 | 06A: safe load; causal transition pending | The real save loads in CLI and Textual; time advance pauses with a visible explanation when `core_os` is already offline during physical transit. Public commands cannot turn off `core_os` or `life_support` during physical transit. Offline terminal restrictions remain: the affected save cannot resume travel without a future causal survival transition, outside 06A. |
 | PT001-07 | Approved; definitive general validation complete | Variable charging load and reserve with a 25% SoC threshold, energy accounting, and causal cuts after effective electrical regulation. 677 tests and 169 subtests passed. |
-| TEMP-01 | Approved invariant; audit pending | Audit and progressively correct the time bases of all subsystems. Internal ship physics uses proper time; external processes use the physically appropriate time; biological time derives from proper time and physiological state. No TEMP-01 implementation is included in 07B-F. |
+| TEMP-01 | 01A audit complete; corrections pending | The [EN/ES inventory](../systems/temporal-bases-audit.md) identifies galactic-time onboard jobs, life-support grace, drone upkeep and fractional alert-age loss; external frames and several gameplay deadlines need design decisions. No productive change was made in 01A. |
 | PT001-08 | 08-F2 implemented; focused validation complete | Normal Textual hibernation stays dark during processing; CLI remains silent after its cleared screen. Existing debug mode shows real progress. Ordinary and legitimate emergency wakes retain their sequence. Exceptions and returned causal blocks pause automatic time, show actual progress, and omit wake narration; the recorded end event reports a technical stop on later consultation. CLI can still save on exit. |
 | PT001-10 | Implemented; focused validation complete | Specific EN/ES departure diagnostics cover engine power/health, target speed, transit/docking, route knowledge/range, fuel and electrical/core OS restrictions. CLI, Textual and route rows share the read-only result. Admission and debit remain in Engine. |
 | QA-01 | Future audit pending | Audit regression scripts excluded from automatic pytest collection, assess their current contracts and decide explicitly which should be collected or run separately. No QA-01 implementation in PT001-01/09-A. |

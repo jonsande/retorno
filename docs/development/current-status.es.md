@@ -32,6 +32,10 @@ especificación vigente. Los documentos técnicos propietarios están en
 - **PT001-07 aprobado tras la validación general definitiva comunicada por el desarrollador:**
   `677 passed, 169 subtests passed in 362.72s`. Es el resultado completado
   de PT001-07, no una ejecución de la suite en PT001-08.
+- **PT001-01/09-B validado definitivamente según lo comunicado por el desarrollador:**
+  `727 passed, 169 subtests passed in 461.08s`. TEMP-01A no volvió a ejecutar
+  esa suite. El [diagnóstico del planificador](../testing/pt001-01-09-diagnosis.es.md)
+  conserva mediciones dirigidas y la limitación del terminal real.
 - **Implementado y revisado en PT001-08, 08-F y 08-F2:** la hibernación normal oculta el progreso de
   simulación, relojes y paneles intermedios hasta el despertar; debug conserva
   el progreso real mediante el mecanismo existente. Los bloqueos técnicos
@@ -49,10 +53,10 @@ especificación vigente. Los documentos técnicos propietarios están en
 
 | ID | Estado | Incidencia o resultado aprobado; trabajo técnico pendiente |
 | --- | --- | --- |
-| PT001-01/09 | B implementado; validación dirigida | El tiempo automático conserva la deuda activa tras plazos incumplidos y la recupera con pasos acotados y cesiones. Pausas, avance manual, hibernación, errores y cierre descartan la deuda; los reinicios permitidos comienzan épocas nuevas. Quedan abiertos la sobrecarga sostenida y la percepción en terminal real; véanse el [diagnóstico y resultados de B](../testing/pt001-01-09-diagnosis.es.md). |
+| PT001-01/09 | B implementado; validación general definitiva completada | El tiempo automático conserva la deuda activa tras plazos incumplidos y la recupera con pasos acotados y cesiones. Pausas, avance manual, hibernación, errores y cierre descartan la deuda; los reinicios permitidos comienzan épocas nuevas. Superadas 727 pruebas y 169 subpruebas. Quedan abiertos la sobrecarga sostenida y la percepción en terminal real; véase el [diagnóstico](../testing/pt001-01-09-diagnosis.es.md). |
 | PT001-06 | 06A: carga protegida; transición causal pendiente | La partida real carga en CLI y Textual; el avance se pausa y se informa cuando `core_os` ya está apagado durante tránsito físico. Se impide apagar `core_os` o `life_support` mediante comandos públicos mientras hay tránsito físico. El terminal apagado conserva sus restricciones: la partida afectada no puede reanudar el viaje sin una futura transición causal de supervivencia, fuera de 06A. |
 | PT001-07 | Aprobado; validación general definitiva completada | Recarga variable y reserva con umbral del 25 %, contabilidad energética y cortes causales tras la regulación eléctrica efectiva. Superadas 677 pruebas y 169 subpruebas. |
-| TEMP-01 | Invariante aprobado; auditoría pendiente | Auditar y corregir progresivamente las bases temporales de todos los subsistemas. La física interna de la nave usa tiempo propio; los procesos externos, el físicamente correspondiente; el tiempo biológico deriva del propio y del estado fisiológico. 07B-F no implementa TEMP-01. |
+| TEMP-01 | Auditoría 01A completada; correcciones pendientes | El [inventario EN/ES](../systems/temporal-bases-audit.es.md) identifica trabajos a bordo en tiempo galáctico, gracia de soporte vital, mantenimiento de drones y pérdida de fracciones en edad de alertas; marcos externos y varios plazos jugables exigen decisiones de diseño. 01A no cambió código productivo. |
 | PT001-08 | 08-F2 implementado; validación dirigida completada | La hibernación normal de Textual permanece oscura durante el procesamiento; CLI guarda silencio tras limpiar la pantalla. El debug existente muestra progreso real. Los despertares ordinarios y las emergencias legítimas conservan su secuencia. Las excepciones y los bloqueos causales devueltos pausan el tiempo automático, muestran el avance real y omiten la narración de despertar; el evento final registrado comunica una detención técnica al consultarlo después. CLI puede guardar al salir. |
 | PT001-10 | Implementado; validación dirigida completada | Diagnósticos específicos EN/ES para alimentación y salud de motores, velocidad objetivo, tránsito/acoplamiento, rutas conocidas/alcance, combustible y restricciones eléctricas o del sistema operativo. CLI, Textual y filas de rutas comparten el resultado de solo lectura. La admisión y el cobro siguen en Engine. |
 | QA-01 | Auditoría futura pendiente | Auditar los scripts de regresión excluidos de la recogida automática de pytest, revisar sus contratos vigentes y decidir expresamente cuáles deben recogerse o ejecutarse por separado. PT001-01/09-A no implementa QA-01. |
