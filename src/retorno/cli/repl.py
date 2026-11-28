@@ -7008,6 +7008,8 @@ def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False,
     total_s = max(0.0, years * Balance.YEAR_S)
     if total_s <= 0:
         raise ValueError("hibernate: nothing to do (duration <= 0)")
+    was_auto = getattr(loop, "_auto_tick_enabled", True)
+    loop.set_auto_tick(False)
     events_to_render: list[tuple[str, Event]] = []
     actual_years = years
     start_t = 0.0
@@ -7028,7 +7030,6 @@ def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False,
             f"Hibernation for {years:.2f} years",
             data={"years": years},
         )
-    was_auto = getattr(loop, "_auto_tick_enabled", True)
     remaining = total_s
     step_events: list[tuple[str, Event]] = []
     woke_early = False
@@ -7037,7 +7038,6 @@ def _execute_hibernate(loop, years: float, wake_on_low_battery: bool = False,
     try:
         with loop.with_lock() as locked_state:
             locked_state.ship.is_hibernating = True
-        loop.set_auto_tick(False)
         while remaining > 0:
             # The requested absolute endpoint already rounds to the current
             # clock. A positive remainder after real progress is only the
@@ -8218,7 +8218,7 @@ def main() -> None:
         nonlocal did_persist_on_exit
         if did_persist_on_exit:
             return
-        loop.stop()
+        loop.close()
         if audio_manager is not None:
             audio_manager.shutdown()
         try:

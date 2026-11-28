@@ -119,3 +119,62 @@ their shares or establish sustained real-time performance.
 No production code, balance, temporal rule, original save, or global test
 configuration was changed in this diagnosis. No general suite or extended
 benchmark was run.
+
+## PT001-01/09-B implementation and focused validation
+
+`GameLoop` now accumulates monotonic time only during an active automatic
+worker and subtracts the galactic time actually committed by each advance.
+One catch-up pass makes at most two one-second requests, with a 50 ms yield
+between overdue requests. A tiny due-time tolerance avoids a rounding spin.
+The worker releases the state lock between requests; normal cadence is still
+one second. A positive partial advance that returns normally remains pending
+until more active time is available. A causal block retains its committed
+time/events, pauses immediately, and emits the existing warning.
+
+The lifecycle policy is explicit: deliberate pause and `stop()` join the
+worker and discard pending debt; `start()` begins a new monotonic epoch.
+External manual advance stops the worker before applying its interval.
+Hibernation stops automatic time before taking its starting clock and resumes
+only under the existing wake policy, in a fresh epoch. Technical errors pause
+and discard debt while keeping committed state. Close joins the worker before
+saving, so no automatic write can follow the save. Debt is not persisted and
+does not accrue while paused, hibernating, or closed.
+
+The versioned read-only probe is
+[`tests/nav_auto_cadence_probe.py`](../../tests/nav_auto_cadence_probe.py).
+With the same four-tick synthetic cruise fixture used in A, B measured
+**4.000 s galactic / 3.980 s proper in 4.033 s wall time**; tick starts stayed
+at 1.000, 2.001, 3.001 and 4.001 s. Lock occupation was 0.122 s, with 4/198
+busy lock polls. A short headless Textual run kept 250 ms median refreshes,
+two header changes and a 0.146 s `status` response proxy. On the private
+PT001-05 copy, B measured **4.000 / 3.464 s in 4.120 s wall time**, with
+one-second tick starts, 0.663 s total lock occupation, and 27/197 busy polls.
+These nominal figures are close to A's corresponding 4.041 s and 4.110 s wall
+samples; they are short local comparisons, not throughput guarantees.
+
+With 1.25 s artificial work on only the first tick, a six-tick rest sample
+recovered the backlog and reached **6.000 s game time in 6.017 s wall time**;
+the second tick started at 2.733 s, then starts returned to 3, 4, 5 and 6 s.
+With the same delay sustained on all four sampled ticks, B advanced 4.000 s
+in 6.423 s wall time; pending time grew to at least 2.102 s and the worker
+yielded between due ticks. Recovery cannot outrun a persistently slower
+engine. A deliberate stop discards that debt, as specified above; B does not
+promise real-time equivalence under sustained overload or replay elapsed time
+after the player pauses or closes the game.
+
+Deterministic tests cover nominal cadence, one-off and sustained overload,
+actual versus requested advance, partial causal blocks, pause/restart, manual
+advance, hibernation, worker serialization, save after stop/close, and relativistic
+proper time. The initial related regression selection yielded **58 passed,
+2 failed** in 103.12 s: an R1 test still asserted the former skip-overdue
+policy and its mock never advanced the game clock. That historical expectation
+was updated; its two cases and the then-new tests passed (**11 passed** in
+4.27 s). After adding pause/save checks, the scheduler module passed
+**10 tests** in 4.13 s. Final targeted selection, including closure, R1/R2 error
+handling, PT001-08 Textual responsiveness and physical hibernation, passed
+**30 tests in 34.63 s**. No general suite or extended benchmark ran.
+
+Engine, radio, physical rules, clock formatting, audio, and Balance were not
+changed. The player's reported irregular real-terminal cruise remains
+unverified; visual integer-second quantization and host-dependent latency
+remain outside B.

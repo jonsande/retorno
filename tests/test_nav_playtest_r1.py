@@ -152,8 +152,8 @@ def test_terminal_hibernation_does_not_restart_automatic_time(monkeypatch):
     assert policy == [False, False]
 
 
-@pytest.mark.parametrize("processing_s,expected_wait", [(.2, .8), (1.3, .7)])
-def test_automatic_loop_uses_deadlines_and_skips_overruns(monkeypatch, processing_s, expected_wait):
+@pytest.mark.parametrize("processing_s,expected_wait", [(.2, .8), (1.3, .05)])
+def test_automatic_loop_tracks_overruns_without_skipping_time(monkeypatch, processing_s, expected_wait):
     import retorno.runtime.loop as loop_module
     game, loop = fractional_departure()
     loop.tick_s = 1.0
@@ -177,9 +177,11 @@ def test_automatic_loop_uses_deadlines_and_skips_overruns(monkeypatch, processin
 
     loop._stop = Stop()
     monkeypatch.setattr(loop_module.time, "monotonic", lambda: simulated[0])
+    initial_t = game.clock.t
 
     def advance(*args, **kwargs):
         simulated[0] += processing_s
+        game.clock.t += args[0]
         count[0] += 1
         if count[0] == 3:
             loop._stop.set()
@@ -189,3 +191,4 @@ def test_automatic_loop_uses_deadlines_and_skips_overruns(monkeypatch, processin
     loop._run()
     assert waits[:2] == pytest.approx([1.0, expected_wait])
     assert count[0] == 3
+    assert game.clock.t - initial_t == pytest.approx(3.0)

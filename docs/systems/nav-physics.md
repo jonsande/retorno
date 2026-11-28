@@ -69,13 +69,42 @@ its nominal segment work uses that same provisional transaction, preserving
 rollback and stable top-level state owners. Forecasting retains a separate
 read-only state copy.
 
-Automatic one-second advance uses monotonic deadlines. Processing time no
-longer extends every nominal period; missed deadlines are skipped without
-replaying ticks or changing the amount of game time per tick. Hibernation
+R1 introduced monotonic deadlines and skipped missed deadlines; PT001-01/09-B
+supersedes that skip policy with active-time accounting and bounded recovery,
+described below. Hibernation
 restores the previous automatic-time setting after normal or legitimate early
 wake, provided the game is not terminal. A still unresolved technical boundary
 leaves automatic time paused and reports a warning; the current save can be
 reloaded after a correction. The full ordinary ship subsystems remain active.
+
+## Automatic time debt (PT001-01/09-B)
+
+`GameLoop` counts monotonic time only while its automatic worker is active.
+Pending time includes the fractional next tick. Each completed automatic
+request subtracts the **actual committed galactic-clock advance**, not its
+requested duration. At most two one-second requests run in one catch-up pass;
+if another is due, the worker yields at least 50 ms before continuing. Each
+request releases the state lock between causal advances. A nanosecond-scale
+comparison tolerance prevents a sub-resolution remainder from spinning. In an
+unloaded loop the normal one-second start cadence remains.
+
+Stopping or pausing joins the worker before returning, discards pending debt,
+and starts a fresh monotonic epoch on explicit restart. External manual
+advance stops the worker first. Hibernation stops automatic time before it
+records its starting clock, and resumes a fresh epoch only when its existing
+wake policy permits. A causal block keeps already committed time and events,
+emits the existing warning, pauses automatic work immediately, and discards
+the remaining automatic debt. Closure waits for the worker before saving; no
+automatic tick can write after that save. Debt is runtime-only and never
+accrues while paused, hibernating, or closed.
+
+Sustained work slower than wall time can still make debt grow; the scheduler
+cannot promise real-time progress beyond engine capacity. Deliberate pause,
+manual intervention, error, and close discard debt rather than replaying it
+later. The player-facing clock formatting and physical time rules are
+unchanged. The short versioned probe is
+[`nav_auto_cadence_probe.py`](../../tests/nav_auto_cadence_probe.py); measured
+limits are recorded in the [PT001-01/09 diagnosis](../testing/pt001-01-09-diagnosis.md).
 
 ## Public causal coordination (NAV-BRAKE-01B3H-D2B1)
 

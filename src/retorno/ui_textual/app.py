@@ -661,7 +661,7 @@ class RetornoTextualApp(App):
             return
         if self._audio_manager is not None:
             self._audio_manager.shutdown()
-        self.loop.stop()
+        self.loop.close()
         try:
             with self.loop.with_lock() as state:
                 saved_path = save_single_slot(state, self._save_path, user=self._user)

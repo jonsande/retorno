@@ -74,14 +74,45 @@ sobre esa misma transacción provisional, con rollback e identidad estable de
 los componentes principales. La predicción conserva una copia independiente
 de solo lectura.
 
-El avance automático de un segundo utiliza plazos monotónicos. El coste del
-procesamiento deja de sumarse a cada período nominal; se omiten los plazos
-perdidos sin reproducir ticks ni cambiar el tiempo de juego por tick. Tras un
+R1 introdujo plazos monotónicos y omitía los incumplidos; PT001-01/09-B
+sustituye esa política por contabilidad del tiempo activo y recuperación
+acotada, descritas más abajo. Tras un
 despertar normal o anticipado legítimo, la hibernación restablece la política
 previa de avance automático si la partida no está en estado terminal. Una
 frontera técnica aún no resuelta mantiene el tiempo automático pausado y
 emite un aviso; el guardado puede recargarse después de corregir el defecto.
 Los subsistemas ordinarios de la nave siguen activos.
+
+## Deuda temporal automática (PT001-01/09-B)
+
+`GameLoop` cuenta tiempo monotónico solo mientras su hilo automático está
+activo. El tiempo pendiente incluye la fracción del siguiente tick. Cada
+solicitud automática completada descuenta el **avance galáctico efectivamente
+confirmado**, no la duración solicitada. Una tanda de recuperación ejecuta como
+máximo dos solicitudes de un segundo; si queda otra vencida, el hilo cede al
+menos 50 ms antes de continuar. Cada solicitud libera el lock del estado entre
+avances causales. Una tolerancia comparativa del orden de un nanosegundo evita
+que un resto inferior a la resolución provoque un bucle. Sin sobrecarga se
+mantiene la cadencia normal de un segundo entre inicios.
+
+Parar o pausar espera a que termine el hilo, descarta la deuda y comienza una
+nueva época monotónica al reiniciar explícitamente. Un avance manual externo
+detiene antes el hilo. La hibernación detiene el tiempo automático antes de
+fijar su reloj inicial, y solo reanuda una época nueva cuando su política de
+despertar existente lo permite. Una frontera causal conserva tiempo y eventos
+ya confirmados, emite el aviso existente, pausa inmediatamente el avance
+automático y descarta la deuda restante. El cierre espera al hilo antes de
+guardar; ningún tick automático puede escribir después de ese guardado. La
+deuda solo existe en ejecución y no se acumula durante pausas, hibernación o
+cierre.
+
+Un trabajo sostenido más lento que el tiempo real todavía puede aumentar la
+deuda; el planificador no garantiza avance en tiempo real por encima de la
+capacidad del motor. Las pausas deliberadas, intervenciones manuales, errores
+y cierres descartan la deuda para no reproducirla después. No cambian la
+presentación de relojes ni las reglas físicas. La sonda breve versionada está
+en [`nav_auto_cadence_probe.py`](../../tests/nav_auto_cadence_probe.py); los
+límites medidos constan en el [diagnóstico PT001-01/09](../testing/pt001-01-09-diagnosis.es.md).
 
 ## Coordinación causal pública (NAV-BRAKE-01B3H-D2B1)
 

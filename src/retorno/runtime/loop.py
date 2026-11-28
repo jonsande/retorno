@@ -23,7 +23,12 @@ class NavigationAdvanceBlocked(RuntimeError):
 
 
 class GameLoop:
+    _AUTO_CATCHUP_STEPS = 2
+    _AUTO_CATCHUP_YIELD_S = 0.05
+
     def __init__(self, engine: Engine, state: GameState, tick_s: float = 1.0) -> None:
+        if not math.isfinite(tick_s) or tick_s <= 0:
+            raise ValueError("automatic tick duration must be positive and finite")
         self.engine = engine
         self.state = state
         self.tick_s = tick_s
@@ -33,31 +38,64 @@ class GameLoop:
         self._rng = random.Random(state.meta.rng_seed)
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._lifecycle_lock = threading.RLock()
+        self._timing_lock = threading.Lock()
+        self._auto_debt_s = 0.0
+        self._auto_thread_id: int | None = None
+        self._closed = False
         self._auto_tick_enabled = True
         self.last_auto_error: str | None = None
 
     def start(self) -> None:
-        if not self._auto_tick_enabled:
-            return
-        if self._thread and self._thread.is_alive():
-            return
-        self._stop.clear()
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
+        with self._lifecycle_lock:
+            if self._closed or not self._auto_tick_enabled:
+                return
+            if self._thread and self._thread.is_alive():
+                if not self._stop.is_set():
+                    return
+                self._thread.join()
+                if not self._auto_tick_enabled:
+                    return
+            self._set_auto_debt(0.0)
+            self._stop.clear()
+            self._thread = threading.Thread(target=self._run, daemon=True)
+            self._thread.start()
 
     def stop(self) -> None:
-        self._stop.set()
-        if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=1.0)
+        with self._lifecycle_lock:
+            self._stop.set()
+            worker = self._thread
+            if worker is not None and worker is not threading.current_thread():
+                worker.join()
+                if self._thread is worker:
+                    self._thread = None
+            self._set_auto_debt(0.0)
 
     def set_auto_tick(self, enabled: bool) -> None:
-        if self._auto_tick_enabled == enabled:
-            return
-        self._auto_tick_enabled = enabled
-        if not enabled:
+        with self._lifecycle_lock:
+            if self._closed:
+                return
+            self._auto_tick_enabled = enabled
+            if enabled:
+                self.start()
+            else:
+                self.stop()
+
+    def close(self) -> None:
+        """Join the worker and permanently prevent automatic writes."""
+        with self._lifecycle_lock:
+            self._closed = True
+            self._auto_tick_enabled = False
             self.stop()
-        else:
-            self.start()
+
+    def auto_debt_s(self) -> float:
+        """Read-only pending active time, including its fractional next tick."""
+        with self._timing_lock:
+            return self._auto_debt_s
+
+    def _set_auto_debt(self, seconds: float) -> None:
+        with self._timing_lock:
+            self._auto_debt_s = max(0.0, seconds)
 
     def apply_action(self, action: Action) -> list[Event]:
         with self._lock:
@@ -100,6 +138,10 @@ class GameLoop:
         """
         if total_s < 0:
             raise ValueError("advance duration must be nonnegative")
+        if threading.get_ident() != self._auto_thread_id:
+            # Manual waits and hibernation start a fresh automatic-time epoch.
+            # Join any active worker before touching the same state.
+            self.stop()
         events: list[Event] = []
         elapsed = 0.0
         with self._lock:
@@ -207,27 +249,53 @@ class GameLoop:
             self.last_auto_error = detail
             self._auto_tick_enabled = False
             self._stop.set()
+        self._set_auto_debt(0.0)
 
     def _run(self) -> None:
-        deadline = time.monotonic() + self.tick_s
-        while not self._stop.is_set():
-            if self._stop.wait(max(0.0, deadline - time.monotonic())):
-                break
-            try:
-                events = self.advance_interval(self.tick_s)
-            except NavigationAdvanceBlocked as exc:
-                self._pause_auto_after_error(
-                    "physical_advance_blocked", str(exc), exc.events, exc.elapsed_s)
-                break
-            except Exception as exc:
-                self._pause_auto_after_error(
-                    "automatic_internal_error", f"{type(exc).__name__}: {exc}", [], 0.0)
-                break
-            with self._lock:
-                self._events_auto.extend(events)
-            deadline += self.tick_s
-            now = time.monotonic()
-            if deadline <= now:
-                # Missed deadlines are skipped, never replayed as a burst.
-                # Each successful iteration still advances one game tick.
-                deadline += (math.floor((now - deadline) / self.tick_s) + 1) * self.tick_s
+        self._auto_thread_id = threading.get_ident()
+        last = time.monotonic()
+        pending = 0.0
+        due_tolerance = min(1e-9, self.tick_s * 1e-6)
+        try:
+            while not self._stop.is_set():
+                if self._stop.wait(max(0.0, self.tick_s - pending)):
+                    break
+                now = time.monotonic()
+                pending += max(0.0, now - last)
+                last = now
+                self._set_auto_debt(pending)
+                steps = 0
+                while pending + due_tolerance >= self.tick_s and steps < self._AUTO_CATCHUP_STEPS:
+                    if self._stop.is_set():
+                        break
+                    with self._lock:
+                        before_t = self.state.clock.t
+                    try:
+                        events = self.advance_interval(self.tick_s)
+                    except NavigationAdvanceBlocked as exc:
+                        self._pause_auto_after_error(
+                            "physical_advance_blocked", str(exc), exc.events, exc.elapsed_s)
+                        return
+                    except Exception as exc:
+                        self._pause_auto_after_error(
+                            "automatic_internal_error", f"{type(exc).__name__}: {exc}", [], 0.0)
+                        return
+                    with self._lock:
+                        committed = self.state.clock.t - before_t
+                        self._events_auto.extend(events)
+                    if committed <= 0:
+                        self._pause_auto_after_error(
+                            "physical_advance_blocked",
+                            "Automatic advance committed no galactic time", [], 0.0)
+                        return
+                    now = time.monotonic()
+                    pending = max(0.0, pending + max(0.0, now - last) - committed)
+                    last = now
+                    self._set_auto_debt(pending)
+                    steps += 1
+                    if (pending + due_tolerance >= self.tick_s
+                            and self._stop.wait(self._AUTO_CATCHUP_YIELD_S)):
+                        break
+        finally:
+            self._auto_thread_id = None
+            self._set_auto_debt(0.0)

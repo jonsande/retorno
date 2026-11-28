@@ -123,3 +123,66 @@ muestras no permiten repartir su impacto ni demostrar rendimiento sostenido.
 Este diagnóstico no cambió código productivo, Balance, reglas temporales,
 partidas originales ni configuración global de pruebas. No se ejecutaron la
 suite general ni benchmarks extensos.
+
+## Implementación y validación dirigida de PT001-01/09-B
+
+`GameLoop` acumula ahora tiempo monotónico únicamente mientras su hilo
+automático está activo y descuenta el tiempo galáctico realmente confirmado
+por cada avance. Una tanda de recuperación solicita como máximo dos avances
+de un segundo, con una cesión de 50 ms entre solicitudes vencidas. Una pequeña
+tolerancia evita un bucle por redondeo en la frontera del plazo. El hilo libera
+el lock entre solicitudes; la cadencia normal sigue siendo de un segundo. Un
+avance parcial positivo que retorna normalmente permanece como tiempo
+pendiente hasta que transcurre más tiempo activo. Una frontera causal conserva
+tiempo y eventos confirmados, pausa enseguida y emite el aviso existente.
+
+La política del ciclo de vida es explícita: una pausa deliberada y `stop()`
+esperan al hilo y descartan la deuda; `start()` inicia una época monotónica
+nueva. Un avance manual externo detiene antes el hilo. La hibernación detiene
+el tiempo automático antes de fijar su reloj inicial y solo lo reanuda según
+la política de despertar existente, en una época nueva. Los errores técnicos
+pausan y descartan deuda, pero conservan el estado confirmado. El cierre
+espera al hilo antes de guardar, por lo que no hay escritura automática tras
+el guardado. La deuda no se persiste ni se acumula en pausa, hibernación o
+cierre.
+
+La sonda versionada y de solo lectura está en
+[`tests/nav_auto_cadence_probe.py`](../../tests/nav_auto_cadence_probe.py).
+Con el mismo crucero sintético de cuatro ticks empleado en A, B midió
+**4,000 s galácticos / 3,980 s propios en 4,033 s reales**; los inicios de
+tick ocurrieron a 1,000, 2,001, 3,001 y 4,001 s. El lock estuvo ocupado
+0,122 s, con 4/198 consultas ocupadas. Una ejecución Textual breve sin
+terminal mantuvo una mediana de 250 ms entre refrescos, dos cambios de
+cabecera y una respuesta aproximada de 0,146 s a `status`. En la copia
+privada PT001-05, B midió **4,000 / 3,464 s en 4,120 s reales**, con inicios
+cada segundo, 0,663 s de ocupación total del lock y 27/197 consultas ocupadas.
+Son cifras nominales cercanas a las muestras de A de 4,041 s y 4,110 s reales;
+la comparación es local y breve, no una garantía de rendimiento sostenido.
+
+Con 1,25 s de trabajo artificial solo en el primer tick, una muestra de seis
+ticks en reposo recuperó el atraso y alcanzó **6,000 s de juego en 6,017 s
+reales**; el segundo tick comenzó a 2,733 s y después los inicios volvieron a
+3, 4, 5 y 6 s. Con el mismo retraso sostenido en los cuatro ticks medidos,
+B avanzó 4,000 s en 6,423 s reales; el tiempo pendiente creció hasta al menos
+2,102 s y el hilo cedió entre ticks vencidos. La recuperación no puede superar
+un motor persistentemente más lento. Una parada deliberada descarta esa deuda,
+conforme a la política anterior; B no promete equivalencia en tiempo real bajo
+sobrecarga sostenida ni reproducir tiempo transcurrido tras una pausa o cierre.
+
+Las pruebas deterministas cubren cadencia nominal, sobrecarga puntual y
+sostenida, avance real frente a solicitado, bloqueo causal parcial,
+pausa/reinicio, avance manual, hibernación, serialización de hilos, guardado
+tras parada/cierre y tiempo propio relativista. La primera selección de regresiones
+relacionadas produjo **58 superadas, 2 fallidas** en 103,12 s: una prueba R1
+aún exigía omitir plazos vencidos y su mock no avanzaba el reloj de juego. Se
+actualizó esa expectativa histórica; sus dos casos y las pruebas nuevas de
+entonces superaron **11 pruebas** en 4,27 s. Tras añadir comprobaciones de
+pausa y guardado, el módulo del planificador superó **10 pruebas** en 4,13 s.
+La selección dirigida final, incluidos cierre, errores R1/R2, capacidad de respuesta
+Textual de PT001-08 e hibernación física, superó **30 pruebas en 34,63 s**.
+No se ejecutaron la suite general ni benchmarks extensos.
+
+No se modificaron motor, radio, reglas físicas, formato de los relojes, audio
+ni Balance. El crucero irregular observado por el jugador en terminal real
+sigue sin verificarse; la cuantización visual a segundos enteros y la
+latencia dependiente del equipo quedan fuera de B.
