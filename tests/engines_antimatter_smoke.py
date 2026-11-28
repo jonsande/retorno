@@ -25,8 +25,10 @@ from retorno.model.os import Locale
 from retorno.model.systems import SystemState
 from retorno.model.world import SpaceNode, add_known_link
 from retorno.runtime.data_loader import load_modules
+from retorno.runtime.loop import GameLoop
 from retorno.ui_textual import presenter
 from retorno.ui_textual.app import RetornoTextualApp
+from tests.test_nav_public_physical import public_game
 
 UPGRADE = 'engine_efficiency_upgrade_01'
 
@@ -146,6 +148,8 @@ class EnginesAntimatterTests(unittest.TestCase):
     def test_05_insufficient_fuel_atomicity_and_exact_balance(self):
         target = self.destination()
         s = self.state
+        profile = self.engine.estimate_travel_profile(s, target)
+        self.assertIsNotNone(profile)
         price = self.engine.estimate_travel_fuel(s, target)
         # One representable float below the unrounded price must be rejected.
         s.ship.antimatter_capsules = math.nextafter(price, 0)
@@ -153,26 +157,42 @@ class EnginesAntimatterTests(unittest.TestCase):
         ev = self.engine.apply_action(s, Travel(node_id=target))
         self.assertEqual(ev[0].data['reason'], 'insufficient_antimatter')
         self.assertEqual(pickle.dumps((s.ship, s.world, s.meta.rng_counter)), before)
+        self.assertIsNone(s.ship.physical_transit)
         s.ship.antimatter_capsules = price
         ev = self.engine.apply_action(s, Travel(node_id=target))
-        self.assertTrue(s.ship.in_transit)
+        self.assertIsNotNone(s.ship.physical_transit)
+        self.assertFalse(s.ship.in_transit)
         self.assertEqual(s.ship.antimatter_capsules, 0.0)
-        self.assertEqual(next(e for e in ev if e.type == EventType.TRAVEL_STARTED).data['fuel_cost'], price)
+        plan = s.ship.physical_transit.nominal_plan
+        self.assertIsNotNone(plan)
+        self.assertEqual(plan.profile, profile)
+        self.assertEqual(plan.capsules_paid, price)
+        started = next(e for e in ev if e.type == EventType.TRAVEL_STARTED)
+        self.assertEqual(started.data['fuel_cost'], price)
+        self.assertEqual(started.data['eta_s'], profile.total_galactic_s)
+        self.assertEqual(started.data['proper_s'], profile.total_proper_s)
         self.assertFalse(s.ship.systems['engines'].forced_offline)
         self.assertEqual(s.ship.op_mode, 'CRUISE')
-        self.assertEqual(s.ship.arrival_t, s.clock.t + 4 * Balance.YEAR_S)
+        self.assertEqual(s.ship.arrival_t, 0.0)
 
     def test_06_duplicate_requests_abort_arrival_and_save_load(self):
-        target = self.destination()
-        s = self.state
+        s = public_game()
+        target = 'NOMINAL_B'
         s.ship.installed_modules = [UPGRADE]
         cost = self.engine.estimate_travel_fuel(s, target)
-        self.engine.apply_action(s, Travel(node_id=target))
+        profile = self.engine.estimate_travel_profile(s, target)
+        self.assertIsNotNone(profile)
+        started = self.engine.apply_action(s, Travel(node_id=target))
+        self.assertTrue(any(e.type == EventType.TRAVEL_STARTED for e in started))
+        self.assertEqual(s.ship.physical_transit.nominal_plan.profile, profile)
         remaining = s.ship.antimatter_capsules
         self.assertEqual(remaining, 12.0 - cost)
-        self.engine.apply_action(s, Travel(node_id=target))
+        duplicate = self.engine.apply_action(s, Travel(node_id=target))
+        self.assertEqual(duplicate[0].data['reason'], 'physical_in_transit')
+        self.assertEqual(s.ship.antimatter_capsules, remaining)
         self.engine.tick(s, 10)
         self.assertEqual(s.ship.antimatter_capsules, remaining)
+        self.assertIsNotNone(s.ship.physical_transit)
         with TemporaryDirectory() as folder:
             slot = Path(folder) / 'engines.dat'
             save_single_slot(s, slot)
@@ -180,18 +200,24 @@ class EnginesAntimatterTests(unittest.TestCase):
         self.assertEqual(loaded.ship.antimatter_capsules, remaining)
         self.assertEqual(loaded.ship.systems['engines'], s.ship.systems['engines'])
         self.assertIn(UPGRADE, loaded.ship.installed_modules)
-        self.engine.apply_action(loaded, TravelAbort())
-        self.assertFalse(loaded.ship.in_transit)
+        self.assertEqual(loaded.ship.physical_transit, s.ship.physical_transit)
+        before_abort = pickle.dumps((loaded.ship, loaded.world, loaded.meta.rng_counter))
+        abort = self.engine.apply_action(loaded, TravelAbort())
+        self.assertEqual(abort[0].data['reason'], 'physical_in_transit')
+        self.assertEqual(pickle.dumps((loaded.ship, loaded.world, loaded.meta.rng_counter)), before_abort)
         self.assertEqual(loaded.ship.antimatter_capsules, remaining)
         waypoint = loaded.world.current_node_id
-        self.engine.apply_action(loaded, TravelAbort())
+        duplicate_abort = self.engine.apply_action(loaded, TravelAbort())
+        self.assertEqual(duplicate_abort[0].data['reason'], 'physical_in_transit')
         self.assertEqual(loaded.world.current_node_id, waypoint)
         self.assertEqual(loaded.ship.antimatter_capsules, remaining)
         # Completion charges nothing, independently of the initial charge.
-        s.ship.arrival_t = s.clock.t + 1
-        self.engine.tick(s, 1)
-        self.assertFalse(s.ship.in_transit)
-        self.assertEqual(s.ship.antimatter_capsules, remaining)
+        arrival = GameLoop(Engine(), loaded).advance_interval(
+            profile.total_galactic_s - loaded.clock.t, stop_at_arrival=True)
+        self.assertEqual([event.type for event in arrival].count(EventType.ARRIVED), 1)
+        self.assertIsNone(loaded.ship.physical_transit)
+        self.assertEqual(loaded.world.current_node_id, target)
+        self.assertEqual(loaded.ship.antimatter_capsules, remaining)
 
     def test_07_local_travel_and_isolated_engines(self):
         target = self.destination(.001)
@@ -229,7 +255,9 @@ class EnginesAntimatterTests(unittest.TestCase):
         self.assertEqual(ev[0].data['reason'], 'insufficient_antimatter')
         s.ship.installed_modules = [UPGRADE]
         ev = self.engine.apply_action(s, Travel(node_id=target, no_cruise=True))
-        self.assertTrue(s.ship.in_transit, ev)
+        self.assertTrue(any(e.type == EventType.TRAVEL_STARTED for e in ev), ev)
+        self.assertIsNotNone(s.ship.physical_transit)
+        self.assertFalse(s.ship.in_transit)
         self.assertEqual(engines.health, .5)
         self.assertAlmostEqual(s.ship.antimatter_capsules, original * .1)
         self.assertEqual(s.ship.op_mode, 'NORMAL')
@@ -342,15 +370,20 @@ class EnginesAntimatterTests(unittest.TestCase):
                 self.assertTrue(any(f"~{cost:.3f}" in line for line in app._log_buffer))
                 await command('nav ' + target)
                 await command('n')
-                self.assertFalse(s.ship.in_transit)
+                self.assertIsNone(s.ship.physical_transit)
                 self.assertEqual(s.ship.antimatter_capsules, 12.0)
                 await command('nav ' + target)
                 await command('s' if locale == Locale.ES else 'y')
-                self.assertTrue(s.ship.in_transit)
-                self.assertEqual(s.ship.antimatter_capsules, 12.0 - cost)
-                await command('nav abort')
-                await command('s' if locale == Locale.ES else 'y')
+                self.assertIsNotNone(s.ship.physical_transit)
                 self.assertFalse(s.ship.in_transit)
+                self.assertEqual(s.ship.antimatter_capsules, 12.0 - cost)
+                current_node = s.world.current_node_id
+                await command('nav abort')
+                blocked = ('Navegación bloqueada: la nave ya está en movimiento.'
+                           if locale == Locale.ES else 'Navigation blocked: ship already moving.')
+                self.assertTrue(any(blocked in line for line in app._log_buffer))
+                self.assertIsNotNone(s.ship.physical_transit)
+                self.assertEqual(s.world.current_node_id, current_node)
                 self.assertEqual(s.ship.antimatter_capsules, 12.0 - cost)
 
         with TemporaryDirectory() as folder:

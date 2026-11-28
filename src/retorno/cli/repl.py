@@ -5705,14 +5705,112 @@ def render_locate(state, system_id: str) -> None:
     print(f"coords: {node.x_ly:.2f}, {node.y_ly:.2f}, {node.z_ly:.2f}")
 
 
-def _nav_departure_blocked(state) -> bool:
-    """Known onboard blockers for presentation; Engine remains the action authority."""
+def _nav_ship_blocker(state) -> str | None:
+    """Read-only onboard departure diagnosis; Engine remains authoritative."""
     ship = state.ship
     core_os = ship.systems.get("core_os")
-    return bool(ship.in_transit or ship.physical_transit is not None
-                or ship.docked_node_id or state.os.terminal_lock
-                or (core_os and core_os.state in {SystemState.DAMAGED, SystemState.OFFLINE})
-                or is_critical_power_state(state))
+    if ship.in_transit or ship.physical_transit is not None:
+        return "in_transit"
+    if ship.docked_node_id:
+        return "docked"
+    if state.os.terminal_lock and state.os.terminal_reason == "life_support_offline":
+        return "life_support_offline"
+    if state.os.terminal_lock or (core_os and core_os.state == SystemState.OFFLINE):
+        return "core_os_offline"
+    if core_os and core_os.state == SystemState.DAMAGED:
+        return "core_os_damaged"
+    if is_critical_power_state(state):
+        if core_os and core_os.state == SystemState.CRITICAL:
+            return "core_os_critical"
+        distribution = ship.systems.get("energy_distribution")
+        if distribution and distribution.state == SystemState.OFFLINE:
+            return "distribution_offline"
+        return "critical_power"
+    return None
+
+
+def _nav_departure_reason(state, destination_id: str, engine: Engine,
+                          cost: float | None, duration: float | None) -> str | None:
+    """Explain a public estimate without admitting travel or inspecting hidden nodes."""
+    if reason := _nav_ship_blocker(state):
+        return reason
+    world = state.world
+    current_id = world.current_node_id
+    if destination_id == current_id:
+        return "current_destination"
+    acquired = world.known_nodes | set(world.known_intel)
+    if destination_id not in acquired:
+        return "unknown_destination"
+    if destination_id not in world.known_links.get(current_id, set()):
+        return "no_known_route"
+    known_distance = distance_between_nodes_ly(world, current_id, destination_id)
+    if known_distance is None or not math.isfinite(known_distance):
+        return "route_unavailable"
+    if not is_hop_within_cap(world, current_id, destination_id):
+        return "out_of_range"
+    engines = state.ship.systems.get("engines")
+    if engines is None:
+        return "engines_unavailable"
+    distance = engine._known_hop_distance(state, destination_id)
+    if distance is None:
+        return "route_unavailable"
+    local = engine._is_local_hop(state, current_id, destination_id, distance)
+    operating = state.ship.engine_operating_state()
+    if (engines and engines.health > Balance.SYSTEM_HEALTH_MIN_ON
+            and (engines.forced_offline or operating == SystemState.OFFLINE)):
+        return "engines_off"
+    if operating in {SystemState.OFFLINE, SystemState.CRITICAL}:
+        return ("engines_damaged" if engines and engines.health < Balance.SYSTEM_HEALTH_CRITICAL
+                else "engines_unavailable")
+    if not local and state.ship.maximum_cruise_speed() <= 0.0:
+        return "engines_unavailable"
+    if not local and state.ship.effective_cruise_speed() <= 0.0:
+        return "target_exceeds_capacity"
+    if not local:
+        for system_id in ("power_core", "energy_distribution"):
+            system = state.ship.systems.get(system_id)
+            if system is None or system.forced_offline or system.state == SystemState.OFFLINE:
+                return "power_path_unavailable"
+    if not math.isfinite(state.ship.antimatter_capsules) or (
+            cost is not None and cost > state.ship.antimatter_capsules):
+        return "insufficient_antimatter"
+    if cost is None or duration is None:
+        return "profile_unavailable"
+    return None
+
+
+def _nav_departure_blocked(state) -> bool:
+    """Compatibility predicate for onboard blockers used by existing callers."""
+    return _nav_ship_blocker(state) is not None
+
+
+_NAV_DEPARTURE_DIAGNOSTICS = {
+    "in_transit": ("Departure blocked: ship already in transit.", "Salida bloqueada: la nave ya está en tránsito."),
+    "docked": ("Departure blocked: ship is docked. Undock before departure.", "Salida bloqueada: la nave está acoplada. Desacopla antes de partir."),
+    "core_os_offline": ("Departure blocked: terminal control is unavailable.", "Salida bloqueada: el control del terminal no está disponible."),
+    "life_support_offline": ("Departure blocked: life support is offline and terminal control is locked.", "Salida bloqueada: el soporte vital está apagado y el control del terminal está bloqueado."),
+    "core_os_damaged": ("Departure blocked: core OS is damaged.", "Salida bloqueada: el sistema operativo central está dañado."),
+    "core_os_critical": ("Departure blocked: core OS is critical.", "Salida bloqueada: el sistema operativo central está en estado crítico."),
+    "distribution_offline": ("Departure blocked: energy distribution is offline.", "Salida bloqueada: la distribución eléctrica está apagada."),
+    "critical_power": ("Departure blocked: electrical supply is unstable.", "Salida bloqueada: el suministro eléctrico es inestable."),
+    "current_destination": ("Departure blocked: already at the destination.", "Salida bloqueada: ya estás en el destino."),
+    "unknown_destination": ("Departure blocked: destination unknown. Scan or acquire navigation intel.", "Salida bloqueada: destino desconocido. Escanea o consigue datos de navegación."),
+    "no_known_route": ("Departure blocked: no known route. Solve a route or acquire navigation intel.", "Salida bloqueada: no hay una ruta conocida. Calcula una ruta o consigue datos de navegación."),
+    "out_of_range": ("Departure blocked: known hop exceeds navigation range. Find a closer waypoint.", "Salida bloqueada: el salto conocido excede el alcance de navegación. Busca un punto de paso más cercano."),
+    "route_unavailable": ("Departure blocked: known route data is incomplete.", "Salida bloqueada: faltan datos de la ruta conocida."),
+    "engines_off": ("Departure blocked: engines are off. Use 'power on engines' when power is available.", "Salida bloqueada: los motores están apagados. Usa 'power on engines' cuando haya suministro eléctrico."),
+    "engines_damaged": ("Departure blocked: engines are damaged. Repair them before departure.", "Salida bloqueada: los motores están averiados. Repáralos antes de partir."),
+    "engines_unavailable": ("Departure blocked: engines are unavailable at current capacity. Inspect engine status.", "Salida bloqueada: los motores no están disponibles con la capacidad actual. Comprueba su estado."),
+    "target_exceeds_capacity": ("Departure blocked: target speed exceeds current engine capacity. Use 'engines speed max' or select a supported lower speed.", "Salida bloqueada: la velocidad objetivo supera la capacidad actual de los motores. Usa 'engines speed max' o elige una velocidad inferior compatible."),
+    "power_path_unavailable": ("Departure blocked: propulsion has no electrical supply. Restore power to the core and distribution.", "Salida bloqueada: la propulsión no recibe electricidad. Restablece el núcleo y la distribución."),
+    "insufficient_antimatter": ("Insufficient fuel", "Combustible insuficiente"),
+    "profile_unavailable": ("Departure blocked: no viable departure profile at current conditions.", "Salida bloqueada: no hay un perfil de partida viable en las condiciones actuales."),
+}
+
+
+def _nav_departure_diagnostic(locale: str, reason: str) -> str:
+    en, es = _NAV_DEPARTURE_DIAGNOSTICS[reason]
+    return es if locale == "es" else en
 
 
 @public_output
@@ -5737,13 +5835,13 @@ def render_nav_routes(state) -> None:
     operating_state = ship.engine_operating_state().value.upper()
     print(f"Motores: {operating_state} | Objetivo de crucero: {target} | Configurar: engines speed <value>" if es else
           f"Engines: {operating_state} | Cruise target: {target} | Set: engines speed <value>")
-    departure_blocked = _nav_departure_blocked(state)
     current_id = state.world.current_node_id
     player_ship_id = getattr(state.ship, "ship_id", "RETORNO_SHIP")
     routes = {
         rid
         for rid in reachable_from(state.world, current_id)
         if rid != current_id and rid != player_ship_id and not _is_hidden_origin_contact_id(rid)
+        and rid in (state.world.known_nodes | set(state.world.known_intel))
     }
     current = state.world.space.nodes.get(current_id)
     cx, cy, cz = (current.x_ly, current.y_ly, current.z_ly) if current else state.world.current_pos_ly
@@ -5798,15 +5896,16 @@ def render_nav_routes(state) -> None:
                 if profile is not None:
                     estimate += (f" | Beta máx.: {profile.peak_beta:.4g}c | Tiempo propio: {_format_eta_short(profile.total_proper_s, 'es')}" if es else
                                  f" | Peak beta: {profile.peak_beta:.4g}c | Ship time: {_format_eta_short(profile.total_proper_s, 'en')}")
-                if cost is not None and cost > ship.antimatter_capsules:
-                    estimate += " | Combustible insuficiente" if es else " | Insufficient fuel"
-                if cost is None or duration is None or departure_blocked:
-                    estimate += " | Salida bloqueada" if es else " | Departure blocked"
+                reason = _nav_departure_reason(state, nid, engine, cost, duration)
+                if reason:
+                    estimate += " | " + _nav_departure_diagnostic(state.os.locale.value, reason)
                 print(estimate)
             else:
                 print(f"- id={nid}")
-                print("  Combustible: — | Velocidad: — | ETA: — | Salida bloqueada" if es else
-                      "  Fuel: — | Speed: — | ETA: — | Departure blocked")
+                reason = _nav_departure_reason(state, nid, engine, None, None)
+                print(("  Combustible: — | Velocidad: — | ETA: —" if es else
+                       "  Fuel: — | Speed: — | ETA: —")
+                      + " | " + _nav_departure_diagnostic(state.os.locale.value, reason or "route_unavailable"))
     else:
         print(f"(sin rutas conocidas desde {current_id})" if es else f"(no known routes from {current_id})")
     # Nearby contacts without routes
@@ -6428,12 +6527,13 @@ def nav_confirmation(state, action) -> tuple[list[str], str | None]:
     engine = Engine()
     cost = engine.estimate_travel_fuel(state, dest)
     duration = engine.estimate_travel_duration(state, dest)
+    reason = _nav_departure_reason(state, dest, engine, cost, duration)
     reserve = state.ship.antimatter_capsules
     lines = [f"Destino: {dest}" if es else f"Destination: {dest}"]
     if cost is None or duration is None:
         lines += ["Crucero: — | ETA galáctica: —" if es else "Cruise: — | Galactic ETA: —",
                   f"Antimateria: — | Reserva: {reserve:.3f}" if es else f"Antimatter: — | Reserve: {reserve:.3f}",
-                  "Salida bloqueada: estimación no disponible" if es else "Departure blocked: estimate unavailable"]
+                  _nav_departure_diagnostic(locale, reason or "profile_unavailable")]
     else:
         distance = engine._known_hop_distance(state, dest)
         local = distance is not None and engine._is_local_hop(state, current_node, dest, distance)
@@ -6451,12 +6551,9 @@ def nav_confirmation(state, action) -> tuple[list[str], str | None]:
                       f"Target beta: {target} | Peak beta: {peak:.4g}c | Nominal galactic ETA: {eta} | Ship time: {proper}",
                       f"Antimateria: ~{cost:.3f} cáps. | Reserva: {reserve:.3f} → ~{reserve - cost:.3f}" if es else
                       f"Antimatter: ~{cost:.3f} caps. | Reserve: {reserve:.3f} → ~{reserve - cost:.3f}"]
-        if cost > reserve:
-            lines.append("Combustible insuficiente" if es else "Insufficient fuel")
-    if (cost is None or duration is None or not math.isfinite(reserve)
-            or cost > reserve or _nav_departure_blocked(state)):
-        if cost is not None and duration is not None and (not math.isfinite(reserve) or _nav_departure_blocked(state)):
-            lines.append("Salida bloqueada" if es else "Departure blocked")
+        if reason:
+            lines.append(_nav_departure_diagnostic(locale, reason))
+    if reason:
         return [public_text(state, line) for line in lines], None
     out = []
     for d in state.ship.drones.values():

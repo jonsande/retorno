@@ -8,6 +8,21 @@
 
 # Descubrimiento, navegación e intel
 
+## Diagnósticos de partida PT001-10 (implementados)
+
+CLI y Textual comparten un diagnóstico de solo lectura para la vista previa de
+`nav`. Explica impedimentos conocidos de la nave, ausencia de ruta adquirida,
+alcance, alimentación y salud de motores, velocidad seleccionada, antimateria
+y restricciones eléctricas o del sistema operativo central. `nav map routes`
+usa el mismo diagnóstico para las rutas mostradas. Las estimaciones válidas
+siguen visibles; el motor decide definitivamente si acepta la partida
+confirmada. La consulta no modifica el estado, crea lugares ni gasta combustible.
+Un identificador no adquirido recibe el mismo mensaje de destino desconocido
+exista o no un nodo físico; las filas de rutas exigen extremos adquiridos.
+Solo se sugieren acciones de recuperación cuando se conoce una acción adecuada.
+Las maniobras locales conservan las reglas de velocidad y combustible cero.
+Véase la [validación dirigida](../testing/pt001-10-review.es.md).
+
 ## Finalización del prólogo — P4
 
 `MetaState.prologue_complete` comienza en `False`. El tratamiento compartido

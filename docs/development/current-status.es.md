@@ -39,6 +39,11 @@ especificación vigente. Los documentos técnicos propietarios están en
   sin narración de despertar. El evento final registrado también presenta una
   detención técnica al consultarlo después. Véase el
   [registro de presentación](../testing/pt001-08-review.es.md).
+- **Implementado en PT001-10:** CLI y Textual explican impedimentos concretos
+  de partida mediante el mismo diagnóstico público y puro; las filas de rutas
+  también lo utilizan. Los destinos ocultos siguen siendo indistinguibles de
+  los inexistentes. Véase la
+  [validación dirigida](../testing/pt001-10-review.es.md).
 
 ## Incidencias abiertas y direcciones de diseño
 
@@ -49,11 +54,11 @@ especificación vigente. Los documentos técnicos propietarios están en
 | PT001-07 | Aprobado; validación general definitiva completada | Recarga variable y reserva con umbral del 25 %, contabilidad energética y cortes causales tras la regulación eléctrica efectiva. Superadas 677 pruebas y 169 subpruebas. |
 | TEMP-01 | Invariante aprobado; auditoría pendiente | Auditar y corregir progresivamente las bases temporales de todos los subsistemas. La física interna de la nave usa tiempo propio; los procesos externos, el físicamente correspondiente; el tiempo biológico deriva del propio y del estado fisiológico. 07B-F no implementa TEMP-01. |
 | PT001-08 | 08-F2 implementado; validación dirigida completada | La hibernación normal de Textual permanece oscura durante el procesamiento; CLI guarda silencio tras limpiar la pantalla. El debug existente muestra progreso real. Los despertares ordinarios y las emergencias legítimas conservan su secuencia. Las excepciones y los bloqueos causales devueltos pausan el tiempo automático, muestran el avance real y omiten la narración de despertar; el evento final registrado comunica una detención técnica al consultarlo después. CLI puede guardar al salir. |
-| PT001-10 | Dirección de presentación aprobada; implementación pendiente | Explicar motivos específicos que impiden iniciar viaje, incluido engines apagado. Localizar EN/ES sin divulgar estado interno; concretar mensajes. |
+| PT001-10 | Implementado; validación dirigida completada | Diagnósticos específicos EN/ES para alimentación y salud de motores, velocidad objetivo, tránsito/acoplamiento, rutas conocidas/alcance, combustible y restricciones eléctricas o del sistema operativo. CLI, Textual y filas de rutas comparten el resultado de solo lectura. La admisión y el cobro siguen en Engine. |
 | PT001-11 | Diseño aprobado; implementación pendiente | `ACTIVE` durante aceleración y frenado; `STANDBY` durante crucero con reactivación anticipada; `OFFLINE` automático tras detenerse efectivamente en destino. Separar estado operativo, salud del sistema y causa de desconexión. La reactivación para una nueva partida, los consumos, el desgaste y los tiempos de arranque requieren concreción en NAV-BRAKE-01C. |
 
 La tabla distingue defectos observados de comportamiento futuro aprobado. No
-afirma que PT001-10 ni PT001-11 estén implementadas; PT001-06 solo tiene la
+afirma que PT001-11 esté implementada; PT001-06 solo tiene la
 protección de carga y prevención de 06A. Siguen vigentes los
 contratos causales, económicos, transaccionales y de conocimiento.
 

@@ -8,6 +8,20 @@
 
 # Discovery, navigation, and intel
 
+## PT001-10 departure diagnostics (implemented)
+
+CLI and Textual share a read-only departure diagnosis for `nav` previews.
+It explains known onboard blockers, acquired-route gaps, range, engine power
+and health, selected speed, antimatter, and electrical or core OS restrictions.
+`nav map routes` uses the same diagnosis for listed routes. Estimates stay
+visible when valid; the engine still decides whether a confirmed departure is
+accepted. The preview neither mutates state nor creates locations or spends
+fuel. An unacquired identifier receives the same unknown-destination message
+whether a physical node exists or not; route rows require acquired endpoints.
+Recovery suggestions appear only for conditions with a known action. Local
+travel keeps its existing zero-fuel and speed rules. See the
+[focused validation](../testing/pt001-10-review.md).
+
 ## Prologue completion — P4
 
 `MetaState.prologue_complete` starts as `False`. The shared arrival handling

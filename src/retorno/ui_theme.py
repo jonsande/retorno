@@ -343,7 +343,7 @@ def _line_spans(line: str) -> list[tuple[int, int, str]]:
         return [(0, len(line), "warn")]
     if line in {"Insufficient fuel", "Combustible insuficiente"}:
         return [(0, len(line), "warn")]
-    if line in {"Departure blocked", "Salida bloqueada", "Departure blocked: estimate unavailable", "Salida bloqueada: estimación no disponible"}:
+    if line.startswith(("Departure blocked:", "Salida bloqueada:")) or line in {"Departure blocked", "Salida bloqueada"}:
         return [(0, len(line), "error")]
     if line.endswith(":") and line.startswith((
         "Known routes from ", "Rutas conocidas desde ",

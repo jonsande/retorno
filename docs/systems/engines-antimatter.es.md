@@ -133,6 +133,13 @@ colores semánticos. `ui_theme.py` reconoce solo los formatos de esta vista;
 los estilos de otros comandos no cambian. Se verifica en
 `tests/test_nav_routes_presentation.py`.
 
+PT001-10 sustituye los avisos genéricos de salida en la vista previa y las
+filas de rutas por el mismo diagnóstico de solo lectura. Distingue motores
+apagados manualmente de averiados o indisponibles, y un objetivo fijo superior
+a la capacidad actual de la falta de combustible. No cambian las estimaciones
+válidas, la excepción local para la velocidad objetivo interestelar ni la
+admisión definitiva y el cobro exacto del motor.
+
 La salida aceptada pasa esa velocidad exacta al mismo cálculo de combustible
 que las estimaciones y cobra una vez antes del tránsito. Falta de combustible
 u objetivo inválido no cambia nave/mundo/rangos/RNG. Repeticiones, ticks y llegada

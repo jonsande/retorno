@@ -128,6 +128,12 @@ headings retain emphasis, metric labels stay plain and states retain semantic
 colors. `ui_theme.py` recognizes only this view's line formats; other command
 styles are unchanged. Verified in `tests/test_nav_routes_presentation.py`.
 
+PT001-10 replaces generic departure notices in the preview and route rows with
+the same read-only diagnosis. It distinguishes engines manually off from damaged
+or unavailable engines, and a fixed target above present capacity from missing
+fuel. Valid estimates, the local exception for interstellar target speed, and
+the engine's final admission and exact debit remain unchanged.
+
 Travel acceptance passes that exact speed to the same fuel calculation used by
 quotes and debits once before transit starts. Insufficient fuel or an invalid
 fixed target does not mutate ship/world/range/RNG state. Repeated requests, ticks

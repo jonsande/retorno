@@ -37,6 +37,10 @@ not a current implementation specification. Technical owners are indexed in
   with automatic time paused and actual progress shown, without wake narration.
   The recorded end event also presents a technical stop when consulted later. See the
   [presentation record](../testing/pt001-08-review.md).
+- **Implemented in PT001-10:** CLI and Textual now explain specific departure
+  blockers through the same pure public diagnosis; route rows use it too.
+  Hidden destinations remain indistinguishable from absent ones. See the
+  [focused validation](../testing/pt001-10-review.md).
 
 ## Open playtest issues and design directions
 
@@ -47,11 +51,11 @@ not a current implementation specification. Technical owners are indexed in
 | PT001-07 | Approved; definitive general validation complete | Variable charging load and reserve with a 25% SoC threshold, energy accounting, and causal cuts after effective electrical regulation. 677 tests and 169 subtests passed. |
 | TEMP-01 | Approved invariant; audit pending | Audit and progressively correct the time bases of all subsystems. Internal ship physics uses proper time; external processes use the physically appropriate time; biological time derives from proper time and physiological state. No TEMP-01 implementation is included in 07B-F. |
 | PT001-08 | 08-F2 implemented; focused validation complete | Normal Textual hibernation stays dark during processing; CLI remains silent after its cleared screen. Existing debug mode shows real progress. Ordinary and legitimate emergency wakes retain their sequence. Exceptions and returned causal blocks pause automatic time, show actual progress, and omit wake narration; the recorded end event reports a technical stop on later consultation. CLI can still save on exit. |
-| PT001-10 | Approved presentation direction; implementation pending | Give specific reasons why a journey cannot start, including engines being off. Localize EN/ES and avoid internal leaks; specify message mapping. |
+| PT001-10 | Implemented; focused validation complete | Specific EN/ES departure diagnostics cover engine power/health, target speed, transit/docking, route knowledge/range, fuel and electrical/core OS restrictions. CLI, Textual and route rows share the read-only result. Admission and debit remain in Engine. |
 | PT001-11 | Approved design; implementation pending | `ACTIVE` during acceleration and braking; `STANDBY` during cruise with early reactivation; automatic `OFFLINE` after the ship actually stops at its destination. Separate operational state, system health, and disconnection cause. Reactivation for a new departure, power use, wear, and startup times need definition in NAV-BRAKE-01C. |
 
 These rows distinguish observed defects from approved future behavior. None
-claims PT001-10 or PT001-11 is implemented; PT001-06 only has the 06A
+claims PT001-11 is implemented; PT001-06 only has the 06A
 load and prevention safeguards. Causal, economic,
 transactional and knowledge contracts remain in force.
 
