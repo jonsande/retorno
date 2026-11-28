@@ -152,3 +152,80 @@ Se leyeron código y especificaciones propietarias; no se ejecutaron pruebas,
 suite general ni benchmarks. El resultado definitivo de PT001-01/09-B
 aportado para este registro es **727 pruebas y 169 subpruebas superadas en
 461,08 s**; no es una ejecución de TEMP-01A.
+
+## Comprobación previa TEMP-01B: bloqueo causal de trabajos ordinarios
+
+**Estado: detenido antes de implementar.** El planificador compartido P/G
+solicitado no puede garantizar la finalización causal en todas las vías de
+avance sin una modificación más amplia del integrador ordinario. Se aplica
+la condición de parada explícita de TEMP-01B; esta intervención no cambió
+trabajos productivos, formato de partidas ni pruebas.
+
+[`Engine._tick_interval`](../../src/retorno/core/engine.py) adelanta los
+relojes G/P/B durante todo el intervalo solicitado, procesa una posible
+llegada legacy y llama una sola vez a `_process_jobs(state, dt)`. Este método
+recorre los trabajos en su orden histórico, resta todo el intervalo G de
+cada `eta_s` y resuelve los efectos al final.
+[`GameLoop.advance_interval`](../../src/retorno/runtime/loop.py) no corta
+un intervalo ordinario al terminar un trabajo (salvo si se pide detenerse
+en la llegada legacy). Por ejemplo, un trabajo de 2 s en un tick de 10 s
+en reposo termina y registra su efecto en G+10; diez ticks de 1 s pueden
+terminarlo en G+2. Una llegada intermedia cambia la localización y el orden
+de sus efectos respecto a los del trabajo. Cambiar solo el débito de ETA a
+P o la previsión en `job_limits` no resolvería la incoherencia.
+
+La vía física sí prepara un estado transaccional y selecciona límites
+causales, pero [`job_limits`](../../src/retorno/core/nav_boundaries.py) y
+[`select_next_boundary`](../../src/retorno/core/nav_coordinator.py) exigen
+límites de trabajo G; el segundo rechaza los P. Una solución completa debe
+subdividir también los intervalos ordinarios en las fronteras de trabajo y
+llegada, convertir cada ETA P restante a G sobre la trayectoria activa y
+confirmar relojes, efectos, riesgo, carga eléctrica y registros en su orden
+real. Debe preservar simultaneidad, orden de trabajos, avance parcial y
+rollback sin repetir mantenimiento, narrativa ni RNG. Esta ordenación
+transaccional excede el cambio acotado de dominio/conversión de TEMP-01B.
+Por eso no se introduce por separado el soporte de la vía física.
+La hibernación usa `advance_interval` y comparte el bloqueo. Todos los
+trabajos productivos de la versión actual siguen usando G.
+
+### Matriz de dominio propuesto de los 24 JobType
+
+`P` significa tiempo propio de la nave para trabajo físicamente a bordo.
+`L` significa tiempo local de un actor externo o del lugar de trabajo,
+**no necesariamente G de la nave**; todavía no existe un reloj L independiente.
+`P/L` exige fijar o seguir la localización de ejecución. Todos los tipos
+siguen implementados en G hasta una migración posterior. La matriz clasifica
+la *duración del trabajo*; la fecha registrada del evento sigue siendo G.
+
+| JobType | Dominio propuesto | Dependencia de localización, propietario o contexto / decisión pendiente |
+| --- | --- | --- |
+| `REPAIR_SYSTEM` | P/L | Operador dron y sistema de la nave; confirmar si el operador puede ser externo y qué reloj lo rige. |
+| `REPAIR_DRONE` | P/L | Operador y objetivo deben coincidir en localización; P a bordo y decisión sobre el actor externo en otro lugar. |
+| `SELFTEST_REPAIR` | P | Autocomprobación de un sistema de la nave; sin propietario externo. |
+| `BOOT_SERVICE` | P | Arranque de servicio de la nave; contexto a bordo. |
+| `DEPLOY_DRONE` | P | Comienza con el dron acoplado y usa duración de bahía; el destino puede ser sector de la nave o nodo exterior. |
+| `MOVE_DRONE` | P/L | Dron y destino pueden estar dentro de la nave o en un nodo; decidir al encolar y ante un traslado. |
+| `DOCK` | Decisión | Maniobra nave/nodo externo; elegir el marco físico de la duración antes de migrar. |
+| `UNDOCK` | Decisión | Maniobra nave/nodo externo; elegir el marco físico de la duración antes de migrar. |
+| `SALVAGE` | Decisión | El valor del enum no tiene encolado ni efecto productivo en el motor inspeccionado; definir su semántica primero. |
+| `INSTALL_MODULE` | P | Instalación de módulo de la nave; trabajo a bordo. |
+| `UNINSTALL_MODULE` | P | Retirada de módulo de la nave; trabajo a bordo. |
+| `DRONE_INSTALL_MODULE` | P/L | Operador dron, localización y objetivo determinan trabajo interior o exterior. |
+| `DRONE_UNINSTALL_MODULE` | P/L | Operador dron, localización y objetivo determinan trabajo interior o exterior. |
+| `REBOOT_DRONE` | P/L | El dron averiado puede estar en bahía o fuera; decidir entre reloj de bahía y del dron. |
+| `SALVAGE_SCRAP` | L | Dron en nodo exterior; falta definir el reloj del actor/lugar. |
+| `SALVAGE_MODULE` | L | Dron en nodo exterior; falta definir el reloj del actor/lugar. |
+| `SALVAGE_DATA` | L | Dron en nodo exterior; falta definir el reloj del actor/lugar. |
+| `SURVEY_DRONE` | L | Dron y nodo exterior; decidir reloj del actor o del lugar. |
+| `SALVAGE_DRONE` | L | Dron y nodo exterior; decidir reloj del actor o del lugar. |
+| `ROUTE_SOLVE` | P | Cálculo del ordenador de la nave; servicio a bordo. |
+| `SCAN` | P | Trabajo de sensores de la nave; servicio a bordo. |
+| `RECALL_DRONE` | P/L | Retorno exterior y recogida en bahía; decidir si dividir fases o usar reloj de actor/lugar. |
+| `CARGO_AUDIT` | P | Cómputo del manifiesto; servicio a bordo. |
+| `RECOVER_AUTH` | P | Recuperación de autorización del SO; servicio a bordo. |
+
+Antes de reintentar TEMP-01B hay que aprobar por separado el alcance de
+subdivisión y transacción del integrador ordinario. Una prueba mínima debería
+demostrar igual instante de finalización y efecto único para 10×1 s y 1×10 s
+en reposo; después, llegada legacy, cambios de fase y trabajos P en tránsito
+físico. Ese prerrequisito no incluye relojes externos ni migraciones productivas.

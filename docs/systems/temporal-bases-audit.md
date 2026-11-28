@@ -147,3 +147,78 @@ phases; valid saves produced by the resulting current version must reload.
 Code and owning specifications were read; no tests, general suite or benchmark
 were run. The definitive PT001-01/09-B suite result supplied for this record is
 **727 tests and 169 subtests passed in 461.08 s**; it is not a TEMP-01A run.
+
+## TEMP-01B preflight: ordinary-job causal blocker
+
+**Status: blocked before implementation.** The requested shared P/G job scheduler
+cannot guarantee causal completion across all active routes without a broader
+ordinary-integrator change. This is the explicit stop condition of TEMP-01B;
+no production job, save format, or test was changed in this intervention.
+
+[`Engine._tick_interval`](../../src/retorno/core/engine.py) advances G/P/B
+clocks for the entire requested interval, performs any legacy arrival, then
+calls `_process_jobs(state, dt)` once. That routine visits jobs in historical
+order, subtracts the whole G interval from each `eta_s`, and resolves effects
+only at the end. [`GameLoop.advance_interval`](../../src/retorno/runtime/loop.py)
+does not cut an ordinary interval at job completion (except when explicitly
+stopping at legacy arrival). For example, a running 2 s job in a 10 s rest
+tick completes and records its effect at G+10; ten 1 s ticks can complete it
+at G+2. An arrival between those instants changes the location and the order
+of arrival/job effects. Changing only the ETA debit to P, or forecasting its
+boundary in `job_limits`, would leave this inconsistency intact.
+
+The physical path does stage state and select causal limits, but
+[`job_limits`](../../src/retorno/core/nav_boundaries.py) and
+[`select_next_boundary`](../../src/retorno/core/nav_coordinator.py) currently
+require G job limits; the latter rejects a P job limit. A complete change
+would need to slice ordinary intervals at eligible job and arrival limits,
+convert each remaining P ETA to G along the active motion, then commit the
+corresponding clocks, effects, risk, electrical load, and records in their
+actual order. It must preserve simultaneous-limit resolution, job order,
+partial progress and rollback without replaying maintenance, lore, or RNG.
+That integration and transactional ordering exceeds the bounded TEMP-01B
+domain-field/conversion change. The physical-only portion is therefore not
+introduced in isolation. Hibernation uses `advance_interval`, so it shares
+the blocker. In the current version, all productive jobs still use G.
+
+### Proposed domain matrix for all 24 JobType values
+
+`P` means ship proper time for work physically aboard. `L` means the local
+time of an external actor or work site, **not automatically ship G**; no
+independent L clock exists yet. `P/L` requires the execution location to be
+fixed or tracked. All rows remain implemented as G until a later migration.
+The matrix classifies the *work duration*; event timestamps remain G.
+
+| JobType | Proposed domain | Location, owner, or execution-context dependency / pending decision |
+| --- | --- | --- |
+| `REPAIR_SYSTEM` | P/L | Drone operator and ship-system target; confirm whether an external operator is possible and which clock governs it. |
+| `REPAIR_DRONE` | P/L | Drone operator and target must be colocated; use P aboard, decide external actor clock elsewhere. |
+| `SELFTEST_REPAIR` | P | Ship system self-test; no external owner. |
+| `BOOT_SERVICE` | P | Ship service startup; ship context. |
+| `DEPLOY_DRONE` | P | Starts with a docked drone and uses bay timing; destination may be a ship sector or external node. |
+| `MOVE_DRONE` | P/L | Drone and destination may be inside the ship or at a world node; decide at enqueue and on relocation. |
+| `DOCK` | Decision | Ship/external-node manoeuvre; choose the physical duration frame before migration. |
+| `UNDOCK` | Decision | Ship/external-node manoeuvre; choose the physical duration frame before migration. |
+| `SALVAGE` | Decision | Enum value has no productive enqueue/effect in the inspected engine; define semantics before assigning a clock. |
+| `INSTALL_MODULE` | P | Ship module installation; onboard work context. |
+| `UNINSTALL_MODULE` | P | Ship module removal; onboard work context. |
+| `DRONE_INSTALL_MODULE` | P/L | Drone operator/location and module target determine onboard versus external work. |
+| `DRONE_UNINSTALL_MODULE` | P/L | Drone operator/location and module target determine onboard versus external work. |
+| `REBOOT_DRONE` | P/L | Disabled drone may be in bay or outside; bay equipment and drone owner clocks need a decision. |
+| `SALVAGE_SCRAP` | L | Drone at a world node; external actor/site clock needs definition. |
+| `SALVAGE_MODULE` | L | Drone at a world node; external actor/site clock needs definition. |
+| `SALVAGE_DATA` | L | Drone at a world node; external actor/site clock needs definition. |
+| `SURVEY_DRONE` | L | Drone and world node; decide actor versus site clock. |
+| `SALVAGE_DRONE` | L | Drone and world node; decide actor versus site clock. |
+| `ROUTE_SOLVE` | P | Ship computer work; onboard service context. |
+| `SCAN` | P | Ship sensor work; onboard service context. |
+| `RECALL_DRONE` | P/L | External return plus bay recovery; decide whether to split phases or use actor/site clock. |
+| `CARGO_AUDIT` | P | Ship manifest computation; onboard service context. |
+| `RECOVER_AUTH` | P | Ship OS authorization recovery; onboard service context. |
+
+Before retrying TEMP-01B, approve the ordinary-integrator slicing and
+transactional scope as a separate design step. A narrow acceptance probe
+should first show identical completion times and single effects for 10×1 s
+and 1×10 s at rest, then for legacy arrival, phase transitions and P jobs in
+physical transit. No external actor clocks or productive migrations belong
+to that prerequisite.
